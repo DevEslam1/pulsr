@@ -540,6 +540,19 @@ class NowPlayingWidget : AppWidgetProvider() {
                         }
                     }
 
+                    override fun onConnectionSuspended() {
+                        timeoutRunnable?.let { mainHandler.removeCallbacks(it) }
+                        synchronized(mediaBrowserLock) {
+                            if (cachedMediaBrowser === localBrowser) {
+                                try { cachedMediaBrowser?.disconnect() } catch (_: Throwable) {}
+                                cachedMediaBrowser = null
+                                cachedMediaController = null
+                            } else {
+                                try { localBrowser?.disconnect() } catch (_: Throwable) {}
+                            }
+                        }
+                    }
+
                     override fun onConnectionFailed() {
                         timeoutRunnable?.let { mainHandler.removeCallbacks(it) }
                         if (!actionExecuted.compareAndSet(false, true)) return

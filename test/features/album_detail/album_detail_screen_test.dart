@@ -288,4 +288,37 @@ void main() {
 
     expect(tester.widget<AnimatedOpacity>(titleFinder).opacity, 1.0);
   });
+
+  testWidgets(
+      'didUpdateWidget refreshes song stream and reloads sort on album change',
+      (tester) async {
+    const album2 = AlbumsTableData(
+      id: 2,
+      title: 'Second Album',
+      artist: 'Second Artist',
+      songCount: 1,
+    );
+
+    when(() => useCase.watchAlbumSongs(1))
+        .thenAnswer((_) => Stream.value(Right([_song(1, 'Alpha')])));
+    when(() => useCase.watchAlbumSongs(2))
+        .thenAnswer((_) => Stream.value(Right([_song(2, 'Gamma')])));
+
+    await tester.pumpWidget(
+      detailHarness(
+        child: AlbumDetailScreen(album: _album, getAlbumsUseCase: useCase),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Alpha'), findsOneWidget);
+
+    await tester.pumpWidget(
+      detailHarness(
+        child: AlbumDetailScreen(album: album2, getAlbumsUseCase: useCase),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Gamma'), findsOneWidget);
+    verify(() => useCase.watchAlbumSongs(2)).called(1);
+  });
 }

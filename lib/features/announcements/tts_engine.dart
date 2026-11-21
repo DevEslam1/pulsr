@@ -1,6 +1,8 @@
 // lib/features/announcements/tts_engine.dart
 
-import 'package:flutter/foundation.dart' show ValueNotifier;
+import 'dart:async';
+
+import 'package:flutter/foundation.dart' show ValueNotifier, visibleForTesting;
 import 'package:flutter/services.dart';
 
 import '../../core/utils/error_logger.dart';
@@ -95,6 +97,11 @@ class MethodChannelTtsEngine implements TtsEngine {
 
   final MethodChannel _channel;
   bool _available = false;
+  bool _disposed = false;
+
+  /// Whether [dispose] has been called on this engine.
+  @visibleForTesting
+  bool get isDisposed => _disposed;
 
   /// Voice id applied to the next [speak] call; empty keeps the system voice.
   String voiceId = '';
@@ -114,12 +121,19 @@ class MethodChannelTtsEngine implements TtsEngine {
 
   @override
   Future<bool> init() async {
+    if (_disposed) return false;
     try {
-      final ready = await _channel.invokeMethod<bool>('init') ?? false;
+      final ready = await _channel
+              .invokeMethod<bool>('init')
+              .timeout(const Duration(seconds: 5)) ??
+          false;
+      if (_disposed) return false;
       _setAvailable(ready);
       return ready;
     } on Exception catch (error, stackTrace) {
-      _handleFailure(error, stackTrace, 'init');
+      if (!_disposed) {
+        _handleFailure(error, stackTrace, 'init');
+      }
       return false;
     }
   }
@@ -130,7 +144,7 @@ class MethodChannelTtsEngine implements TtsEngine {
     double volume = 1.0,
     bool duckAudio = false,
   }) async {
-    if (!_available || text.isEmpty) return;
+    if (_disposed || !_available || text.isEmpty) return;
     final arguments = <String, Object?>{
       'text': text,
       'volume': volume.clamp(0.0, 1.0),
@@ -139,28 +153,38 @@ class MethodChannelTtsEngine implements TtsEngine {
     if (voiceId.isNotEmpty) arguments['voiceId'] = voiceId;
     if (localeId.isNotEmpty) arguments['localeId'] = localeId;
     try {
-      await _channel.invokeMethod<void>('speak', arguments);
+      await _channel
+          .invokeMethod<void>('speak', arguments)
+          .timeout(const Duration(seconds: 15));
     } on Exception catch (error, stackTrace) {
-      _handleFailure(error, stackTrace, 'speak');
+      if (!_disposed) {
+        _handleFailure(error, stackTrace, 'speak');
+      }
     }
   }
 
   @override
   Future<void> stop() async {
-    if (!_available) return;
+    if (_disposed || !_available) return;
     try {
-      await _channel.invokeMethod<void>('stop');
+      await _channel
+          .invokeMethod<void>('stop')
+          .timeout(const Duration(seconds: 5));
     } on Exception catch (error, stackTrace) {
-      _handleFailure(error, stackTrace, 'stop');
+      if (!_disposed) {
+        _handleFailure(error, stackTrace, 'stop');
+      }
     }
   }
 
   @override
   Future<List<TtsVoice>> voices() async {
-    if (!_available) return const <TtsVoice>[];
+    if (_disposed || !_available) return const <TtsVoice>[];
     try {
-      final raw = await _channel.invokeListMethod<dynamic>('voices');
-      if (raw == null) return const <TtsVoice>[];
+      final raw = await _channel
+          .invokeListMethod<dynamic>('voices')
+          .timeout(const Duration(seconds: 5));
+      if (raw == null || _disposed) return const <TtsVoice>[];
       final voices = <TtsVoice>[];
       for (final entry in raw) {
         if (entry is! Map) continue;
@@ -175,7 +199,9 @@ class MethodChannelTtsEngine implements TtsEngine {
       }
       return voices;
     } on Exception catch (error, stackTrace) {
-      _handleFailure(error, stackTrace, 'voices');
+      if (!_disposed) {
+        _handleFailure(error, stackTrace, 'voices');
+      }
       return const <TtsVoice>[];
     }
   }
@@ -185,30 +211,46 @@ class MethodChannelTtsEngine implements TtsEngine {
   /// Not part of [TtsEngine]: it exists so a settings surface can show live
   /// speech state without widening the interface every fake must implement.
   Future<bool> isSpeaking() async {
-    if (!_available) return false;
+    if (_disposed || !_available) return false;
     try {
-      return await _channel.invokeMethod<bool>('isSpeaking') ?? false;
+      return await _channel
+              .invokeMethod<bool>('isSpeaking')
+              .timeout(const Duration(seconds: 5)) ??
+          false;
     } on Exception catch (error, stackTrace) {
-      _handleFailure(error, stackTrace, 'isSpeaking');
+      if (!_disposed) {
+        _handleFailure(error, stackTrace, 'isSpeaking');
+      }
       return false;
     }
   }
 
   @override
   Future<void> dispose() async {
-    if (_available) {
+    if (_disposed) return;
+    final wasAvailable = _available;
+    _disposed = true;
+    _available = false;
+    if (wasAvailable) {
       try {
-        await _channel.invokeMethod<void>('stop');
+        await _channel
+            .invokeMethod<void>('stop')
+            .timeout(const Duration(seconds: 5));
       } on Exception catch (error, stackTrace) {
-        _handleFailure(error, stackTrace, 'dispose');
+        ErrorLogger.log(
+          'TTS dispose stop failed',
+          error: error,
+          stackTrace: stackTrace,
+          category: 'TtsEngine',
+        );
       }
     }
-    _setAvailable(false);
     availability.dispose();
   }
 
   /// Updates [isAvailable] and notifies listeners on a real change only.
   void _setAvailable(bool value) {
+    if (_disposed) return;
     if (_available == value) return;
     _available = value;
     availability.value = value;
@@ -217,10 +259,13 @@ class MethodChannelTtsEngine implements TtsEngine {
   void _handleFailure(Object error, StackTrace stackTrace, String action) {
     _setAvailable(false);
     final isMissingPlugin = error is MissingPluginException;
+    final isTimeout = error is TimeoutException;
     ErrorLogger.log(
       isMissingPlugin
           ? 'TTS channel $channelName has no native handler ($action)'
-          : 'TTS $action failed',
+          : isTimeout
+              ? 'TTS $action timed out'
+              : 'TTS $action failed',
       error: error,
       stackTrace: stackTrace,
       category: 'TtsEngine',

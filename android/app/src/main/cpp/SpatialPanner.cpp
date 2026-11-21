@@ -17,7 +17,7 @@ void SpatialPanner::setSampleRate(double sampleRate) {
 }
 
 void SpatialPanner::setBalance(double balance) {
-    targetBalance_ = std::clamp(balance, -1.0, 1.0);
+    targetBalance_ = std::clamp(std::isfinite(balance) ? balance : 0.0, -1.0, 1.0);
 }
 
 void SpatialPanner::setMono(bool mono) {
@@ -25,7 +25,7 @@ void SpatialPanner::setMono(bool mono) {
 }
 
 void SpatialPanner::applyParams(const PannerParamSet& params) {
-    targetBalance_ = std::clamp(params.balance, -1.0, 1.0);
+    targetBalance_ = std::clamp(std::isfinite(params.balance) ? params.balance : 0.0, -1.0, 1.0);
     mono_ = params.monoMix;
 }
 

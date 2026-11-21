@@ -60,13 +60,18 @@ class _RemasterControlCardState extends State<RemasterControlCard> {
       _loaded = true;
     });
 
-    try {
-      await AudioEffectsChannel().setOversampleMultiplier(_multiplier);
-      await AudioEffectsChannel().setOversampleKernel(_kernel);
-      await AudioEffectsChannel().setPcmToDsdEnabled(_pcmToDsdEnabled);
-      await AudioEffectsChannel().setPcmToDsdRate(_pcmToDsdRate);
-      await AudioEffectsChannel().setPcmToDsdOrder(_pcmToDsdOrder);
-    } catch (_) {}
+    if (widget.blockedReason == null && widget.nativeAvailable) {
+      try {
+        await AudioEffectsChannel().setOversampleMultiplier(_multiplier);
+        await AudioEffectsChannel().setOversampleKernel(_kernel);
+        await AudioEffectsChannel().setPcmToDsdEnabled(_pcmToDsdEnabled);
+        await AudioEffectsChannel().setPcmToDsdRate(_pcmToDsdRate);
+        await AudioEffectsChannel().setPcmToDsdOrder(_pcmToDsdOrder);
+      } catch (e, st) {
+        ErrorLogger.log('Failed to restore native remaster settings',
+            error: e, stackTrace: st, category: 'Remaster');
+      }
+    }
   }
 
   Future<void> _selectMultiplier(int multiplier) async {
@@ -85,6 +90,7 @@ class _RemasterControlCardState extends State<RemasterControlCard> {
       return;
     }
     final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
     await prefs.setInt(PrefsKeys.remasterOversampleMultiplier, multiplier);
     if (getIt.isRegistered<SettingsCubit>()) {
       // Force: the target may be unchanged (e.g. 2x -> 2x after a refused DAC
@@ -106,6 +112,7 @@ class _RemasterControlCardState extends State<RemasterControlCard> {
       return;
     }
     final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
     await prefs.setInt(PrefsKeys.remasterFilterKernel, kernel);
     if (_multiplier > 1 && getIt.isRegistered<SettingsCubit>()) {
       // Kernel coefficients are rebuilt by the control thread when the sink
@@ -127,6 +134,7 @@ class _RemasterControlCardState extends State<RemasterControlCard> {
       return;
     }
     final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
     await prefs.setBool(PrefsKeys.remasterPcmToDsdEnabled, enabled);
   }
 
@@ -143,6 +151,7 @@ class _RemasterControlCardState extends State<RemasterControlCard> {
       return;
     }
     final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
     await prefs.setInt(PrefsKeys.remasterPcmToDsdRate, rate);
   }
 
@@ -159,6 +168,7 @@ class _RemasterControlCardState extends State<RemasterControlCard> {
       return;
     }
     final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
     await prefs.setInt(PrefsKeys.remasterPcmToDsdOrder, order);
   }
 

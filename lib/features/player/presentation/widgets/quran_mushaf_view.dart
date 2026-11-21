@@ -23,6 +23,7 @@ import '../../../../core/utils/pulsr_haptics.dart';
 class QuranMushafView extends StatefulWidget {
   final QuranMetadata? metadata;
   final Duration currentPosition;
+  final int? activeAyah;
   final ValueChanged<Duration>? onSeek;
   final ValueChanged<int>? onSelectSurah;
   final bool isExpanded;
@@ -30,7 +31,8 @@ class QuranMushafView extends StatefulWidget {
   const QuranMushafView({
     super.key,
     this.metadata,
-    required this.currentPosition,
+    this.currentPosition = Duration.zero,
+    this.activeAyah,
     this.onSeek,
     this.onSelectSurah,
     this.isExpanded = false,
@@ -74,20 +76,59 @@ class _QuranMushafViewState extends State<QuranMushafView> {
     if (_scrollController.hasClients) _scrollController.jumpTo(0);
   }
 
-  void _scrollToActiveAyah(int ayah) {
+  double _estimateOffsetForAyah(List<QuranAyahText> ayahs, int ayahNumber) {
+    double offset = 0.0;
+    for (var i = 0; i < ayahs.length && ayahs[i].ayahNumber < ayahNumber; i++) {
+      final a = ayahs[i];
+      // Arabic text wrapped at ~28 chars per line, line height 36 (20 * 1.8)
+      final arabicLines = (a.textArabic.length / 28.0).ceil().clamp(1, 40);
+      final englishLines = a.textEnglish.isNotEmpty
+          ? (a.textEnglish.length / 45.0).ceil().clamp(1, 40)
+          : 0;
+      offset += 56.0 + (arabicLines * 36.0) + (englishLines * 18.0);
+    }
+    return offset;
+  }
+
+  void _scrollToActiveAyah(int ayah, [List<QuranAyahText>? ayahs]) {
     if (_lastActiveAyah == ayah) return;
     _lastActiveAyah = ayah;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !_scrollController.hasClients) return;
       final target = _ayahKeys[ayah]?.currentContext;
-      if (target == null) return;
-      _scrollController.position.ensureVisible(
-        target.findRenderObject()!,
-        alignment: 0.15,
-        duration: context.motionMs(260),
-        curve: Curves.easeOutCubic,
-      );
+      if (target != null) {
+        _scrollController.position.ensureVisible(
+          target.findRenderObject()!,
+          alignment: 0.15,
+          duration: context.motionMs(260),
+          curve: Curves.easeOutCubic,
+        );
+        return;
+      }
+
+      // If the target ayah widget is virtualized/offscreen, jump towards estimated offset
+      // so ListView.builder realizes it, then ensure visible in next frame.
+      final estimatedOffset = ayahs != null
+          ? _estimateOffsetForAyah(ayahs, ayah)
+          : (ayah - 1) * 140.0;
+      final maxExtent = _scrollController.position.maxScrollExtent;
+      final targetOffset =
+          maxExtent > 0 ? estimatedOffset.clamp(0.0, maxExtent) : estimatedOffset;
+      _scrollController.jumpTo(targetOffset);
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_scrollController.hasClients) return;
+        final lateTarget = _ayahKeys[ayah]?.currentContext;
+        if (lateTarget != null) {
+          _scrollController.position.ensureVisible(
+            lateTarget.findRenderObject()!,
+            alignment: 0.15,
+            duration: context.motionMs(260),
+            curve: Curves.easeOutCubic,
+          );
+        }
+      });
     });
   }
 
@@ -167,11 +208,12 @@ class _QuranMushafViewState extends State<QuranMushafView> {
             : null;
     final surah = _repo.getSurah(surahNumber) ?? QuranSurah.byNumber(1)!;
     final ayahs = _repo.getAyahsForSurah(surahNumber);
-    final activeAyah = meta != null && meta.ayahTimings.isNotEmpty
-        ? meta.ayahAt(widget.currentPosition)
-        : null;
+    final activeAyah = widget.activeAyah ??
+        (meta != null && meta.ayahTimings.isNotEmpty
+            ? meta.ayahAt(widget.currentPosition)
+            : null);
 
-    if (activeAyah != null) _scrollToActiveAyah(activeAyah);
+    if (activeAyah != null) _scrollToActiveAyah(activeAyah, ayahs);
 
     final isInSplit = widget.isExpanded || PlayerSplitViewScope.of(context);
 
@@ -284,12 +326,15 @@ class _QuranMushafViewState extends State<QuranMushafView> {
           const SizedBox(height: AppSpacing.s12),
 
           // Basmalah (except for Surah At-Tawbah 9)
-          if (surahNumber != 1 && surahNumber != 9 && ayahs.isNotEmpty) ...[
+          if (surahNumber != 1 &&
+              surahNumber != 9 &&
+              ayahs.isNotEmpty &&
+              quranUthmaniText[1]?.firstOrNull != null) ...[
             Center(
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
                 child: Text(
-                  quranUthmaniText[1]!.first,
+                  quranUthmaniText[1]!.firstOrNull!,
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: AppFontSize.title,
@@ -331,11 +376,12 @@ class _QuranMushafViewState extends State<QuranMushafView> {
     int? activeAyah,
     QuranMetadata? meta,
   ) {
-    return SingleChildScrollView(
+    return ListView.builder(
       controller: _scrollController,
       physics: const BouncingScrollPhysics(),
-      child: Column(
-        children: List.generate(ayahs.length, (idx) {
+      scrollCacheExtent: const ScrollCacheExtent.pixels(800.0),
+      itemCount: ayahs.length,
+      itemBuilder: (context, idx) {
           final ayah = ayahs[idx];
           final isCurrent = ayah.ayahNumber == activeAyah;
           final isRevealed = _revealedAyahs.contains(ayah.ayahNumber);
@@ -451,8 +497,7 @@ class _QuranMushafViewState extends State<QuranMushafView> {
               ),
             ),
           );
-        }),
-      ),
-    );
+        },
+      );
   }
 }

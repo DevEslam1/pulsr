@@ -3,80 +3,95 @@ part of 'player_dsp_controller.dart';
 
 extension PlayerDspProfilesExtension on PlayerDspController {
   Future<void> onOutputDeviceChanged(AudioOutputInfo device) async {
-    if (_isClosed()) return;
-    final song = _getState().currentSong;
-    if (song != null) {
-      // AUDIT-FIX (P0-6): guard fire-and-forget follow-rate call on device switch.
-      unawaited(maybeFollowTrackSampleRate(song)
-          .catchError((Object e, StackTrace st) {
-        ErrorLogger.log('Follow-track sample rate on device change failed',
-            error: e, stackTrace: st, category: 'PlayerDspController');
-      }));
-    }
-    // Route-aware DSP that must track EVERY device/codec change, independent of
-    // the device-profile auto-switch services below (fix #1 crossfeed gating +
-    // fix #2 codec-aware music compensation). Runs before the dedup/early
-    // returns so a codec switch on the same device still re-gates.
-    await reevaluateCrossfeedForRoute(device);
-    if (_isClosed()) return;
-    await applyCodecAwareMusicCompensation();
-    final service = _deviceProfileService;
-    final profilesService = _settingsProfilesService;
-    if (service == null || profilesService == null || _isClosed()) return;
-    try {
-      final key = DeviceProfileService.deviceKeyFromInfo(device);
-      await service.rememberDevice(key, device.deviceName);
-      if (_lastAutoAppliedDeviceKey == key) return;
-      _lastAutoAppliedDeviceKey = null;
-
-      if (_getState().isQuranModeEnabled) {
-        // Quran Mode has an active recitation DSP chain tailored to voice.
-        // Prevent generic music device profiles or AutoEQ from overwriting it.
-        return;
+    return _deviceChangeMutex.protect(() async {
+      if (_isClosed()) return;
+      final song = _getState().currentSong;
+      if (song != null) {
+        // AUDIT-FIX (P0-6): guard fire-and-forget follow-rate call on device switch.
+        unawaited(maybeFollowTrackSampleRate(song)
+            .catchError((Object e, StackTrace st) {
+          ErrorLogger.log('Follow-track sample rate on device change failed',
+              error: e, stackTrace: st, category: 'PlayerDspController');
+        }));
       }
+      // Route-aware DSP that must track EVERY device/codec change, independent of
+      // the device-profile auto-switch services below (fix #1 crossfeed gating +
+      // fix #2 codec-aware music compensation). Runs before the dedup/early
+      // returns so a codec switch on the same device still re-gates.
+      await reevaluateCrossfeedForRoute(device);
+      if (_isClosed()) return;
+      await applyCodecAwareMusicCompensation();
+      if (_isClosed()) return;
+      final service = _deviceProfileService;
+      final profilesService = _settingsProfilesService;
+      if (service == null || profilesService == null || _isClosed()) return;
+      try {
+        final key = DeviceProfileService.deviceKeyFromInfo(device);
+        await service.rememberDevice(key, device.deviceName);
+        if (_isClosed()) return;
+        if (_lastAutoAppliedDeviceKey == key) return;
+        _lastAutoAppliedDeviceKey = null;
 
-      final smart = _smartAudioService;
-      final smartEnabled = smart != null && await smart.isEnabled();
+        if (_getState().isQuranModeEnabled) {
+          // Quran Mode has an active recitation DSP chain tailored to voice.
+          // Prevent generic music device profiles or AutoEQ from overwriting it.
+          return;
+        }
 
-      if (await service.isAutoSwitchEnabled()) {
-        final link = await service.linkForDeviceKey(key);
-        if (link != null) {
-          final profiles = await profilesService.getProfiles();
-          SettingsProfile? profile;
-          for (final p in profiles) {
-            if (p.id == link.profileId) {
-              profile = p;
-              break;
+        final smart = _smartAudioService;
+        final smartEnabled = smart != null && await smart.isEnabled();
+        if (_isClosed()) return;
+
+        if (await service.isAutoSwitchEnabled()) {
+          if (_isClosed()) return;
+          final link = await service.linkForDeviceKey(key);
+          if (_isClosed()) return;
+          if (link != null) {
+            final profiles = await profilesService.getProfiles();
+            if (_isClosed()) return;
+            SettingsProfile? profile;
+            for (final p in profiles) {
+              if (p.id == link.profileId) {
+                profile = p;
+                break;
+              }
             }
-          }
-          if (profile != null) {
-            _lastAutoAppliedDeviceKey = key;
-            final applied = await applyProfile(profile);
-            if (!applied && !_isClosed()) {
-              _lastAutoAppliedDeviceKey = null;
+            if (profile != null) {
+              _lastAutoAppliedDeviceKey = key;
+              final applied = await applyProfile(profile);
+              if (_isClosed()) return;
+              if (!applied) {
+                _lastAutoAppliedDeviceKey = null;
+              }
+              if (smartEnabled) {
+                await _applySmartQuality(device, profile.headphoneProfileId);
+                if (_isClosed()) return;
+              }
+              return;
             }
-            if (smartEnabled) {
-              await _applySmartQuality(device, profile.headphoneProfileId);
-            }
-            return;
           }
         }
-      }
 
-      // Auto-select DAC and engage Bit-Perfect (highest quality path)
-      _lastAutoAppliedDeviceKey = key;
-      if (await _shouldAutoSelectDac(device)) {
-        await _handleDacAutoRouting(device);
-      }
+        if (_isClosed()) return;
+        // Auto-select DAC and engage Bit-Perfect (highest quality path)
+        _lastAutoAppliedDeviceKey = key;
+        if (await _shouldAutoSelectDac(device)) {
+          if (_isClosed()) return;
+          await _handleDacAutoRouting(device);
+          if (_isClosed()) return;
+        }
 
-      if (smartEnabled) {
-        final matched = await _applySmartAutoEq(smart, key, device);
-        await _applySmartQuality(device, matched?.id);
+        if (smartEnabled) {
+          final matched = await _applySmartAutoEq(smart, key, device);
+          if (_isClosed()) return;
+          await _applySmartQuality(device, matched?.id);
+          if (_isClosed()) return;
+        }
+      } catch (e, st) {
+        ErrorLogger.log('Device profile auto-switch failed',
+            error: e, stackTrace: st, category: 'PlayerDspController');
       }
-    } catch (e, st) {
-      ErrorLogger.log('Device profile auto-switch failed',
-          error: e, stackTrace: st, category: 'PlayerDspController');
-    }
+    });
   }
 
   Future<bool> _shouldAutoSelectDac(AudioOutputInfo device) async {
@@ -264,6 +279,7 @@ extension PlayerDspProfilesExtension on PlayerDspController {
         } else {
           await setCrossfeed(false);
         }
+        await setHrtfBinaural(false);
         bool okHp = true;
         if (profile.headphoneProfileId != null) {
           final repo = _headphoneProfilesRepo;
@@ -418,6 +434,15 @@ extension PlayerDspProfilesExtension on PlayerDspController {
             delayUs: dsp.crossfeedDelayUs,
             feedDb: dsp.crossfeedFeedDb,
             mode: dsp.crossfeedMode)
+      ),
+      (
+        'hrtfBinaural',
+        () => _audioHandler.setHrtfBinaural(
+              dsp.isHrtfEnabled,
+              azimuth: dsp.hrtfAzimuth,
+              elevation: dsp.hrtfElevation,
+              sofaPath: dsp.hrtfSofaPath,
+            )
       ),
       (
         'stereoBalance',

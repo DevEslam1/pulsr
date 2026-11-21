@@ -11,7 +11,9 @@ import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/theme/aura_theme.dart';
 import 'package:pulsr/core/widgets/pulsr_search_field.dart';
+import 'package:pulsr/features/audio_profiles/audio_profiles_screen.dart';
 import 'package:pulsr/features/command_palette/presentation/command_palette_sheet.dart';
+import 'package:pulsr/features/diagnostics/diagnostics_screen.dart';
 import 'package:pulsr/features/player/cubit/player_cubit.dart';
 import 'package:pulsr/features/player/cubit/player_state.dart';
 import 'package:pulsr/features/player/presentation/widgets/equalizer_sheet.dart';
@@ -123,5 +125,42 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.byType(CommandPaletteSheet), findsNothing);
     expect(find.byType(EqualizerSheet), findsOneWidget);
+  });
+
+  testWidgets('Diagnostics item pushes DiagnosticsScreen directly',
+      (tester) async {
+    await openPalette(tester);
+    await search(tester, 'diagnostics');
+
+    final finder = find.text('Diagnostics');
+    await tester.tap(finder);
+    // Frame 1: handles tap, pops sheet, registers postFrameCallback
+    await tester.pump();
+    // Frame 2: runs postFrameCallback, calls Navigator.push
+    await tester.pump();
+    // Frame 3: builds pushed route
+    await tester.pump(const Duration(milliseconds: 350));
+
+    expect(tester.takeException(), isNull);
+    expect(find.byType(CommandPaletteSheet), findsNothing);
+    expect(find.byType(DiagnosticsScreen), findsOneWidget);
+  });
+
+  testWidgets('Audio Profiles item pushes AudioProfilesScreen directly',
+      (tester) async {
+    await openPalette(tester);
+    await search(tester, 'audio profiles');
+
+    await tester.tap(find.text('Audio Profiles'));
+    // Frame 1: handles tap, pops sheet, registers postFrameCallback
+    await tester.pump();
+    // Frame 2: runs postFrameCallback, calls Navigator.push
+    await tester.pump();
+    // Frame 3: builds pushed route
+    await tester.pump(const Duration(milliseconds: 350));
+
+    expect(tester.takeException(), isNull);
+    expect(find.byType(CommandPaletteSheet), findsNothing);
+    expect(find.byType(AudioProfilesScreen), findsOneWidget);
   });
 }

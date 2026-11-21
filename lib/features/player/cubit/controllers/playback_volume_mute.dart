@@ -95,7 +95,8 @@ class PlaybackVolumeMute {
           // control instead of slamming software volume to zero. The app
           // slider keeps its value; the DAC display shows the real mute.
           if (_audioHandler.usbHardwareVolumeOwned) {
-            final target = !_muted;
+            final currentlyMuted = _audioHandler.usbHardwareMute ?? _muted;
+            final target = !currentlyMuted;
             if (await _audioHandler.setUsbHardwareMute(target)) {
               _muted = target;
               final s = _getState();

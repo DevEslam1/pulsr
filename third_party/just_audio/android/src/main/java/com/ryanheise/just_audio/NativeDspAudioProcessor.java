@@ -821,6 +821,7 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
 
     @Override
     protected void onReset() {
+        sampleRate = 0;
         directUsbBackpressured = false;
         transitionMuted = false;
         transitionGain = 1.0f;

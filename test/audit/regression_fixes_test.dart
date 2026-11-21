@@ -4,11 +4,11 @@ import 'dart:typed_data';
 
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pulsr/data/audio/dsd_decoder_helper.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:pulsr/core/services/duplicate_finder_service.dart';
 import 'package:pulsr/data/audio/format_aware_decoder.dart';
 import 'package:pulsr/data/db/app_database.dart';
-import 'package:pulsr/domain/models/audio_quality_info.dart';
 import 'package:pulsr/data/services/room_correction_service.dart';
 
 SongsTableData _song({
@@ -42,7 +42,7 @@ void main() {
   group('DoP transport flag reset (HIGH)', () {
     test('decodeForFormat clears a stale dsdDopActive flag', () async {
       // Simulate the previous track having used DoP.
-      AudioQualityInfo.dsdDopActive = true;
+      DsdDecoderHelper.dsdDopActive = true;
 
       final decoder = FormatAwareDecoder(
         resolveYtmStream: (song, tag) async =>
@@ -58,7 +58,7 @@ void main() {
 
       await decoder.decodeForFormat(
           song, MediaItem(id: '1', title: 'Plain MP3'));
-      expect(AudioQualityInfo.dsdDopActive, isFalse,
+      expect(DsdDecoderHelper.dsdDopActive, isFalse,
           reason: 'a non-DSD track must not inherit the previous DoP state');
     });
   });

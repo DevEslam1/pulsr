@@ -82,6 +82,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private var bassBoost: BassBoost? = null
 
     private val stateLock = Any()
+    private val reverbNativeLock = Any()
+    internal var autoDegradedStagesOverrideForTest: Int? = null
 
     @Volatile private var isVirtualizerEnabled = false
     @Volatile private var virtualizerStrength: Short = 0
@@ -154,6 +156,12 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     // getHrtfSofaLoadError so Dart can surface *why* the dataset was rejected
     // without changing the loadHrtfSofa bool contract.
     @Volatile private var hrtfSofaLastError: String? = null
+
+    @Volatile private var remasterOversampleMultiplier = 1
+    @Volatile private var remasterOversampleKernel = 0
+    @Volatile private var remasterPcmToDsdEnabled = false
+    @Volatile private var remasterPcmToDsdRate = 64
+    @Volatile private var remasterPcmToDsdOrder = 5
 
     @Volatile private var isLimiterEnabled = false
     @Volatile private var limiterLookaheadMs = 3.0
@@ -847,7 +855,6 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     @Volatile private var consecutiveHighRtfCount = 0
     @Volatile private var consecutiveLowRtfCount = 0
     @Volatile private var proactivelyDegradedStages = 0
-    private val proactiveDegradeLock = Any()
     private var rtfGovernorRunnable: Runnable? = null
     @Volatile private var isBypassCompareActive = false
     @Volatile private var bypassCompareGainCompensationDb = 0.0
@@ -925,7 +932,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
 
     private fun proactivelyDemoteCheapestHeavyStage() {
         if (!isNativeDspLoaded) return
-        synchronized(proactiveDegradeLock) {
+        synchronized(stateLock) {
             val currentDegraded = try { nativeGetAutoDegradedStages() } catch (_: Exception) { 0 }
             val candidateStages = intArrayOf(
                 STAGE_REVERB,
@@ -952,8 +959,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     }
 
     private fun proactivelyRecoverStage() {
-        if (!isNativeDspLoaded || proactivelyDegradedStages == 0) return
-        synchronized(proactiveDegradeLock) {
+        if (!isNativeDspLoaded) return
+        synchronized(stateLock) {
             if (proactivelyDegradedStages == 0) return
             val candidateStagesInReverse = intArrayOf(
                 STAGE_SATURATION,
@@ -986,27 +993,31 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             val pm = ctx.getSystemService(Context.POWER_SERVICE) as? PowerManager ?: return
             val listener = PowerManager.OnThermalStatusChangedListener { status ->
-                currentThermalStatus = status
-                if (isNativeDspLoaded) {
-                    try { nativeSetThermalLevel(status) } catch (_: Exception) {}
-                }
-                Log.w(TAG, "[ThermalGovernor] Thermal status changed to $status")
-                if (status >= PowerManager.THERMAL_STATUS_MODERATE) {
-                    proactivelyDemoteCheapestHeavyStage()
-                    if (status >= PowerManager.THERMAL_STATUS_SEVERE) {
-                        proactivelyDemoteCheapestHeavyStage()
+                synchronized(stateLock) {
+                    currentThermalStatus = status
+                    if (isNativeDspLoaded) {
+                        try { nativeSetThermalLevel(status) } catch (_: Exception) {}
                     }
-                } else if (status <= PowerManager.THERMAL_STATUS_LIGHT) {
-                    while (proactivelyDegradedStages != 0) {
-                        val before = proactivelyDegradedStages
-                        proactivelyRecoverStage()
-                        if (proactivelyDegradedStages == before) break
+                    Log.w(TAG, "[ThermalGovernor] Thermal status changed to $status")
+                    if (status >= PowerManager.THERMAL_STATUS_MODERATE) {
+                        proactivelyDemoteCheapestHeavyStage()
+                        if (status >= PowerManager.THERMAL_STATUS_SEVERE) {
+                            proactivelyDemoteCheapestHeavyStage()
+                        }
+                    } else if (status <= PowerManager.THERMAL_STATUS_LIGHT) {
+                        while (proactivelyDegradedStages != 0) {
+                            val before = proactivelyDegradedStages
+                            proactivelyRecoverStage()
+                            if (proactivelyDegradedStages == before) break
+                        }
                     }
                 }
             }
             try {
                 pm.addThermalStatusListener(listener)
-                thermalListener = listener
+                synchronized(stateLock) {
+                    thermalListener = listener
+                }
             } catch (e: Exception) {
                 Log.w(TAG, "Failed to add thermal status listener: ${e.message}")
             }
@@ -1015,12 +1026,15 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
 
     private fun unregisterThermalListener(ctx: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val listener = thermalListener as? PowerManager.OnThermalStatusChangedListener ?: return
+            val listener = synchronized(stateLock) {
+                val prev = thermalListener as? PowerManager.OnThermalStatusChangedListener
+                thermalListener = null
+                prev
+            } ?: return
             val pm = ctx.getSystemService(Context.POWER_SERVICE) as? PowerManager ?: return
             try {
                 pm.removeThermalStatusListener(listener)
             } catch (_: Exception) {}
-            thermalListener = null
         }
     }
 
@@ -1072,11 +1086,12 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
 
     private fun activeRemasterFactor(): Int {
         if (!isNativeDspLoaded) return 1
-        return try {
+        val live = try {
             nativeGetActiveOversampleMultiplier()
         } catch (_: Exception) {
             1
         }
+        return maxOf(live, remasterOversampleMultiplier)
     }
 
     /** Single source of truth for "is the DSP chain audible right now?". */
@@ -1085,7 +1100,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             return false
         }
         if (Integer.bitCount(activeDspStages) > 0) return true
-        return activeRemasterFactor() > 1 || isHrtfBinauralEnabled
+        return activeRemasterFactor() > 1 || remasterPcmToDsdEnabled || isHrtfBinauralEnabled
     }
 
     /**
@@ -1996,47 +2011,84 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         lastSystemVolumeRatio = computeSystemMusicVolumeRatio()
     }
 
-    private fun applyDvcRuntimeState(activate: Boolean) {
+    internal fun applyDvcRuntimeState(activate: Boolean): Boolean {
         val am = context?.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
         if (activate) {
-            if (!dvcEnabled || dvcActive) return
+            if (!dvcEnabled) return false
+            if (dvcActive) return true
+            if (am == null) {
+                dvcEnabled = false
+                dvcActive = false
+                return false
+            }
             // Capture the level the device is actually at and carry it into the
             // DSP gain. Pinning STREAM_MUSIC to max without transferring the
             // ratio is what made enabling DVC — and re-engaging it when leaving
             // Bit-Perfect — jump to full scale instead of the user's volume.
-            try {
-                if (am != null) {
-                    val max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-                    val current = am.getStreamVolume(AudioManager.STREAM_MUSIC)
-                    if (max > 0 && current >= 0) {
-                        dvcSavedSystemVolume = current
-                        dvcGain = (current.toDouble() / max.toDouble()).coerceIn(0.0, 1.0)
-                        context?.getSharedPreferences("pulsr_dvc_prefs", Context.MODE_PRIVATE)
-                            ?.edit()
-                            ?.putInt("dvc_saved_volume", current)
-                            ?.putBoolean("dvc_enabled", true)
-                            ?.apply()
-                    }
-                }
-            } catch (_: Throwable) {}
-            dvcActive = true
+            val max = try {
+                am.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+            } catch (_: Throwable) {
+                -1
+            }
+            if (max <= 0) {
+                dvcEnabled = false
+                dvcActive = false
+                return false
+            }
+            val current = try {
+                am.getStreamVolume(AudioManager.STREAM_MUSIC)
+            } catch (_: Throwable) {
+                -1
+            }
+            val previousSavedVolume = dvcSavedSystemVolume
+            val previousGain = dvcGain
+            if (current >= 0) {
+                dvcSavedSystemVolume = current
+                dvcGain = (current.toDouble() / max.toDouble()).coerceIn(0.0, 1.0)
+            }
             // Hearing-safety: fade down before moving the system stream to max.
             if (isNativeDspLoaded) {
                 try { nativeSetDirectVolumeParams(true, 0.0) } catch (_: Throwable) {}
             }
-            try {
-                if (am != null) {
-                    val max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-                    if (max > 0) {
-                        am.setStreamVolume(AudioManager.STREAM_MUSIC, max, 0)
-                    }
+            val volumePinned = try {
+                am.setStreamVolume(AudioManager.STREAM_MUSIC, max, 0)
+                true
+            } catch (e: Throwable) {
+                Log.w(TAG, "DVC failed to pin STREAM_MUSIC to max: ${e.message}")
+                false
+            }
+            if (!volumePinned) {
+                if (isNativeDspLoaded) {
+                    try { nativeSetDirectVolumeParams(false, 1.0) } catch (_: Throwable) {}
                 }
-            } catch (_: Throwable) {}
+                dvcSavedSystemVolume = previousSavedVolume
+                dvcGain = previousGain
+                dvcActive = false
+                dvcEnabled = false
+                try {
+                    context?.getSharedPreferences("pulsr_dvc_prefs", Context.MODE_PRIVATE)
+                        ?.edit()
+                        ?.clear()
+                        ?.apply()
+                } catch (_: Throwable) {}
+                return false
+            }
+            if (current >= 0) {
+                try {
+                    context?.getSharedPreferences("pulsr_dvc_prefs", Context.MODE_PRIVATE)
+                        ?.edit()
+                        ?.putInt("dvc_saved_volume", current)
+                        ?.putBoolean("dvc_enabled", true)
+                        ?.apply()
+                } catch (_: Throwable) {}
+            }
+            dvcActive = true
             if (isNativeDspLoaded) {
                 try { nativeSetDirectVolumeParams(true, dvcGain) } catch (_: Throwable) {}
             }
+            return true
         } else {
-            if (!dvcEnabled || !dvcActive) return
+            if (!dvcEnabled || !dvcActive) return false
             dvcActive = false
             if (isNativeDspLoaded) {
                 try { nativeSetDirectVolumeParams(true, 0.0) } catch (_: Throwable) {}
@@ -2049,6 +2101,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             if (isNativeDspLoaded) {
                 try { nativeSetDirectVolumeParams(false, 1.0) } catch (_: Throwable) {}
             }
+            return true
         }
     }
 
@@ -2335,10 +2388,12 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             nativeSetDitherParams(false, ditherTargetBitDepth, isBluetoothRoute)
         }
         safeCall(TAG, "nativeSetBypassCompare") { nativeSetBypassCompare(false, 0.0) }
+        safeCall(TAG, "nativeSetHrtfBinauralEnabled") { nativeSetHrtfBinauralEnabled(false) }
+        safeCall(TAG, "nativeSetOversampleMultiplier") { nativeSetOversampleMultiplier(1) }
+        safeCall(TAG, "nativeSetPcmToDsdEnabled") { nativeSetPcmToDsdEnabled(false) }
         safeCall(TAG, "nativeSetBitPerfectParams") { nativeSetBitPerfectParams(false, false) }
         safeCall(TAG, "nativeSetActiveStages") { nativeSetActiveStages(0) }
         safeCall(TAG, "nativeReset") { nativeReset() }
-        isHrtfBinauralEnabled = false
         try {
             com.ryanheise.just_audio.PulsrOutputRouting.setDspActive(false)
         } catch (_: Throwable) {}
@@ -2778,8 +2833,25 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         }
         safeCall(TAG, "restoreCrossfeed") {
             pushNativeCrossfeedMode(crossfeedMode)
-            pushNativeCrossfeedParams(crossfeedDelayUs, crossfeedFeedDb, crossfeedFcut)
-            pushNativeCrossfeedEnabled(isCrossfeedEnabled)
+            if (crossfeedMode == 3) {
+                pushNativeCrossfeedParams(crossfeedDelayUs, crossfeedFeedDb, crossfeedFcut)
+            }
+            pushNativeCrossfeedEnabled(isCrossfeedEnabled && !isHrtfBinauralEnabled)
+        }
+        safeCall(TAG, "restoreHrtf") {
+            hrtfSofaPath?.takeIf { it.isNotEmpty() }?.let { path ->
+                nativeLoadHrtfSofa(path)
+            }
+            pushNativeHrtfAzimuth(hrtfAzimuth)
+            pushNativeHrtfElevation(hrtfElevation)
+            pushNativeHrtfBinauralEnabled(isHrtfBinauralEnabled && !isCrossfeedEnabled)
+        }
+        safeCall(TAG, "restoreRemaster") {
+            nativeSetOversampleKernel(remasterOversampleKernel)
+            nativeSetOversampleMultiplier(remasterOversampleMultiplier)
+            nativeSetPcmToDsdOrder(remasterPcmToDsdOrder)
+            nativeSetPcmToDsdRate(remasterPcmToDsdRate)
+            nativeSetPcmToDsdEnabled(remasterPcmToDsdEnabled)
         }
         safeCall(TAG, "restoreLimiter") {
             pushNativeLimiterParams(
@@ -2792,9 +2864,11 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         val targetDamping = reverbDamping
         val targetCrossChannel = reverbCrossChannel
         safeReverbExecute {
-            safeCall(TAG, "restoreReverbPreset") { pushNativeReverbPreset(targetPreset) }
-            safeCall(TAG, "restoreReverbParams") {
-                pushNativeReverbSubParams(targetPredelay, targetDamping, targetCrossChannel)
+            synchronized(reverbNativeLock) {
+                safeCall(TAG, "restoreReverbPreset") { pushNativeReverbPreset(targetPreset) }
+                safeCall(TAG, "restoreReverbParams") {
+                    pushNativeReverbSubParams(targetPredelay, targetDamping, targetCrossChannel)
+                }
             }
         }
         safeCall(TAG, "restoreReverb") {
@@ -2902,6 +2976,9 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 nativeSetReplayGainEnabled(isReplayGainEnabled)
             }
         }
+        if (dvcActive) {
+            safeCall(TAG, "restoreDvc") { nativeSetDirectVolumeParams(true, dvcGain) }
+        }
         // Re-assert bit-perfect/dither snapshot truth after bypass so the
         // C++ early-return and BT dither-skip match the restored route.
         try { nativeSetBitPerfectParams(false, isDopActive) } catch (_: Exception) {}
@@ -2953,11 +3030,15 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     isBitPerfectBypassActive = bypass
                     isDopActive = targetDop
                     if (bypass) {
-                        // Immediately disable virtualizer/loudness/bass + native stages
+                        // Immediately disable virtualizer/loudness/bass + remaster/native stages
                         try { virtualizer?.enabled = false } catch (_: Exception) {}
                         try { loudnessEnhancer?.enabled = false } catch (_: Exception) {}
                         try { bassBoost?.enabled = false } catch (_: Exception) {}
                         try { dynamicsProcessing?.enabled = false } catch (_: Exception) {}
+                        if (isNativeDspLoaded) {
+                            try { nativeSetOversampleMultiplier(1) } catch (_: Exception) {}
+                            try { nativeSetPcmToDsdEnabled(false) } catch (_: Exception) {}
+                        }
                         recalculateActiveStages()
                     } else {
                         recalculateActiveStages()
@@ -3054,6 +3135,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
 
                 // Group 2: Native C++ DSP filters & Spatial
                 "setCrossfeedEnabled", "setCrossfeedParams", "setCrossfeedMode",
+                "setHrtfBinauralEnabled", "setHrtfAzimuth", "setHrtfElevation",
+                "loadHrtfSofa", "getHrtfSofaLoadError", "loadHrtfIr", "getHrtfLatencyFrames",
                 "setLimiterEnabled", "setLimiterParams",
                 "setReverbEnabled", "setReverbPreset", "setReverbWetDry", "setReverbParams",
                 "awaitDspControlUpdates",
@@ -3225,7 +3308,9 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                         result.error("INVALID_ARGUMENT", "EQ band index out of range: $index", null)
                         return
                     }
-                    val gainDb = clamp((call.argument<Number>("gainDb"))?.toDouble() ?: 0.0, -36.0, 36.0)
+                    val gainDb = DspParamRanges.eqBandGainDb.clamp(
+                        (call.argument<Number>("gainDb"))?.toDouble() ?: 0.0
+                    )
                     setEqBandGainValue(index, gainDb)
                     result.success(true)
                 }
@@ -3263,7 +3348,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     val freq = DspParamRanges.eqFilterFrequencyHz.clamp(
                         (call.argument<Number>("frequency"))?.toDouble() ?: 1000.0
                     )
-                    val gainDb = DspParamRanges.eqBandGainDb.clamp(
+                    val gainDb = DspParamRanges.eqFilterGainDb.clamp(
                         (call.argument<Number>("gainDb"))?.toDouble() ?: 0.0
                     )
                     val q = DspParamRanges.eqFilterQ.clamp(
@@ -3303,7 +3388,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                         DspParamRanges.eqFilterFrequencyHz.clamp(freqs[it])
                     }
                     val gainArr = DoubleArray(gains.size) {
-                        DspParamRanges.eqBandGainDb.clamp(gains[it])
+                        DspParamRanges.eqFilterGainDb.clamp(gains[it])
                     }
                     val qArr = qs?.let { values ->
                         DoubleArray(values.size) { idx -> DspParamRanges.eqFilterQ.clamp(values[idx]) }
@@ -3443,6 +3528,16 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 "setCrossfeedEnabled" -> {
                     val enabled = call.argument<Boolean>("enabled") ?: false
                     isCrossfeedEnabled = enabled
+                    if (enabled && isHrtfBinauralEnabled) {
+                        isHrtfBinauralEnabled = false
+                        if (isNativeDspLoaded) {
+                            try {
+                                pushNativeHrtfBinauralEnabled(false)
+                            } catch (e: Exception) {
+                                Log.w(TAG, "nativeSetHrtfBinauralEnabled failed: ${e.message}")
+                            }
+                        }
+                    }
                     if (isNativeDspLoaded) {
                         try {
                             pushNativeCrossfeedEnabled(enabled)
@@ -3484,7 +3579,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 "setCrossfeedMode" -> {
                     val modeArg = call.argument<Any>("mode")
                     val mode = when (modeArg) {
-                        is Number -> modeArg.toInt()
+                        is Number -> modeArg.toInt().coerceIn(0, 3)
                         "headphone", "default", "Bs2bDefault" -> 0
                         "speaker", "cmoy", "Bs2bChuMoy" -> 1
                         "meier", "Bs2bJanMeier" -> 2
@@ -3511,6 +3606,10 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                         return
                     }
                     try {
+                        if (enabled && isCrossfeedEnabled) {
+                            isCrossfeedEnabled = false
+                            pushNativeCrossfeedEnabled(false)
+                        }
                         pushNativeHrtfBinauralEnabled(enabled)
                         isHrtfBinauralEnabled = enabled
                         // STAGE_HRTF is a real mask bit now: rebuild the mask so
@@ -3525,7 +3624,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 }
 
                 "setHrtfAzimuth" -> {
-                    val azimuth = (call.argument<Number>("azimuth") ?: 30.0).toDouble().coerceIn(-90.0, 90.0)
+                    val azimuth = clamp((call.argument<Number>("azimuth") ?: 30.0).toDouble(), -90.0, 90.0)
                     hrtfAzimuth = azimuth
                     if (isNativeDspLoaded) {
                         try {
@@ -3538,7 +3637,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 }
 
                 "setHrtfElevation" -> {
-                    val elevation = (call.argument<Number>("elevation") ?: 0.0).toDouble().coerceIn(-45.0, 45.0)
+                    val elevation = clamp((call.argument<Number>("elevation") ?: 0.0).toDouble(), -45.0, 45.0)
                     hrtfElevation = elevation
                     if (isNativeDspLoaded) {
                         try {
@@ -3591,16 +3690,26 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 }
 
                 "loadHrtfIr" -> {
-                    val ll = (call.argument<List<Double>>("ll") ?: emptyList()).map { it.toFloat() }.toFloatArray()
-                    val lr = (call.argument<List<Double>>("lr") ?: emptyList()).map { it.toFloat() }.toFloatArray()
-                    val rl = (call.argument<List<Double>>("rl") ?: emptyList()).map { it.toFloat() }.toFloatArray()
-                    val rr = (call.argument<List<Double>>("rr") ?: emptyList()).map { it.toFloat() }.toFloatArray()
-                    val taps = call.argument<Int>("taps") ?: ll.size
+                    val rawLl = call.argument<List<*>>("ll")?.mapNotNull { (it as? Number)?.toFloat() } ?: emptyList()
+                    val rawLr = call.argument<List<*>>("lr")?.mapNotNull { (it as? Number)?.toFloat() } ?: emptyList()
+                    val rawRl = call.argument<List<*>>("rl")?.mapNotNull { (it as? Number)?.toFloat() } ?: emptyList()
+                    val rawRr = call.argument<List<*>>("rr")?.mapNotNull { (it as? Number)?.toFloat() } ?: emptyList()
+                    val taps = (call.argument<Number>("taps"))?.toInt() ?: rawLl.size
                     val sampleRate = (call.argument<Number>("sampleRate") ?: 48000.0).toDouble()
 
-                    val ok = if (isNativeDspLoaded && ll.isNotEmpty() && lr.isNotEmpty() && rl.isNotEmpty() && rr.isNotEmpty()) {
+                    val validArrays = taps > 0 &&
+                        sampleRate.isFinite() && sampleRate > 0.0 &&
+                        rawLl.size >= taps && rawLr.size >= taps &&
+                        rawRl.size >= taps && rawRr.size >= taps &&
+                        rawLl.all { it.isFinite() } && rawLr.all { it.isFinite() } &&
+                        rawRl.all { it.isFinite() } && rawRr.all { it.isFinite() }
+                    val ok = if (isNativeDspLoaded && validArrays) {
                         try {
-                            nativeLoadHrtfIr(ll, lr, rl, rr, taps, sampleRate)
+                            nativeLoadHrtfIr(
+                                rawLl.toFloatArray(), rawLr.toFloatArray(),
+                                rawRl.toFloatArray(), rawRr.toFloatArray(),
+                                taps, sampleRate,
+                            )
                         } catch (e: Exception) {
                             Log.w(TAG, "nativeLoadHrtfIr failed: ${e.message}")
                             false
@@ -3656,13 +3765,13 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     limiterTruePeakMode = truePeak
                     // Optional compressor knobs (only sent once the user owns them).
                     (call.argument<Number>("ratio"))?.toDouble()?.let {
-                        limiterRatio = clamp(it, 1.0, 20.0)
+                        limiterRatio = DspParamRanges.compressorRatio.clamp(it)
                     }
                     (call.argument<Number>("attackMs"))?.toDouble()?.let {
-                        limiterAttackMs = clamp(it, HAL_LIMITER_MIN_ATTACK_MS, HAL_LIMITER_MAX_ATTACK_MS)
+                        limiterAttackMs = DspParamRanges.compressorAttackMs.clamp(it)
                     }
                     (call.argument<Number>("makeupGainDb"))?.toDouble()?.let {
-                        limiterMakeupGainDb = clamp(it, 0.0, 12.0)
+                        limiterMakeupGainDb = DspParamRanges.compressorMakeupGainDb.clamp(it)
                     }
                     if (isNativeDspLoaded) {
                         try {
@@ -3725,10 +3834,12 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     reverbPreset = preset
                     if (isNativeDspLoaded && lastNativeReverbPreset != preset) {
                         safeReverbExecute {
-                            try {
-                                pushNativeReverbPreset(preset)
-                            } catch (e: Exception) {
-                                Log.w(TAG, "nativeSetReverbPreset async failed: ${e.message}")
+                            synchronized(reverbNativeLock) {
+                                try {
+                                    pushNativeReverbPreset(preset)
+                                } catch (e: Exception) {
+                                    Log.w(TAG, "nativeSetReverbPreset async failed: ${e.message}")
+                                }
                             }
                         }
                     }
@@ -3759,10 +3870,12 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     reverbCrossChannel = crossChannel
                     if (isNativeDspLoaded && lastNativeReverbParams != reverbSubParamsKey(predelayMs, damping, crossChannel)) {
                         safeReverbExecute {
-                            try {
-                                pushNativeReverbSubParams(predelayMs, damping, crossChannel)
-                            } catch (e: Exception) {
-                                Log.w(TAG, "nativeSetReverbParams async failed: ${e.message}")
+                            synchronized(reverbNativeLock) {
+                                try {
+                                    pushNativeReverbSubParams(predelayMs, damping, crossChannel)
+                                } catch (e: Exception) {
+                                    Log.w(TAG, "nativeSetReverbParams async failed: ${e.message}")
+                                }
                             }
                         }
                     }
@@ -3776,10 +3889,12 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     val damping = reverbDamping
                     if (isNativeDspLoaded && lastNativeReverbParams != reverbSubParamsKey(predelay, damping, crossChannel)) {
                         safeReverbExecute {
-                            try {
-                                pushNativeReverbSubParams(predelay, damping, crossChannel)
-                            } catch (e: Exception) {
-                                Log.w(TAG, "nativeSetReverbCrossChannel failed: ${e.message}")
+                            synchronized(reverbNativeLock) {
+                                try {
+                                    pushNativeReverbSubParams(predelay, damping, crossChannel)
+                                } catch (e: Exception) {
+                                    Log.w(TAG, "nativeSetReverbCrossChannel failed: ${e.message}")
+                                }
                             }
                         }
                     }
@@ -3845,10 +3960,15 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                             } else {
                                 FloatArray(legacyList!!.size) { legacyList[it].toFloat() }
                             }
-                            val loaded = nativeLoadImpulseResponse(floatArray, channels)
+                            val loaded = synchronized(reverbNativeLock) {
+                                nativeLoadImpulseResponse(floatArray, channels)
+                            }
                             if (loaded) {
-                                reverbPreset = REVERB_PRESET_CUSTOM
-                                lastNativeReverbPreset = REVERB_PRESET_CUSTOM
+                                synchronized(stateLock) {
+                                    reverbPreset = REVERB_PRESET_CUSTOM
+                                    lastNativeReverbPreset = REVERB_PRESET_CUSTOM
+                                    cachedDebugReport = null
+                                }
                                 Log.i(TAG, "Custom IR loaded successfully ($sampleCount samples, $channels channels)")
                             } else {
                                 Log.w(TAG, "IR too large or exceeds budget")
@@ -3980,12 +4100,10 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     val enabled = call.argument<Boolean>("enabled") ?: true
                     isRtfGovernorEnabled = enabled
                     if (!enabled) {
-                        synchronized(proactiveDegradeLock) {
-                            if (proactivelyDegradedStages != 0 && isNativeDspLoaded) {
-                                try { nativeRecoverStageAutoDegrade(proactivelyDegradedStages) } catch (_: Exception) {}
-                                proactivelyDegradedStages = 0
-                                cachedDebugReport = null
-                            }
+                        if (proactivelyDegradedStages != 0 && isNativeDspLoaded) {
+                            try { nativeRecoverStageAutoDegrade(proactivelyDegradedStages) } catch (_: Exception) {}
+                            proactivelyDegradedStages = 0
+                            cachedDebugReport = null
                         }
                         stopRtfGovernor()
                     } else {
@@ -4307,8 +4425,14 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                         result.success(false)
                         return
                     }
+                    if (isBitPerfectBypassActive && multiplier > 1) {
+                        result.success(false)
+                        return
+                    }
                     try {
+                        remasterOversampleMultiplier = multiplier
                         nativeSetOversampleMultiplier(multiplier)
+                        cachedDebugReport = null
                         syncDspActiveRouting()
                         result.success(true)
                     } catch (e: Exception) {
@@ -4351,7 +4475,9 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                         return
                     }
                     try {
+                        remasterOversampleKernel = kernel
                         nativeSetOversampleKernel(kernel)
+                        cachedDebugReport = null
                         result.success(true)
                     } catch (e: Exception) {
                         Log.w(TAG, "nativeSetOversampleKernel failed: ${e.message}")
@@ -4378,8 +4504,15 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                         result.success(false)
                         return
                     }
+                    if (isBitPerfectBypassActive && enabled) {
+                        result.success(false)
+                        return
+                    }
                     try {
+                        remasterPcmToDsdEnabled = enabled
                         nativeSetPcmToDsdEnabled(enabled)
+                        cachedDebugReport = null
+                        syncDspActiveRouting()
                         result.success(true)
                     } catch (e: Exception) {
                         Log.w(TAG, "nativeSetPcmToDsdEnabled failed: ${e.message}")
@@ -4409,7 +4542,9 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                         return
                     }
                     try {
+                        remasterPcmToDsdRate = rate
                         nativeSetPcmToDsdRate(rate)
+                        cachedDebugReport = null
                         result.success(true)
                     } catch (e: Exception) {
                         Log.w(TAG, "nativeSetPcmToDsdRate failed: ${e.message}")
@@ -4437,7 +4572,9 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                         return
                     }
                     try {
+                        remasterPcmToDsdOrder = order
                         nativeSetPcmToDsdOrder(order)
+                        cachedDebugReport = null
                         result.success(true)
                     } catch (e: Exception) {
                         Log.w(TAG, "nativeSetPcmToDsdOrder failed: ${e.message}")
@@ -4497,7 +4634,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     val mix = clamp((call.argument<Number>("mix"))?.toDouble() ?: 0.5, 0.0, 1.0)
                     val tilt = clamp((call.argument<Number>("tilt"))?.toDouble() ?: 0.3, 0.0, 1.0)
                     val mode = call.argument<Int>("mode") ?: 0
-                    val multiband = call.argument<Boolean>("multiband") ?: false
+                    val multiband = call.argument<Boolean>("multiband") ?: saturationMultiband
                     saturationDrive = drive
                     saturationMix = mix
                     saturationTilt = tilt
@@ -4676,7 +4813,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                         return
                     }
                     val cornerHz = DspParamRanges.subCrossoverCornerHz.clamp(rawCornerHz)
-                    val slopeDbPerOct = if (rawSlope <= 18.0) 12.0 else 24.0
+                    val slopeDbPerOct = if (rawSlope < 18.0) 12.0 else 24.0
                     val subGain = DspParamRanges.subCrossoverGain.clamp(rawSubGain)
                     subCrossoverCornerHz = cornerHz
                     subCrossoverSlopeDbPerOct = slopeDbPerOct
@@ -4977,6 +5114,15 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
 
     private fun handleAdvancedAndDiagnosticCall(call: MethodCall, result: Result) {
         when (call.method) {
+                "getFocusState" -> {
+                    val am = context?.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+                    val mode = try { am?.mode ?: AudioManager.MODE_NORMAL } catch (_: Exception) { AudioManager.MODE_NORMAL }
+                    val focusFree = mode != AudioManager.MODE_IN_CALL &&
+                        mode != AudioManager.MODE_IN_COMMUNICATION &&
+                        mode != AudioManager.MODE_RINGTONE
+                    result.success(focusFree)
+                }
+
                 // ---- ViPER-DDC (Digital Dynamic Correction) ----
                 "setViperDdcEnabled" -> {
                     val enabled = call.argument<Boolean>("enabled") ?: false
@@ -5337,8 +5483,14 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                             dvcEnabled = true
                             // Re-arm from the live system level: activation
                             // captures it and derives the DSP gain from it.
-                            applyDvcRuntimeState(true)
-                            dvcActive = true
+                            val activated = applyDvcRuntimeState(true)
+                            if (!activated) {
+                                dvcEnabled = false
+                                dvcActive = false
+                                cachedDebugReport = null
+                                result.success(notApplied("Direct Volume Control could not set system volume"))
+                                return
+                            }
                         } else {
                             // Restore the saved stream level while DVC still
                             // owns it, then drop every piece of DVC state.
@@ -5504,7 +5656,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         @Suppress("UNCHECKED_CAST")
         val oemEngines = oemInfo["detectedEngines"] as? List<String> ?: emptyList()
 
-        val autoDegraded = if (isNativeDspLoaded) {
+        val autoDegraded = autoDegradedStagesOverrideForTest ?: if (isNativeDspLoaded) {
             try { nativeGetAutoDegradedStages() } catch (_: Exception) { 0 }
         } else 0
         val halAttached = isEffectPipelineAttached()
@@ -5933,6 +6085,51 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 "redirectBass" to lfeRedirectBass,
             ),
             statusDescription = if (isBitPerfectBypassActive) "Bypassed by Bit-Perfect" else if (isLfeCrossoverEnabled) "${lfeCrossoverHz.toInt()} Hz / LFE ch $lfeChannelIndex" else "Disabled"
+        ))
+
+        // 25. HRTF Binaural Virtualization (Native C++)
+        val hrtfActive = isHrtfBinauralEnabled && !isBitPerfectBypassActive
+        if (hrtfActive) activeNames.add("HRTF Binaural (${hrtfAzimuth.toInt()}° az, ${hrtfElevation.toInt()}° el)")
+        stagesList.add(buildDspStage(
+            name = "HRTF Binaural Virtualization",
+            category = "Native C++ Engine",
+            isSupported = isNativeDspLoaded,
+            isEnabled = isHrtfBinauralEnabled,
+            isBypassed = isBitPerfectBypassActive,
+            isDegraded = ((autoDegraded and STAGE_HRTF) != 0),
+            parameters = mapOf(
+                "azimuth" to hrtfAzimuth,
+                "elevation" to hrtfElevation,
+                "sofaPath" to hrtfSofaPath,
+            ),
+            statusDescription = when {
+                isBitPerfectBypassActive -> "Bypassed by Bit-Perfect"
+                isHrtfBinauralEnabled && !hrtfSofaPath.isNullOrEmpty() -> "SOFA Custom (${hrtfAzimuth.toInt()}° / ${hrtfElevation.toInt()}°)"
+                isHrtfBinauralEnabled -> "Az ${hrtfAzimuth.toInt()}° / El ${hrtfElevation.toInt()}°"
+                else -> "Disabled"
+            }
+        ))
+
+        // 26. DAC Voicing (Native C++)
+        val dacVoicingActive = isDacVoicingEnabled && !isBitPerfectBypassActive
+        val dacVoicingLabel = when (dacVoicingCharacter) {
+            1 -> "Slow Roll-off (NOS)"
+            2 -> "Minimum Phase"
+            else -> "Sharp Linear"
+        }
+        if (dacVoicingActive) activeNames.add("DAC Voicing ($dacVoicingLabel, ${(dacVoicingAmount * 100).toInt()}%)")
+        stagesList.add(buildDspStage(
+            name = "DAC Voicing (Oversampled Reconstruction)",
+            category = "Native C++ Engine",
+            isSupported = isNativeDspLoaded,
+            isEnabled = isDacVoicingEnabled,
+            isBypassed = isBitPerfectBypassActive,
+            isDegraded = ((autoDegraded and STAGE_DAC_VOICING) != 0),
+            parameters = mapOf(
+                "character" to dacVoicingCharacter,
+                "voicingAmount" to dacVoicingAmount,
+            ),
+            statusDescription = if (isBitPerfectBypassActive) "Bypassed by Bit-Perfect" else if (isDacVoicingEnabled) "$dacVoicingLabel (${(dacVoicingAmount * 100).toInt()}%)" else "Disabled"
         ))
 
         val nativeAppliedSampleRate = if (isNativeDspLoaded) {
@@ -6430,7 +6627,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private fun setEqGainsValue(gains: List<Double>?) {
         if (gains == null) return
         for (i in 0 until minOf(gains.size, eqBandCount)) {
-            eqBandGains[i] = clamp(gains[i], -36.0, 36.0)
+            eqBandGains[i] = DspParamRanges.eqBandGainDb.clamp(gains[i])
         }
         cachedDebugReport = null
         updateEqInPlace()
@@ -6800,9 +6997,11 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
      */
     private fun isEffectPipelineAttached(): Boolean {
         if (currentAudioSessionId == 0) return false
+        val wantsHalEq = isEqEnabled && !isHalEqSuppressed()
+        val wantsHalDyn = isDynamicsEnabled && currentDynamicsPreset != "off" && !isDynamicsPresetNativeActive
         val wantsHalLimiter = isLimiterEnabled && !isNativeDspLoaded
-        val wantsAnyHalStage = (isEqEnabled && !isHalEqSuppressed()) ||
-                (isDynamicsEnabled && currentDynamicsPreset != "off" && !isDynamicsPresetNativeActive) ||
+        val wantsAnyHalStage = wantsHalEq ||
+                wantsHalDyn ||
                 isVirtualizerEnabled ||
                 volumeBoostMilliBels > 0 ||
                 bassBoostStrength > 0 ||
@@ -6823,11 +7022,12 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 false
             }
         }
-        return healthy(dynamicsProcessing) ||
-                healthy(legacyEqualizer) ||
-                healthy(virtualizer) ||
-                healthy(loudnessEnhancer) ||
-                healthy(bassBoost)
+        if (wantsHalEq && !healthy(dynamicsProcessing) && !healthy(legacyEqualizer)) return false
+        if ((wantsHalDyn || wantsHalLimiter) && !healthy(dynamicsProcessing)) return false
+        if (isVirtualizerEnabled && !healthy(virtualizer)) return false
+        if (volumeBoostMilliBels > 0 && !healthy(loudnessEnhancer)) return false
+        if (bassBoostStrength > 0 && !healthy(bassBoost)) return false
+        return true
     }
 
     // -------------------------------------------------------------------------
@@ -6943,43 +7143,13 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         legacyEqualizer = null
 
         cachedSupportedEffects = null
+        currentAudioSessionId = 0
+        cachedDebugReport = null
         // Full reset: clear the parameter dedup caches so a subsequent
         // re-attach re-pushes every value to the recreated effects / C++
         // engine instead of being filtered out as a duplicate, and re-arm the
         // DynamicsProcessing build-failure latch for the next session.
-        lastNativeEqPreamp = null
-        lastNativeEqBands.clear()
-        lastNativeEqBandCount = null
-        lastNativeEqEnabled = null
-        lastNativeCrossfeedEnabled = null
-        lastNativeCrossfeedParams = null
-        lastNativeLimiterEnabled = null
-        lastNativeLimiterParams = null
-        lastNativeReverbEnabled = null
-        lastNativeReverbPreset = null
-        lastNativeReverbWetDry = null
-        lastNativeReverbParams = null
-        lastNativeStereoBalance = null
-        lastNativeMonoMix = null
-        lastNativeResamplerEnabled = null
-        lastNativeSaturationEnabled = null
-        lastNativeSaturationParams = null
-        lastNativeDacVoicingEnabled = null
-        lastNativeDacVoicingParams = null
-        lastNativeStereoWidthEnabled = null
-        lastNativeStereoWidthParams = null
-        lastNativeLoudnessEnabled = null
-        lastNativeLoudnessParams = null
-        lastNativeSubCrossoverEnabled = null
-        lastNativeSubCrossoverParams = null
-        lastNativeLfeCrossoverEnabled = null
-        lastNativeLfeCrossoverParams = null
-        lastNativeDynamicEqEnabled = null
-        lastNativeDynamicEqBands.clear()
-        lastNativeMultibandCompressorEnabled = null
-        lastNativeMultibandCompressorBands.clear()
-        lastNativeMultibandCompressorCrossovers = null
-        lastNativeDynamicBassParams = null
+        clearAllNativeDedupeCaches()
         dpBuildFailures = 0
         dpBuildFailureSessionId = 0
         // Reset the stereo->mono DynamicsProcessing fallback so one transient
@@ -7005,6 +7175,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     isHeadphoneSafetyEnabled ||
                     isChannelManagerEnabled ||
                     isCrossfeedEnabled ||
+                    isHrtfBinauralEnabled ||
                     isLimiterEnabled ||
                     isReverbEnabled ||
                     isSaturationEnabled ||
@@ -7012,6 +7183,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     isStereoWidthEnabled ||
                     isLoudnessContourEnabled ||
                     isSubCrossoverEnabled ||
+                    isLfeCrossoverEnabled ||
                     isDynamicEqEnabled ||
                     isMultibandCompressorEnabled ||
                     isDynamicsPresetNativeActive ||
@@ -7021,7 +7193,9 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     isLiveProgEnabled ||
                     isDitherEnabled ||
                     isReplayGainEnabled ||
-                    dvcActive
+                    dvcActive ||
+                    activeRemasterFactor() > 1 ||
+                    remasterPcmToDsdEnabled
             )
 
             return halActive || nativeActive

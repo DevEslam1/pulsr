@@ -6,6 +6,7 @@ import '../../../../core/constants/app_typography.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../data/db/app_database.dart';
+import '../../../../domain/models/smart_playlist_criteria.dart' as domain;
 import '../../../../l10n/generated/app_localizations.dart';
 
 enum SmartRuleField {
@@ -29,6 +30,28 @@ enum SmartRuleField {
         SmartRuleField.duration => l.duration,
         SmartRuleField.isFavorite => l.favorite,
       };
+
+  domain.SmartRuleField toDomain() => switch (this) {
+        SmartRuleField.title => domain.SmartRuleField.title,
+        SmartRuleField.artist => domain.SmartRuleField.artist,
+        SmartRuleField.album => domain.SmartRuleField.album,
+        SmartRuleField.genre => domain.SmartRuleField.genre,
+        SmartRuleField.year => domain.SmartRuleField.year,
+        SmartRuleField.duration => domain.SmartRuleField.durationMs,
+        SmartRuleField.isFavorite => domain.SmartRuleField.isFavorite,
+      };
+
+  static SmartRuleField fromDomain(domain.SmartRuleField field) =>
+      switch (field) {
+        domain.SmartRuleField.title => SmartRuleField.title,
+        domain.SmartRuleField.artist => SmartRuleField.artist,
+        domain.SmartRuleField.album => SmartRuleField.album,
+        domain.SmartRuleField.genre => SmartRuleField.genre,
+        domain.SmartRuleField.year => SmartRuleField.year,
+        domain.SmartRuleField.durationMs => SmartRuleField.duration,
+        domain.SmartRuleField.isFavorite => SmartRuleField.isFavorite,
+        _ => SmartRuleField.artist,
+      };
 }
 
 enum SmartRuleOperator {
@@ -50,6 +73,29 @@ enum SmartRuleOperator {
         SmartRuleOperator.greaterThan => l.smartRuleOpGreaterThan,
         SmartRuleOperator.lessThan => l.smartRuleOpLessThan,
       };
+
+  domain.SmartOperator toDomain() => switch (this) {
+        SmartRuleOperator.contains => domain.SmartOperator.contains,
+        SmartRuleOperator.notContains => domain.SmartOperator.notContains,
+        SmartRuleOperator.equals => domain.SmartOperator.equals,
+        SmartRuleOperator.startsWith => domain.SmartOperator.startsWith,
+        SmartRuleOperator.greaterThan => domain.SmartOperator.greaterThan,
+        SmartRuleOperator.lessThan => domain.SmartOperator.lessThan,
+      };
+
+  static SmartRuleOperator fromDomain(domain.SmartOperator op) => switch (op) {
+        domain.SmartOperator.contains => SmartRuleOperator.contains,
+        domain.SmartOperator.notContains => SmartRuleOperator.notContains,
+        domain.SmartOperator.equals => SmartRuleOperator.equals,
+        domain.SmartOperator.startsWith => SmartRuleOperator.startsWith,
+        domain.SmartOperator.greaterThan ||
+        domain.SmartOperator.greaterThanOrEqual =>
+          SmartRuleOperator.greaterThan,
+        domain.SmartOperator.lessThan ||
+        domain.SmartOperator.lessThanOrEqual =>
+          SmartRuleOperator.lessThan,
+        _ => SmartRuleOperator.contains,
+      };
 }
 
 enum SmartRuleMatchMode {
@@ -66,15 +112,31 @@ enum SmartRuleMatchMode {
 }
 
 class SmartRule {
+  final String id;
   SmartRuleField field;
   SmartRuleOperator operator;
   String value;
 
   SmartRule({
+    String? id,
     this.field = SmartRuleField.artist,
     this.operator = SmartRuleOperator.contains,
     this.value = '',
-  });
+  }) : id = id ?? UniqueKey().toString();
+
+  domain.SmartRule toDomain() => domain.SmartRule(
+        field: field.toDomain(),
+        operator: operator.toDomain(),
+        value: value,
+      );
+
+  factory SmartRule.fromDomain(domain.SmartRule domainRule, {String? id}) =>
+      SmartRule(
+        id: id,
+        field: SmartRuleField.fromDomain(domainRule.field),
+        operator: SmartRuleOperator.fromDomain(domainRule.operator),
+        value: domainRule.value,
+      );
 
   bool evaluate(SongsTableData song) {
     final targetValue = switch (field) {
@@ -238,6 +300,7 @@ class _SmartPlaylistRuleBuilderState extends State<SmartPlaylistRuleBuilder> {
         ...List.generate(_rules.length, (index) {
           final rule = _rules[index];
           return Container(
+            key: ValueKey(rule.id),
             margin: const EdgeInsets.only(bottom: AppSpacing.sm),
             padding: const EdgeInsets.all(AppSpacing.md),
             decoration: BoxDecoration(
@@ -254,6 +317,7 @@ class _SmartPlaylistRuleBuilderState extends State<SmartPlaylistRuleBuilder> {
                     Expanded(
                       flex: 4,
                       child: DropdownButtonFormField<SmartRuleField>(
+                        key: ValueKey('${rule.id}_field'),
                         initialValue: rule.field,
                         isExpanded: true,
                         decoration: InputDecoration(
@@ -286,6 +350,7 @@ class _SmartPlaylistRuleBuilderState extends State<SmartPlaylistRuleBuilder> {
                     Expanded(
                       flex: 5,
                       child: DropdownButtonFormField<SmartRuleOperator>(
+                        key: ValueKey('${rule.id}_op'),
                         initialValue: rule.operator,
                         isExpanded: true,
                         decoration: InputDecoration(
@@ -334,6 +399,7 @@ class _SmartPlaylistRuleBuilderState extends State<SmartPlaylistRuleBuilder> {
                 const SizedBox(height: AppSpacing.sm),
                 // Value text field
                 TextFormField(
+                  key: ValueKey('${rule.id}_value'),
                   initialValue: rule.value,
                   decoration: InputDecoration(
                     hintText: context.l10n.enterSearchValue,

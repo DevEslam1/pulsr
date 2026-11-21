@@ -103,4 +103,103 @@ void main() {
     expect(preamp, greaterThan(-10.0));
     expect(preamp, lessThan(-6.0));
   });
+
+  group('HeadphoneProfile mathematical edge-case guards', () {
+    test('toGraphicEqString guards gains.isEmpty, gains.length == 1, numPoints <= 1 and non-finite gains', () {
+      const emptyProfile = HeadphoneProfile(
+        id: 'empty',
+        name: 'Empty',
+        brand: 'Test',
+        model: 'Test',
+        category: 'Test',
+        gains: [],
+        filters: [],
+      );
+      final emptyStr = emptyProfile.toGraphicEqString(numPoints: 0);
+      expect(emptyStr, 'GraphicEq: 20.0 0.00; 20000.0 0.00');
+      expect(emptyStr.contains('NaN'), isFalse);
+      expect(emptyStr.contains('Infinity'), isFalse);
+
+      const singleGainProfile = HeadphoneProfile(
+        id: 'single',
+        name: 'Single',
+        brand: 'Test',
+        model: 'Test',
+        category: 'Test',
+        gains: [4.5],
+        filters: [],
+      );
+      final singleStr = singleGainProfile.toGraphicEqString();
+      expect(singleStr, 'GraphicEq: 1000.0 4.50');
+      expect(singleStr.contains('NaN'), isFalse);
+      expect(singleStr.contains('Infinity'), isFalse);
+
+      const nonFiniteGainsProfile = HeadphoneProfile(
+        id: 'nan',
+        name: 'Nan',
+        brand: 'Test',
+        model: 'Test',
+        category: 'Test',
+        gains: [double.nan, double.infinity, -double.infinity],
+        filters: [],
+      );
+      final nanStr = nonFiniteGainsProfile.toGraphicEqString();
+      expect(nanStr.contains('NaN'), isFalse);
+      expect(nanStr.contains('Infinity'), isFalse);
+
+      final filterProfile = _profile();
+      final numPoints1 = filterProfile.toGraphicEqString(numPoints: 1);
+      expect(numPoints1.contains('NaN'), isFalse);
+      expect(numPoints1.contains('Infinity'), isFalse);
+      expect(numPoints1.startsWith('GraphicEq: 1000.0 '), isTrue);
+
+      final numPoints0 = filterProfile.toGraphicEqString(numPoints: 0);
+      expect(numPoints0, 'GraphicEq: 20.0 0.00; 20000.0 0.00');
+    });
+
+    test('computeFirPreamp guards gains.isEmpty, gains.length == 1, points <= 1 and non-finite gains', () {
+      const emptyProfile = HeadphoneProfile(
+        id: 'empty',
+        name: 'Empty',
+        brand: 'Test',
+        model: 'Test',
+        category: 'Test',
+        gains: [],
+        filters: [],
+      );
+      expect(emptyProfile.computeFirPreamp(), 0.0);
+
+      const singleGainProfile = HeadphoneProfile(
+        id: 'single',
+        name: 'Single',
+        brand: 'Test',
+        model: 'Test',
+        category: 'Test',
+        gains: [5.0],
+        filters: [],
+      );
+      final singlePreamp = singleGainProfile.computeFirPreamp();
+      expect(singlePreamp, -6.0); // -(5.0 + 1.0)
+      expect(singlePreamp.isFinite, isTrue);
+
+      const nonFiniteProfile = HeadphoneProfile(
+        id: 'nan',
+        name: 'Nan',
+        brand: 'Test',
+        model: 'Test',
+        category: 'Test',
+        gains: [double.nan, double.infinity],
+        filters: [],
+      );
+      expect(nonFiniteProfile.computeFirPreamp(), 0.0);
+
+      final filterProfile = _profile();
+      final points0Preamp = filterProfile.computeFirPreamp(points: 0);
+      expect(points0Preamp, 0.0);
+
+      final points1Preamp = filterProfile.computeFirPreamp(points: 1);
+      expect(points1Preamp.isFinite, isTrue);
+      expect(points1Preamp.isNaN, isFalse);
+    });
+  });
 }

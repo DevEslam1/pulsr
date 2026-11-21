@@ -2,7 +2,9 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/services/duplicate_finder_service.dart';
+import 'package:pulsr/core/utils/l10n_holder.dart';
 import 'package:pulsr/data/db/app_database.dart';
+import 'package:pulsr/l10n/generated/app_localizations_ar.dart';
 
 SongsTableData _testSong({
   required int id,
@@ -208,6 +210,28 @@ void main() {
 
       expect(duplicates.length, 1);
       expect(duplicates.first.songs.map((s) => s.id), unorderedEquals([10, 11]));
+    });
+
+    test('preserves localized reason via L10nHolder when allSongs.length >= 20', () async {
+      final l10n = AppLocalizationsAr();
+      L10nHolder.current = l10n;
+      addTearDown(() => L10nHolder.current = null);
+
+      final songs = List<SongsTableData>.generate(
+        22,
+        (i) => _testSong(
+          id: i + 1,
+          title: i < 2 ? 'Same Song' : 'Unique Song $i',
+          artist: i < 2 ? 'Same Artist' : 'Artist $i',
+          path: '/music/song_$i.mp3',
+        ),
+      );
+
+      final duplicates = await service.findDuplicates(songs);
+
+      expect(duplicates.length, 1);
+      expect(duplicates.first.songs.length, 2);
+      expect(duplicates.first.reason, l10n.dupReasonTitleArtist(2));
     });
   });
 }

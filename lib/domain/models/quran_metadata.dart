@@ -24,8 +24,10 @@ class QuranAyahTiming {
       };
 
   factory QuranAyahTiming.fromMap(Map<String, dynamic> map) {
+    final rawAyah = (map['ayahNumber'] as num?)?.toInt() ?? 1;
+    final ayahNumber = rawAyah < 1 ? 1 : rawAyah;
     return QuranAyahTiming(
-      ayahNumber: (map['ayahNumber'] as num?)?.toInt() ?? 1,
+      ayahNumber: ayahNumber,
       start: Duration(milliseconds: (map['startMs'] as num?)?.toInt() ?? 0),
       end: Duration(milliseconds: (map['endMs'] as num?)?.toInt() ?? 0),
     );

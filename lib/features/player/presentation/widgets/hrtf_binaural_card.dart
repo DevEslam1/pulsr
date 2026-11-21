@@ -14,6 +14,7 @@ import '../../../../core/widgets/pulsr_toast.dart';
 import '../../../../core/widgets/throttled_slider.dart';
 import '../../../../data/audio/equalizer_manager.dart';
 import '../../cubit/player_cubit.dart';
+import '../../cubit/player_state.dart';
 
 /// 3D HRTF Binaural Spatialization Card (§8.9 & §9).
 /// Provides partitioned-convolution binaural synthesis with user-steerable
@@ -38,6 +39,7 @@ class _HrtfBinauralCardState extends State<HrtfBinauralCard> {
   double _azimuth = 30.0;
   double _elevation = 0.0;
   String? _sofaPath;
+  bool _initialized = false;
 
   @override
   void initState() {
@@ -45,13 +47,30 @@ class _HrtfBinauralCardState extends State<HrtfBinauralCard> {
     _restoreState();
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_initialized) {
+      _initialized = true;
+      _restoreState();
+    }
+  }
+
   void _restoreState() {
-    if (getIt.isRegistered<EqualizerManager>()) {
-      final eq = getIt<EqualizerManager>();
-      _enabled = eq.isHrtfEnabled;
-      _azimuth = eq.hrtfAzimuth;
-      _elevation = eq.hrtfElevation;
-      _sofaPath = eq.hrtfSofaPath;
+    try {
+      final playerState = context.read<PlayerCubit>().state;
+      _enabled = playerState.isHrtfEnabled;
+      _azimuth = playerState.hrtfAzimuth;
+      _elevation = playerState.hrtfElevation;
+      _sofaPath = playerState.hrtfSofaPath;
+    } catch (_) {
+      if (getIt.isRegistered<EqualizerManager>()) {
+        final eq = getIt<EqualizerManager>();
+        _enabled = eq.isHrtfEnabled;
+        _azimuth = eq.hrtfAzimuth;
+        _elevation = eq.hrtfElevation;
+        _sofaPath = eq.hrtfSofaPath;
+      }
     }
   }
 
@@ -65,6 +84,7 @@ class _HrtfBinauralCardState extends State<HrtfBinauralCard> {
             elevation: _elevation,
             sofaPath: _sofaPath,
           );
+      if (!mounted) return;
     } catch (e, st) {
       if (mounted) setState(() => _enabled = prev);
       ErrorLogger.log('Failed to toggle HRTF', error: e, stackTrace: st);
@@ -80,6 +100,7 @@ class _HrtfBinauralCardState extends State<HrtfBinauralCard> {
             elevation: _elevation,
             sofaPath: _sofaPath,
           );
+      if (!mounted) return;
     } catch (_) {}
   }
 
@@ -92,6 +113,7 @@ class _HrtfBinauralCardState extends State<HrtfBinauralCard> {
             elevation: val,
             sofaPath: _sofaPath,
           );
+      if (!mounted) return;
     } catch (_) {}
   }
 
@@ -110,6 +132,7 @@ class _HrtfBinauralCardState extends State<HrtfBinauralCard> {
         type: FileType.custom,
         allowedExtensions: ['sofa', 'wav'],
       );
+      if (!mounted) return;
       if (result == null || result.path == null) return;
 
       final file = SafeFilePath.validate(
@@ -129,6 +152,7 @@ class _HrtfBinauralCardState extends State<HrtfBinauralCard> {
               elevation: _elevation,
               sofaPath: path,
             );
+        if (!mounted) return;
         // Success is defined by the manager adopting the path; a rejected file
         // leaves the previous path in place. Only then adopt it locally and
         // report success.
@@ -166,6 +190,7 @@ class _HrtfBinauralCardState extends State<HrtfBinauralCard> {
             elevation: 0.0,
             sofaPath: '',
           );
+      if (!mounted) return;
       if (_hrtfDatasetAcknowledged('') && mounted) {
         setState(() {
           _azimuth = 30.0;
@@ -186,7 +211,21 @@ class _HrtfBinauralCardState extends State<HrtfBinauralCard> {
     );
     final isBlocked = widget.blockedReason != null || !widget.nativeAvailable;
 
-    return Container(
+    return BlocListener<PlayerCubit, PlayerState>(
+      listenWhen: (prev, curr) =>
+          prev.isHrtfEnabled != curr.isHrtfEnabled ||
+          prev.hrtfAzimuth != curr.hrtfAzimuth ||
+          prev.hrtfElevation != curr.hrtfElevation ||
+          prev.hrtfSofaPath != curr.hrtfSofaPath,
+      listener: (context, state) {
+        setState(() {
+          _enabled = state.isHrtfEnabled;
+          _azimuth = state.hrtfAzimuth;
+          _elevation = state.hrtfElevation;
+          _sofaPath = state.hrtfSofaPath;
+        });
+      },
+      child: Container(
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
         color: p.surfaceContainer,
@@ -384,6 +423,7 @@ class _HrtfBinauralCardState extends State<HrtfBinauralCard> {
           ],
         ],
       ),
+    ),
     );
   }
 }

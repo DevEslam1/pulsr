@@ -18,9 +18,12 @@ import androidx.media3.exoplayer.audio.ForwardingAudioOutputProvider;
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.WeakHashMap;
@@ -142,7 +145,7 @@ public final class PulsrOutputRouting {
     }
 
     @Nullable
-    private static AudioTrack getAudioTrackFromSink(DefaultAudioSink sink) {
+    private static synchronized AudioTrack getAudioTrackFromSink(DefaultAudioSink sink) {
         if (sink == null) return null;
         final CapturingAudioOutputProvider provider = capturedProviders.get(sink);
         if (provider != null) {
@@ -291,11 +294,17 @@ public final class PulsrOutputRouting {
     }
 
     /** True while a registered AAudio or AudioTrack stream is playing. */
-    public static synchronized boolean isPlaying() {
-        for (AAudioAudioSink sink : nativeSinks) {
+    public static boolean isPlaying() {
+        final List<AAudioAudioSink> nativeCopy;
+        final List<DefaultAudioSink> sinksCopy;
+        synchronized (PulsrOutputRouting.class) {
+            nativeCopy = new ArrayList<>(nativeSinks);
+            sinksCopy = new ArrayList<>(sinks);
+        }
+        for (AAudioAudioSink sink : nativeCopy) {
             if (sink.isPlaying() && sink.measuredStream()[1] > 0) return true;
         }
-        for (DefaultAudioSink sink : sinks) {
+        for (DefaultAudioSink sink : sinksCopy) {
             AudioTrack track = getAudioTrackFromSink(sink);
             try {
                 if (track != null && track.getPlayState() == AudioTrack.PLAYSTATE_PLAYING) return true;
@@ -384,26 +393,39 @@ public final class PulsrOutputRouting {
      * {@code AudioFormat.ENCODING_*} for PCM. This describes the app stream, not
      * a claim about the downstream DAC/mixer.
      */
-    public static synchronized int[] snapshot() {
+    public static int[] snapshot() {
+        final List<AAudioAudioSink> nativeSinksSnapshot;
+        final List<DefaultAudioSink> sinksSnapshot;
+        final Map<Object, PulsrAudioSink> owners = new HashMap<>();
+        synchronized (PulsrOutputRouting.class) {
+            nativeSinksSnapshot = new ArrayList<>(nativeSinks);
+            sinksSnapshot = new ArrayList<>(sinks);
+            for (AAudioAudioSink sink : nativeSinksSnapshot) {
+                owners.put(sink, ownerOf(sink));
+            }
+            for (DefaultAudioSink sink : sinksSnapshot) {
+                owners.put(sink, ownerOf(sink));
+            }
+        }
         int[] nativeFallback = null;
         PulsrAudioSink nativeFallbackOwner = null;
-        for (AAudioAudioSink sink : nativeSinks) {
+        for (AAudioAudioSink sink : nativeSinksSnapshot) {
             int[] measured = sink.measuredStream();
             if (measured[1] == 0) continue;
             nativeFallback = measured;
-            nativeFallbackOwner = ownerOf(sink);
+            nativeFallbackOwner = owners.get(sink);
             if (sink.isPlaying()) return withDecodedPath(measured, nativeFallbackOwner);
         }
         AudioTrack fallback = null;
         PulsrAudioSink fallbackOwner = null;
-        for (DefaultAudioSink sink : sinks) {
+        for (DefaultAudioSink sink : sinksSnapshot) {
             AudioTrack track = getAudioTrackFromSink(sink);
             try {
                 if (track == null || track.getState() != AudioTrack.STATE_INITIALIZED) continue;
                 if (track.getPlayState() == AudioTrack.PLAYSTATE_PLAYING)
-                    return snapshot(track, ownerOf(sink));
+                    return snapshot(track, owners.get(sink));
                 fallback = track;
-                fallbackOwner = ownerOf(sink);
+                fallbackOwner = owners.get(sink);
             } catch (IllegalStateException released) {
                 // Track released concurrently by the playback thread; skip it.
             }

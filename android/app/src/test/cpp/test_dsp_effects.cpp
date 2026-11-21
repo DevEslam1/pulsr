@@ -1150,6 +1150,359 @@ void testMediumCspFixes() {
     std::cout << "PASS: Medium C++ DSP fixes (Crossfeed/Limiter/Saturation/DynamicBass) verified." << std::endl;
 }
 
+static void testStereoWidthPerSampleRampAndNanScrub() {
+    std::cout << "Testing StereoWidth per-sample ramp (broadband & multiband) and NaN scrubbing..." << std::endl;
+
+    // 1. Broadband planar linear ramp: constant pure-side input (L=1, R=-1) => outL[i] == w[i].
+    {
+        StereoWidth sw;
+        sw.setSampleRate(48000.0);
+        sw.setEnabled(true);
+        sw.configure(0.0);
+        sw.reset();
+
+        constexpr int frames = 512;
+        std::vector<float> l(frames, 1.0f), r(frames, -1.0f);
+        sw.configure(2.0);
+        sw.process(l.data(), r.data(), frames);
+
+        // Must start at previous block's width (0.0), not snap at frame 0.
+        assert(std::abs(l[0] - 0.0f) < 1e-5f && "Broadband planar must start at previous width (no boundary step)");
+        const float expectedStep = l[1] - l[0];
+        assert(expectedStep > 1e-4f && "Broadband planar width must ramp upward per frame");
+        for (int i = 1; i < frames; ++i) {
+            const float step = l[i] - l[i - 1];
+            assert(std::abs(step - expectedStep) < 1e-4f && "Broadband planar ramp must be linear per frame");
+            assert(std::abs(r[i] + l[i]) < 1e-5f && "Broadband planar R must mirror L on pure-side input");
+        }
+
+        // Next block must continue smoothly from end of block 0.
+        const float prevLast = l[frames - 1];
+        std::fill(l.begin(), l.end(), 1.0f);
+        std::fill(r.begin(), r.end(), -1.0f);
+        sw.process(l.data(), r.data(), frames);
+        assert(std::abs((l[0] - prevLast) - expectedStep) < 1e-4f &&
+               "Broadband planar block-boundary delta must match per-sample ramp slope");
+    }
+
+    // 2. Broadband interleaved linear ramp (2ch and 4ch).
+    for (int channels : {2, 4}) {
+        StereoWidth sw;
+        sw.setSampleRate(48000.0);
+        sw.setEnabled(true);
+        sw.configure(0.0);
+        sw.reset();
+
+        constexpr int frames = 512;
+        std::vector<float> buf(frames * channels);
+        auto fillPureSide = [&]() {
+            for (int i = 0; i < frames; ++i) {
+                for (int ch = 0; ch < channels; ch += 2) {
+                    buf[i * channels + ch] = 1.0f;
+                    buf[i * channels + ch + 1] = -1.0f;
+                }
+            }
+        };
+        fillPureSide();
+        sw.configure(2.0);
+        sw.processInterleaved(buf.data(), frames, channels);
+
+        assert(std::abs(buf[0] - 0.0f) < 1e-5f && "Broadband interleaved must start at previous width");
+        const float expectedStep = buf[channels] - buf[0];
+        assert(expectedStep > 1e-4f && "Broadband interleaved width must ramp per frame");
+        for (int i = 1; i < frames; ++i) {
+            for (int ch = 0; ch < channels; ch += 2) {
+                const float cur = buf[i * channels + ch];
+                const float prev = buf[(i - 1) * channels + ch];
+                assert(std::abs((cur - prev) - expectedStep) < 1e-4f &&
+                       "Broadband interleaved ramp must be linear across all pairs");
+            }
+        }
+        const float prevLast = buf[(frames - 1) * channels];
+        fillPureSide();
+        sw.processInterleaved(buf.data(), frames, channels);
+        assert(std::abs((buf[0] - prevLast) - expectedStep) < 1e-4f &&
+               "Broadband interleaved block boundary must be continuous");
+    }
+
+    // 3. Multiband per-sample ramp (planar & interleaved): low-frequency out-of-phase sine
+    //    must ramp smoothly across block boundaries when lowWidth jumps 0.0 -> 2.0.
+    {
+        StereoWidth swPlanar, swInter;
+        swPlanar.setSampleRate(48000.0);
+        swPlanar.setEnabled(true);
+        swPlanar.configureMultiband(true, 0.0, 0.0, 0.0, 250.0, 3000.0);
+        swPlanar.reset();
+
+        swInter.setSampleRate(48000.0);
+        swInter.setEnabled(true);
+        swInter.configureMultiband(true, 0.0, 0.0, 0.0, 250.0, 3000.0);
+        swInter.reset();
+
+        constexpr int blockSize = 512;
+        int cursor = 0;
+        std::vector<float> prevInter;
+        float prevPlanarLastL = 0.0f;
+        bool hasPrevPlanar = false;
+
+        auto runBlocks = [&](int count, float maxAllowedDelta, const char* label) {
+            for (int b = 0; b < count; ++b) {
+                std::vector<float> l(blockSize), r(blockSize), inter(blockSize * 2);
+                for (int i = 0; i < blockSize; ++i) {
+                    const float t = static_cast<float>(cursor + i) / 48000.0f;
+                    const float s = 0.7f * std::sin(2.0f * static_cast<float>(M_PI) * 100.0f * t);
+                    l[i] = s;
+                    r[i] = -s;
+                    inter[i * 2] = s;
+                    inter[i * 2 + 1] = -s;
+                }
+                swPlanar.process(l.data(), r.data(), blockSize);
+                swInter.processInterleaved(inter.data(), blockSize, 2);
+
+                if (hasPrevPlanar) {
+                    assert(std::abs(l[0] - prevPlanarLastL) < maxAllowedDelta &&
+                           "Multiband planar boundary must not stair-step on width jump");
+                }
+                for (int i = 1; i < blockSize; ++i) {
+                    assert(std::abs(l[i] - l[i - 1]) < maxAllowedDelta &&
+                           "Multiband planar internal step must stay smooth");
+                }
+                for (int i = 0; i < blockSize; ++i) {
+                    assert(std::abs(l[i] - inter[i * 2]) < 1e-5f &&
+                           std::abs(r[i] - inter[i * 2 + 1]) < 1e-5f &&
+                           "Multiband planar and interleaved ramps must match");
+                }
+                checkSignalContinuity(prevInter, inter, 2, maxAllowedDelta, label);
+                prevPlanarLastL = l[blockSize - 1];
+                hasPrevPlanar = true;
+                prevInter = inter;
+                cursor += blockSize;
+            }
+        };
+
+        runBlocks(4, 0.06f, "StereoWidth Multiband Warm");
+        swPlanar.configureMultiband(true, 2.0, 2.0, 2.0, 250.0, 3000.0);
+        swInter.configureMultiband(true, 2.0, 2.0, 2.0, 250.0, 3000.0);
+        runBlocks(8, 0.06f, "StereoWidth Multiband Jump 0->2");
+        swPlanar.setEnabled(false);
+        swInter.setEnabled(false);
+        runBlocks(8, 0.06f, "StereoWidth Multiband Disable");
+    }
+
+    // 4. Multiband NaN/Inf input scrubbing (planar & interleaved): crossover state stays finite.
+    {
+        StereoWidth sw;
+        sw.setSampleRate(48000.0);
+        sw.setEnabled(true);
+        sw.configureMultiband(true, 0.0, 1.0, 1.5, 200.0, 3000.0);
+        sw.reset();
+
+        constexpr int frames = 256;
+        std::vector<float> l(frames), r(frames);
+        for (int i = 0; i < frames; ++i) {
+            const float s = 0.4f * std::sin(2.0f * static_cast<float>(M_PI) * 500.0f * i / 48000.0f);
+            l[i] = s;
+            r[i] = -s;
+        }
+        l[0] = std::numeric_limits<float>::quiet_NaN();
+        r[0] = std::numeric_limits<float>::infinity();
+        l[5] = -std::numeric_limits<float>::infinity();
+        r[5] = std::numeric_limits<float>::quiet_NaN();
+
+        sw.process(l.data(), r.data(), frames);
+        for (int i = 0; i < frames; ++i) {
+            assert(std::isfinite(l[i]) && std::isfinite(r[i]) &&
+                   "StereoWidth multiband planar must scrub NaN/Inf before crossover");
+        }
+        // Subsequent clean block must remain finite and produce real audio.
+        for (int i = 0; i < frames; ++i) {
+            const float s = 0.4f * std::sin(2.0f * static_cast<float>(M_PI) * 500.0f * (frames + i) / 48000.0f);
+            l[i] = s;
+            r[i] = s;
+        }
+        sw.process(l.data(), r.data(), frames);
+        float maxClean = 0.0f;
+        for (int i = 0; i < frames; ++i) {
+            assert(std::isfinite(l[i]) && std::isfinite(r[i]) &&
+                   "StereoWidth multiband planar crossover state must stay finite");
+            maxClean = std::max(maxClean, std::abs(l[i]));
+        }
+        assert(maxClean > 0.1f && "StereoWidth multiband planar must recover clean audio after NaN");
+
+        sw.reset();
+        std::vector<float> inter(frames * 4, 0.0f);
+        for (int i = 0; i < frames; ++i) {
+            const float s = 0.4f * std::sin(2.0f * static_cast<float>(M_PI) * 500.0f * i / 48000.0f);
+            for (int ch = 0; ch < 4; ++ch) inter[i * 4 + ch] = s;
+        }
+        inter[0] = std::numeric_limits<float>::quiet_NaN();
+        inter[1] = -std::numeric_limits<float>::infinity();
+        inter[2] = std::numeric_limits<float>::infinity();
+        inter[3] = std::numeric_limits<float>::quiet_NaN();
+        sw.processInterleaved(inter.data(), frames, 4);
+        for (float v : inter) {
+            assert(std::isfinite(v) && "StereoWidth multiband interleaved must scrub NaN/Inf");
+        }
+        for (int i = 0; i < frames; ++i) {
+            const float s = 0.4f * std::sin(2.0f * static_cast<float>(M_PI) * 500.0f * (frames + i) / 48000.0f);
+            for (int ch = 0; ch < 4; ++ch) inter[i * 4 + ch] = s;
+        }
+        sw.processInterleaved(inter.data(), frames, 4);
+        float maxInterClean = 0.0f;
+        for (float v : inter) {
+            assert(std::isfinite(v) && "StereoWidth multiband interleaved state must stay finite");
+            maxInterClean = std::max(maxInterClean, std::abs(v));
+        }
+        assert(maxInterClean > 0.1f && "StereoWidth multiband interleaved must recover after NaN");
+    }
+
+    std::cout << "PASS: StereoWidth per-sample ramp & multiband NaN scrubbing verified." << std::endl;
+}
+
+static void testLiveProgUtf8Lexer() {
+    std::cout << "Testing LiveProg Lexer UTF-8 / non-ASCII byte safety..." << std::endl;
+    LiveProg prog;
+    prog.setSampleRate(48000.0);
+
+    // UTF-8 accented Latin, CJK, and high-bit bytes inside line and block comments
+    const std::string utf8Script =
+        "// Caf\xC3\xA9 \xE9\x9F\xB3\xE6\xA5\xBD \xF0\x9F\x8E\xB5 \x80\xFF\n"
+        "@init\n"
+        "/* \xD0\x9F\xD1\x80\xD0\xB8\xD0\xB2\xD0\xB5\xD1\x82 gain = 0.5 */\n"
+        "g = 0.5;\n"
+        "@sample\n"
+        "// \xC3\xBC\xC3\xB6\xC3\xA4 scaling\n"
+        "spl0 = spl0 * g;\n"
+        "spl1 = spl1 * g;\n";
+
+    const bool ok = prog.loadCode(utf8Script);
+    assert(ok && "LiveProg must compile scripts with UTF-8 comments cleanly");
+    prog.setEnabled(true);
+    prog.reset();
+
+    std::vector<float> buf(64 * 2, 0.8f);
+    prog.processInterleaved(buf.data(), 64, 2);
+    for (float v : buf) {
+        assert(std::isfinite(v) && std::abs(v - 0.4f) < 1e-4f &&
+               "LiveProg UTF-8 commented script must execute accurately");
+    }
+
+    // Stray non-ASCII bytes outside comments must fail cleanly without UB/crash.
+    const std::string badNonAscii = "@sample\n\xC3\xA9 = spl0;\n";
+    assert(!prog.loadCode(badNonAscii) && "Non-ASCII identifier must be rejected cleanly");
+    assert(!prog.getLastError().empty() && "Rejected non-ASCII token must set lastError");
+
+    const std::string badHighByte = "@sample\n\xFF\n";
+    assert(!prog.loadCode(badHighByte) && "0xFF byte outside comment must be rejected cleanly");
+
+    const std::string badAtTag = "@\xC3\xA9\nspl0 = spl0;\n";
+    (void)prog.loadCode(badAtTag); // Must not UB/crash regardless of parse outcome
+
+    std::cout << "PASS: LiveProg Lexer UTF-8 / non-ASCII safety verified." << std::endl;
+}
+
+static void testConvolutionReverbSurroundToggleCrossfade() {
+    std::cout << "Testing ConvolutionReverb multichannel (5.1) surround toggle crossfade..." << std::endl;
+    auto reverb = std::make_unique<ConvolutionReverb>();
+    reverb->setSampleRate(48000.0);
+    reverb->setPreset(ReverbPreset::Room);
+    reverb->setWetDry(0.5);
+    reverb->setEnabled(false);
+    reverb->reset();
+
+    const int channels = 6;
+    const int blockSize = 256;
+    const float freq = 220.0f;
+    const float amp = 0.6f;
+
+    std::vector<float> prevBlock;
+    int cursor = 0;
+
+    auto runBlocks = [&](int count, const char* label, float maxSurroundDelta, float firstBoundaryMax = -1.0f) {
+        for (int b = 0; b < count; ++b) {
+            auto block = generateSineWave(blockSize, channels, freq, 48000.0f, amp, cursor);
+            reverb->processInterleaved(block.data(), blockSize, channels);
+            if (!prevBlock.empty()) {
+                const float bLimit = (b == 0 && firstBoundaryMax > 0.0f) ? firstBoundaryMax : maxSurroundDelta;
+                for (int ch = 2; ch < channels; ++ch) {
+                    const float lastPrev = prevBlock[prevBlock.size() - channels + ch];
+                    const float firstCur = block[ch];
+                    const float boundaryDelta = std::abs(firstCur - lastPrev);
+                    if (!std::isfinite(firstCur) || boundaryDelta > bLimit) {
+                        std::cerr << "FAIL [" << label << "]: surround ch " << ch
+                                  << " block " << b << " boundary click delta=" << boundaryDelta
+                                  << " (limit=" << bLimit << ")" << std::endl;
+                        std::exit(1);
+                    }
+                    for (int i = 1; i < blockSize; ++i) {
+                        const float step = std::abs(block[i * channels + ch] - block[(i - 1) * channels + ch]);
+                        if (!std::isfinite(block[i * channels + ch]) || step > maxSurroundDelta) {
+                            std::cerr << "FAIL [" << label << "]: surround ch " << ch
+                                      << " block " << b << " internal click at frame " << i
+                                      << " delta=" << step << std::endl;
+                            std::exit(1);
+                        }
+                    }
+                }
+            }
+            prevBlock = block;
+            cursor += blockSize;
+        }
+    };
+
+    // 1. Disabled warm-up (natural 220 Hz @ 48 kHz slope is ~0.017)
+    runBlocks(4, "Reverb 5.1 Disabled", 0.04f);
+
+    // 2. Enable reverb -> first boundary must stay continuous with undelayed input (< 0.04,
+    //    whereas un-crossfaded snap to zeroed delay jumped by ~0.56). Later blocks allow
+    //    bounded emergence of the zero-primed delay line matching L/R's dryDelay_.
+    //    70 blocks (~373 ms) exceeds 9.2 * 35 ms so smoothedEnabledMix_ snaps to 1.0.
+    reverb->setEnabled(true);
+    runBlocks(70, "Reverb 5.1 Enabling", 0.20f, 0.04f);
+
+    // 3. Steady-state check: surround channel is delayed by reverbLatencyFrames_ (512 samples)
+    const int latency = reverb->getReverbLatencyFrames();
+    assert(latency == ConvolutionReverb::PARTITION_SIZE && "Room preset @ 48kHz has 512-sample latency");
+    {
+        auto block = generateSineWave(blockSize, channels, freq, 48000.0f, amp, cursor);
+        reverb->processInterleaved(block.data(), blockSize, channels);
+        for (int i = 0; i < blockSize; ++i) {
+            const float tDelayed = static_cast<float>(cursor + i - latency) / 48000.0f;
+            const float expected = amp * std::sin(2.0f * static_cast<float>(M_PI) * freq * tDelayed);
+            for (int ch = 2; ch < channels; ++ch) {
+                assert(std::abs(block[i * channels + ch] - expected) < 1e-3f &&
+                       "Steady-state surround channel must be time-aligned with reverb latency");
+            }
+        }
+        prevBlock = block;
+        cursor += blockSize;
+    }
+
+    // 4. Disable reverb -> surround must smoothly crossfade back to undelayed before bypass
+    //    with tight continuity across every sample and block boundary (including entering bypass).
+    reverb->setEnabled(false);
+    runBlocks(70, "Reverb 5.1 Disabling", 0.04f);
+    assert(!reverb->isRamping() && "Reverb 5.1 disable ramp must finish within 70 blocks");
+
+    // 5. Post-disable bypass must be exact undelayed input and continuous with the final ramp block
+    {
+        auto block = generateSineWave(blockSize, channels, freq, 48000.0f, amp, cursor);
+        auto expected = block;
+        reverb->processInterleaved(block.data(), blockSize, channels);
+        for (int ch = 2; ch < channels; ++ch) {
+            const float lastPrev = prevBlock[prevBlock.size() - channels + ch];
+            assert(std::abs(block[ch] - lastPrev) < 0.04f &&
+                   "Post-disable 5.1 bypass entry must be click-free");
+        }
+        for (size_t i = 0; i < block.size(); ++i) {
+            assert(std::abs(block[i] - expected[i]) < 1e-6f &&
+                   "Post-disable 5.1 bypass must be exact passthrough");
+        }
+    }
+
+    std::cout << "PASS: ConvolutionReverb 5.1 surround toggle crossfade verified click-free." << std::endl;
+}
+
 int main() {
     std::cout << "Running DSP effects C++ unit tests..." << std::endl;
     testConvolutionReverbUnityGain();
@@ -1173,6 +1526,9 @@ int main() {
     testDynamicBassNanGuard();
     testSubCrossoverNanGuard();
     testMediumCspFixes();
+    testStereoWidthPerSampleRampAndNanScrub();
+    testLiveProgUtf8Lexer();
+    testConvolutionReverbSurroundToggleCrossfade();
     std::cout << "All DSP effects C++ tests passed successfully!" << std::endl;
     return 0;
 }

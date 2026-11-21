@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pulsr/core/constants/prefs_keys.dart';
 import 'package:pulsr/core/services/ytm_service.dart';
 import 'package:pulsr/core/telemetry/playback_latency_tracker.dart';
+import 'package:pulsr/core/utils/error_logger.dart';
 import 'package:pulsr/data/db/app_database.dart';
 import 'package:pulsr/domain/models/ytm_track.dart';
 
@@ -92,7 +93,7 @@ class StreamResolutionPipeline {
       artist: song.artist,
       duration:
           song.durationMs > 0 ? Duration(milliseconds: song.durationMs) : null,
-    );
+    ).timeout(const Duration(seconds: 20));
     if (stream.url.trim().isEmpty) {
       throw const YtmException(
           'YTM_UNAVAILABLE', 'Resolved stream URL is empty');
@@ -135,6 +136,9 @@ class StreamResolutionPipeline {
     if (videoId == null || videoId.isEmpty) return;
     try {
       await resolveStreamUrl(song, forceRefresh: false, prefs: prefs);
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('warmStreamCache failed',
+          error: e, stackTrace: st, category: 'StreamResolutionPipeline');
+    }
   }
 }

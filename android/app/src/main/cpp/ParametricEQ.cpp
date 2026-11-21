@@ -67,9 +67,11 @@ void ParametricEQ::setDynamicBands(int count, const double* freqs, const double*
     if (!freqs || count <= 0) return;
     bandCount_ = std::clamp(count, 1, MAX_BANDS);
     for (int i = 0; i < bandCount_; ++i) {
-        bands_[i].frequency = freqs[i];
-        bands_[i].smoothedFrequency = freqs[i];
-        bands_[i].q = qs ? qs[i] : 1.414;
+        const double safeF = std::isfinite(freqs[i]) ? freqs[i] : 1000.0;
+        const double safeQ = (qs && std::isfinite(qs[i])) ? qs[i] : 1.414;
+        bands_[i].frequency = std::clamp(safeF, 10.0, sampleRate_ * 0.499);
+        bands_[i].smoothedFrequency = bands_[i].frequency;
+        bands_[i].q = std::clamp(safeQ, 0.05, 30.0);
         bands_[i].smoothedQ = bands_[i].q;
         bands_[i].targetGainDb = 0.0;
         bands_[i].smoothedGainDb = 0.0;
@@ -86,9 +88,12 @@ void ParametricEQ::setBand(int idx, double freq, double gainDb, double q, Filter
     if (idx < 0 || idx >= MAX_BANDS) return;
     if (idx >= bandCount_) bandCount_ = idx + 1;
 
-    bands_[idx].frequency = std::clamp(freq, 10.0, sampleRate_ * 0.499);
-    bands_[idx].targetGainDb = std::clamp(gainDb, -30.0, 30.0);
-    bands_[idx].q = std::clamp(q, 0.05, 30.0);
+    const double safeF = std::isfinite(freq) ? freq : 1000.0;
+    const double safeG = std::isfinite(gainDb) ? gainDb : 0.0;
+    const double safeQ = std::isfinite(q) ? q : 1.0;
+    bands_[idx].frequency = std::clamp(safeF, 10.0, sampleRate_ * 0.499);
+    bands_[idx].targetGainDb = std::clamp(safeG, -30.0, 30.0);
+    bands_[idx].q = std::clamp(safeQ, 0.05, 30.0);
     // Direct programmatic set: snap the smoothed freq/Q so coeffs reflect the new
     // band immediately (the snapshot/applyParams path is what sweeps click-free).
     bands_[idx].smoothedFrequency = bands_[idx].frequency;
@@ -111,7 +116,8 @@ void ParametricEQ::setBandMute(int idx, bool mute) {
 }
 
 void ParametricEQ::setPreamp(double preampDb) {
-    targetPreampDb_ = std::clamp(preampDb, -30.0, 30.0);
+    const double safe = std::isfinite(preampDb) ? preampDb : 0.0;
+    targetPreampDb_ = std::clamp(safe, -30.0, 30.0);
 }
 
 void ParametricEQ::beginEnableRamp() {
@@ -130,6 +136,30 @@ void ParametricEQ::beginEnableRamp() {
 }
 
 void ParametricEQ::beginDisableRamp() {
+    // Only engage a disable fade-out when the EQ actually holds non-unity state;
+    // transitioning off from a fresh/flat EQ (e.g. default enabled_=true -> false
+    // on the engine's first block) must remain an instant, zero-latency bypass.
+    bool hasAudibleState = std::abs(smoothedPreampDb_) >= 1e-4 ||
+                           std::abs(autoHeadroomDb_.load(std::memory_order_relaxed)) >= 1e-4;
+    if (!hasAudibleState) {
+        for (int i = 0; i < bandCount_; ++i) {
+            const auto& b = bands_[i];
+            if (!b.enabled || b.mute) continue;
+            const bool isUnityBypassType =
+                (b.type == FilterType::Peaking ||
+                 b.type == FilterType::LowShelf ||
+                 b.type == FilterType::HighShelf);
+            if (!isUnityBypassType || std::abs(b.smoothedGainDb) >= 1e-4 || !b.bypass) {
+                hasAudibleState = true;
+                break;
+            }
+        }
+    }
+    if (!hasAudibleState) {
+        fadeOutActive_ = false;
+        fadeOutFrames_ = 0;
+        return;
+    }
     // Symmetric to beginEnableRamp: don't clear state or jump to bypass. process()
     // keeps running (see fadeOutActive_) with every gain/preamp smoothing toward
     // unity, then hard-bypasses once the ramp has settled. Settle over ~5 of the

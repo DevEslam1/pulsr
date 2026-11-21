@@ -205,10 +205,10 @@ class DownloadTask {
       ),
       progress: (json['progress'] as num?)?.toDouble() ?? 0.0,
       speedKbps: (json['speedKbps'] as num?)?.toDouble(),
-      etaSeconds: json['etaSeconds'] as int?,
+      etaSeconds: (json['etaSeconds'] as num?)?.toInt(),
       filePath: json['filePath'] as String?,
       format: json['format'] as String?,
-      bitrate: json['bitrate'] as int?,
+      bitrate: (json['bitrate'] as num?)?.toInt(),
       error: json['error'] as String?,
       createdAt: json['createdAt'] != null
           ? DateTime.tryParse(json['createdAt'] as String) ?? DateTime.now()
@@ -250,6 +250,7 @@ class DownloadTask {
           format == other.format &&
           bitrate == other.bitrate &&
           error == other.error &&
+          createdAt == other.createdAt &&
           sourceSongId == other.sourceSongId &&
           localSongId == other.localSongId &&
           fileSize == other.fileSize &&
@@ -273,6 +274,7 @@ class DownloadTask {
         format,
         bitrate,
         error,
+        createdAt,
         sourceSongId,
         localSongId,
         fileSize,

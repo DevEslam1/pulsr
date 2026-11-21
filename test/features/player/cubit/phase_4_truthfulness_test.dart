@@ -6,6 +6,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/data/audio/audio_handler.dart';
+import 'package:pulsr/data/audio/equalizer_manager.dart';
 import 'package:pulsr/data/db/app_database.dart';
 import 'package:pulsr/domain/repositories/music_repository_interface.dart';
 import 'package:pulsr/domain/usecases/toggle_favorite_usecase.dart';
@@ -57,14 +58,32 @@ class _TestAudioHandler extends BaseAudioHandler
     _volumeSubject.add(_vol);
   }
 
-  @override
-  bool get usbHardwareVolumeOwned => false;
+  bool usbHardwareVolumeOwnedOverride = false;
+  bool? hardwareMuteState;
+  final List<bool> setUsbHardwareMuteCalls = <bool>[];
+  EqualizerManager? overrideEqualizerManager;
+  bool crossfeedEnabledOverride = false;
+  late final EqualizerManager _fallbackEqualizerManager = MockEqualizerManager();
 
   @override
-  bool? get usbHardwareMute => null;
+  bool get usbHardwareVolumeOwned => usbHardwareVolumeOwnedOverride;
 
   @override
-  Future<bool> setUsbHardwareMute(bool muted) async => false;
+  bool? get usbHardwareMute => hardwareMuteState;
+
+  @override
+  Future<bool> setUsbHardwareMute(bool muted) async {
+    setUsbHardwareMuteCalls.add(muted);
+    hardwareMuteState = muted;
+    return true;
+  }
+
+  @override
+  EqualizerManager get equalizerManager =>
+      overrideEqualizerManager ?? _fallbackEqualizerManager;
+
+  @override
+  bool get crossfeedUserEnabled => crossfeedEnabledOverride;
 
   void emitHardwareVolume(double vol) {
     _vol = vol.clamp(0.0, 1.0);
@@ -189,6 +208,53 @@ void main() {
 
       await cubit.close();
     });
+
+    test(
+        'PlaybackVolumeMute.toggleMute syncs with usbHardwareMute when hardware owns volume',
+        () async {
+      PlayerState state = const PlayerState();
+      handler.usbHardwareVolumeOwnedOverride = true;
+      // Pretend hardware mute was enabled in Settings while controller _muted=false.
+      handler.hardwareMuteState = true;
+
+      final controller = PlaybackVolumeMute(
+        audioHandler: handler,
+        getState: () => state,
+        emit: (s) => state = s,
+      );
+
+      await controller.toggleMute();
+      expect(handler.setUsbHardwareMuteCalls, [false]);
+      expect(state.isMuted, isFalse);
+
+      // Pretend hardware mute was cleared in Settings while controller _muted=false.
+      await controller.toggleMute();
+      expect(handler.setUsbHardwareMuteCalls, [false, true]);
+      expect(state.isMuted, isTrue);
+    });
+
+    test('PlayerCubit re-syncs state.dsp when equalizerManager.reloadNotifier fires',
+        () async {
+      final reloadNotifier = ValueNotifier<int>(0);
+      addTearDown(reloadNotifier.dispose);
+      final mockEq = MockEqualizerManager();
+      when(() => mockEq.reloadNotifier).thenReturn(reloadNotifier);
+      handler.overrideEqualizerManager = mockEq;
+      handler.crossfeedEnabledOverride = false;
+
+      final cubit = PlayerCubit(
+        audioHandler: handler,
+        repository: MockMusicRepository(),
+        toggleFavoriteUseCase: MockToggleFavoriteUseCase(),
+      );
+      expect(cubit.state.isCrossfeedEnabled, isFalse);
+
+      handler.crossfeedEnabledOverride = true;
+      reloadNotifier.value++;
+      expect(cubit.state.isCrossfeedEnabled, isTrue);
+
+      await cubit.close();
+    });
   });
 
   group('PlayerVolumeBar Widget', () {
@@ -224,6 +290,29 @@ void main() {
       await tester.tap(find.byIcon(Icons.volume_up_rounded).last);
       await tester.pump();
       verify(() => cubit.setVolume(1.0)).called(1);
+    });
+
+    testWidgets(
+        'shows muted icon even with non-zero slider volume under USB hardware mute',
+        (tester) async {
+      final cubit = stubPlayerCubit(
+        state: const PlayerState().copyWith(
+          playback: const PlaybackSlice(volume: 0.8, isMuted: true),
+        ),
+      );
+      when(() => cubit.toggleMute()).thenAnswer((_) async {});
+      when(() => cubit.setVolume(any())).thenAnswer((_) async {});
+
+      await tester.pumpWidget(sheetHost(
+        playerCubit: cubit,
+        child: PlayerVolumeBar(
+          cubit: cubit,
+          activeColor: Colors.deepPurple,
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(Icons.volume_off_rounded), findsOneWidget);
     });
   });
 }

@@ -28,7 +28,7 @@ import '../../../../data/db/app_database.dart';
 import '../../../../domain/models/audio_effects_config.dart';
 import '../../../../domain/models/audio_output_info.dart';
 import '../../../../data/audio/live_output_verdict.dart';
-import '../../../../domain/models/audio_quality_info.dart';
+import '../../../../data/audio/dsd_decoder_helper.dart';
 import '../../../../domain/models/audio_signal_path.dart';
 import '../../../../core/telemetry/audio_session_log.dart';
 import '../../../../domain/models/eq_preset.dart';
@@ -188,6 +188,7 @@ class PlayerDspController {
 
   final Mutex _followSampleRateMutex = Mutex();
   final Mutex _dspEffectsToggleMutex = Mutex();
+  final Mutex _deviceChangeMutex = Mutex();
   int? _lastFollowedSampleRate;
   int? _lastFollowedBitDepth;
   String? _lastFollowedRoute;
@@ -206,7 +207,7 @@ class PlayerDspController {
       aaudioEnabled: s.aaudioOutputEnabled,
       // DoP packs DSD into the PCM carrier; any DSP/gain write corrupts it.
       // The EQ sheet already gates on this, but programmatic setters did not.
-      dsdDopActive: AudioQualityInfo.dsdDopActive,
+      dsdDopActive: DsdDecoderHelper.dsdDopActive,
     );
   }
 

@@ -273,19 +273,24 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
   Future<void> restoreQueue(
           List<SongsTableData> previousQueue, int previousIndex,
           {Duration? initialPosition}) =>
-      _queueMutex.protect(() async => _restoreQueueLocked(
+      _queueMutex.protect(() => _restoreQueueLocked(
           previousQueue, previousIndex,
           initialPosition: initialPosition));
 
-  void _restoreQueueLocked(
+  Future<void> _restoreQueueLocked(
       List<SongsTableData> previousQueue, int previousIndex,
-      {Duration? initialPosition}) {
+      {Duration? initialPosition}) async {
     // Empty queue is a safe no-op: `clamp(0, previousQueue.length - 1)` would
     // be clamp(0, -1) and throw ArgumentError.
     if (previousQueue.isEmpty) return;
     final state = _getState();
     final validIndex = previousIndex.clamp(0, previousQueue.length - 1);
     final restorePosition = initialPosition ?? state.position;
+    final targetSong = previousQueue[validIndex];
+    final preCallQueueSlice = state.queueSlice;
+    final preCallPlayback = state.playback;
+    final preSlot = _queueSlots[state.activeQueueSlot];
+
     setQueueSlot(
       state.activeQueueSlot,
       songs: List.from(previousQueue),
@@ -304,18 +309,48 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
       playback: state.playback.copyWith(position: restorePosition),
     ));
     _invalidateQueueSyncResolution();
-    _audioHandler
-        .loadQueue(
-          previousQueue,
-          initialIndex: validIndex,
-          initialPosition: restorePosition,
-          autoPlay: state.isPlaying,
-        )
-        .whenComplete(_invalidateQueueSyncResolution)
-        .catchError((Object e, StackTrace st) {
+
+    try {
+      await _audioHandler.loadQueue(
+        previousQueue,
+        initialIndex: validIndex,
+        initialPosition: restorePosition,
+        autoPlay: state.isPlaying,
+      );
+      _invalidateQueueSyncResolution();
+      if (_isClosed()) return;
+    } catch (e, st) {
+      _invalidateQueueSyncResolution();
       ErrorLogger.log('Failed to restore queue in audio handler',
           error: e, stackTrace: st, category: 'PlayerQueueController');
-    });
+      if (!_isClosed()) {
+        final current = _getState();
+        final currentSong = current.currentSong;
+        final superseded =
+            currentSong != null && !_isSameTrack(currentSong, targetSong);
+        if (!superseded) {
+          if (preSlot != null) {
+            _queueSlots[state.activeQueueSlot] = preSlot;
+          } else {
+            _queueSlots.remove(state.activeQueueSlot);
+          }
+          debouncedPersistQueueSlots();
+          _bumpQueueVersion();
+          _emit(current.copyWith(
+            queueSlice: preCallQueueSlice,
+            playback: preCallPlayback.copyWith(
+              error: uiError('Failed to restore queue: $e'),
+            ),
+          ));
+        } else {
+          _emit(current.copyWith(
+            playback: current.playback.copyWith(
+              error: uiError('Failed to restore queue: $e'),
+            ),
+          ));
+        }
+      }
+    }
   }
 
   /// Reorder the queue using **post-removal** target index semantics (`0..queue.length - 1`),

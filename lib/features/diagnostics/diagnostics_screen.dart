@@ -8,15 +8,18 @@ import 'dart:async';
 
 import 'package:material_ui/material_ui.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/constants/app_radii.dart';
 import '../../core/constants/app_spacing.dart';
 import '../../core/constants/app_typography.dart';
+import '../../core/di/injection.dart';
 import '../../core/errors/app_error.dart';
 import '../../core/theme/aura_theme.dart';
 import '../../core/utils/error_logger.dart';
 import '../../core/widgets/pulsr_empty_state.dart';
 import '../../core/widgets/pulsr_progress.dart';
+import '../settings/cubit/settings_cubit.dart';
 import 'diagnostics_bundle_service.dart';
 import 'diagnostics_strings.dart';
 import 'safe_mode_controller.dart';
@@ -25,18 +28,18 @@ import 'safe_mode_controller.dart';
 class DiagnosticsScreen extends StatefulWidget {
   const DiagnosticsScreen({
     super.key,
-    required this.bundleService,
-    required this.safeMode,
+    this.bundleService,
+    this.safeMode,
     this.deviceLabel,
     this.deviceKey,
     this.selfTest,
   });
 
   /// Builds and exports the bundle.
-  final DiagnosticsBundleService bundleService;
+  final DiagnosticsBundleService? bundleService;
 
   /// Tracks and clears safe mode for the active device.
-  final SafeModeController safeMode;
+  final SafeModeController? safeMode;
 
   /// Human label of the active output device.
   final String? Function()? deviceLabel;
@@ -60,12 +63,48 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
   bool _safeModeActive = false;
   int _safeModeFailures = 0;
   String? _safeModeReason;
+  DiagnosticsBundleService? _localBundleService;
+  SafeModeController? _localSafeMode;
+
+  DiagnosticsBundleService get _effectiveBundleService {
+    final s = widget.bundleService ?? _localBundleService;
+    if (s == null) {
+      throw StateError('DiagnosticsBundleService not initialized');
+    }
+    return s;
+  }
+
+  SafeModeController? get _effectiveSafeMode =>
+      widget.safeMode ?? _localSafeMode;
 
   @override
   void initState() {
     super.initState();
-    _syncSafeMode();
+    if (widget.safeMode != null) {
+      _syncSafeMode();
+    }
     _refresh();
+  }
+
+  static Map<String, Object?> _defaultOutputDeviceSnapshot() {
+    if (!getIt.isRegistered<SettingsCubit>()) {
+      return const {'name': 'Unknown output device', 'type': 'unknown'};
+    }
+    final device = getIt<SettingsCubit>().state.currentOutputDevice;
+    if (device == null) {
+      return const {'name': 'Unknown output device', 'type': 'unknown'};
+    }
+    return {
+      'name': device.deviceName,
+      'type': device.isUsb
+          ? 'usb'
+          : device.isBluetooth
+              ? 'bluetooth'
+              : 'wired',
+      'sampleRate': device.sampleRate,
+      'bitDepth': device.bitDepth,
+      'bitPerfect': device.isBitPerfectActive,
+    };
   }
 
   String _currentDeviceKey() {
@@ -77,10 +116,12 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
   }
 
   void _syncSafeMode() {
+    final sm = _effectiveSafeMode;
+    if (sm == null) return;
     final key = _currentDeviceKey();
-    _safeModeActive = widget.safeMode.isFallbackActive(key);
-    _safeModeFailures = widget.safeMode.consecutiveFailures(key);
-    _safeModeReason = widget.safeMode.lastFailureReason(key);
+    _safeModeActive = sm.isFallbackActive(key);
+    _safeModeFailures = sm.consecutiveFailures(key);
+    _safeModeReason = sm.lastFailureReason(key);
   }
 
   Future<void> _refresh() async {
@@ -89,7 +130,19 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
       _error = null;
     });
     try {
-      final bundle = await widget.bundleService.build();
+      if ((widget.bundleService == null && _localBundleService == null) ||
+          (widget.safeMode == null && _localSafeMode == null)) {
+        final prefs = await SharedPreferences.getInstance();
+        _localSafeMode ??= getIt.isRegistered<SafeModeController>()
+            ? getIt<SafeModeController>()
+            : SafeModeController(prefs: prefs);
+        _localBundleService ??= DiagnosticsBundleService(
+          prefs: prefs,
+          outputDevice: _defaultOutputDeviceSnapshot,
+        );
+        _syncSafeMode();
+      }
+      final bundle = await _effectiveBundleService.build();
       if (!mounted) return;
       setState(() {
         _bundle = bundle;
@@ -116,7 +169,9 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
   void dispose() {
     // Never leave a redacted bundle behind if the user leaves the screen
     // without sharing, or if the share future completed just before teardown.
-    unawaited(widget.bundleService.cleanupExport());
+    unawaited(widget.bundleService?.cleanupExport() ??
+        _localBundleService?.cleanupExport() ??
+        Future.value());
     super.dispose();
   }
 
@@ -125,7 +180,7 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
     final errorColor = context.palette.error;
     setState(() => _busy = true);
     try {
-      final files = await widget.bundleService.export(bundle: _bundle);
+      final files = await _effectiveBundleService.export(bundle: _bundle);
       await SharePlus.instance.share(
         ShareParams(
           files: files,
@@ -148,7 +203,7 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
     } finally {
       // The bundle contains paths and preferences; do not let it accumulate in
       // the cache directory after the share sheet has it.
-      await widget.bundleService.cleanupExport();
+      await _effectiveBundleService.cleanupExport();
       if (mounted) setState(() => _busy = false);
     }
   }
@@ -158,7 +213,7 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
     final errorColor = context.palette.error;
     setState(() => _busy = true);
     try {
-      await widget.safeMode.applyFallback(_currentDeviceKey());
+      await _effectiveSafeMode?.applyFallback(_currentDeviceKey());
       if (!mounted) return;
       setState(_syncSafeMode);
       messenger?.showSnackBar(
@@ -187,7 +242,7 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
     final errorColor = context.palette.error;
     setState(() => _busy = true);
     try {
-      await widget.safeMode.reset(_currentDeviceKey());
+      await _effectiveSafeMode?.reset(_currentDeviceKey());
       if (!mounted) return;
       setState(_syncSafeMode);
       messenger?.showSnackBar(
@@ -241,7 +296,7 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
 
   Future<String> _defaultSelfTest() async {
     final watch = Stopwatch()..start();
-    final bundle = await widget.bundleService.build();
+    final bundle = await _effectiveBundleService.build();
     watch.stop();
     final sections = <String>[
       if (bundle.app.isNotEmpty) 'app',

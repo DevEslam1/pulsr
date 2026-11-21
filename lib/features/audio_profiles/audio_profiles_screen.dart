@@ -9,6 +9,7 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/constants/app_radii.dart';
 import '../../core/constants/app_spacing.dart';
@@ -29,12 +30,12 @@ import 'audio_profile_strings.dart';
 class AudioProfilesScreen extends StatefulWidget {
   const AudioProfilesScreen({
     super.key,
-    required this.service,
+    this.service,
     this.deviceLabel,
   });
 
   /// Store and applier for the profiles.
-  final AudioProfileService service;
+  final AudioProfileService? service;
 
   /// Label of the currently connected output device, injected so the screen
   /// stays independent of the audio stack.
@@ -53,6 +54,15 @@ class _AudioProfilesScreenState extends State<AudioProfilesScreen> {
   bool _busy = false;
   String? _error;
   String? _defaultId;
+  AudioProfileService? _localService;
+
+  AudioProfileService get _effectiveService {
+    final s = widget.service ?? _localService;
+    if (s == null) {
+      throw StateError('AudioProfileService not initialized');
+    }
+    return s;
+  }
 
   @override
   void initState() {
@@ -68,8 +78,12 @@ class _AudioProfilesScreenState extends State<AudioProfilesScreen> {
       });
     }
     try {
-      final profiles = await widget.service.list();
-      final defaultId = widget.service.defaultProfileId;
+      final service = widget.service ??
+          (_localService ??= AudioProfileService(
+            prefs: await SharedPreferences.getInstance(),
+          ));
+      final profiles = await service.list();
+      final defaultId = service.defaultProfileId;
       if (!mounted) return;
       setState(() {
         _profiles = profiles;
@@ -145,7 +159,7 @@ class _AudioProfilesScreenState extends State<AudioProfilesScreen> {
     final device = widget.deviceLabel?.call();
     await _runAction(
       () async {
-        await widget.service.captureCurrent(trimmed, deviceName: device);
+        await _effectiveService.captureCurrent(trimmed, deviceName: device);
         return AudioProfileStrings.captureSaved;
       },
       failureMessage: AudioProfileStrings.captureFailed,
@@ -163,7 +177,7 @@ class _AudioProfilesScreenState extends State<AudioProfilesScreen> {
     if (!mounted || confirmed != true) return;
     await _runAction(
       () async {
-        final report = await widget.service.apply(profile);
+        final report = await _effectiveService.apply(profile);
         return report.skippedKeys.isEmpty
             ? AudioProfileStrings.applyDone(report.appliedCount)
             : AudioProfileStrings.applyDoneWithSkipped(
@@ -225,7 +239,7 @@ class _AudioProfilesScreenState extends State<AudioProfilesScreen> {
     if (!mounted || pick == null) return;
     await _runAction(
       () async {
-        final saved = await widget.service.setGlobalDefaults(pick.profileId);
+        final saved = await _effectiveService.setGlobalDefaults(pick.profileId);
         if (!saved) {
           throw const AudioProfileStoreError(
             code: 'audio-profile-default-missing',
@@ -251,7 +265,7 @@ class _AudioProfilesScreenState extends State<AudioProfilesScreen> {
     if (!mounted || confirmed != true) return;
     await _runAction(
       () async {
-        await widget.service.delete(profile.id);
+        await _effectiveService.delete(profile.id);
         return AudioProfileStrings.deleted;
       },
       failureMessage: AudioProfileStrings.deleteFailed,
@@ -263,7 +277,7 @@ class _AudioProfilesScreenState extends State<AudioProfilesScreen> {
     final errorColor = context.palette.error;
     File? exported;
     try {
-      exported = await widget.service.export(profile);
+      exported = await _effectiveService.export(profile);
       await SharePlus.instance.share(
         ShareParams(
           files: <XFile>[
@@ -290,7 +304,7 @@ class _AudioProfilesScreenState extends State<AudioProfilesScreen> {
       // as sharing finishes. cleanupExport ignores anything it did not create,
       // so user-chosen backup/import files are never deleted.
       if (exported != null) {
-        await widget.service.cleanupExport(exported);
+        await _effectiveService.cleanupExport(exported);
       }
     }
   }
@@ -301,7 +315,7 @@ class _AudioProfilesScreenState extends State<AudioProfilesScreen> {
     if (path == null) return;
     await _runAction(
       () async {
-        final imported = await widget.service.importFromFile(path);
+        final imported = await _effectiveService.importFromFile(path);
         return imported.ignoredKeys.isEmpty
             ? AudioProfileStrings.importSaved
             : AudioProfileStrings.importSavedSkipped(

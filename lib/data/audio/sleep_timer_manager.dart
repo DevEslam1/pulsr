@@ -1,5 +1,6 @@
 // lib/data/audio/sleep_timer_manager.dart
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/constants/prefs_keys.dart';
@@ -186,7 +187,9 @@ class SleepTimerManager {
       if (_lastPlayerGetter != null) {
         try {
           player = _lastPlayerGetter!();
-        } catch (_) {
+        } catch (e, st) {
+          ErrorLogger.log('Failed to get active player in countdown ticker',
+              error: e, stackTrace: st, category: 'SleepTimer');
           player = null;
         }
       }
@@ -352,6 +355,11 @@ class SleepTimerManager {
 
   bool _nativeCurveArmed = false;
   bool _nativeCurveArming = false;
+  AudioPlayer? _armedCurvePlayer;
+
+  @visibleForTesting
+  void debugApplyFadeOut(AudioPlayer? player, int remainingSeconds) =>
+      _applyFadeOut(player, remainingSeconds);
 
   void _applyFadeOut(AudioPlayer? player, int remainingSeconds) {
     if (player == null || !player.playing) return;
@@ -369,17 +377,42 @@ class SleepTimerManager {
         (i) => 1.0 - (i / (points - 1)),
       );
       _nativeCurveArming = true;
+      _armedCurvePlayer = player;
+      final token = _sleepFadeToken;
       try {
         player.dspSetGainCurve(gains, segmentMs: segmentMs).then((ok) {
           _nativeCurveArming = false;
+          if (token != _sleepFadeToken) {
+            player.dspClearGainCurve().catchError((e, st) {
+              ErrorLogger.log('Failed to clear gain curve on stale sleep token',
+                  error: e, stackTrace: st, category: 'SleepTimer');
+              return false;
+            });
+            if (identical(_armedCurvePlayer, player)) {
+              _armedCurvePlayer = null;
+            }
+            return;
+          }
           if (ok == true) {
             _nativeCurveArmed = true;
+          } else if (identical(_armedCurvePlayer, player)) {
+            _armedCurvePlayer = null;
           }
-        }).catchError((_) {
+        }).catchError((e, st) {
           _nativeCurveArming = false;
+          if (identical(_armedCurvePlayer, player)) {
+            _armedCurvePlayer = null;
+          }
+          ErrorLogger.log('dspSetGainCurve failed',
+              error: e, stackTrace: st, category: 'SleepTimer');
         });
-      } catch (_) {
+      } catch (e, st) {
         _nativeCurveArming = false;
+        if (identical(_armedCurvePlayer, player)) {
+          _armedCurvePlayer = null;
+        }
+        ErrorLogger.log('dspSetGainCurve invocation failed',
+            error: e, stackTrace: st, category: 'SleepTimer');
       }
     }
 
@@ -436,18 +469,25 @@ class SleepTimerManager {
     if (_lastPlayerGetter != null) {
       try {
         player = _lastPlayerGetter!();
-      } catch (_) {
+      } catch (e, st) {
+        ErrorLogger.log('Failed to get active player in expiration',
+            error: e, stackTrace: st, category: 'SleepTimer');
         player = null;
       }
     }
-    if ((_nativeCurveArmed || _nativeCurveArming) && player != null) {
+    final curvePlayer = _armedCurvePlayer ?? player;
+    if ((_nativeCurveArmed || _nativeCurveArming) && curvePlayer != null) {
       // The armed curve is a multiplier on the player's base volume. Clearing
       // it restores unity instantly, so silence the base first; otherwise a
       // fade that has not reached zero (paused mid-fade, ticker drift) blips
       // back to full volume between the clear and the pause landing. The
       // restore in `finally` re-applies the pre-fade level afterwards.
       try {
-        await player.setVolume(0);
+        if (onFadeFactor != null) {
+          onFadeFactor!(0.0);
+        } else {
+          await curvePlayer.setVolume(0);
+        }
       } catch (e, st) {
         ErrorLogger.log(
           'Failed to silence the player before clearing the sleep fade',
@@ -457,13 +497,18 @@ class SleepTimerManager {
         );
       }
       try {
-        player.dspClearGainCurve().catchError((_) => false);
+        curvePlayer.dspClearGainCurve().catchError((e, st) {
+          ErrorLogger.log('dspClearGainCurve failed in expiration',
+              error: e, stackTrace: st, category: 'SleepTimer');
+          return false;
+        });
       } catch (e, st) {
         ErrorLogger.log('Best-effort SleepTimer operation failed',
             error: e, stackTrace: st, category: 'SleepTimer');
       }
       _nativeCurveArmed = false;
       _nativeCurveArming = false;
+      _armedCurvePlayer = null;
     }
     // The track/queue modes (endOfTrack/afterNTracks/endOfQueue) expire at a
     // playback boundary via onTrackCompleted/onQueueCompleted and have no
@@ -476,6 +521,7 @@ class SleepTimerManager {
         player != null &&
         player.playing) {
       await _fadeBeforePause(player, token);
+      if (_sleepFadeToken != token) return;
     }
     var expiredPaused = false;
     try {
@@ -546,21 +592,29 @@ class SleepTimerManager {
     if (_lastPlayerGetter != null) {
       try {
         player = _lastPlayerGetter!();
-      } catch (_) {
+      } catch (e, st) {
+        ErrorLogger.log('Failed to get active player in cancelSleepTimer',
+            error: e, stackTrace: st, category: 'SleepTimer');
         player = null;
       }
     }
-    if (player != null) {
-      if (_nativeCurveArmed || _nativeCurveArming) {
-        try {
-          player.dspClearGainCurve().catchError((_) => false);
-        } catch (e, st) {
-          ErrorLogger.log('Best-effort SleepTimer operation failed',
+    final curvePlayer = _armedCurvePlayer ?? player;
+    if ((_nativeCurveArmed || _nativeCurveArming) && curvePlayer != null) {
+      try {
+        curvePlayer.dspClearGainCurve().catchError((e, st) {
+          ErrorLogger.log('dspClearGainCurve failed in cancelSleepTimer',
               error: e, stackTrace: st, category: 'SleepTimer');
-        }
-        _nativeCurveArmed = false;
-        _nativeCurveArming = false;
+          return false;
+        });
+      } catch (e, st) {
+        ErrorLogger.log('Best-effort SleepTimer operation failed',
+            error: e, stackTrace: st, category: 'SleepTimer');
       }
+      _nativeCurveArmed = false;
+      _nativeCurveArming = false;
+      _armedCurvePlayer = null;
+    }
+    if (player != null) {
       if (onFadeFactor != null) {
         // Coordinated mode: release the fade factor so the handler restores the
         // clean, duck-aware target (not a possibly-ducked snapshot).
@@ -604,7 +658,10 @@ class SleepTimerManager {
     SharedPreferences.getInstance().then((prefs) {
       prefs.setInt(PrefsKeys.sleepTimerTarget, targetMs);
       prefs.setString(_modeKey, modeName);
-    }).catchError((_) {});
+    }).catchError((e, st) {
+      ErrorLogger.log('Failed to persist sleep timer state',
+          error: e, stackTrace: st, category: 'SleepTimer');
+    });
   }
 
   /// Restores a persisted duration timer after process death / background kill.
@@ -654,7 +711,9 @@ class SleepTimerManager {
         getActivePlayer: getActivePlayer,
       );
       return true;
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('Failed to restore persisted sleep timer state',
+          error: e, stackTrace: st, category: 'SleepTimer');
       return false;
     }
   }
@@ -663,7 +722,10 @@ class SleepTimerManager {
     SharedPreferences.getInstance().then((prefs) {
       prefs.remove(PrefsKeys.sleepTimerTarget);
       prefs.remove(_modeKey);
-    }).catchError((_) {});
+    }).catchError((e, st) {
+      ErrorLogger.log('Failed to clear persisted sleep timer state',
+          error: e, stackTrace: st, category: 'SleepTimer');
+    });
   }
 
   void dispose() {
@@ -671,6 +733,15 @@ class SleepTimerManager {
     _isArmed = false;
     _countdownTicker?.cancel();
     _oneShotTimer?.cancel();
+    final curvePlayer = _armedCurvePlayer;
+    if ((_nativeCurveArmed || _nativeCurveArming) && curvePlayer != null) {
+      try {
+        curvePlayer.dspClearGainCurve().catchError((_) => false);
+      } catch (_) {}
+    }
+    _nativeCurveArmed = false;
+    _nativeCurveArming = false;
+    _armedCurvePlayer = null;
     // Drop coordination hooks so no late fade-factor callback fires into a
     // handler that is tearing down.
     onFadeFactor = null;

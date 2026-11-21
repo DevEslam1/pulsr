@@ -228,11 +228,10 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
             '';
         final currentDir =
             p_path.posix.normalize(effectivePath.replaceAll('\\', '/'));
-        final dirPrefix =
-            currentDir.endsWith('/') ? currentDir : '$currentDir/';
         final childFolders = folders.where((f) {
           final normF = p_path.posix.normalize(f.replaceAll('\\', '/'));
-          return normF != currentDir && normF.startsWith(dirPrefix);
+          return normF != currentDir &&
+              p_path.posix.dirname(normF) == currentDir;
         }).toList()
           ..sort((a, b) {
             int cmp;

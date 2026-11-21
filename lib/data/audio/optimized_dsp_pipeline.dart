@@ -96,6 +96,7 @@ class OptimizedDspPipeline {
 
   /// Returns the active DSP stages, skipping disabled stages entirely with zero wasted CPU cycles.
   List<DspStage> getActiveStages() {
+    if (isBitPerfectBypass) return const [];
     return pipelineOrder.where((stage) {
       switch (stage) {
         case DspStage.parametricEq:

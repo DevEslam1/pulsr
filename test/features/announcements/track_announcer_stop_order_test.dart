@@ -5,6 +5,7 @@
 import 'dart:async';
 
 import 'package:audio_service/audio_service.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/features/announcements/announcement_settings.dart';
 import 'package:pulsr/features/announcements/track_announcer.dart';
@@ -143,5 +144,86 @@ void main() {
     expect(engine.availability.value, isFalse);
     await engine.dispose();
     expect(() => engine.availability.addListener(() {}), throwsFlutterError);
+  });
+
+  test('MethodChannelTtsEngine dispose marks engine disposed and ignores calls', () async {
+    final engine = MethodChannelTtsEngine();
+    await engine.dispose();
+    expect(engine.isDisposed, isTrue);
+    expect(await engine.init(), isFalse);
+    expect(await engine.voices(), isEmpty);
+    expect(await engine.isSpeaking(), isFalse);
+    await engine.speak('test');
+    await engine.stop();
+  });
+
+  test('MethodChannelTtsEngine handles TimeoutException by resetting availability', () async {
+    final channel = const MethodChannel('test_tts_channel');
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+      throw TimeoutException('Timed out');
+    });
+    final engine = MethodChannelTtsEngine(channel: channel);
+    addTearDown(engine.dispose);
+    final ready = await engine.init();
+    expect(ready, isFalse);
+    expect(engine.isAvailable, isFalse);
+  });
+
+  test('MethodChannelTtsEngine.dispose() followed by late completion does not throw FlutterError', () async {
+    final channel = const MethodChannel('test_tts_channel_late');
+    final completer = Completer<bool>();
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+      if (call.method == 'init') {
+        return completer.future;
+      }
+      return null;
+    });
+
+    final engine = MethodChannelTtsEngine(channel: channel);
+    final initFuture = engine.init();
+
+    await engine.dispose();
+    expect(engine.isDisposed, isTrue);
+    expect(engine.isAvailable, isFalse);
+
+    // Complete late after disposal
+    completer.complete(true);
+
+    final result = await initFuture;
+    expect(result, isFalse);
+    expect(engine.isAvailable, isFalse);
+  });
+
+  test('MethodChannelTtsEngine.dispose() followed by late error does not throw or log to notifier', () async {
+    final channel = const MethodChannel('test_tts_channel_late_err');
+    final completer = Completer<dynamic>();
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+      if (call.method == 'voices') {
+        return completer.future;
+      }
+      return null;
+    });
+
+    final engine = MethodChannelTtsEngine(channel: channel);
+    // Pretend engine was initialized
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+      if (call.method == 'init') return true;
+      if (call.method == 'voices') return completer.future;
+      return null;
+    });
+    await engine.init();
+    expect(engine.isAvailable, isTrue);
+
+    final voicesFuture = engine.voices();
+    await engine.dispose();
+
+    completer.completeError(PlatformException(code: 'ERROR', message: 'Late failure'));
+    final voices = await voicesFuture;
+    expect(voices, isEmpty);
+    expect(engine.isAvailable, isFalse);
   });
 }

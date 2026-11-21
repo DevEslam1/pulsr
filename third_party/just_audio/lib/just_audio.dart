@@ -4439,16 +4439,33 @@ _ProxyHandler _proxyHandlerForSource(StreamAudioSource source) {
     }
 
     final completer = Completer<void>();
-    final subscription = stream.listen(request.response.add,
-        onError: (e, st) {}, onDone: completer.complete);
+    final subscription = stream.listen(
+      (List<int> chunk) {
+        try {
+          request.response.add(chunk);
+        } catch (_) {}
+      },
+      onError: (Object e, StackTrace st) {
+        if (!completer.isCompleted) completer.complete();
+      },
+      onDone: () {
+        if (!completer.isCompleted) completer.complete();
+      },
+    );
 
     unawaited(request.response.done.then((dynamic value) {
       unawaited(subscription.cancel());
+      if (!completer.isCompleted) completer.complete();
+    }, onError: (Object e, StackTrace st) {
+      unawaited(subscription.cancel());
+      if (!completer.isCompleted) completer.complete();
     }));
 
     await completer.future;
 
-    await request.response.close();
+    try {
+      await request.response.close();
+    } catch (_) {}
   }
 
   return handler;
@@ -4464,7 +4481,6 @@ _ProxyHandler _proxyHandlerForUri(
   Uri? redirectedUri;
   Future<void> handler(_ProxyHttpServer server, HttpRequest request) async {
     final client = _createHttpClient(userAgent: userAgent);
-    var socketDetached = false;
     try {
       // Try to make normal request
       String? host;
@@ -4542,19 +4558,34 @@ _ProxyHandler _proxyHandlerForUri(
         final socket = await Socket.connect(uri.host, uri.port);
         final clientSocket =
             await request.response.detachSocket(writeHeaders: false);
-        // The response socket is now owned by clientSocket; closing the
-        // HttpClient here would tear down a connection already handed off.
-        socketDetached = true;
         final done = Completer<dynamic>();
         socket.listen(
-          clientSocket.add,
-          onDone: () async {
-            await clientSocket.flush();
+          (List<int> chunk) {
+            try {
+              clientSocket.add(chunk);
+            } catch (_) {}
+          },
+          onError: (Object e, StackTrace st) {
             unawaited(socket.close());
             unawaited(clientSocket.close());
-            done.complete();
+            if (!done.isCompleted) done.complete();
+          },
+          onDone: () async {
+            try {
+              await clientSocket.flush();
+            } catch (_) {}
+            unawaited(socket.close());
+            unawaited(clientSocket.close());
+            if (!done.isCompleted) done.complete();
           },
         );
+        unawaited(clientSocket.done.then((dynamic _) {
+          unawaited(socket.close());
+          if (!done.isCompleted) done.complete();
+        }, onError: (dynamic _) {
+          unawaited(socket.close());
+          if (!done.isCompleted) done.complete();
+        }));
         // Rewrite headers
         final headers = <String, String?>{};
         request.headers.forEach((name, value) {
@@ -4578,7 +4609,7 @@ _ProxyHandler _proxyHandlerForUri(
       }
       }
     } finally {
-      if (!socketDetached) client.close();
+      client.close();
     }
   }
 

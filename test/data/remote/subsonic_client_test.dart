@@ -3,6 +3,7 @@
 // leak credentials, and streamUrl round-tripping without double encoding.
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -87,6 +88,7 @@ void main() {
       expect(fake.requests, hasLength(1));
       final request = fake.requests.single;
       expect(request.method, 'GET');
+      expect(request.followRedirects, isFalse);
       expect(request.url.path, '/rest/ping.view');
       final query = request.url.queryParameters;
       expect(query['u'], _user);
@@ -358,6 +360,38 @@ void main() {
       expect(playlist.songs.first.duration, const Duration(seconds: 305));
     });
 
+    test('getArtists and getPlaylists tolerate single map entries', () async {
+      final fake = _FakeHttpClient((request) async {
+        if (request.url.path.contains('getArtists')) {
+          return _jsonResponse(_envelope({
+            'artists': {
+              'index': {
+                'name': 'P',
+                'artist': {'id': '1', 'name': 'Portishead'},
+              },
+            },
+          }));
+        }
+        if (request.url.path.contains('getPlaylists')) {
+          return _jsonResponse(_envelope({
+            'playlists': {
+              'playlist': {'id': 'p1', 'name': 'Late Night'},
+            },
+          }));
+        }
+        return _jsonResponse(_envelope());
+      });
+      final client = _client(fake);
+
+      final artists = await client.getArtists();
+      expect(artists, hasLength(1));
+      expect(artists.first.name, 'Portishead');
+
+      final playlists = await client.getPlaylists();
+      expect(playlists, hasLength(1));
+      expect(playlists.first.name, 'Late Night');
+    });
+
     test('rejects a missing payload as a typed bad response', () async {
       final fake = _FakeHttpClient((_) async => _jsonResponse(_envelope()));
       final client = _client(fake);
@@ -522,6 +556,26 @@ void main() {
       expect(error.cause.toString(), isNot(contains('t=')));
       expect(error.cause.toString(), isNot(contains(_password)));
       expect(error.toString(), isNot(contains(_password)));
+    });
+
+    test('redacts short passwords and exceptions in cause', () async {
+      const shortPass = 'xy';
+      final client = SubsonicClient(
+        baseUrl: Uri.parse('https://music.example.com'),
+        username: 'user',
+        password: shortPass,
+        client: _FakeHttpClient((_) async =>
+            throw const SocketException('Connection refused with xy secret')),
+      );
+
+      try {
+        await client.ping();
+        fail('expected SubsonicError');
+      } on SubsonicError catch (e) {
+        expect(e.code, 'SUBSONIC_NETWORK');
+        expect(e.cause.toString(), isNot(contains(shortPass)));
+        expect(e.cause.toString(), contains('***'));
+      }
     });
   });
 
@@ -821,6 +875,28 @@ void main() {
         expect(fake.requests.single.url.path, entry.value,
             reason: 'base ${entry.key}');
       }
+    });
+
+    test('blocks 302 redirects to loopback and does not follow them', () async {
+      final fake = _FakeHttpClient((request) async {
+        return http.StreamedResponse(
+          Stream<List<int>>.value(utf8.encode('Redirecting')),
+          302,
+          headers: {'location': 'http://127.0.0.1:8080/admin'},
+        );
+      });
+      final client = _client(fake);
+
+      await expectLater(
+        client.ping(),
+        throwsA(isA<SubsonicError>()
+            .having((e) => e.code, 'code', 'SUBSONIC_HTTP_302')),
+      );
+
+      // Verify request had followRedirects disabled and only 1 request was made (no redirect followed)
+      expect(fake.requests.length, equals(1));
+      expect(fake.requests.single.followRedirects, isFalse);
+      expect(fake.requests.any((r) => r.url.host == '127.0.0.1'), isFalse);
     });
   });
 }

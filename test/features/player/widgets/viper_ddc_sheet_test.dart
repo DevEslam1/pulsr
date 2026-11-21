@@ -2,13 +2,96 @@
 import 'dart:async';
 import 'dart:typed_data';
 
+import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:just_audio_platform_interface/just_audio_platform_interface.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
+import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 import 'package:pulsr/features/player/cubit/player_state.dart';
 import 'package:pulsr/features/player/presentation/widgets/viper_ddc_sheet.dart';
 
 import 'player_sheet_test_support.dart';
+
+class _FailingPathProvider extends PathProviderPlatform
+    with MockPlatformInterfaceMixin {
+  @override
+  Future<String?> getTemporaryPath() =>
+      Future<String?>.error(StateError('temp dir unavailable'));
+}
+
+class _StubAudioPlayerPlatform extends AudioPlayerPlatform {
+  _StubAudioPlayerPlatform(super.id);
+
+  final StreamController<PlaybackEventMessage> _events =
+      StreamController<PlaybackEventMessage>.broadcast();
+
+  @override
+  Stream<PlaybackEventMessage> get playbackEventMessageStream => _events.stream;
+
+  @override
+  Stream<PlayerDataMessage> get playerDataMessageStream => const Stream.empty();
+
+  @override
+  Future<PauseResponse> pause(PauseRequest request) async => PauseResponse();
+
+  @override
+  Future<SetVolumeResponse> setVolume(SetVolumeRequest request) async =>
+      SetVolumeResponse();
+
+  @override
+  Future<SetSpeedResponse> setSpeed(SetSpeedRequest request) async =>
+      SetSpeedResponse();
+
+  @override
+  Future<SetLoopModeResponse> setLoopMode(SetLoopModeRequest request) async =>
+      SetLoopModeResponse();
+
+  @override
+  Future<SetShuffleModeResponse> setShuffleMode(
+          SetShuffleModeRequest request) async =>
+      SetShuffleModeResponse();
+
+  @override
+  Future<SetShuffleOrderResponse> setShuffleOrder(
+          SetShuffleOrderRequest request) async =>
+      SetShuffleOrderResponse();
+
+  @override
+  Future<DisposeResponse> dispose(DisposeRequest request) async {
+    if (!_events.isClosed) await _events.close();
+    return DisposeResponse();
+  }
+}
+
+class _StubJustAudioPlatform extends JustAudioPlatform {
+  final Map<String, _StubAudioPlayerPlatform> _players = {};
+
+  @override
+  Future<AudioPlayerPlatform> init(InitRequest request) async {
+    final player = _StubAudioPlayerPlatform(request.id);
+    _players[request.id] = player;
+    return player;
+  }
+
+  @override
+  Future<DisposePlayerResponse> disposePlayer(
+      DisposePlayerRequest request) async {
+    await _players.remove(request.id)?.dispose(DisposeRequest());
+    return DisposePlayerResponse();
+  }
+
+  @override
+  Future<DisposeAllPlayersResponse> disposeAllPlayers(
+      DisposeAllPlayersRequest request) async {
+    for (final player in _players.values) {
+      await player.dispose(DisposeRequest());
+    }
+    _players.clear();
+    return DisposeAllPlayersResponse();
+  }
+}
 
 Uint8List _float32(List<double> values) {
   final bd = ByteData(values.length * 4);
@@ -335,6 +418,67 @@ void main() {
 
       expect(identical(firstPainter, secondPainter), isFalse);
       expect((secondPainter as dynamic).shouldRepaint(firstPainter), isFalse);
+    });
+
+    testWidgets(
+        'failed test-tone sweep start resumes main playback paused for sweep',
+        (tester) async {
+      final originalPathProvider = PathProviderPlatform.instance;
+      final originalJustAudio = JustAudioPlatform.instance;
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      const audioSessionChannel = MethodChannel('com.ryanheise.audio_session');
+      messenger.setMockMethodCallHandler(audioSessionChannel, (_) async => null);
+      PathProviderPlatform.instance = _FailingPathProvider();
+      JustAudioPlatform.instance = _StubJustAudioPlatform();
+      addTearDown(() {
+        PathProviderPlatform.instance = originalPathProvider;
+        JustAudioPlatform.instance = originalJustAudio;
+        messenger.setMockMethodCallHandler(audioSessionChannel, null);
+      });
+
+      final controller = StreamController<PlayerState>.broadcast();
+      addTearDown(controller.close);
+      var current = const PlayerState(
+        playback: PlaybackSlice(isPlaying: true),
+      );
+      final cubit = stubPlayerCubit(state: current);
+      when(() => cubit.state).thenAnswer((_) => current);
+      when(() => cubit.stream).thenAnswer((_) => controller.stream);
+      when(() => cubit.pause()).thenAnswer((_) async {
+        current = current.copyWith(
+          playback: current.playback.copyWith(isPlaying: false),
+        );
+        controller.add(current);
+      });
+      when(() => cubit.play()).thenAnswer((_) async {
+        current = current.copyWith(
+          playback: current.playback.copyWith(isPlaying: true),
+        );
+        controller.add(current);
+      });
+
+      await tester.pumpWidget(sheetHost(
+        playerCubit: cubit,
+        child: const ViperDdcSheet(),
+      ));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Test Tone (1k+Sweep)'));
+      await tester.pump();
+      await tester.pump();
+
+      expect(tester.takeException(), isNull);
+      verify(() => cubit.pause()).called(1);
+      verify(() => cubit.play()).called(1);
+      expect(find.text('Test Tone (1k+Sweep)'), findsOneWidget);
+      expect(find.text('Stop Sweep'), findsNothing);
+
+      // Closing the sheet after recovery must not double-call play().
+      clearInteractions(cubit);
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump();
+      verifyNever(() => cubit.play());
     });
   });
 }

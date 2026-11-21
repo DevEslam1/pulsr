@@ -84,6 +84,21 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
     _loadSortPreference();
   }
 
+  @override
+  void didUpdateWidget(AlbumDetailScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.album.id != widget.album.id ||
+        oldWidget.getAlbumsUseCase != widget.getAlbumsUseCase) {
+      _useCase = widget.getAlbumsUseCase ?? getIt<GetAlbumsUseCase>();
+      setState(() {
+        _selectedIds.clear();
+        _sort = _AlbumSort.track;
+        _updateStream();
+      });
+      _loadSortPreference();
+    }
+  }
+
   void _updateStream() {
     _songsStream = _useCase.watchAlbumSongs(widget.album.id).distinct();
   }
@@ -114,7 +129,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
         final matches =
             _AlbumSort.values.where((e) => e.name == stored).toList();
         if (matches.isNotEmpty && mounted) {
-          _sort = matches.first;
+          setState(() => _sort = matches.first);
         }
       }
     } catch (e, st) {

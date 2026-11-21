@@ -465,8 +465,6 @@ mixin PulsrAudioDspBridge on BaseAudioHandler {
 
   // Low-power route
   bool get isLowPowerRouteEnabled => _equalizerManager.isLowPowerRouteEnabled;
-  Future<void> setLowPowerRoute(bool enabled) =>
-      _equalizerManager.setLowPowerRoute(enabled);
 
   bool get isMultibandCompressorEnabled =>
       _equalizerManager.isMultibandCompressorEnabled;

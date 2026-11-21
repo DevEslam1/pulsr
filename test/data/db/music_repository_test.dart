@@ -259,6 +259,58 @@ void main() {
       expect(recent.length, equals(1));
       expect(recent.first.playCount, equals(1));
     });
+
+    test('recordPlayHistory records negative-ID CUE virtual tracks and YTM tracks, ignores 0', () async {
+      // Negative ID CUE virtual track
+      await db.into(db.songsTable).insert(
+            SongsTableCompanion.insert(
+              id: const Value(-1),
+              title: 'CUE Virtual Track 1',
+              path: '/storage/music/album.cue',
+              source: const Value(SongSource.local),
+              cueStartMs: const Value(0),
+              cueEndMs: const Value(180000),
+            ),
+          );
+
+      // Negative ID YTM streamed track
+      await db.into(db.songsTable).insert(
+            SongsTableCompanion.insert(
+              id: const Value(-7),
+              title: 'YTM Streamed Track',
+              path: 'ytmusic://vid7',
+              source: const Value(SongSource.youtube),
+              remoteId: const Value('vid7'),
+            ),
+          );
+
+      // Record play for CUE track
+      final resCue = await repository.recordPlayHistory(-1, completed: true);
+      expect(resCue.isRight(), isTrue);
+
+      // Record play for YTM track (with >1.5s delay simulation by changing id)
+      final resYtm = await repository.recordPlayHistory(-7, completed: false);
+      expect(resYtm.isRight(), isTrue);
+
+      // Record play with songId == 0 (no-op)
+      final resZero = await repository.recordPlayHistory(0, completed: true);
+      expect(resZero.isRight(), isTrue);
+
+      // Verify DB updates
+      final cueSong = await (db.select(db.songsTable)..where((t) => t.id.equals(-1))).getSingle();
+      expect(cueSong.playCount, equals(1));
+      expect(cueSong.lastPlayed, isNotNull);
+
+      final ytmSong = await (db.select(db.songsTable)..where((t) => t.id.equals(-7))).getSingle();
+      expect(ytmSong.playCount, equals(1));
+      expect(ytmSong.lastPlayed, isNotNull);
+
+      // Verify history rows
+      final history = await db.select(db.playHistoryTable).get();
+      final historySongIds = history.map((h) => h.songId).toList();
+      expect(historySongIds, containsAll([-1, -7]));
+      expect(historySongIds, isNot(contains(0)));
+    });
   });
 
   group('orphan cleanup vs. hidden folders', () {

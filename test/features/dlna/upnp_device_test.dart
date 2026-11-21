@@ -2,6 +2,7 @@
 // typed failures the renderer service relies on.
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/features/dlna/upnp_device.dart';
+import 'package:pulsr/features/dlna/upnp_entities.dart';
 
 const String _namespacedDescription = '<?xml version="1.0"?>'
     '<s:root xmlns:s="urn:schemas-upnp-org:device-1-0">'
@@ -72,6 +73,42 @@ void main() {
       expect(
         description.avTransportControlUrl,
         Uri.parse('http://10.0.0.5:8080/upnp/control/avt'),
+      );
+    });
+
+    test('rejects URLBase pointing to 127.0.0.1 or external untrusted host', () {
+      const xmlLoopback = '<root><URLBase>http://127.0.0.1:8080/</URLBase>'
+          '<device><friendlyName>Living Room</friendlyName>'
+          '<serviceList><service>'
+          '<serviceType>urn:schemas-upnp-org:service:AVTransport:1</serviceType>'
+          '<controlURL>/control/avt</controlURL>'
+          '</service></serviceList></device></root>';
+
+      final descriptionLoopback = UpnpDeviceDescription.parse(
+        xmlLoopback,
+        location: Uri.parse('http://192.168.1.10:49152/description.xml'),
+      );
+
+      expect(
+        descriptionLoopback.avTransportControlUrl,
+        Uri.parse('http://192.168.1.10:49152/control/avt'),
+      );
+
+      const xmlExternal = '<root><URLBase>http://evil.com:8080/</URLBase>'
+          '<device><friendlyName>Living Room</friendlyName>'
+          '<serviceList><service>'
+          '<serviceType>urn:schemas-upnp-org:service:AVTransport:1</serviceType>'
+          '<controlURL>/control/avt</controlURL>'
+          '</service></serviceList></device></root>';
+
+      final descriptionExternal = UpnpDeviceDescription.parse(
+        xmlExternal,
+        location: Uri.parse('http://192.168.1.10:49152/description.xml'),
+      );
+
+      expect(
+        descriptionExternal.avTransportControlUrl,
+        Uri.parse('http://192.168.1.10:49152/control/avt'),
       );
     });
 
@@ -243,6 +280,23 @@ void main() {
           ),
         ),
       );
+    });
+  });
+
+  group('decodeXmlEntities', () {
+    test('decodes standard XML entities and numeric code points', () {
+      expect(
+        decodeXmlEntities('&lt;tag&gt; &quot;quote&quot; &amp; &apos;apostrophe&apos; &#65; &#x42;'),
+        '<tag> "quote" & \'apostrophe\' A B',
+      );
+    });
+
+    test('retains malformed or surrogate code points safely', () {
+      // Surrogate code points 0xD800 to 0xDFFF should not be decoded as characters
+      expect(decodeXmlEntities('&#xD800;'), '&#xD800;');
+      expect(decodeXmlEntities('&#55296;'), '&#55296;');
+      // Out of bounds code point > 0x10FFFF
+      expect(decodeXmlEntities('&#x110000;'), '&#x110000;');
     });
   });
 }

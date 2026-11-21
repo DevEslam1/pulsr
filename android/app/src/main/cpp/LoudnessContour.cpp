@@ -85,6 +85,8 @@ void LoudnessContour::reset() {
 }
 
 void LoudnessContour::computeLowShelf(Biquad& bq, double f0, double gainDb, double fs) {
+    if (!(fs > 0.0) || !std::isfinite(fs)) fs = 48000.0;
+    f0 = std::clamp(std::isfinite(f0) ? f0 : 100.0, 10.0, fs * 0.45);
     const double A = std::pow(10.0, gainDb / 40.0);
     const double w0 = 2.0 * M_PI * f0 / fs;
     const double cw = std::cos(w0), sw = std::sin(w0);
@@ -99,6 +101,16 @@ void LoudnessContour::computeLowShelf(Biquad& bq, double f0, double gainDb, doub
 }
 
 void LoudnessContour::computeHighShelf(Biquad& bq, double f0, double gainDb, double fs) {
+    if (!(fs > 0.0) || !std::isfinite(fs)) fs = 48000.0;
+    if (!std::isfinite(f0) || f0 >= fs * 0.45) {
+        bq.b0 = 1.0;
+        bq.b1 = 0.0;
+        bq.b2 = 0.0;
+        bq.a1 = 0.0;
+        bq.a2 = 0.0;
+        return;
+    }
+    f0 = std::clamp(f0, 10.0, fs * 0.45);
     const double A = std::pow(10.0, gainDb / 40.0);
     const double w0 = 2.0 * M_PI * f0 / fs;
     const double cw = std::cos(w0), sw = std::sin(w0);

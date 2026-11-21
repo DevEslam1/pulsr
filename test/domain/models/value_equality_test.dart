@@ -231,5 +231,25 @@ void main() {
       expect(withArt, isNot(equals(base)));
       expect(withArt.hashCode, isNot(equals(base.hashCode)));
     });
+
+    test('createdAt change breaks equality and hashCode', () {
+      final withCreatedAt =
+          base.copyWith(createdAt: DateTime.utc(2026, 2, 2));
+      expect(withCreatedAt, isNot(equals(base)));
+      expect(withCreatedAt.hashCode, isNot(equals(base.hashCode)));
+    });
+
+    test('fromJson parses etaSeconds and bitrate from num/double safely', () {
+      final task = DownloadTask.fromJson(<String, dynamic>{
+        'id': 'task_1',
+        'videoId': 'vid_1',
+        'title': 'Title',
+        'artist': 'Artist',
+        'etaSeconds': 42.0,
+        'bitrate': 320.0,
+      });
+      expect(task.etaSeconds, 42);
+      expect(task.bitrate, 320);
+    });
   });
 }

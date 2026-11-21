@@ -53,7 +53,7 @@ void main() {
     when(() => player.stream)
         .thenAnswer((_) => const Stream<PlayerState>.empty());
     when(() => player.clearQueue()).thenAnswer((_) async {});
-    when(() => player.restoreQueue(any(), any())).thenReturn(null);
+    when(() => player.restoreQueue(any(), any())).thenAnswer((_) async {});
     when(() => player.reorderQueue(any(), any())).thenAnswer((_) async {});
     when(() => player.addAllToQueue(any())).thenAnswer((_) async {});
     when(() => player.playSong(any(), queue: any(named: 'queue')))

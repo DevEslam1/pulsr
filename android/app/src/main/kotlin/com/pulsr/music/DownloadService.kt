@@ -467,11 +467,24 @@ class DownloadService : Service() {
                 renderCurrentNotification(vid)
             }
             ACTION_UPDATE -> {
-                val vid = intent.getStringExtra(EXTRA_VIDEO_ID) ?: return START_NOT_STICKY
+                val vid = intent.getStringExtra(EXTRA_VIDEO_ID)
+                if (vid == null) {
+                    if (!foregroundStarted) {
+                        postPlaceholderAndStop()
+                    }
+                    return START_NOT_STICKY
+                }
+                if (!foregroundStarted && isTombstoned(vid)) {
+                    postPlaceholderAndStop()
+                    return START_NOT_STICKY
+                }
                 val title = intent.getStringExtra(EXTRA_TITLE)
                 val progress = intent.getIntExtra(EXTRA_PROGRESS, 0)
                 val downloadedBytes = intent.getLongExtra(EXTRA_DOWNLOADED_BYTES, -1L)
                 handleProgressUpdate(vid, title, progress, downloadedBytes)
+                if (!foregroundStarted && activeDownloads.isEmpty()) {
+                    postPlaceholderAndStop()
+                }
             }
             ACTION_CANCEL -> {
                 if (intent.getBooleanExtra(EXTRA_CANCEL_ALL, false)) {
@@ -540,30 +553,10 @@ class DownloadService : Service() {
             ACTION_SET_PAUSED -> {
                 val vid = intent.getStringExtra(EXTRA_VIDEO_ID)
                 val paused = intent.getBooleanExtra(EXTRA_PAUSED, false)
-                if (vid != null && !isTombstoned(vid)) {
-                    if (paused) {
-                        pausedDownloads.add(vid)
-                        speedStates.remove(vid)
-                        runCatching { DownloadChunkStateStore.flushPending(this) }
-                    } else {
-                        pausedDownloads.remove(vid)
-                        timeoutPausedIds.remove(vid)
-                    }
-                    renderCurrentNotification(vid)
-                }
+                handleSetPaused(vid, paused)
             }
             ACTION_STOP -> {
-                cancelIdleStop()
-                intent.getStringExtra(EXTRA_VIDEO_ID)?.let { recordTombstone(it) }
-                for (id in activeDownloads.keys.toList()) {
-                    recordTombstone(id)
-                }
-                activeDownloads.clear()
-                downloadTitles.clear()
-                pausedDownloads.clear()
-                speedStates.clear()
-                timeoutPausedIds.clear()
-                stopForegroundAndSelf()
+                handleStop(intent.getStringExtra(EXTRA_VIDEO_ID))
             }
         }
         return START_NOT_STICKY
@@ -638,8 +631,9 @@ class DownloadService : Service() {
         }
     }
 
-    /** Satisfies the startForegroundService contract for a malformed start. */
+    /** Satisfies the startForegroundService contract for a malformed or already-finished start. */
     private fun postPlaceholderAndStop() {
+        cancelIdleStop()
         val n = notificationFor(
             getString(R.string.download_notification_downloads),
             0,

@@ -158,4 +158,49 @@ void main() {
       AnnouncementElement.artist,
     ]);
   });
+
+  test('coalesces rapid concurrent save calls without dropping the latest value', () async {
+    final settings = await AnnouncementSettings.load();
+    addTearDown(settings.dispose);
+
+    final futures = <Future<void>>[];
+    for (var i = 1; i <= 20; i++) {
+      settings.setDelayMs(1000 + i * 50);
+      futures.add(settings.save());
+    }
+    await Future.wait(futures);
+
+    final restored = await AnnouncementSettings.load();
+    addTearDown(restored.dispose);
+    expect(restored.delayMs, 1000 + 20 * 50);
+  });
+
+  test('AnnouncementSettings.save() rapid concurrent calls preserving final value', () async {
+    final settings = await AnnouncementSettings.load();
+    addTearDown(settings.dispose);
+
+    final futures = <Future<void>>[];
+    for (var i = 1; i <= 30; i++) {
+      settings.setDelayMs(1000 + i * 20);
+      settings.setVolume(0.4 + (i % 6) * 0.1);
+      settings.setEnabled(i.isEven);
+      settings.setVoiceId('voice-$i');
+      futures.add(settings.save());
+    }
+    // Final explicit updates
+    settings.setDelayMs(3200);
+    settings.setVolume(0.9);
+    settings.setEnabled(true);
+    settings.setVoiceId('final-voice-id');
+    futures.add(settings.save());
+
+    await Future.wait(futures);
+
+    final restored = await AnnouncementSettings.load();
+    addTearDown(restored.dispose);
+    expect(restored.delayMs, 3200);
+    expect(restored.volume, 0.9);
+    expect(restored.enabled, isTrue);
+    expect(restored.voiceId, 'final-voice-id');
+  });
 }

@@ -160,8 +160,12 @@ class PlaybackVolumeController {
     // Stream loudness normalization for YouTube Music tracks:
     // YouTube's reference level is -14 LUFS. loudnessDb expresses offset relative to reference.
     // Gain to apply: gainDb = -loudnessDb -> multiplier = 10^(-loudnessDb / 20).
+    // Gate on ReplayGain being enabled and not already handled natively so turning
+    // normalization off leaves stream levels untouched.
     // Apply peak limiter ceiling (0.985 / -0.13 dBFS) matching BitChord to avoid clipping.
-    if (song.source == SongSource.youtube) {
+    if (_replayGainMode != 'off' &&
+        !_nativeRgActive &&
+        song.source == SongSource.youtube) {
       final ytmService =
           getIt.isRegistered<YtmService>() ? getIt<YtmService>() : null;
       final videoId = song.remoteId;

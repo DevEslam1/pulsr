@@ -155,6 +155,7 @@ void main() {
       expect(fake.requests, hasLength(1));
       final request = fake.requests.single;
       expect(request.method, 'POST');
+      expect(request.followRedirects, isFalse);
       expect(request.url, controlUrl);
       expect(
         request.headers['SOAPACTION'],
@@ -298,6 +299,19 @@ void main() {
       expect(object.resourceUrl, 'http://h/a.mp3');
       expect(object.protocolInfo, 'http-get:*:audio/mpeg:*');
       expect(object.duration, const Duration(minutes: 1));
+    });
+
+    test('selects uppercase protocolInfo and decodes entities properly', () {
+      const xml = '<DIDL-Lite><item id="x" parentID="0">'
+          '<title>Valid&#x20;Track &amp; Surrogates &#xD800; &#x00;</title>'
+          '<res protocolInfo="HTTP-GET:*:AUDIO/FLAC:*"'
+          ' duration="0:02:00">http://h/a.flac</res>'
+          '</item></DIDL-Lite>';
+
+      final object = UpnpContentDirectory.parseDidlLite(xml).single;
+
+      expect(object.resourceUrl, 'http://h/a.flac');
+      expect(object.title, 'Valid Track & Surrogates &#xD800; &#x00;');
     });
 
     test('handles CDATA and a bare ampersand without failing the page', () {
@@ -498,6 +512,40 @@ void main() {
         throwsA(isA<UpnpBrowseError>().having(
             (error) => error.code, 'code', 'UPNP_CONTROL_URL_INVALIDSCHEME')),
       );
+    });
+
+    test('rejects loopback and link-local even when trustRequestHost is true', () async {
+      final fake = _FakeHttpClient((_) async => _xmlResponse(_browseResponse(didl: _libraryDidl)));
+      final trusted = UpnpContentDirectory(client: fake, trustRequestHost: true);
+
+      for (final badHost in ['127.0.0.1', 'localhost', '169.254.169.254', '[::1]']) {
+        await expectLater(
+          trusted.browse(controlUrl: Uri.parse('http://$badHost:8200/control')),
+          throwsA(isA<UpnpBrowseError>().having(
+              (error) => error.code, 'code', 'UPNP_CONTROL_URL_PRIVATENETWORK')),
+          reason: 'Failed for $badHost',
+        );
+      }
+    });
+
+    test('blocks 302 redirects to loopback and does not follow them', () async {
+      final fake = _FakeHttpClient((request) async {
+        return http.StreamedResponse(
+          Stream<List<int>>.value(utf8.encode('Moved')),
+          302,
+          headers: {'location': 'http://127.0.0.1:8200/secret'},
+        );
+      });
+      final directory = UpnpContentDirectory(client: fake);
+
+      await expectLater(
+        directory.browse(controlUrl: Uri.parse('http://192.168.1.50:8200/control')),
+        throwsA(isA<UpnpBrowseError>()),
+      );
+
+      expect(fake.requests.length, equals(1));
+      expect(fake.requests.single.followRedirects, isFalse);
+      expect(fake.requests.any((r) => r.url.host == '127.0.0.1'), isFalse);
     });
   });
 

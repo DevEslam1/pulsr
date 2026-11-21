@@ -267,34 +267,79 @@ class AnnouncementSettings extends ChangeNotifier {
     _changed();
   }
 
+  Future<void>? _activeSave;
+  bool _needsSave = false;
+  Completer<void>? _pendingCompleter;
+
   /// Writes every field to the preference store.
   ///
   /// Setters already call this; await it when the caller needs the write to be
-  /// durable before tearing the settings object down.
-  Future<void> save() async {
+  /// durable before tearing the settings object down. Rapid calls (e.g. from
+  /// slider adjustments) are coalesced into a serialized save loop.
+  Future<void> save() {
+    final prefs = _prefs;
+    if (prefs == null) return Future<void>.value();
+    if (_activeSave != null) {
+      _needsSave = true;
+      _pendingCompleter ??= Completer<void>();
+      return _pendingCompleter!.future;
+    }
+    _activeSave = _runSaveLoop();
+    return _activeSave!;
+  }
+
+  Future<void> _runSaveLoop() async {
     final prefs = _prefs;
     if (prefs == null) return;
     try {
-      await prefs.setBool(keyEnabled, _enabled);
-      await prefs.setStringList(
-        keyElements,
-        _elements.map((element) => element.name).toList(),
-      );
-      await prefs.setInt(keyDelayMs, _delayMs);
-      await prefs.setDouble(keyVolume, _volume);
-      await prefs.setBool(keyDuckAudio, _duckAudio);
-      await prefs.setBool(keySkipWhenCasting, _skipWhenCasting);
-      await prefs.setBool(keySkipWhenBitPerfect, _skipWhenBitPerfect);
-      await prefs.setString(keyVoiceId, _voiceId);
-      await prefs.setString(keyLocaleId, _localeId);
-      await prefs.setInt(keyMaxLength, _maxLength);
-    } on Exception catch (error, stackTrace) {
-      ErrorLogger.log(
-        'Announcement settings could not be saved',
-        error: error,
-        stackTrace: stackTrace,
-        category: 'Announcements',
-      );
+      Completer<void>? completing;
+      while (true) {
+        _needsSave = false;
+        completing = _pendingCompleter;
+        _pendingCompleter = null;
+
+        final enabled = _enabled;
+        final elements = _elements.map((element) => element.name).toList();
+        final delayMs = _delayMs;
+        final volume = _volume;
+        final duckAudio = _duckAudio;
+        final skipWhenCasting = _skipWhenCasting;
+        final skipWhenBitPerfect = _skipWhenBitPerfect;
+        final voiceId = _voiceId;
+        final localeId = _localeId;
+        final maxLength = _maxLength;
+
+        try {
+          await prefs.setBool(keyEnabled, enabled);
+          await prefs.setStringList(keyElements, elements);
+          await prefs.setInt(keyDelayMs, delayMs);
+          await prefs.setDouble(keyVolume, volume);
+          await prefs.setBool(keyDuckAudio, duckAudio);
+          await prefs.setBool(keySkipWhenCasting, skipWhenCasting);
+          await prefs.setBool(keySkipWhenBitPerfect, skipWhenBitPerfect);
+          await prefs.setString(keyVoiceId, voiceId);
+          await prefs.setString(keyLocaleId, localeId);
+          await prefs.setInt(keyMaxLength, maxLength);
+        } on Exception catch (error, stackTrace) {
+          ErrorLogger.log(
+            'Announcement settings could not be saved',
+            error: error,
+            stackTrace: stackTrace,
+            category: 'Announcements',
+          );
+        }
+
+        completing?.complete();
+        completing = null;
+
+        if (!_needsSave) break;
+      }
+    } finally {
+      _activeSave = null;
+      if (_pendingCompleter != null && !_pendingCompleter!.isCompleted) {
+        _pendingCompleter!.complete();
+      }
+      _pendingCompleter = null;
     }
   }
 

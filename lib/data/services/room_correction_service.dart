@@ -6,6 +6,7 @@ import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:injectable/injectable.dart';
+import 'package:mutex/mutex.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../../domain/models/eq_preset.dart';
@@ -121,7 +122,13 @@ class RoomCorrectionService {
     int leadMs = 60,
     int tailMs = 40,
   }) {
+    if (sampleRate <= 0 || toneMs <= 0 || tones.isEmpty || pcm.isEmpty) {
+      return tones.isEmpty ? [] : List<double>.filled(tones.length, 0.0);
+    }
     final framesPerTone = sampleRate * toneMs ~/ 1000;
+    if (framesPerTone <= 0) {
+      return List<double>.filled(tones.length, 0.0);
+    }
     final lead = sampleRate * leadMs ~/ 1000;
     final tail = sampleRate * tailMs ~/ 1000;
     // Detect onset if there is leading latency/silence before the sweep starts.
@@ -322,21 +329,31 @@ class RoomCorrectionService {
     double freq,
   ) {
     final n = math.min(gains.length, centers.length);
-    if (n == 0 || !freq.isFinite) return 0.0;
+    if (n == 0 || !freq.isFinite || freq < 0) return 0.0;
+    // Validate positive sorted centers and finite values
+    for (var i = 0; i < n; i++) {
+      final c = centers[i];
+      if (!c.isFinite || c <= 0) return 0.0;
+      if (i > 0 && c <= centers[i - 1]) return 0.0;
+    }
     final lo = math.log(centers.first);
-    final hi = math.log(centers.last);
-    final logF = math.log(freq.clamp(centers.first, centers.last).toDouble());
+    final hi = math.log(centers[n - 1]);
+    final clampedFreq = freq.clamp(centers.first, centers[n - 1]).toDouble();
+    final logF = math.log(clampedFreq);
     for (var i = 0; i < n - 1; i++) {
       final l0 = math.log(centers[i]);
       final l1 = math.log(centers[i + 1]);
       if (logF >= l0 && logF <= l1) {
         final t = (l1 - l0) < 1e-9 ? 0.0 : (logF - l0) / (l1 - l0);
-        final g = gains[i] * (1 - t) + gains[i + 1] * t;
+        final g0 = gains[i];
+        final g1 = gains[i + 1];
+        if (!g0.isFinite || !g1.isFinite) return 0.0;
+        final g = g0 * (1 - t) + g1 * t;
         return g.isFinite ? g : 0.0;
       }
     }
     if (logF <= lo) return gains.first.isFinite ? gains.first : 0.0;
-    if (logF >= hi) return gains.last.isFinite ? gains.last : 0.0;
+    if (logF >= hi) return gains[n - 1].isFinite ? gains[n - 1] : 0.0;
     return 0.0;
   }
 
@@ -491,6 +508,7 @@ class RoomCorrectionService {
 
   // --- capture plumbing ---
 
+  final Mutex _captureMutex = Mutex();
   StreamSubscription<dynamic>? _captureSub;
   final BytesBuilder _pcmBuffer = BytesBuilder(copy: true);
   bool _capturing = false;
@@ -499,73 +517,81 @@ class RoomCorrectionService {
 
   /// Starts mic capture; PCM blocks accumulate until [stopCapture].
   /// Returns false with a log when microphone permission is denied.
-  ///
-  /// Re-entrancy safe: any previous capture subscription is cancelled before a
-  /// new one is armed, so overlapping starts cannot double-append PCM into the
-  /// same buffer.
-  Future<bool> startCapture({int sampleRate = captureSampleRate}) async {
-    await _captureSub?.cancel();
-    _captureSub = null;
-    _capturing = false;
-    try {
-      final micStatus = await Permission.microphone.status;
-      if (!micStatus.isGranted) {
-        final requested = await Permission.microphone.request();
-        if (!requested.isGranted) {
-          ErrorLogger.log(
-              'Room-correction capture blocked: microphone permission denied',
-              category: 'RoomCorrection');
-          return false;
-        }
-      }
-      _pcmBuffer.clear();
-      _captureSub = _events.receiveBroadcastStream().listen((data) {
-        if (data is Map && data['pcm'] is Uint8List) {
-          final chunk = data['pcm'] as Uint8List;
-          final remaining = maxCaptureBytes - _pcmBuffer.length;
-          if (remaining <= 0) return;
-          _pcmBuffer.add(chunk.length <= remaining
-              ? chunk
-              : Uint8List.sublistView(chunk, 0, remaining));
-        }
-      }, onError: (Object e) {
-        ErrorLogger.log('Room-correction capture stream error',
-            error: e, category: 'RoomCorrection');
-      });
-      final ok = await _method
-          .invokeMethod<bool>('startCapture', {'sampleRate': sampleRate});
-      if (ok != true) {
+  Future<bool> startCapture({int sampleRate = captureSampleRate}) =>
+      _captureMutex.protect(() async {
         await _captureSub?.cancel();
         _captureSub = null;
         _capturing = false;
-        return false;
-      }
-      _capturing = true;
-      return true;
-    } catch (e, st) {
-      ErrorLogger.log('Failed to start room-correction capture',
-          error: e, stackTrace: st, category: 'RoomCorrection');
-      await _captureSub?.cancel();
-      _captureSub = null;
-      return false;
-    }
-  }
+        try {
+          final micStatus = await Permission.microphone.status;
+          if (!micStatus.isGranted) {
+            final requested = await Permission.microphone.request();
+            if (!requested.isGranted) {
+              ErrorLogger.log(
+                  'Room-correction capture blocked: microphone permission denied',
+                  category: 'RoomCorrection');
+              return false;
+            }
+          }
+          _pcmBuffer.clear();
+          _captureSub = _events.receiveBroadcastStream().listen((data) {
+            if (data is Map && data['pcm'] is Uint8List) {
+              final chunk = data['pcm'] as Uint8List;
+              final remaining = maxCaptureBytes - _pcmBuffer.length;
+              if (remaining <= 0) return;
+              _pcmBuffer.add(chunk.length <= remaining
+                  ? chunk
+                  : Uint8List.sublistView(chunk, 0, remaining));
+            }
+          }, onError: (Object e) {
+            ErrorLogger.log('Room-correction capture stream error',
+                error: e, category: 'RoomCorrection');
+          });
+          final ok = await _method
+              .invokeMethod<bool>('startCapture', {'sampleRate': sampleRate})
+              .timeout(const Duration(seconds: 5));
+          if (ok != true) {
+            await _captureSub?.cancel();
+            _captureSub = null;
+            _capturing = false;
+            return false;
+          }
+          _capturing = true;
+          return true;
+        } catch (e, st) {
+          ErrorLogger.log('Failed to start room-correction capture',
+              error: e, stackTrace: st, category: 'RoomCorrection');
+          await _captureSub?.cancel();
+          _captureSub = null;
+          _capturing = false;
+          return false;
+        }
+      });
 
   /// Stops capture and returns the accumulated mono 16-bit samples.
-  Future<Int16List> stopCapture() async {
-    try {
-      await _method.invokeMethod<bool>('stopCapture');
-    } catch (e) {
-      ErrorLogger.log('Failed to stop room-correction capture',
-          error: e, category: 'RoomCorrection');
-    }
-    await _captureSub?.cancel();
+  Future<Int16List> stopCapture() => _captureMutex.protect(() async {
+        try {
+          await _method
+              .invokeMethod<bool>('stopCapture')
+              .timeout(const Duration(seconds: 5));
+        } catch (e, st) {
+          ErrorLogger.log('Failed to stop room-correction capture',
+              error: e, stackTrace: st, category: 'RoomCorrection');
+        }
+        await _captureSub?.cancel();
+        _captureSub = null;
+        _capturing = false;
+        final bytes = _pcmBuffer.takeBytes();
+        // Align to whole samples (16-bit).
+        final sampleBytes = bytes.length - (bytes.length % 2);
+        return Int16List.view(bytes.buffer, bytes.offsetInBytes, sampleBytes ~/ 2);
+      });
+
+  void dispose() {
+    _captureSub?.cancel();
     _captureSub = null;
     _capturing = false;
-    final bytes = _pcmBuffer.takeBytes();
-    // Align to whole samples (16-bit).
-    final sampleBytes = bytes.length - (bytes.length % 2);
-    return Int16List.view(bytes.buffer, bytes.offsetInBytes, sampleBytes ~/ 2);
+    _pcmBuffer.clear();
   }
 
   /// Closed-loop convergence verification (Pillar 2).
@@ -587,6 +613,7 @@ class RoomCorrectionService {
     }
 
     final n = math.min(preResponseDb.length, postResponseDb.length);
+    var validCount = 0;
     var preVarSum = 0.0;
     var postVarSum = 0.0;
     var maxDelta = 0.0;
@@ -594,14 +621,26 @@ class RoomCorrectionService {
     for (var i = 0; i < n; i++) {
       final pre = preResponseDb[i];
       final post = postResponseDb[i];
+      if (!pre.isFinite || !post.isFinite) continue;
       preVarSum += pre * pre;
       postVarSum += post * post;
       final delta = post.abs();
       if (delta > maxDelta) maxDelta = delta;
+      validCount++;
     }
 
-    final preRms = math.sqrt(preVarSum / n);
-    final postRms = math.sqrt(postVarSum / n);
+    if (validCount == 0) {
+      return const ConvergenceResult(
+        score: 0.0,
+        initialVarianceDb: 0.0,
+        residualVarianceDb: 0.0,
+        maxResidualDeltaDb: 0.0,
+        converged: false,
+      );
+    }
+
+    final preRms = math.sqrt(preVarSum / validCount);
+    final postRms = math.sqrt(postVarSum / validCount);
 
     final score = preRms > 1e-6
         ? ((1.0 - (postRms / preRms)) * 100.0).clamp(0.0, 100.0)
@@ -611,9 +650,9 @@ class RoomCorrectionService {
 
     return ConvergenceResult(
       score: (score * 10).roundToDouble() / 10.0,
-      initialVarianceDb: preRms,
-      residualVarianceDb: postRms,
-      maxResidualDeltaDb: maxDelta,
+      initialVarianceDb: preRms.isFinite ? preRms : 0.0,
+      residualVarianceDb: postRms.isFinite ? postRms : 0.0,
+      maxResidualDeltaDb: maxDelta.isFinite ? maxDelta : 0.0,
       converged: converged,
     );
   }
@@ -636,18 +675,36 @@ class RoomCorrectionService {
       );
     }
 
+    final safeGate = (gateThresholdDb.isFinite && gateThresholdDb >= 0)
+        ? gateThresholdDb
+        : 0.5;
+
     final n = math.min(measuredDb.length, targetDb.length);
+    var validCount = 0;
     var maxDev = 0.0;
     var totalDev = 0.0;
 
     for (var i = 0; i < n; i++) {
-      final dev = (measuredDb[i] - targetDb[i]).abs();
+      final m = measuredDb[i];
+      final t = targetDb[i];
+      if (!m.isFinite || !t.isFinite) continue;
+      final dev = (m - t).abs();
       if (dev > maxDev) maxDev = dev;
       totalDev += dev;
+      validCount++;
     }
 
-    final meanDev = totalDev / n;
-    final isWithinGate = maxDev <= gateThresholdDb;
+    if (validCount == 0) {
+      return const LoopbackVerificationResult(
+        maxDeviationDb: 0.0,
+        meanDeviationDb: 0.0,
+        thdEstimatePercent: 0.0,
+        isWithinGate: false,
+      );
+    }
+
+    final meanDev = totalDev / validCount;
+    final isWithinGate = maxDev <= safeGate;
 
     return LoopbackVerificationResult(
       maxDeviationDb: (maxDev * 100).roundToDouble() / 100.0,

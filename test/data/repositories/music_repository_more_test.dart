@@ -344,6 +344,8 @@ void main() {
 
     test('case-variant duplicate paths fold onto one row and keep children',
         () async {
+      // Simulate legacy pre-migration database without lower(path) UNIQUE index
+      await db.customStatement('DROP INDEX IF EXISTS idx_songs_path_cue;');
       await insertSong(id: 10, title: 'Winner', path: '/music/song.mp3');
       await insertSong(id: 20, title: 'Loser', path: '/Music/Song.mp3');
 

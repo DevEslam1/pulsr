@@ -183,5 +183,79 @@ void main() {
 
       await cubit.close();
     });
+
+    test('HomeState.refreshEpoch participates in equality and copyWith', () {
+      const base = HomeState();
+      const bumped = HomeState(refreshEpoch: 1);
+
+      expect(base, isNot(equals(bumped)));
+      expect(base.copyWith(refreshEpoch: 3).refreshEpoch, 3);
+    });
+
+    test('refreshCategory clears cache, refetches, and bumps refreshEpoch',
+        () async {
+      var calls = 0;
+      when(() => mockYtm.searchWithFallback('Chill songs',
+          limit: any(named: 'limit'))).thenAnswer((_) async {
+        calls++;
+        return [
+          YtmTrack(
+            videoId: 'v$calls',
+            title: 'Song $calls',
+            artist: 'Artist',
+            duration: const Duration(minutes: 3),
+          ),
+        ];
+      });
+
+      final cubit = createCubit();
+      final first = await cubit.categoryFuture('Chill');
+      expect(first.single.videoId, 'v1');
+      expect(calls, 1);
+
+      // Cached read does not trigger another fetch.
+      await cubit.categoryFuture('Chill');
+      expect(calls, 1);
+      expect(cubit.state.refreshEpoch, 0);
+
+      final refreshed = await cubit.refreshCategory('Chill');
+      expect(refreshed.single.videoId, 'v2');
+      expect(calls, 2);
+      expect(cubit.state.refreshEpoch, 1);
+
+      await cubit.close();
+    });
+
+    test('retryCategory drops only the retried category and bumps refreshEpoch',
+        () async {
+      var chillCalls = 0;
+      var popCalls = 0;
+      when(() => mockYtm.searchWithFallback('Chill songs',
+          limit: any(named: 'limit'))).thenAnswer((_) async {
+        chillCalls++;
+        return testTracks;
+      });
+      when(() => mockYtm.searchWithFallback('Pop songs',
+          limit: any(named: 'limit'))).thenAnswer((_) async {
+        popCalls++;
+        return testTracks;
+      });
+
+      final cubit = createCubit();
+      await cubit.categoryFuture('Chill');
+      await cubit.categoryFuture('Pop');
+      expect(chillCalls, 1);
+      expect(popCalls, 1);
+
+      cubit.retryCategory('Chill');
+      expect(cubit.state.refreshEpoch, 1);
+
+      await cubit.categoryFuture('Pop');
+      await cubit.categoryFuture('Chill');
+      expect(popCalls, 1, reason: 'unrelated category remains cached');
+      expect(chillCalls, 2, reason: 'retried category refetches');
+
+      await cubit.close();
+    });
   });
 }

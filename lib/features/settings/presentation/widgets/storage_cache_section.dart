@@ -4,7 +4,10 @@ import 'package:path_provider/path_provider.dart';
 import '../../../../core/config/app_config.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/services/artwork_cache_manager.dart';
+import '../../../../core/services/ytm_browse_service.dart';
 import '../../../../core/services/ytm_cache_manager.dart';
+import '../../../../core/services/ytm_search_cache.dart';
+import '../../../../core/services/ytm_url_cache.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/error_logger.dart';
 import '../../../../core/utils/l10n_extensions.dart';
@@ -360,6 +363,15 @@ class _StorageCacheSectionState extends State<StorageCacheSection>
                 final cacheManager = _ytmCacheManager;
                 if (cacheManager == null) return;
                 await cacheManager.clearCache();
+                if (getIt.isRegistered<YtmUrlCache>()) {
+                  getIt<YtmUrlCache>().clear();
+                }
+                if (getIt.isRegistered<YtmSearchCache>()) {
+                  await getIt<YtmSearchCache>().clear();
+                }
+                if (getIt.isRegistered<YtmBrowseService>()) {
+                  getIt<YtmBrowseService>().clearCache();
+                }
                 await _refreshCacheSize();
                 if (context.mounted) {
                   PulsrToast.show(

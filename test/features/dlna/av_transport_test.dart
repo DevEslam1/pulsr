@@ -332,6 +332,41 @@ void main() {
         ),
       );
     });
+
+    test('sets followRedirects = false on invoke requests', () async {
+      bool? followRedirects;
+      final av = AvTransportClient(
+        controlUrl,
+        client: MockClient((request) async {
+          followRedirects = request.followRedirects;
+          return http.Response(_transportResponse, 200);
+        }),
+      );
+      addTearDown(av.close);
+
+      await av.getTransportInfo();
+
+      expect(followRedirects, isFalse);
+    });
+
+    test('enforces response byte cap and throws DLNA_RESPONSE_TOO_LARGE',
+        () async {
+      final oversizedBody = 'x' * (256 * 1024 + 1);
+      final av = AvTransportClient(
+        controlUrl,
+        client: MockClient((_) async => http.Response(oversizedBody, 200)),
+      );
+      addTearDown(av.close);
+
+      await expectLater(
+        av.play(),
+        throwsA(
+          isA<UpnpActionError>()
+              .having((e) => e.code, 'code', 'DLNA_RESPONSE_TOO_LARGE')
+              .having((e) => e.action, 'action', 'Play'),
+        ),
+      );
+    });
   });
 
   group('duration helpers', () {

@@ -188,6 +188,7 @@ extension PlayerDspEffectsExtension on PlayerDspController {
               isVirtualizerEnabled: false,
               isDynamicsEnabled: false,
               isCrossfeedEnabled: false,
+              isHrtfEnabled: false,
               isLimiterEnabled: false,
               isReverbEnabled: false,
               isSaturationEnabled: false,
@@ -212,6 +213,7 @@ extension PlayerDspEffectsExtension on PlayerDspController {
           await _audioHandler.setDynamicsPreset(DynamicsPreset.off,
               enabled: false);
           await _audioHandler.setCrossfeed(false);
+          await _audioHandler.setHrtfBinaural(false);
           await _audioHandler.setLookaheadLimiter(false);
           await _audioHandler.setReverb(false);
           await _audioHandler.setSaturation(false);
@@ -246,6 +248,10 @@ extension PlayerDspEffectsExtension on PlayerDspController {
               crossfeedDelayUs: snap.crossfeedDelayUs,
               crossfeedFeedDb: snap.crossfeedFeedDb,
               crossfeedMode: snap.crossfeedMode,
+              isHrtfEnabled: snap.isHrtfEnabled,
+              hrtfAzimuth: snap.hrtfAzimuth,
+              hrtfElevation: snap.hrtfElevation,
+              hrtfSofaPath: snap.hrtfSofaPath,
               isLimiterEnabled: snap.isLimiterEnabled,
               limiterThresholdDb: snap.limiterThresholdDb,
               limiterReleaseMs: snap.limiterReleaseMs,
@@ -308,6 +314,14 @@ extension PlayerDspEffectsExtension on PlayerDspController {
                   delayUs: snap.crossfeedDelayUs,
                   feedDb: snap.crossfeedFeedDb,
                   mode: snap.crossfeedMode);
+            }
+            if (snap.isHrtfEnabled) {
+              await _audioHandler.setHrtfBinaural(
+                true,
+                azimuth: snap.hrtfAzimuth,
+                elevation: snap.hrtfElevation,
+                sofaPath: snap.hrtfSofaPath,
+              );
             }
             if (snap.isLimiterEnabled) {
               await _audioHandler.setLookaheadLimiter(true,
@@ -402,6 +416,13 @@ extension PlayerDspEffectsExtension on PlayerDspController {
                   .clamp(0.0, 1.0)
                   .toDouble();
               await _audioHandler.setVolumeBoost(safeValue);
+              if (!_isClosed() &&
+                  (safeValue - snap.effectiveVolumeBoost).abs() > 0.001) {
+                final s = _getState();
+                _emit(s.copyWith(
+                  dsp: s.dsp.copyWith(effectiveVolumeBoost: safeValue),
+                ));
+              }
             }
           } else {
             // No snapshot exists because no stage was on when the master switch
@@ -607,6 +628,7 @@ extension PlayerDspEffectsExtension on PlayerDspController {
       guardCondition: enabled,
       updateDsp: (dsp) => dsp.copyWith(
         isCrossfeedEnabled: enabled,
+        isHrtfEnabled: enabled ? false : dsp.isHrtfEnabled,
         crossfeedDelayUs: clampedDelay ?? dsp.crossfeedDelayUs,
         crossfeedFeedDb: clampedFeed ?? dsp.crossfeedFeedDb,
         crossfeedMode: clampedMode ?? dsp.crossfeedMode,
@@ -643,6 +665,10 @@ extension PlayerDspEffectsExtension on PlayerDspController {
       featureName: 'HRTF Spatializer',
       guardCondition: enabled,
       updateDsp: (dsp) => dsp.copyWith(
+        isHrtfEnabled: enabled,
+        hrtfAzimuth: azimuth ?? dsp.hrtfAzimuth,
+        hrtfElevation: elevation ?? dsp.hrtfElevation,
+        hrtfSofaPath: sofaPath ?? dsp.hrtfSofaPath,
         isCrossfeedEnabled: enabled ? false : dsp.isCrossfeedEnabled,
       ),
       applyAudioHandler: () => _audioHandler.setHrtfBinaural(

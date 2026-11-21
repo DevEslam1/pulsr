@@ -461,5 +461,16 @@ void main() {
         isFalse,
       );
     });
+
+    test('SafeModeController concurrent recordFailure calls preserving exact count', () async {
+      final futures = <Future<void>>[];
+      for (var i = 0; i < 10; i++) {
+        futures.add(controller.recordFailure('Pixel 8', 'failure-$i'));
+      }
+      await Future.wait(futures);
+
+      expect(prefs.getInt(SafeModeController.failuresKey('Pixel 8')), 10);
+      expect(controller.consecutiveFailures('Pixel 8'), 10);
+    });
   });
 }

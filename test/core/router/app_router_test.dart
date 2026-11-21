@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/config/app_config.dart';
 import 'package:pulsr/core/router/app_router.dart';
+import 'package:pulsr/core/theme/pulsr_page_transitions.dart';
 import 'package:pulsr/core/services/ytm_account_service.dart';
 import 'package:pulsr/core/widgets/entity_by_id_loader.dart';
 import 'package:pulsr/data/db/app_database.dart';
@@ -137,16 +138,6 @@ void main() {
           ),
         ),
       ),
-    );
-  }
-
-  Widget runTransition(Page<dynamic> page, BuildContext ctx) {
-    final custom = page as CustomTransitionPage<dynamic>;
-    return custom.transitionsBuilder(
-      ctx,
-      const AlwaysStoppedAnimation<double>(1.0),
-      const AlwaysStoppedAnimation<double>(0.0),
-      const SizedBox.shrink(),
     );
   }
 
@@ -469,7 +460,7 @@ void main() {
   });
 
   group('page builders', () {
-    testWidgets('shell tabs build tab pages with transition builders',
+    testWidgets('shell tabs build tab pages with MaterialPage',
         (tester) async {
       await pumpContext(tester);
       for (final path in [
@@ -480,8 +471,8 @@ void main() {
         '/settings'
       ]) {
         final page = routeFor(path).pageBuilder!(context, stateFor(path));
-        expect(page, isA<CustomTransitionPage<dynamic>>(), reason: path);
-        expect(runTransition(page, context), isA<Widget>(), reason: path);
+        expect(page, isA<MaterialPage<void>>(), reason: path);
+        expect((page as MaterialPage<void>).child, isA<Widget>(), reason: path);
       }
       // Query parameters feed the tab screens.
       routeFor('/library').pageBuilder!(
@@ -489,35 +480,21 @@ void main() {
       routeFor('/search').pageBuilder!(context, stateFor('/search?q=beatles'));
     });
 
-    testWidgets('reduced motion short-circuits the tab transition',
-        (tester) async {
-      await pumpContext(tester, disableAnimations: true);
-      final page = routeFor('/').pageBuilder!(context, stateFor('/'));
-      final result = runTransition(page, context);
-      expect(result, isA<SizedBox>());
-    });
-
-    testWidgets('now-playing builds its slide transition', (tester) async {
+    testWidgets('now-playing builds its route with PulsrNowPlayingPage', (tester) async {
       await pumpContext(tester);
       final page = routeFor('/now-playing').pageBuilder!(
           context, stateFor('/now-playing'));
-      expect(page, isA<CustomTransitionPage<dynamic>>());
-      expect(runTransition(page, context), isA<Widget>());
+      expect(page, isA<PulsrNowPlayingPage<void>>());
+      final route = (page as PulsrNowPlayingPage<void>).createRoute(context);
+      expect(route, isA<Route<void>>());
     });
 
-    testWidgets('detail pages use the shared pulsr transition', (tester) async {
+    testWidgets('detail pages use MaterialPage with restorationId', (tester) async {
       await pumpContext(tester);
       final page = routeFor('/album').pageBuilder!(
           context, stateFor('/album', extra: _album()));
-      expect(runTransition(page, context), isA<Widget>());
-    });
-
-    testWidgets('reduced motion short-circuits the detail transition',
-        (tester) async {
-      await pumpContext(tester, disableAnimations: true);
-      final page = routeFor('/album').pageBuilder!(
-          context, stateFor('/album', extra: _album()));
-      expect(runTransition(page, context), isA<Widget>());
+      expect(page, isA<MaterialPage<void>>());
+      expect((page as MaterialPage<void>).restorationId, isNotNull);
     });
 
     testWidgets('album route honours typed extras, maps and fallbacks',
@@ -526,23 +503,23 @@ void main() {
       final builder = routeFor('/album').pageBuilder!;
 
       final typed = builder(context, stateFor('/album', extra: _album()))
-          as CustomTransitionPage<dynamic>;
+          as MaterialPage<void>;
       expect(typed.child, isA<AlbumDetailScreen>());
 
       final mapped = builder(
         context,
         stateFor('/album', extra: {'album': _album(), 'heroTag': 'hero'}),
-      ) as CustomTransitionPage<dynamic>;
+      ) as MaterialPage<void>;
       expect(mapped.child, isA<AlbumDetailScreen>());
 
       final byId = builder(
         context,
         stateFor('/album', pathParameters: {'id': '5'}),
-      ) as CustomTransitionPage<dynamic>;
+      ) as MaterialPage<void>;
       expect(byId.child, isA<EntityByIdLoader<AlbumsTableData>>());
 
       final notFound =
-          builder(context, stateFor('/album')) as CustomTransitionPage<dynamic>;
+          builder(context, stateFor('/album')) as MaterialPage<void>;
       expect(notFound.child, isA<Scaffold>());
     });
 
@@ -552,17 +529,17 @@ void main() {
       final builder = routeFor('/artist').pageBuilder!;
 
       final typed = builder(context, stateFor('/artist', extra: _artist()))
-          as CustomTransitionPage<dynamic>;
+          as MaterialPage<void>;
       expect(typed.child, isA<ArtistDetailScreen>());
 
       final byId = builder(
         context,
         stateFor('/artist', pathParameters: {'id': '6'}),
-      ) as CustomTransitionPage<dynamic>;
+      ) as MaterialPage<void>;
       expect(byId.child, isA<EntityByIdLoader<ArtistsTableData>>());
 
       final notFound = builder(context, stateFor('/artist'))
-          as CustomTransitionPage<dynamic>;
+          as MaterialPage<void>;
       expect(notFound.child, isA<Scaffold>());
     });
 
@@ -574,17 +551,17 @@ void main() {
       final typed = builder(
         context,
         stateFor('/genre', extra: const GenreItem(name: 'Rock', songCount: 2)),
-      ) as CustomTransitionPage<dynamic>;
+      ) as MaterialPage<void>;
       expect(typed.child, isA<GenreDetailScreen>());
 
       final byName = builder(
         context,
         stateFor('/genre', pathParameters: {'name': 'Jazz'}),
-      ) as CustomTransitionPage<dynamic>;
+      ) as MaterialPage<void>;
       expect(byName.child, isA<GenreDetailScreen>());
 
       final notFound =
-          builder(context, stateFor('/genre')) as CustomTransitionPage<dynamic>;
+          builder(context, stateFor('/genre')) as MaterialPage<void>;
       expect(notFound.child, isA<Scaffold>());
     });
 
@@ -596,17 +573,17 @@ void main() {
       final typed = builder(
         context,
         stateFor('/year', extra: const YearItem(year: 1999, songCount: 1)),
-      ) as CustomTransitionPage<dynamic>;
+      ) as MaterialPage<void>;
       expect(typed.child, isA<YearDetailScreen>());
 
       final byYear = builder(
         context,
         stateFor('/year', pathParameters: {'year': '2020'}),
-      ) as CustomTransitionPage<dynamic>;
+      ) as MaterialPage<void>;
       expect(byYear.child, isA<YearDetailScreen>());
 
       final notFound =
-          builder(context, stateFor('/year')) as CustomTransitionPage<dynamic>;
+          builder(context, stateFor('/year')) as MaterialPage<void>;
       expect(notFound.child, isA<Scaffold>());
     });
 
@@ -616,17 +593,17 @@ void main() {
       final builder = routeFor('/playlist').pageBuilder!;
 
       final typed = builder(context, stateFor('/playlist', extra: _playlist()))
-          as CustomTransitionPage<dynamic>;
+          as MaterialPage<void>;
       expect(typed.child, isA<PlaylistDetailScreen>());
 
       final byId = builder(
         context,
         stateFor('/playlist', pathParameters: {'id': '7'}),
-      ) as CustomTransitionPage<dynamic>;
+      ) as MaterialPage<void>;
       expect(byId.child, isA<EntityByIdLoader<PlaylistsTableData>>());
 
       final notFound = builder(context, stateFor('/playlist'))
-          as CustomTransitionPage<dynamic>;
+          as MaterialPage<void>;
       expect(notFound.child, isA<Scaffold>());
     });
   });

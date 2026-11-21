@@ -130,42 +130,30 @@ int SincResampler::processInterleaved(float* buffer, int frames, int channels) {
     (void)channels;
     (void)buffer;
     if (!enabled_ || frames <= 0) return frames;
-
-    static std::atomic<bool> sWarned{false};
-    if (!isBypassed() && !sWarned.exchange(true)) {
-#if defined(__ANDROID__)
-        __android_log_print(ANDROID_LOG_WARN, "PulsrDSP",
-            "SincResampler: in-place processInterleaved cannot alter frame count (ratio %f); audio passed through. Relying on AAudio/HAL rate conversion.", ratio_);
-#else
-        fprintf(stderr,
-            "SincResampler: in-place processInterleaved cannot alter frame count (ratio %f); audio passed through. Relying on host/HAL rate conversion.\n", ratio_);
-#endif
-    }
-
-    // The engine passes a fixed block and reuses the same buffer downstream, so
-    // the frame count must not change. A causal sample-rate converter cannot
-    // satisfy that (downsampling needs more input frames than it emits, and
-    // upsampling emits more than it consumes): forcing it either reads
-    // future/stale ring samples (gross distortion) or grows/skips the FIFO
-    // (periodic dropouts). Pass the audio through untouched and let the
-    // platform AudioTrack perform the rate conversion. Ratio-correct conversion
-    // is available via processPlanar() (used by the convolution reverb), which
-    // is allowed to vary the output frame count.
+    // Fixed N-in/N-out contract: pass audio through untouched (rate conversion
+    // runs upstream in tap SRC / AAudio HAL, or via processPlanar()).
     return frames;
 }
 
 int SincResampler::processPlanar(const float* const* in, float* const* out, int inFrames, int channels, int maxOutFrames) {
-    if (!enabled_ || inFrames <= 0 || isBypassed()) {
-        int count = std::min(inFrames, maxOutFrames);
-        if (in != out) {
+    if (!in || !out || maxOutFrames <= 0 || inFrames < 0) return 0;
+    channels = std::clamp(channels, 1, MAX_CHANNELS);
+
+    if (!enabled_ || inFrames == 0 || isBypassed()) {
+        int count = std::max(0, std::min(inFrames, maxOutFrames));
+        if (count > 0 && in != out) {
             for (int ch = 0; ch < channels; ++ch) {
-                std::memcpy(out[ch], in[ch], count * sizeof(float));
+                if (out[ch] && in[ch]) {
+                    std::memcpy(out[ch], in[ch], static_cast<size_t>(count) * sizeof(float));
+                }
             }
         }
         return count;
     }
 
-    channels = std::clamp(channels, 1, MAX_CHANNELS);
+    for (int ch = 0; ch < channels; ++ch) {
+        if (!in[ch] || !out[ch]) return 0;
+    }
 
     // The FIR reads up to HALF_TAPS samples of already-consumed history behind
     // the oldest unread frame, so leave headroom below the physical capacity.
@@ -351,14 +339,7 @@ int SincResampler::processPlanar(const float* const* in, float* const* out, int 
     }
 
     if (droppedFrames) {
-#if defined(__ANDROID__)
-        __android_log_print(ANDROID_LOG_WARN, "PulsrDSP",
-            "SincResampler: FIFO overflow, dropped oldest frames (limit %d)",
-            FIFO_LIMIT);
-#else
-        fprintf(stderr, "SincResampler: FIFO overflow, dropped oldest frames (limit %d)\n",
-            FIFO_LIMIT);
-#endif
+        fifoOverflowCount_.fetch_add(1, std::memory_order_relaxed);
     }
 
     return outFrames;

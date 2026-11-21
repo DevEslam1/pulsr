@@ -56,6 +56,7 @@ class DownloadRepositoryImpl implements IDownloadRepository {
   final Queue<String> _queue = Queue<String>();
   final Set<String> _activeVideoIds = {};
   final Set<String> _pausedVideoIds = {};
+  final Set<String> _pausingVideoIds = {};
 
   /// Tasks paused automatically — by the Wi-Fi/offline policy or by a lost
   /// connection — not by the user. Only these are auto-resumed when the
@@ -71,6 +72,8 @@ class DownloadRepositoryImpl implements IDownloadRepository {
       StreamController<DownloadTask>.broadcast();
 
   Timer? _saveDebounce;
+  Future<void> _persistChain = Future<void>.value();
+  bool _needsPersist = false;
   final Map<String, int> _lastProgressEmitMs = {};
   final Map<String, int> _lastProgressPersistMs = {};
   static const int _progressCheckpointMs = 5000;
@@ -294,6 +297,7 @@ class DownloadRepositoryImpl implements IDownloadRepository {
     _ytDownloadService.markPaused(videoId);
 
     if (_activeVideoIds.contains(videoId)) {
+      _pausingVideoIds.add(videoId);
       _ytDownloadService.cancel(videoId);
       // Await active completer briefly so that appended .part resume logic sees stable state
       final c = _activeCompleters[videoId];
@@ -307,9 +311,9 @@ class DownloadRepositoryImpl implements IDownloadRepository {
           );
         }
       }
-      // FIX-A08: Force-remove videoId from _activeVideoIds and _activeCompleters to prevent leaks
-      _activeVideoIds.remove(videoId);
-      _activeCompleters.remove(videoId);
+      // Note: do NOT remove videoId from _activeVideoIds on 2s timeout;
+      // keep it owned by _executeTask's finally block and keep _pausingVideoIds
+      // marked so resumeDownload cannot spawn a duplicate writer on the same .part file.
     }
 
     // The job may have finished saving/tagging while the cancel was in flight
@@ -360,6 +364,10 @@ class DownloadRepositoryImpl implements IDownloadRepository {
     final task = _tasks[videoId];
     if (task == null) {
       return const Left(DownloadFailure('Task not found'));
+    }
+    // Prevent spawning a duplicate writer while pause cancellation is in flight.
+    if (_pausingVideoIds.contains(videoId) || _activeVideoIds.contains(videoId)) {
+      return const Right(unit);
     }
     // Resume is only meaningful for a paused task. A duplicate tap, a stale
     // notification action, or an admission racing the completion tail used to
@@ -445,6 +453,7 @@ class DownloadRepositoryImpl implements IDownloadRepository {
   Future<Either<AppFailure, Unit>> deleteDownload(String videoId) async {
     var task = _tasks[videoId];
     _pausedVideoIds.remove(videoId);
+    _pausingVideoIds.remove(videoId);
     _autoPausedVideoIds.remove(videoId);
     _queue.remove(videoId);
     // A deleted task must not keep the foreground service alive through its
@@ -536,11 +545,19 @@ class DownloadRepositoryImpl implements IDownloadRepository {
 
     try {
       int freeBytes = 0;
+      int? realTotalBytes;
       try {
         freeBytes =
             await _downloadChannel.invokeMethod<int>('getFreeDiskSpace') ?? 0;
       } catch (e, st) {
         ErrorLogger.log('Could not read free disk space via platform channel',
+            error: e, stackTrace: st, category: 'Download');
+      }
+      try {
+        realTotalBytes =
+            await _downloadChannel.invokeMethod<int>('getTotalDiskSpace');
+      } catch (e, st) {
+        ErrorLogger.log('Could not read total disk space via platform channel',
             error: e, stackTrace: st, category: 'Download');
       }
 
@@ -652,11 +669,13 @@ class DownloadRepositoryImpl implements IDownloadRepository {
             error: e, stackTrace: st, category: 'Download');
       }
 
-      final totalBytes = freeBytes + totalUsedBytes;
+      final total = (realTotalBytes != null && realTotalBytes > 0)
+          ? realTotalBytes
+          : 0;
       final stats = StorageStats(
         usedBytes: totalUsedBytes,
         freeBytes: freeBytes,
-        totalBytes: totalBytes > 0 ? totalBytes : 1,
+        totalBytes: total > 0 ? total : 1,
         downloadedSongsCount: completedCount,
       );
 
@@ -787,6 +806,7 @@ class DownloadRepositoryImpl implements IDownloadRepository {
       }
     }
 
+    final pendingDbUpdates = <int, SongsTableCompanion>{};
     const ioConcurrency = 32;
     for (var i = 0; i < completedTasks.length; i += ioConcurrency) {
       final batch = completedTasks.sublist(
@@ -795,8 +815,28 @@ class DownloadRepositoryImpl implements IDownloadRepository {
         batch.map((task) => _reconcileCompletedTask(
               task,
               prefetchedSongs: prefetchedSongs,
+              pendingDbUpdates: pendingDbUpdates,
             )),
       );
+    }
+
+    if (pendingDbUpdates.isNotEmpty && db != null) {
+      try {
+        await db.transaction(() async {
+          await db.batch((b) {
+            for (final entry in pendingDbUpdates.entries) {
+              b.update(
+                db.songsTable,
+                entry.value,
+                where: (s) => s.id.equals(entry.key),
+              );
+            }
+          });
+        });
+      } catch (e, st) {
+        ErrorLogger.log('Failed batch updating reconciled song metadata',
+            error: e, stackTrace: st, category: 'Download');
+      }
     }
   }
 
@@ -856,6 +896,7 @@ class DownloadRepositoryImpl implements IDownloadRepository {
   Future<void> _reconcileCompletedTask(
     DownloadTask task, {
     Map<int, SongsTableData>? prefetchedSongs,
+    Map<int, SongsTableCompanion>? pendingDbUpdates,
   }) async {
     final db = _effectiveDb;
     try {
@@ -964,13 +1005,18 @@ class DownloadRepositoryImpl implements IDownloadRepository {
             (repairTitle != song.title ||
                 repairArtist != song.artist ||
                 repairAlbum != song.album)) {
-          await (database.update(database.songsTable)
-                ..where((s) => s.id.equals(songRowId)))
-              .write(SongsTableCompanion(
+          final companion = SongsTableCompanion(
             title: Value(repairTitle),
             artist: Value(repairArtist),
             album: Value(repairAlbum),
-          ));
+          );
+          if (pendingDbUpdates != null) {
+            pendingDbUpdates[songRowId] = companion;
+          } else {
+            await (database.update(database.songsTable)
+                  ..where((s) => s.id.equals(songRowId)))
+                .write(companion);
+          }
         }
       }
 
@@ -1084,6 +1130,7 @@ class DownloadRepositoryImpl implements IDownloadRepository {
     // Flush pending state so terminal states are never lost
     // on a fast close/kill after the debounce window opened.
     await _persistNow();
+    _pausingVideoIds.clear();
     // FIX-A07: Cancel all _throttleFlushTimers entries BEFORE closing _streamController
     for (final timer in _throttleFlushTimers.values) {
       timer.cancel();
@@ -1118,7 +1165,21 @@ class DownloadRepositoryImpl implements IDownloadRepository {
   /// kept (they are the resume/recovery state).
   static const int _maxPersistedTasks = 2000;
 
-  Future<void> _persistNow() async {
+  Future<void> _persistNow() {
+    _needsPersist = true;
+    _persistChain = _persistChain.then((_) async {
+      if (!_needsPersist) return;
+      _needsPersist = false;
+      await _persistNowInternal();
+    }).catchError((e, st) {
+      _needsPersist = false;
+      ErrorLogger.log('Failed persisting download queue',
+          error: e, stackTrace: st, category: 'Download');
+    });
+    return _persistChain;
+  }
+
+  Future<void> _persistNowInternal() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final live = <DownloadTask>[];
@@ -1574,6 +1635,7 @@ class DownloadRepositoryImpl implements IDownloadRepository {
         _ytDownloadService.releaseForeground(videoId);
       }
     } finally {
+      _pausingVideoIds.remove(videoId);
       _activeVideoIds.remove(videoId);
       _activeCompleters.remove(videoId);
       if (!completer.isCompleted) completer.complete();

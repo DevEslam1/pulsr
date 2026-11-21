@@ -19,7 +19,7 @@ import 'package:pulsr/data/audio/audio_handler.dart';
 import 'package:rxdart/rxdart.dart';
 import 'package:pulsr/data/db/app_database.dart';
 import 'package:pulsr/domain/models/audio_output_info.dart';
-import 'package:pulsr/domain/models/audio_quality_info.dart';
+import 'package:pulsr/data/audio/dsd_decoder_helper.dart';
 import 'package:pulsr/features/player/cubit/player_cubit.dart';
 import 'package:pulsr/features/player/cubit/player_state.dart';
 import 'package:pulsr/features/player/presentation/widgets/audio_quality_sheet.dart';
@@ -1055,9 +1055,9 @@ void main() {
     );
     // A DoP carrier is never a verified PCM chain; this file's DSD case leaves
     // the flag set, so pin it for the comparison below.
-    final dopBefore = AudioQualityInfo.dsdDopActive;
-    AudioQualityInfo.dsdDopActive = false;
-    addTearDown(() => AudioQualityInfo.dsdDopActive = dopBefore);
+    final dopBefore = DsdDecoderHelper.dsdDopActive;
+    DsdDecoderHelper.dsdDopActive = false;
+    addTearDown(() => DsdDecoderHelper.dsdDopActive = dopBefore);
     var currentDsp = const DspSlice(isDitherEnabled: true);
     PlayerState playerState() => PlayerState(
         dsp: currentDsp, playback: const PlaybackSlice(currentSong: testSong));

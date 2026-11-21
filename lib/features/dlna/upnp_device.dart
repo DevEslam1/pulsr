@@ -4,6 +4,8 @@
 // stripped before reading elements, so the parser accepts both
 // `<friendlyName>` and `<s:friendlyName>` shapes from real-world devices.
 import '../../core/errors/app_error_base.dart';
+import 'ssdp_client.dart';
+import 'upnp_entities.dart';
 
 /// Raised when a device description cannot be used as a DLNA renderer.
 class UpnpParseError extends AppError {
@@ -85,7 +87,12 @@ class UpnpDeviceDescription {
       );
     }
 
-    final service = _selectAvTransportService(document);
+    final base = _resolveBase(document, location);
+    final service = _selectAvTransportService(
+      document,
+      base: base,
+      sourceAddress: location.host,
+    );
     final controlUrl = service?.controlUrl ?? '';
     if (controlUrl.isEmpty) {
       throw const UpnpParseError(
@@ -94,8 +101,13 @@ class UpnpDeviceDescription {
       );
     }
 
-    final base = _resolveBase(document, location);
-    final resolvedControl = base.resolve(controlUrl);
+    final resolvedControl = Uri.parse(controlUrl);
+    if (!SsdpClient.isAllowedDescriptionLocation(resolvedControl, location.host)) {
+      throw const UpnpParseError(
+        code: 'DLNA_CONTROL_URL_DISALLOWED',
+        userMessage: 'The AVTransport control URL points to a disallowed location.',
+      );
+    }
 
     return UpnpDeviceDescription(
       friendlyName: friendlyName,
@@ -123,7 +135,7 @@ String? _elementText(String document, String localName) {
     caseSensitive: false,
   ).firstMatch(document);
   if (match == null) return null;
-  return _decodeEntities(_stripCdata(match.group(1) ?? '').trim());
+  return decodeXmlEntities(_stripCdata(match.group(1) ?? '').trim());
 }
 
 String _stripCdata(String value) {
@@ -145,12 +157,22 @@ Uri _resolveBase(String document, Uri location) {
   if (urlBase == null || urlBase.isEmpty) return location;
   final parsed = Uri.tryParse(urlBase);
   if (parsed == null || !parsed.hasScheme) return location;
-  return parsed;
+  final resolved = location.resolveUri(parsed);
+  if (!SsdpClient.isAllowedDescriptionLocation(resolved, location.host)) {
+    return location;
+  }
+  return resolved;
 }
 
-_ServiceEntry? _selectAvTransportService(String document) =>
+_ServiceEntry? _selectAvTransportService(
+  String document, {
+  required Uri base,
+  String? sourceAddress,
+}) =>
     _selectService(
       document,
+      base: base,
+      sourceAddress: sourceAddress,
       isPrimary: (type, _) =>
           type.contains(':service:AVTransport:') ||
           type.endsWith(':AVTransport:1'),
@@ -158,9 +180,15 @@ _ServiceEntry? _selectAvTransportService(String document) =>
           serviceId.contains('AVTransport') || control.contains('avtrans'),
     );
 
-_ServiceEntry? _selectContentDirectoryService(String document) =>
+_ServiceEntry? _selectContentDirectoryService(
+  String document, {
+  required Uri base,
+  String? sourceAddress,
+}) =>
     _selectService(
       document,
+      base: base,
+      sourceAddress: sourceAddress,
       isPrimary: (type, _) =>
           type.contains(':service:ContentDirectory:') ||
           type.endsWith(':ContentDirectory:1'),
@@ -173,6 +201,8 @@ _ServiceEntry? _selectContentDirectoryService(String document) =>
 /// matching [isFallback].
 _ServiceEntry? _selectService(
   String document, {
+  required Uri base,
+  String? sourceAddress,
   required bool Function(String type, String serviceId) isPrimary,
   required bool Function(String type, String serviceId, String controlUrl)
       isFallback,
@@ -188,43 +218,17 @@ _ServiceEntry? _selectService(
     final body = block.group(1) ?? '';
     final type = _elementText(body, 'serviceType') ?? '';
     final control = _elementText(body, 'controlURL') ?? '';
+    if (control.isEmpty) continue;
+    final resolved = base.resolve(control);
+    if (!SsdpClient.isAllowedDescriptionLocation(resolved, sourceAddress)) {
+      continue;
+    }
     final serviceId = _elementText(body, 'serviceId') ?? '';
-    final entry = _ServiceEntry(controlUrl: control);
+    final entry = _ServiceEntry(controlUrl: resolved.toString());
     if (isPrimary(type, serviceId)) return entry;
     if (isFallback(type, serviceId, control)) fallback ??= entry;
   }
   return fallback;
-}
-
-String _decodeEntities(String value) {
-  if (!value.contains('&')) return value;
-  return value.replaceAllMapped(
-    RegExp(r'&(#x?[0-9A-Fa-f]+|[A-Za-z]+);'),
-    (match) {
-      final token = match.group(1) ?? '';
-      switch (token) {
-        case 'amp':
-          return '&';
-        case 'lt':
-          return '<';
-        case 'gt':
-          return '>';
-        case 'quot':
-          return '"';
-        case 'apos':
-          return "'";
-      }
-      if (token.startsWith('#x') || token.startsWith('#X')) {
-        final code = int.tryParse(token.substring(2), radix: 16);
-        return code == null ? match.group(0)! : String.fromCharCode(code);
-      }
-      if (token.startsWith('#')) {
-        final code = int.tryParse(token.substring(1));
-        return code == null ? match.group(0)! : String.fromCharCode(code);
-      }
-      return match.group(0)!;
-    },
-  );
 }
 
 /// The subset of a UPnP description Pulsr needs to browse a MediaServer.
@@ -297,7 +301,12 @@ class UpnpServerDescription {
       );
     }
 
-    final service = _selectContentDirectoryService(document);
+    final base = _resolveBase(document, location);
+    final service = _selectContentDirectoryService(
+      document,
+      base: base,
+      sourceAddress: location.host,
+    );
     final controlUrl = service?.controlUrl ?? '';
     if (controlUrl.isEmpty) {
       throw const UpnpParseError(
@@ -307,7 +316,15 @@ class UpnpServerDescription {
       );
     }
 
-    final base = _resolveBase(document, location);
+    final resolvedControl = Uri.parse(controlUrl);
+    if (!SsdpClient.isAllowedDescriptionLocation(resolvedControl, location.host)) {
+      throw const UpnpParseError(
+        code: 'DLNA_CONTENT_DIRECTORY_DISALLOWED',
+        userMessage:
+            'The ContentDirectory control URL points to a disallowed location.',
+      );
+    }
+
     return UpnpServerDescription(
       friendlyName: friendlyName,
       modelName: _emptyToNull(_elementText(document, 'modelName')),
@@ -315,7 +332,7 @@ class UpnpServerDescription {
       udn: _emptyToNull(_elementText(document, 'UDN')),
       deviceType: _emptyToNull(_elementText(document, 'deviceType')),
       location: location,
-      contentDirectoryControlUrl: base.resolve(controlUrl),
+      contentDirectoryControlUrl: resolvedControl,
     );
   }
 }

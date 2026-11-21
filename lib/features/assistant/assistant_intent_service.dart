@@ -8,6 +8,7 @@
 
 import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/services.dart';
+import 'package:mutex/mutex.dart';
 
 import '../../core/utils/error_logger.dart';
 import 'assistant_query.dart';
@@ -63,6 +64,7 @@ class AssistantIntentService {
   String? _lastSignature;
   Duration? _lastRequestElapsed;
   bool _disposed = false;
+  final Mutex _dispatchMutex = Mutex();
 
   /// Default time source for [dedupeWindow]: one [Stopwatch] per service.
   ///
@@ -174,7 +176,14 @@ class AssistantIntentService {
   Future<void> _dispatch(
     String signature,
     Future<AssistantResolution> Function() resolve,
+  ) =>
+      _dispatchMutex.protect(() => _dispatchLocked(signature, resolve));
+
+  Future<void> _dispatchLocked(
+    String signature,
+    Future<AssistantResolution> Function() resolve,
   ) async {
+    if (_disposed) return;
     final now = _monotonicClock();
     final previousAt = _lastRequestElapsed;
     final elapsedSincePrevious = previousAt == null ? null : now - previousAt;

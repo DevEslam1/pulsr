@@ -40,6 +40,7 @@ class LyricsTranslationService {
   static final Map<String, _CachedTranslation> _memoryCache = {};
   static Future<void> _diskIndexChain = Future<void>.value();
   static final RegExp _markerRegex = RegExp(r'\uE000[^\uE001]*\uE001');
+  static String _lastDetectedSource = '';
 
   final http.Client _client;
   final bool _ownsClient;
@@ -217,9 +218,15 @@ class LyricsTranslationService {
       for (final batch in batches) {
         var answer =
             await _requestRomanizationBatch(batch, fallbackTargetLanguage);
-        if (answer == null && detectedSource != 'auto') {
-          // Retry using InputTools with detected source
-          answer = await _requestInputToolsBatch(batch, detectedSource);
+        if (answer == null) {
+          // Allow InputTools fallback on batch 1 using detected source or script detection
+          var lang = detectedSource != 'auto' ? detectedSource : _lastDetectedSource;
+          if (lang.isEmpty || lang == 'auto') {
+            lang = _detectScriptLanguage(batch.texts);
+          }
+          if (lang.isNotEmpty && lang != 'auto') {
+            answer = await _requestInputToolsBatch(batch, lang);
+          }
         }
         if (answer == null) {
           return LyricsTranslationResult(lines: lines);
@@ -249,7 +256,6 @@ class LyricsTranslationService {
         final rom = romanizedTexts[i];
         return orig.copyWith(
           romanization: rom.isNotEmpty ? rom : orig.romanization,
-          translation: rom.isNotEmpty ? rom : orig.translation,
         );
       });
 
@@ -277,7 +283,6 @@ class LyricsTranslationService {
       if (cached.isRomanized) {
         return orig.copyWith(
           romanization: text.isNotEmpty ? text : orig.romanization,
-          translation: text.isNotEmpty ? text : orig.translation,
         );
       }
       return orig.copyWith(
@@ -354,7 +359,8 @@ class LyricsTranslationService {
 
       if (response.statusCode != 200) return null;
 
-      final dynamic data = jsonDecode(response.body);
+      final dynamic data = jsonDecode(
+          utf8.decode(response.bodyBytes, allowMalformed: true));
       if (data is! List || data.isEmpty) return null;
 
       final segments = data[0];
@@ -416,7 +422,8 @@ class LyricsTranslationService {
 
       if (response.statusCode != 200) return null;
 
-      final dynamic data = jsonDecode(response.body);
+      final dynamic data = jsonDecode(
+          utf8.decode(response.bodyBytes, allowMalformed: true));
       if (data is! List || data.isEmpty) return null;
 
       final segments = data[0];
@@ -435,6 +442,9 @@ class LyricsTranslationService {
       final String fullRomanized = sb.toString();
       final String source =
           (data.length > 2 && data[2] != null) ? data[2].toString() : '';
+      if (source.isNotEmpty) {
+        _lastDetectedSource = source;
+      }
 
       final parts =
           fullRomanized.split(_markerRegex).map((s) => s.trim()).toList();
@@ -442,7 +452,9 @@ class LyricsTranslationService {
         return _BatchAnswer(translations: parts, sourceLanguage: source);
       }
       return null;
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('Romanization request batch failed',
+          error: e, stackTrace: st, category: 'LyricsTranslation');
       return null;
     }
   }
@@ -472,19 +484,76 @@ class LyricsTranslationService {
 
       if (response.statusCode != 200) return null;
 
-      final dynamic data = jsonDecode(response.body);
+      final dynamic data = jsonDecode(
+          utf8.decode(response.bodyBytes, allowMalformed: true));
       if (data is! List || data.isEmpty || data[0] != 'SUCCESS') return null;
 
-      final resultObj = data[1][0][1][0]?.toString() ?? '';
+      String resultObj = '';
+      if (data.length > 1 && data[1] is List && (data[1] as List).isNotEmpty) {
+        final d10 = (data[1] as List)[0];
+        if (d10 is List && d10.length > 1 && d10[1] is List && (d10[1] as List).isNotEmpty) {
+          resultObj = (d10[1] as List)[0]?.toString() ?? '';
+        }
+      }
+      if (resultObj.isEmpty) return null;
+
       final parts = resultObj.split(_markerRegex).map((s) => s.trim()).toList();
       if (parts.length == batch.texts.length) {
         return _BatchAnswer(
             translations: parts, sourceLanguage: sourceLanguage);
       }
       return null;
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('InputTools request batch failed',
+          error: e, stackTrace: st, category: 'LyricsTranslation');
       return null;
     }
+  }
+
+  static String _detectScriptLanguage(List<String> texts) {
+    for (final text in texts) {
+      for (final rune in text.runes) {
+        // Japanese: Hiragana / Katakana
+        if ((rune >= 0x3040 && rune <= 0x309F) ||
+            (rune >= 0x30A0 && rune <= 0x30FF)) {
+          return 'ja';
+        }
+        // Korean: Hangul
+        if ((rune >= 0xAC00 && rune <= 0xD7AF) ||
+            (rune >= 0x1100 && rune <= 0x11FF)) {
+          return 'ko';
+        }
+        // Arabic
+        if (rune >= 0x0600 && rune <= 0x06FF) {
+          return 'ar';
+        }
+        // Cyrillic (Russian)
+        if (rune >= 0x0400 && rune <= 0x04FF) {
+          return 'ru';
+        }
+        // Devanagari (Hindi)
+        if (rune >= 0x0900 && rune <= 0x097F) {
+          return 'hi';
+        }
+        // Greek
+        if (rune >= 0x0370 && rune <= 0x03FF) {
+          return 'el';
+        }
+        // Hebrew
+        if (rune >= 0x0590 && rune <= 0x05FF) {
+          return 'he';
+        }
+        // Thai
+        if (rune >= 0x0E00 && rune <= 0x0E7F) {
+          return 'th';
+        }
+        // CJK Unified Ideographs (Chinese)
+        if (rune >= 0x4E00 && rune <= 0x9FFF) {
+          return 'zh';
+        }
+      }
+    }
+    return '';
   }
 
   static bool _hasNonLatinLetters(List<String> texts) {
@@ -521,7 +590,9 @@ class LyricsTranslationService {
         texts: texts,
         isRomanized: map['rm'] as bool? ?? false,
       );
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('Failed to read lyrics translation from disk cache',
+          error: e, stackTrace: st, category: 'LyricsTranslation');
       return null;
     }
   }
@@ -549,22 +620,31 @@ class LyricsTranslationService {
           await prefs.remove('$_cachePrefix$evicted');
         }
         await prefs.setStringList(_diskIndexKey, index);
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('Failed to write lyrics translation to disk cache',
+            error: e, stackTrace: st, category: 'LyricsTranslation');
+      }
     });
     return _diskIndexChain;
   }
 
-  /// Clears in-memory and disk caches.
-  static Future<void> clearCache() async {
+  /// Clears in-memory and disk caches, serialized through _diskIndexChain.
+  static Future<void> clearCache() {
     _memoryCache.clear();
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final keys = prefs.getKeys().where((k) => k.startsWith(_cachePrefix));
-      for (final k in keys) {
-        await prefs.remove(k);
+    _diskIndexChain = _diskIndexChain.whenComplete(() async {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final keys = prefs.getKeys().where((k) => k.startsWith(_cachePrefix)).toList();
+        for (final k in keys) {
+          await prefs.remove(k);
+        }
+        await prefs.remove(_diskIndexKey);
+      } catch (e, st) {
+        ErrorLogger.log('Failed to clear lyrics translation cache',
+            error: e, stackTrace: st, category: 'LyricsTranslation');
       }
-      await prefs.remove(_diskIndexKey);
-    } catch (_) {}
+    });
+    return _diskIndexChain;
   }
 }
 

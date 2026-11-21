@@ -12,6 +12,7 @@
 #include <new>
 #include <shared_mutex>
 #include <string>
+#include <unordered_set>
 
 #include "AAudioSink.h"
 
@@ -22,14 +23,20 @@ namespace {
 
 using pulsr::AAudioSink;
 
-inline AAudioSink* AsSink(jlong handle) {
-    return reinterpret_cast<AAudioSink*>(static_cast<intptr_t>(handle));
-}
-
-// Serialises nativeClose()'s `delete sink` against every other call that uses
-// the raw jlong handle (write/play/pause/flush/volume/queries). Shared for the
-// hot write path, unique for close, so the sink can never be freed mid-call.
+// Serialises handle registration/removal and nativeClose()'s teardown against
+// every other call that uses the raw jlong handle (write/play/pause/flush/
+// volume/queries). Shared for the hot write/query paths, unique for open
+// registration and close extraction, so a sink can never be freed mid-call
+// and stale or double-closed jlong handles never cause use-after-free.
 std::shared_mutex gSinkLifecycleMutex;
+std::unordered_set<AAudioSink*> gLiveSinks;
+
+// Caller must hold gSinkLifecycleMutex (shared or unique).
+inline AAudioSink* AsSink(jlong handle) {
+    if (handle == 0) return nullptr;
+    auto* candidate = reinterpret_cast<AAudioSink*>(static_cast<intptr_t>(handle));
+    return gLiveSinks.find(candidate) != gLiveSinks.end() ? candidate : nullptr;
+}
 
 // RAII shared guard for the common entry points.
 struct SinkReadLock {
@@ -50,6 +57,14 @@ static jlong OpenSinkInternal(jint deviceId, jint sampleRate, jint channelCount,
     std::string error;
     if (!sink->Open(cfg, &error)) {
         LOGW("OpenSinkInternal failed: %s", error.c_str());
+        delete sink;
+        return 0;
+    }
+    try {
+        std::unique_lock<std::shared_mutex> lifeLock(gSinkLifecycleMutex);
+        gLiveSinks.insert(sink);
+    } catch (...) {
+        sink->Close();
         delete sink;
         return 0;
     }
@@ -76,9 +91,19 @@ extern "C" JNIEXPORT void JNICALL
 Java_com_ryanheise_just_1audio_AaudioNativeBridge_nativeClose(
     JNIEnv* /*env*/, jclass /*clazz*/, jlong handle) {
     if (handle == 0) return;
-    std::unique_lock<std::shared_mutex> lifeLock(gSinkLifecycleMutex);
-    auto* sink = AsSink(handle);
-    if (sink == nullptr) return;
+    AAudioSink* sink = nullptr;
+    {
+        // Waiting on unique_lock drains any in-flight shared callers; the worst
+        // case is bounded by AAudioSink::Write()'s 150 ms (3 x 50 ms) write
+        // timeout. Erasing `sink` from gLiveSinks before releasing the lock
+        // guarantees no stale, concurrent, or double-close call can resolve
+        // this handle again (and avoids ABA before `delete sink`), while the
+        // longer tail drain inside sink->Close() runs outside the lock.
+        std::unique_lock<std::shared_mutex> lifeLock(gSinkLifecycleMutex);
+        sink = AsSink(handle);
+        if (sink == nullptr) return;
+        gLiveSinks.erase(sink);
+    }
     sink->Close();
     delete sink;
 }

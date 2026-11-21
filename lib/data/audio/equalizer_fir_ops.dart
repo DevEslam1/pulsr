@@ -111,7 +111,9 @@ extension EqualizerFirOps on EqualizerManager {
             arbitraryEqString = '';
             arbitraryEqLinearPhase = false;
             await _effectsChannel.setArbitraryEqEnabled(false);
-            if (PlatformCapabilities.isAndroid) {
+            if (PlatformCapabilities.isAndroid &&
+                isEnabled &&
+                !isBitPerfectBypass) {
               await _effectsChannel.setNativeEqEnabled(true);
               await _effectsChannel.setEqEnabled(true);
             }
@@ -124,12 +126,24 @@ extension EqualizerFirOps on EqualizerManager {
           }
         } else if (isParametric) {
           await _disableFirCorrection(persist: false);
+          if (PlatformCapabilities.isAndroid &&
+              isEnabled &&
+              !isBitPerfectBypass) {
+            await _effectsChannel.setNativeEqEnabled(true);
+            await _effectsChannel.setEqEnabled(true);
+          }
           final applied = await _applyParametricProfile(profile);
           if (!applied) {
             await _applyCurrentPresetCore();
           }
         } else {
           await _disableFirCorrection(persist: false);
+          if (PlatformCapabilities.isAndroid &&
+              isEnabled &&
+              !isBitPerfectBypass) {
+            await _effectsChannel.setNativeEqEnabled(true);
+            await _effectsChannel.setEqEnabled(true);
+          }
           await _applyCurrentPresetCore();
         }
         await setBassBoost(profile.bassBoost);
@@ -145,6 +159,12 @@ extension EqualizerFirOps on EqualizerManager {
         if (prevProfile == null) return;
         selectedHeadphoneProfile = null;
         await _disableFirCorrection(persist: false);
+        if (PlatformCapabilities.isAndroid &&
+            isEnabled &&
+            !isBitPerfectBypass) {
+          await _effectsChannel.setNativeEqEnabled(true);
+          await _effectsChannel.setEqEnabled(true);
+        }
         final targetFreqs = activeFrequencies;
         currentPreset = EqPreset(
           name: 'Flat',
@@ -183,6 +203,10 @@ extension EqualizerFirOps on EqualizerManager {
     if (PlatformCapabilities.isAndroid) {
       try {
         await _effectsChannel.setArbitraryEqEnabled(false);
+        if (isEnabled && !isBitPerfectBypass) {
+          await _effectsChannel.setNativeEqEnabled(true);
+          await _effectsChannel.setEqEnabled(true);
+        }
       } catch (e, st) {
         ErrorLogger.log('Failed to disable the FIR correction',
             error: e, stackTrace: st, category: 'EqualizerManager');
@@ -193,11 +217,13 @@ extension EqualizerFirOps on EqualizerManager {
 
   /// A manual preset/band edit owns the EQ again: stop the AutoEQ FIR and
   /// reset the mode so the sheet cannot claim a correction that is not live.
+  /// Manual Arbitrary EQ authored independently of an AutoEQ headphone
+  /// profile is preserved intact.
   Future<void> _clearFirForManualEdit() async {
     final firOwned = selectedHeadphoneProfile != null &&
         (autoEqCorrectionMode == AutoEqCorrectionMode.firMinPhase ||
             autoEqCorrectionMode == AutoEqCorrectionMode.firLinear);
-    if (!firOwned && !isArbitraryEqEnabled) return;
+    if (!firOwned) return;
     await _disableFirCorrection(persist: false);
     autoEqCorrectionMode = AutoEqCorrectionMode.peq;
     _debouncedSavePreferences();

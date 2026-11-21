@@ -88,6 +88,28 @@ void main() {
       final prefs = await SharedPreferences.getInstance();
       expect(prefs.getBool('cloud_sync_playlists_enabled'), isFalse);
     });
+
+    test('resetSessionState clears persisted baselines and hashes', () async {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+          'cloud_sync_local_modified_favorites', '{"song_1": 12345}');
+      await prefs.setString(
+          'cloud_sync_hashes_cache', '{"users/u1/favorites/1": "hash1"}');
+      await prefs.setStringList(
+          'cloud_sync_uploaded_favorite_ids', ['fav_1', 'fav_2']);
+      await prefs.setStringList(
+          'cloud_sync_uploaded_playlist_ids', ['pl_1', 'pl_2']);
+      await prefs.setString(
+          'cloud_sync_uploaded_playlist_songs', '{"pl_1": ["s1", "s2"]}');
+
+      await service.resetSessionState();
+
+      expect(prefs.getString('cloud_sync_local_modified_favorites'), isNull);
+      expect(prefs.getString('cloud_sync_hashes_cache'), isNull);
+      expect(prefs.getStringList('cloud_sync_uploaded_favorite_ids'), isNull);
+      expect(prefs.getStringList('cloud_sync_uploaded_playlist_ids'), isNull);
+      expect(prefs.getString('cloud_sync_uploaded_playlist_songs'), isNull);
+    });
   });
 
   group('syncAll gating', () {

@@ -90,7 +90,7 @@ class HiresDacBridge {
           'setUac2HardwareVolume',
           {'position': position.clamp(0.0, 1.0)}).timeout(
           const Duration(seconds: 3));
-      return res != false && !(res is Map && res['error'] != null);
+      return res != null && res != false && !(res is Map && res['error'] != null);
     } catch (_) {
       return false;
     }

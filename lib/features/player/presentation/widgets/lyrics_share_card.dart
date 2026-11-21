@@ -57,11 +57,45 @@ class LyricsShareCardRenderer {
     try {
       image = await picture.toImage(cardWidth.toInt(), cardHeight.toInt());
       final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-      return byteData!.buffer.asUint8List();
+      if (byteData == null) {
+        throw StateError('PNG encoding failed');
+      }
+      return byteData.buffer.asUint8List();
     } finally {
       image?.dispose();
       picture.dispose();
       debugOnDisposed?.call(picture, image);
+    }
+  }
+
+  /// Deletes stale temporary pulsr_story_*.png files older than [maxAge].
+  static Future<void> pruneStaleStoryFiles({
+    Directory? dir,
+    Duration maxAge = const Duration(minutes: 5),
+  }) async {
+    try {
+      final tempDir = dir ?? await getTemporaryDirectory();
+      if (!tempDir.existsSync()) return;
+      final now = DateTime.now();
+      final entities = tempDir.listSync();
+      for (final entity in entities) {
+        if (entity is File) {
+          final name = entity.uri.pathSegments.isNotEmpty
+              ? entity.uri.pathSegments.last
+              : '';
+          if (name.startsWith('pulsr_story_') && name.endsWith('.png')) {
+            try {
+              final stat = entity.statSync();
+              if (now.difference(stat.modified) >= maxAge) {
+                entity.deleteSync();
+              }
+            } catch (_) {}
+          }
+        }
+      }
+    } catch (e, st) {
+      ErrorLogger.log('Pruning stale story files failed',
+          error: e, stackTrace: st, category: 'LyricsShare');
     }
   }
 
@@ -446,6 +480,7 @@ class _LyricsShareSheetState extends State<LyricsShareSheet> {
   Future<void> _shareImage() async {
     if (_selectedIndices.isEmpty || _isGenerating) return;
     setState(() => _isGenerating = true);
+    final messenger = ScaffoldMessenger.of(context);
     try {
       final sortedIndices = _selectedIndices.toList()..sort();
       final lines = sortedIndices.map((i) => widget.lyrics[i]).toList();
@@ -458,6 +493,7 @@ class _LyricsShareSheetState extends State<LyricsShareSheet> {
       );
 
       final tempDir = await getTemporaryDirectory();
+      await LyricsShareCardRenderer.pruneStaleStoryFiles(dir: tempDir);
       final file = File(
           '${tempDir.path}/pulsr_story_${DateTime.now().millisecondsSinceEpoch}.png');
       await file.writeAsBytes(pngBytes, flush: true);
@@ -473,6 +509,11 @@ class _LyricsShareSheetState extends State<LyricsShareSheet> {
     } catch (e, st) {
       ErrorLogger.log('Sharing lyrics card failed',
           error: e, stackTrace: st, category: 'LyricsShare');
+      if (mounted) {
+        messenger.showSnackBar(
+          SnackBar(content: Text('Failed to share lyrics card: $e')),
+        );
+      }
     } finally {
       if (mounted) setState(() => _isGenerating = false);
     }
@@ -499,15 +540,22 @@ class _LyricsShareSheetState extends State<LyricsShareSheet> {
           '${dir.path}/pulsr_lyrics_${DateTime.now().millisecondsSinceEpoch}.png');
       await file.writeAsBytes(pngBytes, flush: true);
 
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(l10n.lyricsShareCardSaved(file.path)),
-          duration: const Duration(seconds: 3),
-        ),
-      );
+      if (mounted) {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(l10n.lyricsShareCardSaved(file.path)),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
     } catch (e, st) {
       ErrorLogger.log('Saving lyrics card failed',
           error: e, stackTrace: st, category: 'LyricsShare');
+      if (mounted) {
+        messenger.showSnackBar(
+          SnackBar(content: Text('Failed to save lyrics card: $e')),
+        );
+      }
     } finally {
       if (mounted) setState(() => _isGenerating = false);
     }

@@ -176,6 +176,10 @@ abstract class DspSlice with _$DspSlice {
     @Default(350.0) double crossfeedDelayUs,
     @Default(-9.0) double crossfeedFeedDb,
     @Default(0) int crossfeedMode,
+    @Default(false) bool isHrtfEnabled,
+    @Default(30.0) double hrtfAzimuth,
+    @Default(0.0) double hrtfElevation,
+    String? hrtfSofaPath,
     @Default(false) bool isLimiterEnabled,
     @Default(-0.2) double limiterThresholdDb,
     @Default(50.0) double limiterReleaseMs,
@@ -243,6 +247,7 @@ abstract class DspSlice with _$DspSlice {
       isDynamicsEnabled ||
       isSpatializerEnabled ||
       isCrossfeedEnabled ||
+      isHrtfEnabled ||
       isLimiterEnabled ||
       isReverbEnabled ||
       isSaturationEnabled ||
@@ -263,6 +268,7 @@ abstract class DspSlice with _$DspSlice {
       isDynamicsEnabled ||
       isSpatializerEnabled ||
       isCrossfeedEnabled ||
+      isHrtfEnabled ||
       isLimiterEnabled ||
       isReverbEnabled ||
       isSaturationEnabled ||
@@ -286,6 +292,7 @@ abstract class DspSlice with _$DspSlice {
     if (isDynamicsEnabled) count++;
     if (isSpatializerEnabled) count++;
     if (isCrossfeedEnabled) count++;
+    if (isHrtfEnabled) count++;
     if (isLimiterEnabled) count++;
     if (isReverbEnabled) count++;
     if (isSaturationEnabled) count++;
@@ -398,6 +405,10 @@ abstract class PlayerState with _$PlayerState {
   double get crossfeedDelayUs => dsp.crossfeedDelayUs;
   double get crossfeedFeedDb => dsp.crossfeedFeedDb;
   int get crossfeedMode => dsp.crossfeedMode;
+  bool get isHrtfEnabled => dsp.isHrtfEnabled;
+  double get hrtfAzimuth => dsp.hrtfAzimuth;
+  double get hrtfElevation => dsp.hrtfElevation;
+  String? get hrtfSofaPath => dsp.hrtfSofaPath;
   bool get isLimiterEnabled => dsp.isLimiterEnabled;
   double get limiterThresholdDb => dsp.limiterThresholdDb;
   double get limiterReleaseMs => dsp.limiterReleaseMs;

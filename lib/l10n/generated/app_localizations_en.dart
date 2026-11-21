@@ -10737,6 +10737,37 @@ class AppLocalizationsEn extends AppLocalizations {
   String get commandPaletteActionAudioQuality => 'Audio Quality & Output';
 
   @override
+  String get commandPaletteNavRadioSubtitle => 'Stream online radio stations';
+
+  @override
+  String get commandPaletteNavDiagnostics => 'Diagnostics';
+
+  @override
+  String get commandPaletteNavDiagnosticsSubtitle =>
+      'System logs, USB audio checks and safe mode';
+
+  @override
+  String get commandPaletteNavAudioProfiles => 'Audio Profiles';
+
+  @override
+  String get commandPaletteNavAudioProfilesSubtitle =>
+      'Saved sound and DSP presets';
+
+  @override
+  String get commandPaletteNavDlna => 'DLNA / UPnP Cast';
+
+  @override
+  String get commandPaletteNavDlnaSubtitle =>
+      'Cast audio to network renderers and speakers';
+
+  @override
+  String get commandPaletteNavPodcasts => 'Podcasts & Audiobooks';
+
+  @override
+  String get commandPaletteNavPodcastsSubtitle =>
+      'Long-form spoken word with position bookmarks';
+
+  @override
   String get coachMarkDspTitle => 'Essential & Studio DSP';
 
   @override

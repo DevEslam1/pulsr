@@ -1,7 +1,6 @@
 // lib/domain/models/headphone_profile.dart
 import 'dart:math' as math;
 
-import '../../data/audio/eq_legacy_migration.dart';
 import 'eq_preset.dart';
 
 /// Value equality for lists whose elements implement `==`. Kept local so the
@@ -127,7 +126,7 @@ class HeadphoneProfile {
     // Null-guard gains like every sibling field: a stored profile missing the
     // key must not throw and abort the whole profile load.
     final rawGains = (json['gains'] as List<dynamic>?)
-            ?.map((e) => (e as num).toDouble())
+            ?.map((e) => e is num && e.isFinite ? e.toDouble() : 0.0)
             .toList() ??
         const <double>[];
     final rawFilters = json['filters'] as List<dynamic>?;
@@ -152,7 +151,7 @@ class HeadphoneProfile {
       gains: rawGains.length == EqPreset.centerFrequencies.length
           ? rawGains
           : rawGains.length == 5
-              ? EqLegacyMigration.to10Band(rawGains)
+              ? EqPreset.to10Band(rawGains)
               : EqPreset.interpolateGains(rawGains),
       bassBoost: (json['bassBoost'] as num?)?.toDouble() ?? 0.0,
       preampGain: (json['preampGain'] as num?)?.toDouble() ?? 0.0,
@@ -232,7 +231,15 @@ class HeadphoneProfile {
     double sampleRate = 48000.0,
     double preampDb = 0.0,
   }) {
+    final safePreamp = preampDb.isFinite ? preampDb : 0.0;
+
     if (filters.isEmpty && gains.isNotEmpty) {
+      if (gains.length == 1) {
+        final rawG = gains[0];
+        final safeG = rawG.isFinite ? rawG : 0.0;
+        final g = (safeG + safePreamp).clamp(-30.0, 30.0);
+        return 'GraphicEq: 1000.0 ${g.toStringAsFixed(2)}';
+      }
       final centers = gains.length == EqPreset.centerFrequencies.length
           ? EqPreset.centerFrequencies
           : List.generate(
@@ -241,14 +248,24 @@ class HeadphoneProfile {
             );
       final pairs = <String>[];
       for (int i = 0; i < gains.length; i++) {
-        pairs.add('${centers[i].toStringAsFixed(1)} '
-            '${(gains[i] + preampDb).clamp(-30.0, 30.0).toStringAsFixed(2)}');
+        final rawG = gains[i];
+        final safeG = rawG.isFinite ? rawG : 0.0;
+        final clampedGain = (safeG + safePreamp).clamp(-30.0, 30.0);
+        final freq = centers[i].isFinite && centers[i] > 0 ? centers[i] : 1000.0;
+        pairs.add('${freq.toStringAsFixed(1)} ${clampedGain.toStringAsFixed(2)}');
       }
       return 'GraphicEq: ${pairs.join("; ")}';
     }
 
-    if (filters.isEmpty) {
+    if (filters.isEmpty || numPoints <= 0) {
       return 'GraphicEq: 20.0 0.00; 20000.0 0.00';
+    }
+
+    if (numPoints == 1) {
+      final rawG = _compositeGainAt(1000.0, sampleRate);
+      final safeG = rawG.isFinite ? rawG : 0.0;
+      final g = (safeG + safePreamp).clamp(-30.0, 30.0);
+      return 'GraphicEq: 1000.0 ${g.toStringAsFixed(2)}';
     }
 
     final minLog = math.log(20.0) / math.ln10;
@@ -257,8 +274,9 @@ class HeadphoneProfile {
     final pairs = <String>[];
     for (int i = 0; i < numPoints; i++) {
       final f = math.pow(10.0, minLog + i * step).toDouble();
-      final g = (_compositeGainAt(f, sampleRate) + preampDb)
-          .clamp(-30.0, 30.0);
+      final rawG = _compositeGainAt(f, sampleRate);
+      final safeG = rawG.isFinite ? rawG : 0.0;
+      final g = (safeG + safePreamp).clamp(-30.0, 30.0);
       pairs.add('${f.toStringAsFixed(1)} ${g.toStringAsFixed(2)}');
     }
     return 'GraphicEq: ${pairs.join("; ")}';
@@ -296,6 +314,7 @@ class HeadphoneProfile {
     double safetyMarginDb = 1.0,
   }) {
     if (filters.isEmpty) {
+      if (gains.isEmpty) return 0.0;
       var maxGain = 0.0;
       for (final g in gains) {
         if (g.isFinite && g > maxGain) maxGain = g;
@@ -304,16 +323,22 @@ class HeadphoneProfile {
           ? (-(maxGain + safetyMarginDb)).clamp(-30.0, 0.0)
           : 0.0;
     }
+    if (points <= 0) return 0.0;
     final top = math.min(20000.0, sampleRate * 0.45);
     if (top <= 20.0) return 0.0;
+    if (points == 1) {
+      final rawG = _compositeGainAt(20.0, sampleRate);
+      final g = rawG.isFinite ? rawG : 0.0;
+      return g > 0 ? (-(g + safetyMarginDb)).clamp(-30.0, 0.0) : 0.0;
+    }
     final minLog = math.log(20.0) / math.ln10;
     final maxLog = math.log(top) / math.ln10;
+    final step = (maxLog - minLog) / (points - 1);
     var maxGain = 0.0;
     for (int i = 0; i < points; ++i) {
-      final f = math.pow(10.0, minLog + (maxLog - minLog) * i / (points - 1))
-          .toDouble();
+      final f = math.pow(10.0, minLog + i * step).toDouble();
       final g = _compositeGainAt(f, sampleRate);
-      if (g > maxGain) maxGain = g;
+      if (g.isFinite && g > maxGain) maxGain = g;
     }
     if (maxGain <= 0) return 0.0;
     return (-(maxGain + safetyMarginDb)).clamp(-30.0, 0.0);

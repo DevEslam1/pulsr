@@ -41,8 +41,11 @@ import java.util.UUID
  */
 class TtsPlugin : FlutterPlugin, MethodCallHandler {
     private var channel: MethodChannel? = null
-    private var context: Context? = null
+    internal var context: Context? = null
     private var tts: TextToSpeech? = null
+    internal var ttsFactory: (Context, TextToSpeech.OnInitListener) -> TextToSpeech = { ctx, listener ->
+        TextToSpeech(ctx, listener)
+    }
     private var audioManager: AudioManager? = null
     private val mainHandler = Handler(Looper.getMainLooper())
     private var state: InitState = InitState.IDLE
@@ -167,7 +170,7 @@ class TtsPlugin : FlutterPlugin, MethodCallHandler {
         pendingInitResults.add(result)
         val token = ++generation
         val engine = try {
-            TextToSpeech(appContext) { code -> handleInit(token, code) }
+            ttsFactory(appContext) { code -> handleInit(token, code) }
         } catch (e: Exception) {
             Log.w(TAG, "TextToSpeech constructor failed: ${e.message}")
             // Invalidate the token and complete everyone waiting, including
@@ -187,21 +190,23 @@ class TtsPlugin : FlutterPlugin, MethodCallHandler {
     }
 
     private fun handleInit(token: Int, code: Int) {
-        if (disposed || token != generation) {
-            // Late callback from a disposed or superseded engine.
-            return
-        }
-        val engine = tts
-        if (code == TextToSpeech.SUCCESS && engine != null) {
-            state = InitState.READY
-            configureEngine(engine)
-            completePending(true)
-        } else {
-            state = InitState.UNAVAILABLE
-            runCatching { engine?.shutdown() }
-            tts = null
-            Log.w(TAG, "TextToSpeech init failed with code $code")
-            completePending(false)
+        mainHandler.post {
+            if (disposed || token != generation) {
+                // Late callback from a disposed or superseded engine.
+                return@post
+            }
+            val engine = tts
+            if (code == TextToSpeech.SUCCESS && engine != null) {
+                state = InitState.READY
+                configureEngine(engine)
+                completePending(true)
+            } else {
+                state = InitState.UNAVAILABLE
+                runCatching { engine?.shutdown() }
+                tts = null
+                Log.w(TAG, "TextToSpeech init failed with code $code")
+                completePending(false)
+            }
         }
     }
 

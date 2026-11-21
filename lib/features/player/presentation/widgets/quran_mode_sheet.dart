@@ -696,13 +696,15 @@ class _QuranModePanelState extends State<QuranModePanel> {
             ),
             if (state.isQuranModeEnabled) ...[
               const SizedBox(height: AppSpacing.md),
-              BlocSelector<PlayerCubit, PlayerState, Duration>(
-                selector: (s) => s.position,
-                builder: (context, position) => QuranMushafView(
+              BlocSelector<PlayerCubit, PlayerState, int?>(
+                selector: (s) => (currentTrackUri == _lastLoadedTrackUri
+                    ? _metadata?.ayahAt(s.position)
+                    : null),
+                builder: (context, activeAyah) => QuranMushafView(
                   key: ValueKey(currentTrackUri),
                   metadata:
                       currentTrackUri == _lastLoadedTrackUri ? _metadata : null,
-                  currentPosition: position,
+                  activeAyah: activeAyah,
                   onSeek: (pos) => cubit.seek(pos),
                 ),
               ),

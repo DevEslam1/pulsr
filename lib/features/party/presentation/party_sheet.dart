@@ -1,3 +1,4 @@
+import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
@@ -40,6 +41,7 @@ class _PartySheetState extends State<PartySheet> {
   bool _isJoining = false;
   bool _showSettings = false;
   String? _errorMessage;
+  String? _serverUrlError;
 
   @override
   void initState() {
@@ -119,7 +121,11 @@ class _PartySheetState extends State<PartySheet> {
   Future<void> _handleLeave() async {
     await _partyService.leaveParty();
     if (mounted) {
-      Navigator.of(context).pop();
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      } else {
+        context.go('/');
+      }
     }
   }
 
@@ -244,6 +250,26 @@ class _PartySheetState extends State<PartySheet> {
     );
   }
 
+  bool _validateServerUrl(String raw) {
+    final text = raw.trim();
+    if (text.isEmpty) {
+      setState(() => _serverUrlError = 'Server URL cannot be empty');
+      return false;
+    }
+    final uri = Uri.tryParse(text);
+    final scheme = uri?.scheme.toLowerCase();
+    final validScheme = scheme == 'http' ||
+        scheme == 'https' ||
+        scheme == 'ws' ||
+        scheme == 'wss';
+    if (uri == null || !validScheme || uri.host.isEmpty) {
+      setState(() => _serverUrlError = 'Enter a valid URL (http, https, ws, or wss)');
+      return false;
+    }
+    setState(() => _serverUrlError = null);
+    return true;
+  }
+
   Widget _buildSettingsView(PulsrPalette p) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -259,9 +285,15 @@ class _PartySheetState extends State<PartySheet> {
         const SizedBox(height: AppSpacing.xs),
         TextField(
           controller: _serverController,
+          onChanged: (_) {
+            if (_serverUrlError != null) {
+              setState(() => _serverUrlError = null);
+            }
+          },
           decoration: InputDecoration(
             hintText: 'https://party.pulsr.app',
             labelText: context.l10n.partyServerUrl,
+            errorText: _serverUrlError,
             border: OutlineInputBorder(borderRadius: AppRadii.r12All),
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -275,17 +307,24 @@ class _PartySheetState extends State<PartySheet> {
               onPressed: () {
                 _serverController.text = ListenTogetherService.defaultServerUrl;
                 _partyService.setCustomServerUrl(null);
-                setState(() => _showSettings = false);
+                setState(() {
+                  _showSettings = false;
+                  _serverUrlError = null;
+                });
               },
               child: Text(context.l10n.partyResetDefault),
             ),
             const SizedBox(width: AppSpacing.xs),
             FilledButton(
               onPressed: () async {
-                await _partyService
-                    .setCustomServerUrl(_serverController.text.trim());
+                final trimmed = _serverController.text.trim();
+                if (!_validateServerUrl(trimmed)) return;
+                await _partyService.setCustomServerUrl(trimmed);
                 if (mounted) {
-                  setState(() => _showSettings = false);
+                  setState(() {
+                    _showSettings = false;
+                    _serverUrlError = null;
+                  });
                 }
               },
               child: Text(context.l10n.save),

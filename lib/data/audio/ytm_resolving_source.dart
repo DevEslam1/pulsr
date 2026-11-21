@@ -14,6 +14,7 @@ import 'package:path/path.dart' as p;
 import '../../core/constants/embedded_browser_ua.dart';
 import '../../core/di/injection.dart';
 import '../../core/errors/ytm_error_classifier.dart';
+import '../../core/utils/error_logger.dart';
 import 'adaptive_buffer_engine.dart';
 import '../../core/services/stream_url_verifier.dart';
 import '../../core/services/ytm_cache_manager.dart';
@@ -214,11 +215,14 @@ class YtmResolvingSource extends StreamAudioSource {
         if (burned) {
           try {
             await _deleteCacheFilesFor(videoId);
-          } catch (_) {}
+          } catch (e, st) {
+            ErrorLogger.log('Failed to delete cache files for burned videoId',
+                error: e, stackTrace: st, category: 'YtmResolvingSource');
+          }
         }
 
         try {
-          final freshInner = await _createInner(forceRefresh: burned);
+          final freshInner = await _ensureInner(forceRefresh: burned);
           // Outside the lock held above, so this acquisition is fresh rather
           // than a re-entry against ourselves.
           return await _withPathLockIfUncached(
@@ -337,6 +341,8 @@ class YtmResolvingSource extends StreamAudioSource {
     }
   }
 
+  void dispose() => _discardInner();
+
   bool _isExpiringSoon() {
     final expires = _resolvedExpiresAt;
     if (expires == null) return false;
@@ -344,20 +350,28 @@ class YtmResolvingSource extends StreamAudioSource {
     return expires.difference(now).inSeconds < 300;
   }
 
-  Future<LockCachingAudioSource> _ensureInner() async {
-    final existing = _inner;
-    if (existing != null && !_isExpiringSoon()) return existing;
+  Future<LockCachingAudioSource> _ensureInner(
+      {bool forceRefresh = false}) async {
+    if (!forceRefresh) {
+      final existing = _inner;
+      if (existing != null && !_isExpiringSoon()) return existing;
+    }
     final pending = _pending;
     if (pending != null) {
       try {
         return await pending;
-      } catch (_) {
+      } catch (e, st) {
         // Stale failed future: fall through and create a fresh one instead
         // of handing every waiter the same cached failure (thundering herd).
+        ErrorLogger.log(
+            'Pending inner creation failed, clearing stale pending',
+            error: e,
+            stackTrace: st,
+            category: 'YtmResolvingSource');
         _pending = null;
       }
     }
-    final fut = _createInner();
+    final fut = _createInner(forceRefresh: forceRefresh);
     _pending = fut;
     try {
       final inner = await fut;
@@ -447,7 +461,10 @@ class YtmResolvingSource extends StreamAudioSource {
           try {
             // Cache hit skips pluginEntered and marks urlObtained directly
             _latency?.markStage(PlaybackStage.urlObtained);
-          } catch (_) {}
+          } catch (e, st) {
+            ErrorLogger.log('Latency markStage failed',
+                error: e, stackTrace: st, category: 'YtmResolvingSource');
+          }
         }
       }
     }
@@ -455,11 +472,17 @@ class YtmResolvingSource extends StreamAudioSource {
     if (url == null) {
       try {
         _latency?.markStage(PlaybackStage.pluginEntered);
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('Latency markStage failed',
+            error: e, stackTrace: st, category: 'YtmResolvingSource');
+      }
       url = await retryWithBackoff(() => resolve(forceRefresh: skipCache));
       try {
         _latency?.markStage(PlaybackStage.urlObtained);
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('Latency markStage failed',
+            error: e, stackTrace: st, category: 'YtmResolvingSource');
+      }
       // The resolver assigns userAgent/cookies/quality as a side effect, so read
       // them back rather than keeping the values captured before the call.
       effectiveUa = userAgent ?? effectiveUa;
@@ -507,7 +530,10 @@ class YtmResolvingSource extends StreamAudioSource {
         _innerCacheFile = cacheFile;
         try {
           _latency?.markStage(PlaybackStage.sourceSet);
-        } catch (_) {}
+        } catch (e, st) {
+          ErrorLogger.log('Latency markStage failed',
+              error: e, stackTrace: st, category: 'YtmResolvingSource');
+        }
 
         // Trigger asynchronous background cache pruning if exceeding size limit
         _cacheManager.pruneIfExceedsLimit().ignore();
@@ -560,7 +586,10 @@ class YtmResolvingSource extends StreamAudioSource {
     }
     try {
       _latency?.markStage(PlaybackStage.firstBytesReady);
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Latency markStage failed',
+          error: e, stackTrace: st, category: 'YtmResolvingSource');
+    }
     return _wrapWithThroughputSampler(res);
   }
 
@@ -631,8 +660,10 @@ class YtmResolvingSource extends StreamAudioSource {
       for (final name in YtmCacheManager.allCacheFileNames(hash)) {
         if (File(p.join(dir.path, name)).existsSync()) return true;
       }
-    } catch (_) {
+    } catch (e, st) {
       // An unreadable cache directory means "unknown": probe.
+      ErrorLogger.log('Error reading cache directory during complete check',
+          error: e, stackTrace: st, category: 'YtmResolvingSource');
     }
     return false;
   }
@@ -674,7 +705,9 @@ class YtmResolvingSource extends StreamAudioSource {
   static String _hostOf(String url) {
     try {
       return Uri.parse(url).host;
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('Failed to parse host from url',
+          error: e, stackTrace: st, category: 'YtmResolvingSource');
       return 'unknown';
     }
   }
@@ -718,7 +751,9 @@ class YtmResolvingSource extends StreamAudioSource {
       if (host.endsWith('.c.youtube.com')) return false;
       if (uri.path.contains('/videoplayback')) return false;
       return true;
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('Failed to parse URI to check cookies',
+          error: e, stackTrace: st, category: 'YtmResolvingSource');
       return false;
     }
   }
@@ -738,7 +773,10 @@ class YtmResolvingSource extends StreamAudioSource {
         if (await f.exists()) {
           try {
             await f.delete();
-          } catch (_) {}
+          } catch (e, st) {
+            ErrorLogger.log('Failed to delete cache file',
+                error: e, stackTrace: st, category: 'YtmResolvingSource');
+          }
         }
       }
     }
@@ -777,7 +815,10 @@ class YtmResolvingSource extends StreamAudioSource {
     try {
       final mime = Uri.parse(url).queryParameters['mime'] ?? '';
       if (mime.contains('webm')) ext = 'webm';
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Failed to parse mime from url',
+          error: e, stackTrace: st, category: 'YtmResolvingSource');
+    }
     // F9: quality-keyed too, through the one naming helper every reader and
     // sweeper shares rather than a second inline format string.
     return File(

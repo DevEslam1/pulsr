@@ -538,6 +538,26 @@ int main() {
         engine->prepareTapResampler(44100.0, 44100.0, 2);
         check(engine->activeOversampleFactor() == 1,
               "a locked-rate tap reports no active oversampling");
+
+        // Non-zero kernel with multiplier==1 must NOT engage Oversampler on a 2x SRC rate pair
+        engine->setOversampleMultiplier(1);
+        engine->setOversampleKernel(2);
+        engine->prepareTapResampler(44100.0, 88200.0, 2);
+        check(!engine->isTapOversamplerEngaged(),
+              "oversampleKernel != 0 with multiplier==1 must use SincResampler, not Oversampler");
+        check(engine->activeOversampleFactor() == 1,
+              "oversampleKernel != 0 with multiplier==1 must report factor 1");
+
+        // Native PCM->DSD 32-bit packing groups 4 bytes per channel word [L0..3, R0..3]
+        engine->setPcmToDsdEnabled(true);
+        engine->setPcmToDsdRate(64);
+        engine->preparePcmToDsd(44100.0, 64, 4, 24);
+        std::vector<uint8_t> dsdOut(frames * 16, 0);
+        int nativeConsumed = 0;
+        const int nativeBytes = engine->convertPcmToDsdNative(
+            input.data(), frames, dsdOut.data(), static_cast<int>(dsdOut.size()), 4, nativeConsumed);
+        check(nativeBytes > 0 && nativeConsumed > 0 && (nativeBytes % 8) == 0,
+              "convertPcmToDsdNative(bps=4) produces complete 8-byte stereo DSD_U32 frames");
     }
 
     if (gFailures != 0) {

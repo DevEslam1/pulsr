@@ -125,13 +125,16 @@ extension _PulsrAudioLifecycleExt on PulsrAudioHandler {
     // Idempotency check first: a second call used to re-run the observer and
     // timer teardown before bailing out.
     if (_disposed) return;
+    _disposed = true;
+    _playGeneration++;
+    _loadQueueGeneration++;
+    _engineSwitchGeneration++;
     try {
       await stopNativeDsd(clearStatus: true);
     } catch (e, st) {
       ErrorLogger.log('Failed to stop native DSD during dispose',
           error: e, stackTrace: st, category: 'AudioHandler');
     }
-    _disposed = true;
     try {
       await _castPlaybackHandoff?.dispose();
     } catch (e, st) {
@@ -295,8 +298,18 @@ extension _PulsrAudioLifecycleExt on PulsrAudioHandler {
             ? _preDuckVolume!
             : (currentTarget * _sleepFadeFactor).clamp(0.0, 1.0);
         try {
-          await _activePlayer.setVolume(restoreActive.clamp(0.0, 1.0));
+          await Future.wait([
+            _syncDirectUsbVolume(restoreActive, song: currentSong),
+            _activePlayer.setVolume(restoreActive.clamp(0.0, 1.0)),
+          ]);
         } catch (_) {}
+        if (!_crossfadeManager.isCrossfading &&
+            _preDuckInactiveVolume != null) {
+          try {
+            await _inactivePlayer
+                .setVolume(_preDuckInactiveVolume!.clamp(0.0, 1.0));
+          } catch (_) {}
+        }
         _preDuckVolume = null;
         _preDuckInactiveVolume = null;
         _preDuckSongId = null;
@@ -306,9 +319,15 @@ extension _PulsrAudioLifecycleExt on PulsrAudioHandler {
     try {
       final f = duckingController.duckFactor;
       _volumeController?.updateSettings(duckFactor: f, isDucked: true);
-      await _activePlayer.setVolume(
-        f * (_preDuckVolume ?? _activePlayer.volume),
-      );
+      final targetDuck = (f * (_preDuckVolume ?? _activePlayer.volume)).clamp(0.0, 1.0);
+      await Future.wait([
+        _syncDirectUsbVolume(targetDuck, song: currentSong),
+        _activePlayer.setVolume(targetDuck),
+      ]);
+      if (_crossfadeManager.isCrossfading) {
+        await _inactivePlayer
+            .setVolume((f * (_preDuckInactiveVolume ?? 0.0)).clamp(0.0, 1.0));
+      }
     } catch (_) {
       // Ducking failed: restore state immediately instead of leaving the
       // 500 ms timer to do it (or not, if it never fires).
@@ -323,6 +342,7 @@ extension _PulsrAudioLifecycleExt on PulsrAudioHandler {
         _preDuckInactiveVolume = null;
         _preDuckSongId = null;
         _preDuckRgTarget = null;
+        unawaited(_reapplyActiveVolume());
       }
     }
   }

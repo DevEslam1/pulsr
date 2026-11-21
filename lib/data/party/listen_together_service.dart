@@ -7,9 +7,11 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:injectable/injectable.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:web_socket_channel/io.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import '../../core/constants/prefs_keys.dart';
 import '../../core/di/injection.dart';
+import '../../core/network/remote_target_policy.dart';
 import '../../core/services/ytm_account_service.dart';
 import '../../core/utils/error_logger.dart';
 import '../../domain/models/ytm_track.dart';
@@ -59,6 +61,9 @@ class ListenTogetherService {
   final ValueNotifier<String?> lastError = ValueNotifier<String?>(null);
   static const FlutterSecureStorage _secureStorage = FlutterSecureStorage();
   int _reconnectAttempts = 0;
+  int _connectGeneration = 0;
+  bool _reconnectScheduled = false;
+  bool _isCheckingDrift = false;
 
   final ValueNotifier<bool> clockSynced = ValueNotifier<bool>(false);
 
@@ -84,6 +89,12 @@ class ListenTogetherService {
   // Drift correction state
   int _lastHandledSeq = -1;
 
+  @visibleForTesting
+  int get lastHandledSeq => _lastHandledSeq;
+
+  @visibleForTesting
+  set debugLastHandledSeq(int val) => _lastHandledSeq = val;
+
   /// Local monotonic time before which reconciliation must stay quiet, so a
   /// track load or a seek is not immediately re-corrected by the next tick.
   int _reconcileQuietUntilMs = 0;
@@ -105,7 +116,9 @@ class ListenTogetherService {
         await _secureStorage.write(key: prefSavedTokenKey, value: legacyToken);
         await prefs.remove(prefSavedTokenKey);
       }
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('Failed to read secure party token',
+          error: e, stackTrace: st, category: 'PARTY');
       savedToken = prefs.getString(prefSavedTokenKey);
     }
     final serverBase = await getServerUrl();
@@ -120,12 +133,31 @@ class ListenTogetherService {
     _bindPlayerCubitEvents();
   }
 
+  /// Validates a candidate server URL against [RemoteTargetPolicy].
+  ///
+  /// Rejects insecure `http://` targets unless they target an explicit local or
+  /// LAN address (such as localhost or private RFC-1918 space for local dev).
+  static bool isValidServerUrl(String raw) {
+    final uri = Uri.tryParse(raw.trim());
+    if (uri == null || uri.host.isEmpty) return false;
+    final isLocal = RemoteTargetPolicy.isUnsafeHost(uri.host);
+    final verdict = RemoteTargetPolicy.classify(
+      raw.trim(),
+      requireHttps: !isLocal,
+      allowedHostSuffixes: isLocal ? {uri.host} : const {},
+    );
+    return verdict == RemoteTargetVerdict.allowed;
+  }
+
   /// Configured server URL (custom or fallback to default).
   Future<String> getServerUrl() async {
     final prefs = await SharedPreferences.getInstance();
     final custom = prefs.getString(prefCustomServerKey)?.trim();
     if (custom != null && custom.isNotEmpty) {
-      return _normalizeUrl(custom);
+      final normalized = _normalizeUrl(custom);
+      if (isValidServerUrl(normalized)) {
+        return normalized;
+      }
     }
     return defaultServerUrl;
   }
@@ -135,7 +167,11 @@ class ListenTogetherService {
     if (url == null || url.trim().isEmpty) {
       await prefs.remove(prefCustomServerKey);
     } else {
-      await prefs.setString(prefCustomServerKey, _normalizeUrl(url.trim()));
+      final normalized = _normalizeUrl(url.trim());
+      if (!isValidServerUrl(normalized)) {
+        throw ArgumentError('The party server address is not allowed.');
+      }
+      await prefs.setString(prefCustomServerKey, normalized);
     }
   }
 
@@ -218,13 +254,14 @@ class ListenTogetherService {
         )
         .timeout(const Duration(seconds: 12));
 
+    final respBody = utf8.decode(resp.bodyBytes, allowMalformed: true);
     if (resp.statusCode != 200 && resp.statusCode != 201) {
-      final err = 'Failed to create party (${resp.statusCode}): ${resp.body}';
+      final err = 'Failed to create party (${resp.statusCode}): $respBody';
       lastError.value = err;
       throw Exception(err);
     }
 
-    final data = jsonDecode(resp.body) as Map<String, dynamic>;
+    final data = jsonDecode(respBody) as Map<String, dynamic>;
     final membership = PartyMembership.fromJson(data);
 
     await _saveSession(serverBase, membership.code, membership.token);
@@ -257,13 +294,14 @@ class ListenTogetherService {
         )
         .timeout(const Duration(seconds: 12));
 
+    final respBody = utf8.decode(resp.bodyBytes, allowMalformed: true);
     if (resp.statusCode != 200) {
-      final err = 'Failed to join party (${resp.statusCode}): ${resp.body}';
+      final err = 'Failed to join party (${resp.statusCode}): $respBody';
       lastError.value = err;
       throw Exception(err);
     }
 
-    final data = jsonDecode(resp.body) as Map<String, dynamic>;
+    final data = jsonDecode(respBody) as Map<String, dynamic>;
     final membership = PartyMembership.fromJson(data);
 
     await _saveSession(serverBase, membership.code, membership.token);
@@ -279,10 +317,13 @@ class ListenTogetherService {
     final token = _activeToken;
     final serverBase = _activeServerBase ?? await getServerUrl();
 
+    _connectGeneration++;
     _disconnectWebSocket();
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
+    _reconnectScheduled = false;
     _reconnectAttempts = 0;
+    _lastHandledSeq = -1;
     _clock.reset();
     clockSynced.value = false;
     roundTripMs.value = 0;
@@ -353,20 +394,29 @@ class ListenTogetherService {
     final serverBase = _activeServerBase;
     if (code == null || token == null || serverBase == null) return;
 
+    final generation = ++_connectGeneration;
     connectionState.value = PartyConnectionState.connecting;
     final wsBase = _resolveWsBase(serverBase);
     final wsUri = Uri.parse('$wsBase/ws/parties/$code');
 
     try {
-      _channel = WebSocketChannel.connect(
+      final channel = IOWebSocketChannel.connect(
         wsUri,
-        protocols: ['Bearer', token],
+        headers: {'Authorization': 'Bearer $token'},
       );
+      _channel = channel;
       // Do not claim "live" before the WebSocket handshake succeeds.
-      await _channel!.ready.timeout(const Duration(seconds: 12));
+      await channel.ready.timeout(const Duration(seconds: 12));
+      if (generation != _connectGeneration) {
+        try {
+          channel.sink.close();
+        } catch (_) {}
+        return;
+      }
       _reconnectAttempts = 0;
+      _reconnectScheduled = false;
       lastError.value = null;
-      _channelSub = _channel!.stream.listen(
+      _channelSub = channel.stream.listen(
         _onWebSocketMessage,
         onError: (e, st) {
           ErrorLogger.log('Party WebSocket error',
@@ -383,6 +433,7 @@ class ListenTogetherService {
       _startReconciliationTicker();
       connectionState.value = PartyConnectionState.live;
     } catch (e, st) {
+      if (generation != _connectGeneration) return;
       ErrorLogger.log('Party WebSocket connect failed',
           error: e, stackTrace: st, category: 'PARTY');
       _scheduleReconnect();
@@ -390,6 +441,8 @@ class ListenTogetherService {
   }
 
   void _disconnectWebSocket() {
+    _lastHandledSeq = -1;
+    _reconnectScheduled = false;
     _pingBurstTimer?.cancel();
     _pingBurstTimer = null;
     _pingTimer?.cancel();
@@ -413,19 +466,26 @@ class ListenTogetherService {
 
   Timer? _reconnectTimer;
   void _scheduleReconnect() {
+    if (_reconnectScheduled) return;
+    _reconnectScheduled = true;
     _reconnectTimer?.cancel();
-    if (_activeCode == null || _activeToken == null) return;
+    if (_activeCode == null || _activeToken == null) {
+      _reconnectScheduled = false;
+      return;
+    }
     _reconnectAttempts++;
     if (_reconnectAttempts > 5) {
       connectionState.value = PartyConnectionState.offline;
       lastError.value =
           'Unable to reconnect to the party. Check your connection.';
+      _reconnectScheduled = false;
       return;
     }
     connectionState.value = PartyConnectionState.connecting;
     final delay =
         Duration(seconds: math.min(30, 3 * (1 << (_reconnectAttempts - 1))));
     _reconnectTimer = Timer(delay, () {
+      _reconnectScheduled = false;
       if (_activeCode != null && _activeToken != null) {
         _connectWebSocket();
       }
@@ -758,71 +818,77 @@ class ListenTogetherService {
     PartyPlayback playback, {
     bool forceTrackReconciliation = false,
   }) async {
-    if (!getIt.isRegistered<PlayerCubit>()) return;
-    final playerCubit = getIt<PlayerCubit>();
-    final playerState = playerCubit.state;
+    if (_isCheckingDrift) return;
+    _isCheckingDrift = true;
+    try {
+      if (!getIt.isRegistered<PlayerCubit>()) return;
+      final playerCubit = getIt<PlayerCubit>();
+      final playerState = playerCubit.state;
 
-    final targetTrack = playback.track;
-    if (targetTrack == null) return;
+      final targetTrack = playback.track;
+      if (targetTrack == null) return;
 
-    final now = _clock.nowMs();
-    if (now < _reconcileQuietUntilMs) return;
+      final now = _clock.nowMs();
+      if (now < _reconcileQuietUntilMs) return;
 
-    await _resolveOutputLatencyMs();
+      await _resolveOutputLatencyMs();
 
-    // 1. Reconcile Track: verify current track matches target videoId
-    final currentSong = playerState.currentSong;
-    final currentVideoId = currentSong?.remoteId ?? currentSong?.id.toString();
+      // 1. Reconcile Track: verify current track matches target videoId
+      final currentSong = playerState.currentSong;
+      final currentVideoId = currentSong?.remoteId ?? currentSong?.id.toString();
 
-    if (forceTrackReconciliation || currentVideoId != targetTrack.videoId) {
-      if (currentVideoId != targetTrack.videoId) {
+      if (forceTrackReconciliation || currentVideoId != targetTrack.videoId) {
+        if (currentVideoId != targetTrack.videoId) {
+          _isReconcilingInbound = true;
+          _reconcileQuietUntilMs = now + 2500;
+          try {
+            await _loadTrackForParty(targetTrack, playback);
+          } finally {
+            _isReconcilingInbound = false;
+          }
+          return;
+        }
+      }
+
+      // 2. Play/Pause state alignment
+      if (!playback.isPlaying && playerState.isPlaying) {
         _isReconcilingInbound = true;
-        _reconcileQuietUntilMs = now + 2500;
         try {
-          await _loadTrackForParty(targetTrack, playback);
+          await playerCubit.pause();
         } finally {
           _isReconcilingInbound = false;
         }
         return;
+      } else if (playback.isPlaying && !playerState.isPlaying) {
+        await _startAtAnchor(playback);
       }
-    }
 
-    // 2. Play/Pause state alignment
-    if (!playback.isPlaying && playerState.isPlaying) {
-      _isReconcilingInbound = true;
-      try {
-        await playerCubit.pause();
-      } finally {
-        _isReconcilingInbound = false;
+      // 3. Audible-time correction. Compared against the latency-compensated
+      // target: matching raw positions is not enough when one member hears the
+      // music 200 ms after it is rendered and another hears it immediately.
+      if (!playback.isPlaying || !_clock.synced) return;
+
+      final roomPosition = effectivePartyPositionMs(playback);
+      if (roomPosition == null) return;
+
+      final decision = _sync.evaluatePosition(
+        localRenderMs: playerState.position.inMilliseconds,
+        roomPositionMs: roomPosition,
+        outputLatencyMs: _outputLatencyMs,
+        durationMs: targetTrack.durationMs,
+      );
+
+      if (decision.action == SyncAction.seek) {
+        _isReconcilingInbound = true;
+        _reconcileQuietUntilMs = now + 1500;
+        try {
+          await playerCubit.seek(Duration(milliseconds: decision.seekToMs!));
+        } finally {
+          _isReconcilingInbound = false;
+        }
       }
-      return;
-    } else if (playback.isPlaying && !playerState.isPlaying) {
-      await _startAtAnchor(playback);
-    }
-
-    // 3. Audible-time correction. Compared against the latency-compensated
-    // target: matching raw positions is not enough when one member hears the
-    // music 200 ms after it is rendered and another hears it immediately.
-    if (!playback.isPlaying || !_clock.synced) return;
-
-    final roomPosition = effectivePartyPositionMs(playback);
-    if (roomPosition == null) return;
-
-    final decision = _sync.evaluatePosition(
-      localRenderMs: playerState.position.inMilliseconds,
-      roomPositionMs: roomPosition,
-      outputLatencyMs: _outputLatencyMs,
-      durationMs: targetTrack.durationMs,
-    );
-
-    if (decision.action == SyncAction.seek) {
-      _isReconcilingInbound = true;
-      _reconcileQuietUntilMs = now + 1500;
-      try {
-        await playerCubit.seek(Duration(milliseconds: decision.seekToMs!));
-      } finally {
-        _isReconcilingInbound = false;
-      }
+    } finally {
+      _isCheckingDrift = false;
     }
   }
 
@@ -897,5 +963,11 @@ class ListenTogetherService {
     _playerStateSub?.cancel();
     _playerStateSub = null;
     _httpClient.close();
+    connectionState.dispose();
+    partySnapshot.dispose();
+    currentMember.dispose();
+    lastError.dispose();
+    clockSynced.dispose();
+    roundTripMs.dispose();
   }
 }

@@ -38,6 +38,8 @@ enum SmartOperator {
   greaterThanOrEqual('>=', '>='),
   lessThanOrEqual('<=', '<='),
   contains('contains', 'Contains'),
+  notContains('not_contains', 'Does Not Contain'),
+  startsWith('starts_with', 'Starts With'),
   withinDays('within_days', 'Within Days'),
   between('between', 'Between');
 
@@ -119,14 +121,19 @@ class SmartCriteria {
   }
 
   factory SmartCriteria.fromJson(Map<String, dynamic> json) {
-    final rulesList = (json['rules'] as List<dynamic>?)
-            ?.map((e) => SmartRule.fromJson(e as Map<String, dynamic>))
-            .toList() ??
-        [];
+    final rawRules = json['rules'] as List<dynamic>?;
+    final rulesList = <SmartRule>[];
+    if (rawRules != null) {
+      for (final e in rawRules) {
+        if (e is Map) {
+          rulesList.add(SmartRule.fromJson(Map<String, dynamic>.from(e)));
+        }
+      }
+    }
     return SmartCriteria(
       rules: rulesList,
       matchAll: json['matchAll'] as bool? ?? true,
-      limit: json['limit'] as int?,
+      limit: (json['limit'] as num?)?.toInt(),
       sortBy: json['sortBy'] as String?,
       sortAscending: json['sortAscending'] as bool? ?? true,
     );

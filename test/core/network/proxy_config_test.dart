@@ -87,6 +87,44 @@ void main() {
       expect(reconstructed.bypassHosts, original.bypassHosts);
       expect(reconstructed.hasAuth, true);
     });
+
+    test('value equality and hashCode across all 7 fields', () {
+      const config1 = ProxyConfig(
+        enabled: true,
+        type: AppProxyType.socks5,
+        host: '10.0.0.1',
+        port: 1080,
+        username: 'user',
+        password: 'pass',
+        bypassHosts: 'localhost',
+      );
+      const config2 = ProxyConfig(
+        enabled: true,
+        type: AppProxyType.socks5,
+        host: '10.0.0.1',
+        port: 1080,
+        username: 'user',
+        password: 'pass',
+        bypassHosts: 'localhost',
+      );
+
+      expect(config1, equals(config2));
+      expect(config1.hashCode, equals(config2.hashCode));
+
+      final variants = [
+        config1.copyWith(enabled: false),
+        config1.copyWith(type: AppProxyType.http),
+        config1.copyWith(host: '10.0.0.2'),
+        config1.copyWith(port: 8080),
+        config1.copyWith(username: 'other'),
+        config1.copyWith(password: 'secret'),
+        config1.copyWith(bypassHosts: '127.0.0.1'),
+      ];
+
+      for (final variant in variants) {
+        expect(variant, isNot(equals(config1)));
+      }
+    });
   });
 
   group('ProxyEntry', () {

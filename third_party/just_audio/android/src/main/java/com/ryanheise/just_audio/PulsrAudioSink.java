@@ -315,8 +315,10 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
                 }
             }).send();
             return done.await(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS);
-        } catch (RuntimeException | InterruptedException e) {
+        } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+            return false;
+        } catch (RuntimeException e) {
             return false;
         }
     }

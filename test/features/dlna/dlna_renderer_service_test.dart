@@ -1,5 +1,6 @@
 // End-to-end orchestration: fake SSDP replies, mocked SOAP endpoint, and the
 // real loopback media server that a renderer would fetch from.
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -488,5 +489,82 @@ void main() {
     await Future<void>.delayed(const Duration(milliseconds: 150));
 
     expect(requests.map(_actionOf), contains('Stop'));
+  });
+
+  test('playUrl and queueUrl reject invalid URLs with DLNA_INVALID_URL', () async {
+    service = buildService();
+    addTearDown(service.dispose);
+    await service.discover();
+    await service.select(service.devices.single);
+
+    await service.playUrl('not a valid url');
+    expect(service.state, DlnaState.error);
+    expect(service.lastError?.code, 'DLNA_INVALID_URL');
+
+    await service.playUrl('ftp://example.com/audio.mp3');
+    expect(service.state, DlnaState.error);
+    expect(service.lastError?.code, 'DLNA_INVALID_URL');
+
+    await service.queueUrl('javascript:alert(1)');
+    expect(service.state, DlnaState.error);
+    expect(service.lastError?.code, 'DLNA_INVALID_URL');
+  });
+
+  test('aborts between setAvTransportUri and play on sequence change', () async {
+    final setUriStarted = Completer<void>();
+    final allowSetUriFinish = Completer<void>();
+    final executedActions = <String>[];
+
+    final client = MockClient((request) async {
+      if (request.method == 'GET' &&
+          request.url.path.endsWith('description.xml')) {
+        return http.Response(_descriptionXml, 200);
+      }
+      final action = _actionOf(request);
+      executedActions.add(action);
+      if (action == 'SetAVTransportURI') {
+        if (!setUriStarted.isCompleted) setUriStarted.complete();
+        await allowSetUriFinish.future;
+        return http.Response(_soap(''), 200);
+      }
+      return http.Response(_soap(''), 200);
+    });
+
+    final testService = DlnaRendererService(
+      ssdpClient: _FakeSsdpClient(<SsdpResponse>[
+        const SsdpResponse(
+          location: 'http://192.168.1.5:5555/description.xml',
+          searchTarget: 'urn:schemas-upnp-org:device:MediaRenderer:1',
+          usn: 'uuid:mock-renderer',
+          server: 'Test/1.0 UPnP/1.1',
+          sourceAddress: '192.168.1.5',
+        ),
+      ]),
+      httpClient: client,
+      discoveryTimeout: const Duration(milliseconds: 10),
+      localAddressResolver: (host, port) async => InternetAddress.loopbackIPv4,
+    );
+    addTearDown(testService.dispose);
+
+    await testService.discover();
+    await testService.select(testService.devices.single);
+
+    // Start playUrl in the background
+    final firstPlayFuture =
+        testService.playUrl('http://192.168.1.5:5555/track1.mp3');
+    // Wait until SetAVTransportURI starts
+    await setUriStarted.future;
+
+    // Trigger sequence change before setAvTransportUri completes
+    await testService.stop();
+
+    // Now let SetAVTransportURI finish
+    allowSetUriFinish.complete();
+    await firstPlayFuture;
+
+    // Verify: SetAVTransportURI was called, but Play was NOT called
+    expect(executedActions, contains('SetAVTransportURI'));
+    expect(executedActions, contains('Stop'));
+    expect(executedActions.where((a) => a == 'Play'), isEmpty);
   });
 }

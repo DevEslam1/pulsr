@@ -701,7 +701,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
     return PulsrRefreshIndicator(
       onRefresh: () async {
         if (_scope == SourceScope.online) {
-          await cubit.autoFetchOnlineLibrary(force: true);
+          await cubit.refreshOnlineLibrary();
         } else {
           final count = await context.read<SettingsCubit>().rescanLibrary();
           if (context.mounted) {
@@ -1757,6 +1757,12 @@ class _LikedMusicOnlineCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const gradientColors = [AppColors.spotifyGreen, AppColors.spotifyGreenDeep];
+    final hasCachedTracks = trackCount > 0;
+    final isAuthError = error != null &&
+        (error!.toLowerCase().contains('sign in') ||
+            error!.toLowerCase().contains('expired'));
+    final retryAction =
+        isAuthError ? () => YtmWebLoginSheet.show(context) : onFetch;
 
     String subtitle;
     switch (status) {
@@ -1771,20 +1777,21 @@ class _LikedMusicOnlineCard extends StatelessWidget {
             '${context.l10n.songsCount(trackCount)} ${context.l10n.browseSynced} • ${context.l10n.browseTapToPlayOrDownload}';
         break;
       case YtmFetchStatus.error:
-        subtitle = error ?? context.l10n.browseFailedToFetch;
+        final errCopy = error ?? context.l10n.browseFailedToFetch;
+        subtitle = hasCachedTracks
+            ? '${context.l10n.songsCount(trackCount)} • $errCopy'
+            : errCopy;
         break;
     }
+
+    final canOpenCached =
+        status == YtmFetchStatus.done ||
+        (status == YtmFetchStatus.error && hasCachedTracks);
 
     return InkWell(
       onTap: status == YtmFetchStatus.loading
           ? null
-          : (status == YtmFetchStatus.done
-              ? onPlay
-              : (error != null &&
-                      (error!.toLowerCase().contains('sign in') ||
-                          error!.toLowerCase().contains('expired'))
-                  ? () => YtmWebLoginSheet.show(context)
-                  : onFetch)),
+          : (canOpenCached ? onPlay : retryAction),
       borderRadius: AppRadii.r22All,
       child: Container(
         padding: const EdgeInsets.all(AppSpacing.s20),
@@ -1887,6 +1894,55 @@ class _LikedMusicOnlineCard extends StatelessWidget {
                     ),
                     const SizedBox(width: AppSpacing.s10),
                   ],
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.play_arrow_rounded,
+                      color: gradientColors.first,
+                      size: 26,
+                    ),
+                  ),
+                ],
+              )
+            else if (status == YtmFetchStatus.error && hasCachedTracks)
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Semantics(
+                    button: true,
+                    label: context.l10n.retry,
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: retryAction,
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(
+                          minWidth: 44,
+                          minHeight: 44,
+                        ),
+                        child: Center(
+                          child: Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: AppColors.specularAt(0.2),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.refresh_rounded,
+                              color: Colors.white,
+                              size: 22,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.s10),
                   Container(
                     width: 40,
                     height: 40,

@@ -188,22 +188,58 @@ class AudioEffectsChannel {
 
   Future<bool> isVolumeBoostSupportedLive() async {
     if (!_isAndroid) return false;
-    return await _channel.invokeMethod<bool>('isVolumeBoostSupported') ?? false;
+    try {
+      return await _channel
+              .invokeMethod<bool>('isVolumeBoostSupported')
+              .timeout(const Duration(seconds: 3)) ??
+          false;
+    } catch (e, st) {
+      ErrorLogger.log('isVolumeBoostSupported failed',
+          error: e, stackTrace: st, category: 'AudioEffectsChannel');
+      return false;
+    }
   }
 
   Future<bool> isBassBoostSupportedLive() async {
     if (!_isAndroid) return false;
-    return await _channel.invokeMethod<bool>('isBassBoostSupported') ?? false;
+    try {
+      return await _channel
+              .invokeMethod<bool>('isBassBoostSupported')
+              .timeout(const Duration(seconds: 3)) ??
+          false;
+    } catch (e, st) {
+      ErrorLogger.log('isBassBoostSupported failed',
+          error: e, stackTrace: st, category: 'AudioEffectsChannel');
+      return false;
+    }
   }
 
   Future<bool> isVirtualizerSupportedLive() async {
     if (!_isAndroid) return false;
-    return await _channel.invokeMethod<bool>('isVirtualizerSupported') ?? false;
+    try {
+      return await _channel
+              .invokeMethod<bool>('isVirtualizerSupported')
+              .timeout(const Duration(seconds: 3)) ??
+          false;
+    } catch (e, st) {
+      ErrorLogger.log('isVirtualizerSupported failed',
+          error: e, stackTrace: st, category: 'AudioEffectsChannel');
+      return false;
+    }
   }
 
   Future<bool> isDynamicsSupportedLive() async {
     if (!_isAndroid) return false;
-    return await _channel.invokeMethod<bool>('isDynamicsSupported') ?? false;
+    try {
+      return await _channel
+              .invokeMethod<bool>('isDynamicsSupported')
+              .timeout(const Duration(seconds: 3)) ??
+          false;
+    } catch (e, st) {
+      ErrorLogger.log('isDynamicsSupported failed',
+          error: e, stackTrace: st, category: 'AudioEffectsChannel');
+      return false;
+    }
   }
 
   /// Whether the native C++ DSP chain is in ExoPlayer's audible path.
@@ -669,6 +705,7 @@ class AudioEffectsChannel {
   /// still needed as a fallback (single-application guarantee, 13-01).
   Future<bool> setEqBands(List<double> frequencies) async {
     if (!_isAndroid) return true;
+    if (frequencies.any((f) => !f.isFinite || f <= 0)) return false;
     try {
       await _channel.invokeMethod('setEqBands',
           {'frequencies': frequencies}).timeout(const Duration(seconds: 3));
@@ -687,6 +724,7 @@ class AudioEffectsChannel {
   /// Live-updates a single band's gain (dB) without rebuilding the effect.
   Future<bool> setEqBandGain(int index, double gainDb) async {
     if (!_isAndroid) return true;
+    if (!gainDb.isFinite) return false;
     try {
       await _channel.invokeMethod('setEqBandGain', {
         'index': index,
@@ -707,6 +745,7 @@ class AudioEffectsChannel {
   /// Sets all band gains (dB) at once. Length should match the band count.
   Future<bool> setEqBandGains(List<double> gains) async {
     if (!_isAndroid) return true;
+    if (gains.any((g) => !g.isFinite)) return false;
     try {
       await _channel.invokeMethod('setEqBandGains', {'gains': gains}).timeout(
           const Duration(seconds: 3));
@@ -724,7 +763,7 @@ class AudioEffectsChannel {
 
   /// Sets the EQ preamp (dB). Negative values attenuate as real headroom.
   Future<void> setEqPreamp(double preampDb) async {
-    if (!_isAndroid) return;
+    if (!_isAndroid || !preampDb.isFinite) return;
     try {
       await _channel.invokeMethod('setEqPreamp',
           {'preampDb': preampDb}).timeout(const Duration(seconds: 3));
@@ -749,6 +788,7 @@ class AudioEffectsChannel {
     bool enabled = true,
   }) async {
     if (!_isAndroid) return true;
+    if (!freq.isFinite || !gainDb.isFinite || !q.isFinite) return false;
     try {
       await _channel.invokeMethod('setNativeEqBand', {
         'index': index,
@@ -781,6 +821,11 @@ class AudioEffectsChannel {
     List<int>? types,
   }) async {
     if (!_isAndroid) return true;
+    if (frequencies.any((f) => !f.isFinite || f <= 0) ||
+        gains.any((g) => !g.isFinite) ||
+        (qs != null && qs.any((q) => !q.isFinite || q <= 0))) {
+      return false;
+    }
     try {
       final defaultTypes = frequencies.length >= 5
           ? (List<int>.filled(frequencies.length, 0)
@@ -950,7 +995,9 @@ class AudioEffectsChannel {
   Future<double> getRollingRtf() async {
     if (!_isAndroid) return 0.0;
     try {
-      final res = await _channel.invokeMethod<num>('getRollingRtf');
+      final res = await _channel
+          .invokeMethod<num>('getRollingRtf')
+          .timeout(const Duration(seconds: 3));
       return res?.toDouble() ?? 0.0;
     } catch (e, st) {
       ErrorLogger.log(
@@ -1047,7 +1094,12 @@ class AudioEffectsChannel {
     double feedDb, {
     double? fcut,
   }) async {
-    if (!_isAndroid) return;
+    if (!_isAndroid ||
+        !delayUs.isFinite ||
+        !feedDb.isFinite ||
+        (fcut != null && !fcut.isFinite)) {
+      return;
+    }
     try {
       await _invokeNativeSetter('setCrossfeedParams', {
         'delayUs': delayUs,
@@ -1080,11 +1132,12 @@ class AudioEffectsChannel {
         stackTrace: st,
         category: 'AudioEffectsChannel',
       );
+      rethrow;
     }
   }
 
   Future<void> setHrtfAzimuth(double azimuth) async {
-    if (!_isAndroid) return;
+    if (!_isAndroid || !azimuth.isFinite) return;
     try {
       await _invokeNativeSetter('setHrtfAzimuth', {'azimuth': azimuth})
           .timeout(const Duration(seconds: 3));
@@ -1095,11 +1148,12 @@ class AudioEffectsChannel {
         stackTrace: st,
         category: 'AudioEffectsChannel',
       );
+      rethrow;
     }
   }
 
   Future<void> setHrtfElevation(double elevation) async {
-    if (!_isAndroid) return;
+    if (!_isAndroid || !elevation.isFinite) return;
     try {
       await _invokeNativeSetter('setHrtfElevation', {'elevation': elevation})
           .timeout(const Duration(seconds: 3));
@@ -1110,6 +1164,7 @@ class AudioEffectsChannel {
         stackTrace: st,
         category: 'AudioEffectsChannel',
       );
+      rethrow;
     }
   }
 
@@ -1162,6 +1217,18 @@ class AudioEffectsChannel {
     double sampleRate = 48000.0,
   }) async {
     if (!_isAndroid) return false;
+    if (!sampleRate.isFinite ||
+        sampleRate <= 0 ||
+        ll.isEmpty ||
+        lr.isEmpty ||
+        rl.isEmpty ||
+        rr.isEmpty ||
+        !ll.every((v) => v.isFinite) ||
+        !lr.every((v) => v.isFinite) ||
+        !rl.every((v) => v.isFinite) ||
+        !rr.every((v) => v.isFinite)) {
+      return false;
+    }
     try {
       final ok = await _channel.invokeMethod<bool>('loadHrtfIr', {
         'll': ll,
@@ -1221,7 +1288,15 @@ class AudioEffectsChannel {
     double? attackMs,
     double? makeupGainDb,
   }) async {
-    if (!_isAndroid) return;
+    if (!_isAndroid ||
+        !lookaheadMs.isFinite ||
+        !thresholdDb.isFinite ||
+        !releaseMs.isFinite ||
+        (ratio != null && !ratio.isFinite) ||
+        (attackMs != null && !attackMs.isFinite) ||
+        (makeupGainDb != null && !makeupGainDb.isFinite)) {
+      return;
+    }
     try {
       await _invokeNativeSetter('setLimiterParams', {
         'lookaheadMs': lookaheadMs,
@@ -1279,7 +1354,7 @@ class AudioEffectsChannel {
   }
 
   Future<void> setReverbWetDry(double wetRatio) async {
-    if (!_isAndroid) return;
+    if (!_isAndroid || !wetRatio.isFinite) return;
     try {
       await _invokeNativeSetter('setReverbWetDry', {'wetRatio': wetRatio})
           .timeout(const Duration(seconds: 3));
@@ -1334,7 +1409,7 @@ class AudioEffectsChannel {
   // --- STEREO BALANCE & MONO MIX ---
 
   Future<void> setStereoBalance(double balance) async {
-    if (!_isAndroid) return;
+    if (!_isAndroid || !balance.isFinite) return;
     try {
       await _invokeNativeSetter('setStereoBalance', {
         'balance': balance.clamp(-1.0, 1.0),
@@ -1435,6 +1510,10 @@ class AudioEffectsChannel {
       return true;
     } on PlatformException {
       return false;
+    } on MissingPluginException {
+      return false;
+    } on TimeoutException {
+      return false;
     }
   }
 
@@ -1510,6 +1589,10 @@ class AudioEffectsChannel {
       return true;
     } on PlatformException {
       return false;
+    } on MissingPluginException {
+      return false;
+    } on TimeoutException {
+      return false;
     }
   }
 
@@ -1541,6 +1624,10 @@ class AudioEffectsChannel {
       _cachedOversampleKernel = valid;
       return true;
     } on PlatformException {
+      return false;
+    } on MissingPluginException {
+      return false;
+    } on TimeoutException {
       return false;
     }
   }
@@ -1584,14 +1671,18 @@ class AudioEffectsChannel {
     double mix,
     double tilt, {
     int mode = 0,
+    bool? multiband,
   }) async {
-    if (!_isAndroid) return;
+    if (!_isAndroid || !drive.isFinite || !mix.isFinite || !tilt.isFinite) {
+      return;
+    }
     try {
       await _invokeNativeSetter('setSaturationParams', {
         'drive': drive,
         'mix': mix,
         'tilt': tilt,
         'mode': mode,
+        if (multiband != null) 'multiband': multiband,
       }).timeout(const Duration(seconds: 3));
     } catch (e, st) {
       ErrorLogger.log(
@@ -1631,7 +1722,15 @@ class AudioEffectsChannel {
     double lowCrossoverHz = 160.0,
     double highCrossoverHz = 2500.0,
   }) async {
-    if (!_isAndroid) return;
+    if (!_isAndroid ||
+        !width.isFinite ||
+        !lowWidth.isFinite ||
+        !midWidth.isFinite ||
+        !highWidth.isFinite ||
+        !lowCrossoverHz.isFinite ||
+        !highCrossoverHz.isFinite) {
+      return;
+    }
     try {
       await _invokeNativeSetter('setStereoWidthParams', {
         'width': width,
@@ -1701,7 +1800,7 @@ class AudioEffectsChannel {
     double intensity,
     double volumeLinear,
   ) async {
-    if (!_isAndroid) return;
+    if (!_isAndroid || !intensity.isFinite || !volumeLinear.isFinite) return;
     try {
       await _invokeNativeSetter('setLoudnessContourParams', {
         'intensity': intensity,
@@ -1743,7 +1842,12 @@ class AudioEffectsChannel {
     bool bassMono = false,
     bool antiPop = true,
   }) async {
-    if (!_isAndroid) return;
+    if (!_isAndroid ||
+        !cornerHz.isFinite ||
+        !slopeDbPerOct.isFinite ||
+        !subGain.isFinite) {
+      return;
+    }
     try {
       await _invokeNativeSetter('setSubCrossoverParams', {
         'cornerHz': cornerHz,
@@ -1788,7 +1892,7 @@ class AudioEffectsChannel {
     double trimDb = 0.0,
     double delayMs = 0.0,
   }) async {
-    if (!_isAndroid) return;
+    if (!_isAndroid || !trimDb.isFinite || !delayMs.isFinite) return;
     try {
       await _invokeNativeSetter('setChannelManagerChannel', {
         'channel': channel,
@@ -1847,7 +1951,13 @@ class AudioEffectsChannel {
     int lfeChannelIndex = 3,
     bool redirectBass = true,
   }) async {
-    if (!_isAndroid) return;
+    if (!_isAndroid ||
+        !crossoverHz.isFinite ||
+        !lfeLowPassHz.isFinite ||
+        !slopeDbPerOct.isFinite ||
+        !lfeGainDb.isFinite) {
+      return;
+    }
     try {
       await _invokeNativeSetter('setLfeCrossoverParams', {
         'crossoverHz': crossoverHz,
@@ -1933,7 +2043,17 @@ class AudioEffectsChannel {
     int filterType = 0,
     bool enabled = true,
   }) async {
-    if (!_isAndroid) return;
+    if (!_isAndroid ||
+        !frequency.isFinite ||
+        !q.isFinite ||
+        !thresholdDb.isFinite ||
+        !ratio.isFinite ||
+        !attackMs.isFinite ||
+        !releaseMs.isFinite ||
+        !maxCutDb.isFinite ||
+        !maxBoostDb.isFinite) {
+      return;
+    }
     try {
       await _invokeNativeSetter('setDynamicEqBand', {
         'index': index,
@@ -1989,7 +2109,15 @@ class AudioEffectsChannel {
     required double makeupGainDb,
     bool enabled = true,
   }) async {
-    if (!_isAndroid) return;
+    if (!_isAndroid ||
+        !thresholdDb.isFinite ||
+        !ratio.isFinite ||
+        !attackMs.isFinite ||
+        !releaseMs.isFinite ||
+        !kneeDb.isFinite ||
+        !makeupGainDb.isFinite) {
+      return;
+    }
     try {
       await _invokeNativeSetter('setMultibandCompressorBand', {
         'bandIndex': bandIndex,
@@ -2017,7 +2145,7 @@ class AudioEffectsChannel {
     required double f1,
     required double f2,
   }) async {
-    if (!_isAndroid) return;
+    if (!_isAndroid || !f0.isFinite || !f1.isFinite || !f2.isFinite) return;
     try {
       await _invokeNativeSetter('setMultibandCompressorCrossovers', {
         'f0': f0,
@@ -2046,7 +2174,12 @@ class AudioEffectsChannel {
     required double sideGainHigh,
     required int devicePreset,
   }) async {
-    if (!_isAndroid) return;
+    if (!_isAndroid ||
+        !strength.isFinite ||
+        !sideGainLow.isFinite ||
+        !sideGainHigh.isFinite) {
+      return;
+    }
     try {
       await _invokeNativeSetter('setDynamicBassParams', {
         'enabled': enabled,
@@ -2237,7 +2370,7 @@ class AudioEffectsChannel {
   }
 
   Future<void> setReverbCrossChannel(double crossChannel) async {
-    if (!_isAndroid) return;
+    if (!_isAndroid || !crossChannel.isFinite) return;
     try {
       await _invokeNativeSetter(
               'setReverbCrossChannel', {'crossChannel': crossChannel})
@@ -2262,7 +2395,12 @@ class AudioEffectsChannel {
     required double damping,
     required double crossChannel,
   }) async {
-    if (!_isAndroid) return;
+    if (!_isAndroid ||
+        !predelayMs.isFinite ||
+        !damping.isFinite ||
+        !crossChannel.isFinite) {
+      return;
+    }
     try {
       await _invokeNativeSetter('setReverbParams', {
         'predelayMs': predelayMs,
@@ -2309,7 +2447,9 @@ class AudioEffectsChannel {
   Future<String> getDspPreference() async {
     if (!_isAndroid) return 'default';
     try {
-      final res = await _channel.invokeMethod<String>('getDspPreference');
+      final res = await _channel
+          .invokeMethod<String>('getDspPreference')
+          .timeout(const Duration(seconds: 3));
       return res ?? 'default';
     } catch (e, st) {
       ErrorLogger.log(
@@ -2386,7 +2526,7 @@ class AudioEffectsChannel {
     required int character,
     required double voicingAmount,
   }) async {
-    if (!_isAndroid) return false;
+    if (!_isAndroid || !voicingAmount.isFinite) return false;
     try {
       final applied = await _channel
           .invokeMethod<bool>('setDacVoicingParams', {
@@ -2623,7 +2763,11 @@ class AudioEffectsChannel {
     double doseThreshold = 1.0,
     double safetyCeilingDb = -6.0,
   }) async {
-    if (!_isAndroid) return;
+    if (!_isAndroid ||
+        !doseThreshold.isFinite ||
+        !safetyCeilingDb.isFinite) {
+      return;
+    }
     try {
       await _invokeNativeSetter('setHeadphoneSafetyParams', {
         'enabled': enabled,
@@ -2820,7 +2964,7 @@ class AudioEffectsChannel {
   }
 
   Future<void> setLiveProgSlider(int index, double value) async {
-    if (!_isAndroid) return;
+    if (!_isAndroid || !value.isFinite) return;
     try {
       await _invokeNativeSetter(
               'setLiveProgSlider', {'index': index, 'value': value})
@@ -2899,9 +3043,11 @@ class AudioEffectsChannel {
       final res = await _channel.invokeMethod<bool>(
         'setLowPowerRoute',
         {'enabled': enabled},
-      );
+      ).timeout(const Duration(seconds: 3));
       return res ?? false;
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('setLowPowerRoute failed',
+          error: e, stackTrace: st, category: 'AudioEffectsChannel');
       return false;
     }
   }
@@ -2910,9 +3056,13 @@ class AudioEffectsChannel {
   Future<bool> isLowPowerBypassed() async {
     if (!_isAndroid) return false;
     try {
-      final res = await _channel.invokeMethod<bool>('isLowPowerBypassed');
+      final res = await _channel
+          .invokeMethod<bool>('isLowPowerBypassed')
+          .timeout(const Duration(seconds: 3));
       return res ?? false;
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('isLowPowerBypassed failed',
+          error: e, stackTrace: st, category: 'AudioEffectsChannel');
       return false;
     }
   }
@@ -3035,7 +3185,9 @@ class AudioEffectsChannel {
       final res = await _channel.invokeMethod<bool>('sendWarmupBuffer',
           {'durationMs': durationMs}).timeout(const Duration(seconds: 2));
       return res ?? true;
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('sendWarmupBuffer failed',
+          error: e, stackTrace: st, category: 'AudioEffectsChannel');
       return false;
     }
   }
@@ -3044,7 +3196,10 @@ class AudioEffectsChannel {
   Future<bool> isOffloadAllowed() async {
     if (!_isAndroid) return false;
     try {
-      return await _channel.invokeMethod<bool>('isOffloadAllowed') ?? false;
+      return await _channel
+              .invokeMethod<bool>('isOffloadAllowed')
+              .timeout(const Duration(seconds: 3)) ??
+          false;
     } catch (e, st) {
       ErrorLogger.log(
         'isOffloadAllowed failed',
@@ -3060,7 +3215,9 @@ class AudioEffectsChannel {
   Future<String> setMultiOutputRoute(String mode) async {
     if (!_isAndroid) return 'unsupported';
     try {
-      final res = await _channel.invokeMethod<String>('setMultiOutputRoute', {'mode': mode});
+      final res = await _channel
+          .invokeMethod<String>('setMultiOutputRoute', {'mode': mode})
+          .timeout(const Duration(seconds: 3));
       return res ?? 'unsupported';
     } catch (e, st) {
       ErrorLogger.log(
@@ -3070,6 +3227,27 @@ class AudioEffectsChannel {
         category: 'AudioEffectsChannel',
       );
       return 'unsupported';
+    }
+  }
+
+  /// Queries whether Android audio output is free of voice-call/ringtone focus
+  /// preemption. Returns `true` off Android or on channel failure so playback
+  /// controls fail open gracefully.
+  Future<bool> getFocusState() async {
+    if (!_isAndroid) return true;
+    try {
+      final res = await _channel
+          .invokeMethod<bool>('getFocusState')
+          .timeout(const Duration(seconds: 2));
+      return res ?? true;
+    } catch (e, st) {
+      ErrorLogger.log(
+        'getFocusState failed',
+        error: e,
+        stackTrace: st,
+        category: 'AudioEffectsChannel',
+      );
+      return true;
     }
   }
 }

@@ -376,6 +376,38 @@ int main() {
         work = input;
         engine->processInterleaved(work.data(), frames, channels);
         check(!engine->isLowPowerBypassed(), "low power bypass must not engage when remaster/oversample is enabled");
+
+        // Interlock: DVC, ReplayGain, Headphone Safety, Direct USB gain must block low-power bypass
+        snap->oversample.enabled = false;
+        snap->directVolume.enabled = true;
+        snap->directVolume.gainLinear = 0.5;
+        engine->publishParams(snap);
+        work = input;
+        engine->processInterleaved(work.data(), frames, channels);
+        check(!engine->isLowPowerBypassed(), "low power bypass must not engage when DVC is enabled");
+
+        snap->directVolume.enabled = false;
+        snap->headphoneSafety.enabled = true;
+        engine->publishParams(snap);
+        work = input;
+        engine->processInterleaved(work.data(), frames, channels);
+        check(!engine->isLowPowerBypassed(), "low power bypass must not engage when headphone safety is enabled");
+    }
+
+    // Crossfeed vs HRTF mutual exclusion: when both are enabled, HRTF wins and
+    // crossfeed stays suppressed inside AudioDspEngine.
+    {
+        auto engine = makeEngine();
+        auto snap = baseSnapshot();
+        snap->activeStages = STAGE_CROSSFEED | STAGE_HRTF;
+        snap->crossfeed.enabled = true;
+        snap->hrtf.enabled = true;
+        engine->publishParams(snap);
+        auto work = makeSignal(frames, channels);
+        engine->processInterleaved(work.data(), frames, channels);
+        check(engine->hrtf().isEnabled(), "HRTF stays enabled when requested");
+        check(!engine->crossfeed().isEnabled(),
+              "Crossfeed must be suppressed while HRTF binaural virtualization is active");
     }
 
     if (gFailures != 0) {

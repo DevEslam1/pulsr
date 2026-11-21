@@ -151,4 +151,42 @@ void main() {
 
     expect(find.text('OutsidePage'), findsOneWidget);
   });
+
+  testWidgets('only shows direct child folders, not deeper descendants',
+      (tester) async {
+    setSurface(tester);
+    final cubit = stubLibraryCubit(const LibraryState(
+      folders: [
+        FolderItem(
+            path: '/music/AlbumA',
+            name: 'AlbumA',
+            songCount: 3,
+            isExcluded: false,
+            representativeSongId: 1),
+        FolderItem(
+            path: '/music/AlbumA/SubDirect',
+            name: 'SubDirect',
+            songCount: 2,
+            isExcluded: false,
+            representativeSongId: 2),
+        FolderItem(
+            path: '/music/AlbumA/SubDirect/DeepDescendant',
+            name: 'DeepDescendant',
+            songCount: 1,
+            isExcluded: false,
+            representativeSongId: 3),
+      ],
+    ));
+
+    await tester.pumpWidget(libraryHarness(
+      libraryCubit: cubit,
+      child: const Scaffold(body: FolderTreeBrowserTab()),
+    ));
+    await tester.pumpAndSettle();
+
+    // Direct child folder must be visible.
+    expect(find.text('SubDirect'), findsOneWidget);
+    // Deeper descendant folder must NOT be visible at root level.
+    expect(find.text('DeepDescendant'), findsNothing);
+  });
 }

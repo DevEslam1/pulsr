@@ -99,6 +99,7 @@ class DatabaseEncryptionBootstrap {
 
   static const String keyStorageKey = 'pulsr_db_encryption_key_v1';
   static const String databaseName = 'pulsr_music_db';
+  static const String missingKeyForEncryptedDb = 'missingKeyForEncryptedDb';
 
   /// Appended to the live database path while a plaintext copy is being
   /// exported. Kept next to the database so a rename is atomic on the same
@@ -188,15 +189,43 @@ class DatabaseEncryptionBootstrap {
       return _status;
     }
 
+    final Directory docs;
+    try {
+      docs = directory ?? await getApplicationDocumentsDirectory();
+    } catch (e, st) {
+      _activeKeyHex = null;
+      _status = DatabaseEncryptionStatus(
+        state: DatabaseEncryptionState.degraded,
+        cipherAvailable: cipherAvailable,
+        keyAvailable: null,
+        degradedReason: 'Could not access documents directory: $e',
+      );
+      ErrorLogger.log('Could not access documents directory',
+          error: e, stackTrace: st, category: 'Database');
+      return _status;
+    }
+    final live = databaseFileIn(docs);
+
     String? keyHex;
     try {
       final storage = secureStorage ?? const FlutterSecureStorage();
       keyHex = await storage.read(key: keyStorageKey);
-      if (keyHex == null || keyHex.isEmpty) {
-        keyHex = generateKeyHex();
-        await storage.write(key: keyStorageKey, value: keyHex);
-      } else if (!isValidKeyHex(keyHex)) {
-        // A corrupted/foreign value must not be used as a raw key.
+      if (keyHex == null || keyHex.isEmpty || !isValidKeyHex(keyHex)) {
+        if (live.existsSync() && !isPlaintextSqliteFile(live)) {
+          _activeKeyHex = null;
+          _status = const DatabaseEncryptionStatus(
+            state: DatabaseEncryptionState.degraded,
+            cipherAvailable: true,
+            keyAvailable: false,
+            degradedReason: missingKeyForEncryptedDb,
+          );
+          ErrorLogger.log(
+            'Encrypted database exists on disk but secure storage has no valid key. '
+            'Preserving file without overwriting key.',
+            category: 'Database',
+          );
+          return _status;
+        }
         keyHex = generateKeyHex();
         await storage.write(key: keyStorageKey, value: keyHex);
       }
@@ -214,8 +243,6 @@ class DatabaseEncryptionBootstrap {
     }
 
     try {
-      final docs = directory ?? await getApplicationDocumentsDirectory();
-      final live = databaseFileIn(docs);
       final temp = File('${live.path}$encryptedTempSuffix');
       final backup = File('${live.path}$plaintextBackupSuffix');
 
@@ -465,6 +492,11 @@ class DatabaseEncryptionBootstrap {
           throw StateError(
               'foreign_key_check found ${fkViolations.length} violation(s)');
         }
+        final versionRow = target.select('PRAGMA source.user_version;');
+        final userVersion = versionRow.isNotEmpty
+            ? (versionRow.first.values.first as int? ?? 0)
+            : 0;
+        target.execute('PRAGMA user_version = $userVersion;');
         target.execute('COMMIT;');
         try {
           target.execute('DETACH DATABASE source;');
@@ -491,7 +523,26 @@ class DatabaseEncryptionBootstrap {
       plaintext.renameSync(backup.path);
       temp.renameSync(plaintext.path);
       _clearWal(plaintext);
-      ErrorLogger.log('Plaintext database backed up to ${backup.path}',
+
+      if (verifyEncryptedDatabase(plaintext, keyHex)) {
+        if (backup.existsSync()) {
+          try {
+            backup.deleteSync();
+          } catch (e, st) {
+            ErrorLogger.log('Failed to delete plaintext backup',
+                error: e, stackTrace: st, category: 'Database');
+          }
+        }
+      } else {
+        if (plaintext.existsSync()) {
+          plaintext.deleteSync();
+        }
+        throw StateError(
+            'encrypted database at ${plaintext.path} did not verify with the key');
+      }
+
+      ErrorLogger.log(
+          'Plaintext database encrypted at rest successfully (${plaintext.path})',
           category: 'Database');
       return true;
     } catch (e, st) {
@@ -539,9 +590,9 @@ class DatabaseEncryptionBootstrap {
             'encrypted copy',
             category: 'Database',
           );
-          return;
+        } else {
+          temp.deleteSync();
         }
-        temp.deleteSync();
       }
       if (!live.existsSync() && backup.existsSync()) {
         backup.renameSync(live.path);
@@ -551,6 +602,20 @@ class DatabaseEncryptionBootstrap {
           'backup',
           category: 'Database',
         );
+      }
+      if (live.existsSync() &&
+          backup.existsSync() &&
+          verifyEncryptedDatabase(live, keyHex)) {
+        try {
+          backup.deleteSync();
+          ErrorLogger.log(
+            'Cleaned up leftover plaintext backup after verified encrypted live database',
+            category: 'Database',
+          );
+        } catch (e, st) {
+          ErrorLogger.log('Failed to delete leftover plaintext backup',
+              error: e, stackTrace: st, category: 'Database');
+        }
       }
     } catch (e, st) {
       ErrorLogger.log('Database encryption recovery failed',

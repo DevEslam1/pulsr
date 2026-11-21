@@ -224,9 +224,9 @@ class SsdpClient {
   /// responder [sourceAddress] or is on the same private LAN. Hostnames are
   /// rejected because they cannot be verified without a DNS lookup.
   static bool isAllowedDescriptionLocation(
-    Uri location,
-    String sourceAddress,
-  ) {
+    Uri location, [
+    String? sourceAddress,
+  ]) {
     final scheme = location.scheme.toLowerCase();
     if (scheme != 'http' && scheme != 'https') return false;
     if (!location.hasAuthority || location.host.isEmpty) return false;
@@ -234,8 +234,15 @@ class SsdpClient {
     final target = InternetAddress.tryParse(location.host);
     if (target == null) return false;
 
+    if (sourceAddress == null || sourceAddress.isEmpty) {
+      return _isPrivateOrLocal(target);
+    }
+
     final source = InternetAddress.tryParse(sourceAddress);
     if (source != null && target.address == source.address) return true;
+    if (target.isLoopback && (source == null || !source.isLoopback)) {
+      return false;
+    }
     return source != null &&
         _isPrivateOrLocal(source) &&
         _isPrivateOrLocal(target);

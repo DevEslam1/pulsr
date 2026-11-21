@@ -7,6 +7,7 @@ import '../../../../core/constants/app_radii.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/theme/aura_theme.dart';
+import '../../../../core/utils/error_logger.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../data/audio/audio_effects_channel.dart';
 import '../../../../domain/models/dsp_battery_estimate.dart';
@@ -25,16 +26,19 @@ class EngineTelemetryPanel extends StatefulWidget {
   State<EngineTelemetryPanel> createState() => _EngineTelemetryPanelState();
 }
 
-class _EngineTelemetryPanelState extends State<EngineTelemetryPanel> {
+class _EngineTelemetryPanelState extends State<EngineTelemetryPanel>
+    with WidgetsBindingObserver {
   late bool _isExpanded;
   late final DspTelemetryCubit _cubit;
   bool _ownsCubit = false;
   Timer? _batteryTimer;
   DspBatteryEstimate? _batteryEstimate;
+  bool _batteryFetchInFlight = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _isExpanded = widget.initialExpanded;
     final existingCubit = _tryReadCubit(context);
     if (existingCubit != null) {
@@ -51,6 +55,19 @@ class _EngineTelemetryPanelState extends State<EngineTelemetryPanel> {
     }
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      if (_isExpanded && _batteryTimer == null) {
+        _startBatteryPolling();
+      }
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.detached) {
+      _stopBatteryPolling();
+    }
+  }
+
   void _startBatteryPolling() {
     _batteryTimer?.cancel();
     _fetchBattery();
@@ -63,13 +80,21 @@ class _EngineTelemetryPanelState extends State<EngineTelemetryPanel> {
     _batteryTimer = null;
   }
 
-  void _fetchBattery() async {
+  Future<void> _fetchBattery() async {
+    if (_batteryFetchInFlight) return;
+    _batteryFetchInFlight = true;
     try {
-      final est = await AudioEffectsChannel().getDspBatteryEstimate();
-      if (mounted) {
-        setState(() => _batteryEstimate = est);
-      }
-    } catch (_) {}
+      final est = await AudioEffectsChannel()
+          .getDspBatteryEstimate()
+          .timeout(const Duration(milliseconds: 900));
+      if (!mounted) return;
+      setState(() => _batteryEstimate = est);
+    } catch (e, st) {
+      ErrorLogger.log('Failed to fetch DSP battery estimate',
+          error: e, stackTrace: st, category: 'Telemetry');
+    } finally {
+      _batteryFetchInFlight = false;
+    }
   }
 
   DspTelemetryCubit? _tryReadCubit(BuildContext ctx) {
@@ -82,6 +107,7 @@ class _EngineTelemetryPanelState extends State<EngineTelemetryPanel> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _stopBatteryPolling();
     if (_isExpanded) {
       _cubit.unsubscribe();

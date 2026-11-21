@@ -267,6 +267,72 @@ void main() {
       expect(factors.length, greaterThanOrEqualTo(17));
       expect(factors.last, 1.0);
     });
+
+    test('coordinated mode invokes onFadeFactor(0.0) on duration expiry', () {
+      fakeAsync((async) {
+        final factors = <double>[];
+        var expired = 0;
+        when(() => player.dspSetGainCurve(any(),
+            segmentMs: any(named: 'segmentMs'))).thenAnswer((_) async => true);
+        manager.onFadeFactor = factors.add;
+        manager.baseVolumeProvider = () => 0.9;
+
+        manager.startSleepTimer(
+          const Duration(seconds: 5),
+          fadeOut: true,
+          onTimerExpired: () async {
+            expired++;
+          },
+          getActivePlayer: () => player,
+        );
+        async.elapse(const Duration(seconds: 6));
+        expect(expired, 1);
+        expect(factors, contains(0.0));
+        expect(factors.last, 1.0);
+        verifyNever(() => player.setVolume(any()));
+      });
+    });
+
+    test(
+        'tracks armed native-curve player and clears curve on that player after swap',
+        () {
+      fakeAsync((async) {
+        final armedPlayer = MockAudioPlayer();
+        final swappedPlayer = MockAudioPlayer();
+        for (final p in [armedPlayer, swappedPlayer]) {
+          when(() => p.volume).thenReturn(1.0);
+          when(() => p.playing).thenReturn(true);
+          when(() => p.setVolume(any())).thenAnswer((_) async {});
+          when(() => p.dspClearGainCurve()).thenAnswer((_) async => true);
+        }
+        when(() => armedPlayer.dspSetGainCurve(any(),
+            segmentMs: any(named: 'segmentMs'))).thenAnswer((_) async => true);
+        when(() => swappedPlayer.dspSetGainCurve(any(),
+            segmentMs: any(named: 'segmentMs'))).thenAnswer((_) async => false);
+
+        AudioPlayer currentPlayer = armedPlayer;
+        manager.baseVolumeProvider = () => 1.0;
+
+        manager.startSleepTimer(
+          const Duration(seconds: 5),
+          fadeOut: true,
+          onTimerExpired: () async {},
+          getActivePlayer: () => currentPlayer,
+        );
+        // Enter fade window so armedPlayer arms its native gain curve.
+        async.elapse(const Duration(seconds: 1));
+        verify(() => armedPlayer.dspSetGainCurve(any(),
+            segmentMs: any(named: 'segmentMs'))).called(1);
+
+        // Swap the active player (simulating crossfade swap) before cancel.
+        currentPlayer = swappedPlayer;
+        manager.cancelSleepTimer();
+        async.flushMicrotasks();
+
+        verify(() => armedPlayer.dspClearGainCurve()).called(1);
+        verifyNever(() => swappedPlayer.dspClearGainCurve());
+      });
+    });
   });
 
   group('persistence restore', () {

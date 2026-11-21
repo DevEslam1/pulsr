@@ -1157,4 +1157,111 @@ void main() {
       expect(details.tracks.single.artist, equals('Real Artist'));
     });
   });
+
+  group('account playlists pagination and header harvesting', () {
+    test(
+        'fetchAccountPlaylists follows continuation tokens across pages and deduplicates ids',
+        () async {
+      final service = await loggedIn();
+      handler = (request) async {
+        final body = jsonDecode(request.body) as Map<String, dynamic>;
+        final continuation = body['continuation'] as String?;
+        if (continuation == null) {
+          return _json(200, {
+            'contents': [
+              _twoRowPlaylist(browseId: 'VLPLp1', title: 'Page One'),
+            ],
+            'continuations': [
+              {
+                'nextContinuationData': {'continuation': 'ctok-page-2'},
+              },
+            ],
+          });
+        }
+        if (continuation == 'ctok-page-2') {
+          return _json(200, {
+            'continuationContents': {
+              'gridContinuation': {
+                'items': [
+                  _twoRowPlaylist(browseId: 'VLPLp1', title: 'Page One Dup'),
+                  _twoRowPlaylist(browseId: 'VLPLp2', title: 'Page Two'),
+                ],
+                'continuations': [
+                  {
+                    'nextContinuationData': {'continuation': 'ctok-page-3'},
+                  },
+                ],
+              },
+            },
+          });
+        }
+        if (continuation == 'ctok-page-3') {
+          return _json(200, {
+            'continuationContents': {
+              'gridContinuation': {
+                'items': [
+                  _twoRowPlaylist(browseId: 'VLPLp3', title: 'Page Three'),
+                ],
+              },
+            },
+          });
+        }
+        return _json(200, const {});
+      };
+
+      final playlists = await service.fetchAccountPlaylists();
+
+      expect(
+        playlists.map((p) => p.playlistId).toList(),
+        ['PLp1', 'PLp2', 'PLp3'],
+      );
+    });
+
+    test(
+        '_harvestSessionState extracts accountName runs/simpleText and accountPhoto avatar',
+        () async {
+      final service = await loggedIn();
+      handler = (request) async => _json(200, {
+            'activeAccountHeaderRenderer': {
+              'accountName': {
+                'runs': [
+                  {'text': 'Ada'},
+                  {'text': ' Lovelace'},
+                ],
+              },
+              'accountPhoto': {
+                'thumbnails': [
+                  {'url': 'https://art/small.jpg'},
+                  {'url': 'https://art/large.jpg'},
+                ],
+              },
+            },
+            'contents': [
+              _twoRowPlaylist(browseId: 'VLPLone', title: 'One'),
+            ],
+          });
+
+      await service.fetchAccountPlaylists();
+      expect(service.accountName, 'Ada Lovelace');
+      expect(service.accountAvatar, 'https://art/large.jpg');
+
+      handler = (request) async => _json(200, {
+            'activeAccountHeaderRenderer': {
+              'accountName': {'simpleText': 'Grace Hopper'},
+              'accountPhoto': {
+                'thumbnails': [
+                  {'url': 'https://art/grace.jpg'},
+                ],
+              },
+            },
+            'contents': [
+              _twoRowPlaylist(browseId: 'VLPLtwo', title: 'Two'),
+            ],
+          });
+
+      await service.fetchAccountPlaylists();
+      expect(service.accountName, 'Grace Hopper');
+      expect(service.accountAvatar, 'https://art/grace.jpg');
+    });
+  });
 }

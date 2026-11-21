@@ -104,7 +104,9 @@ class PlaybackPositionPersister {
       final dir = await _getDocumentsDirectory();
       if (dir == null) return null;
       return _cachedRecoveryFile = File(p.join(dir.path, 'last_position.json'));
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('Failed to get recovery file directory',
+          error: e, stackTrace: st, category: 'AudioHandler');
       return null;
     }
   }
@@ -126,7 +128,10 @@ class PlaybackPositionPersister {
           }
         }
       }
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Failed to read crash position recovery',
+          error: e, stackTrace: st, category: 'AudioHandler');
+    }
     return null;
   }
 
@@ -144,9 +149,12 @@ class PlaybackPositionPersister {
         _positionSaveQueued = false;
         await _writePositionSnapshot();
       } while (_positionSaveQueued && !_isDisposed());
+      completer.complete();
+    } catch (e, st) {
+      completer.completeError(e, st);
+      rethrow;
     } finally {
       _positionSaveInFlight = null;
-      completer.complete();
     }
   }
 
@@ -168,11 +176,11 @@ class PlaybackPositionPersister {
       return;
     }
 
-    _lastPersistedSongId = snapshot.songId;
-    _lastPersistedPositionMs = snapshot.positionMs;
-
     await _writeRecoveryFiles(snapshot);
     await _persistToRepository(snapshot);
+
+    _lastPersistedSongId = snapshot.songId;
+    _lastPersistedPositionMs = snapshot.positionMs;
   }
 
   Future<void> _writeRecoveryFiles(PlaybackPositionSnapshot snapshot) async {
@@ -208,25 +216,42 @@ class PlaybackPositionPersister {
               error: e, stackTrace: st, category: 'AudioHandler');
         }
       }
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Failed to write position recovery files',
+          error: e, stackTrace: st, category: 'AudioHandler');
+    }
   }
 
-  Future<void> _persistToRepository(PlaybackPositionSnapshot snapshot) async {
+  Future<bool> _persistToRepository(PlaybackPositionSnapshot snapshot) async {
     try {
-      await _repository.updateLastPosition(snapshot.songId, snapshot.positionMs);
+      final posRes =
+          await _repository.updateLastPosition(snapshot.songId, snapshot.positionMs);
+      posRes.fold(
+        (failure) => throw failure,
+        (_) {},
+      );
       if (snapshot.queueDirty ||
           snapshot.queueIndex != snapshot.savedQueueIndex) {
-        await _repository.saveQueue(
+        final queueRes = await _repository.saveQueue(
           snapshot.queueIds,
           snapshot.queueIndex,
           snapshot.positionMs,
+        );
+        queueRes.fold(
+          (failure) => throw failure,
+          (_) {},
         );
         _onQueueSaved(snapshot.queueIndex);
       } else {
         // Same track, later position: refresh just the current row so a cold
         // resume restores where the user actually was, not the position from
         // the last structural queue edit.
-        await _repository.updateQueuePosition(snapshot.positionMs);
+        final updateRes =
+            await _repository.updateQueuePosition(snapshot.positionMs);
+        updateRes.fold(
+          (failure) => throw failure,
+          (_) {},
+        );
       }
       // Only clear AFTER a successful write, and only if no newer position
       // arrived while the async database write was in flight.
@@ -234,11 +259,13 @@ class PlaybackPositionPersister {
         _clearDirty();
       }
       unawaited(_clearCrashSnapshot());
+      return true;
     } catch (e, st) {
       // Re-dirty so the periodic timer (and a later app pause) retries.
       _markDirty();
       ErrorLogger.log('Failed to save current position',
           error: e, stackTrace: st, category: 'AudioHandler');
+      rethrow;
     }
   }
 }

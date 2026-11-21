@@ -47,9 +47,9 @@ void HarmonicSaturation::setSampleRate(double sampleRate) {
 }
 
 void HarmonicSaturation::configure(double drive, double mix, double tilt, int mode, bool multiband) {
-    drive_ = std::clamp(drive, 0.0, 1.0);
-    mix_ = std::clamp(mix, 0.0, 1.0);
-    tilt_ = std::clamp(tilt, 0.0, 1.0);
+    drive_ = std::clamp(std::isfinite(drive) ? drive : 0.0, 0.0, 1.0);
+    mix_ = std::clamp(std::isfinite(mix) ? mix : 0.5, 0.0, 1.0);
+    tilt_ = std::clamp(std::isfinite(tilt) ? tilt : 0.0, 0.0, 1.0);
     const int newMode = std::clamp(mode, 0, 2);
     if (newMode != mode_) {
         if ((enabled_ || smoothedEnabledMix_ >= 1e-4f) && k_ > 1e-9) {

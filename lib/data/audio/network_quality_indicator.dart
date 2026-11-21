@@ -41,7 +41,9 @@ class NetworkQualityIndicator {
     }
     if (bars != _currentBars) {
       _currentBars = bars;
-      _barsController.add(bars);
+      if (!_barsController.isClosed) {
+        _barsController.add(bars);
+      }
     }
   }
 

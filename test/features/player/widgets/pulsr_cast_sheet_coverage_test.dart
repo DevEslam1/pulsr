@@ -87,6 +87,8 @@ void main() {
   testWidgets('Android init takes the SDK route when a session is available',
       (tester) async {
     messenger.setMockMethodCallHandler(
+        const MethodChannel(PulsrChannels.cast), (call) async => false);
+    messenger.setMockMethodCallHandler(
       const MethodChannel(PulsrChannels.castSession),
       (call) async {
         if (call.method == 'isAvailable') return true;

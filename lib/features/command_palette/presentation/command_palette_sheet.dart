@@ -20,8 +20,9 @@ import '../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../core/widgets/pulsr_pressable.dart';
 import '../../../core/widgets/pulsr_search_field.dart';
 import '../../../domain/models/genre_item.dart';
+import '../../audio_profiles/audio_profiles_screen.dart';
+import '../../diagnostics/diagnostics_screen.dart';
 import '../../dlna/dlna_screen.dart';
-import '../../extras/presentation/extras_screen.dart';
 import '../../player/cubit/player_cubit.dart';
 import '../../player/presentation/widgets/audio_quality_sheet.dart';
 import '../../player/presentation/widgets/equalizer_sheet.dart';
@@ -193,7 +194,7 @@ class _CommandPaletteSheetState extends State<CommandPaletteSheet> {
       CommandPaletteItem(
         id: 'nav_radio',
         title: l10n.radioTitle,
-        subtitle: 'Stream online radio stations',
+        subtitle: l10n.commandPaletteNavRadioSubtitle,
         icon: Icons.radio_rounded,
         section: CommandPaletteSection.navigation,
         keywords: [
@@ -208,27 +209,9 @@ class _CommandPaletteSheetState extends State<CommandPaletteSheet> {
         onSelect: (ctx) => ctx.push('/radio'),
       ),
       CommandPaletteItem(
-        id: 'nav_equalizer',
-        title: l10n.equalizerTitle,
-        subtitle: l10n.equalizerSubtitle,
-        icon: Icons.tune_rounded,
-        section: CommandPaletteSection.navigation,
-        keywords: [
-          'equalizer',
-          'eq',
-          'dsp',
-          'sound',
-          'bands',
-          'bass',
-          'profile',
-          'tone',
-        ],
-        onSelect: (ctx) => EqualizerSheet.show(ctx),
-      ),
-      CommandPaletteItem(
         id: 'nav_diagnostics',
-        title: 'Diagnostics',
-        subtitle: 'System logs, USB audio checks and safe mode',
+        title: l10n.commandPaletteNavDiagnostics,
+        subtitle: l10n.commandPaletteNavDiagnosticsSubtitle,
         icon: Icons.monitor_heart_rounded,
         section: CommandPaletteSection.navigation,
         keywords: [
@@ -242,13 +225,13 @@ class _CommandPaletteSheetState extends State<CommandPaletteSheet> {
           'troubleshoot',
         ],
         onSelect: (ctx) => Navigator.of(ctx).push(
-          MaterialPageRoute<void>(builder: (_) => const ExtrasScreen()),
+          MaterialPageRoute<void>(builder: (_) => const DiagnosticsScreen()),
         ),
       ),
       CommandPaletteItem(
         id: 'nav_audio_profiles',
-        title: 'Audio Profiles',
-        subtitle: 'Saved sound and DSP presets',
+        title: l10n.commandPaletteNavAudioProfiles,
+        subtitle: l10n.commandPaletteNavAudioProfilesSubtitle,
         icon: Icons.badge_rounded,
         section: CommandPaletteSection.navigation,
         keywords: [
@@ -260,13 +243,13 @@ class _CommandPaletteSheetState extends State<CommandPaletteSheet> {
           'dac',
         ],
         onSelect: (ctx) => Navigator.of(ctx).push(
-          MaterialPageRoute<void>(builder: (_) => const ExtrasScreen()),
+          MaterialPageRoute<void>(builder: (_) => const AudioProfilesScreen()),
         ),
       ),
       CommandPaletteItem(
         id: 'nav_dlna',
-        title: 'DLNA / UPnP Cast',
-        subtitle: 'Cast audio to network renderers and speakers',
+        title: l10n.commandPaletteNavDlna,
+        subtitle: l10n.commandPaletteNavDlnaSubtitle,
         icon: Icons.cast_rounded,
         section: CommandPaletteSection.navigation,
         keywords: [
@@ -284,8 +267,8 @@ class _CommandPaletteSheetState extends State<CommandPaletteSheet> {
       ),
       CommandPaletteItem(
         id: 'nav_podcasts_audiobooks',
-        title: 'Podcasts & Audiobooks',
-        subtitle: 'Long-form spoken word with position bookmarks',
+        title: l10n.commandPaletteNavPodcasts,
+        subtitle: l10n.commandPaletteNavPodcastsSubtitle,
         icon: Icons.podcasts_rounded,
         section: CommandPaletteSection.navigation,
         keywords: [
@@ -370,7 +353,16 @@ class _CommandPaletteSheetState extends State<CommandPaletteSheet> {
         subtitle: l10n.equalizerSubtitle,
         icon: Icons.tune_rounded,
         section: CommandPaletteSection.actions,
-        keywords: ['dsp', 'sound', 'bands', 'bass', 'profile'],
+        keywords: [
+          'equalizer',
+          'eq',
+          'dsp',
+          'sound',
+          'bands',
+          'bass',
+          'profile',
+          'tone',
+        ],
         onSelect: (ctx) => EqualizerSheet.show(ctx),
       ),
       CommandPaletteItem(
@@ -505,11 +497,13 @@ class _CommandPaletteSheetState extends State<CommandPaletteSheet> {
   /// `showModalBottomSheet` all resolve. The caller context from [show] is the
   /// fallback for hosts that build the sheet without a navigator ancestor.
   BuildContext? _resolveAppContext() {
-    final navigator = Navigator.maybeOf(context, rootNavigator: true);
-    final navContext = navigator?.context;
-    if (navContext != null && navContext.mounted) return navContext;
     final fallback = widget.appContext;
     if (fallback != null && fallback.mounted) return fallback;
+    final navigator = Navigator.maybeOf(context, rootNavigator: true);
+    final overlayContext = navigator?.overlay?.context;
+    if (overlayContext != null && overlayContext.mounted) return overlayContext;
+    final navContext = navigator?.context;
+    if (navContext != null && navContext.mounted) return navContext;
     return null;
   }
 

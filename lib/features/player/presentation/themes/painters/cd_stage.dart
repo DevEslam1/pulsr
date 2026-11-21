@@ -35,6 +35,15 @@ class _CdJewelStageState extends State<_CdJewelStage> {
   );
 
   @override
+  void didUpdateWidget(covariant _CdJewelStage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.props.state.currentSong?.id !=
+        widget.props.state.currentSong?.id) {
+      _scrub.cancel();
+    }
+  }
+
+  @override
   void dispose() {
     _scrub.dispose();
     super.dispose();

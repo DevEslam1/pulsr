@@ -14,45 +14,46 @@ extension AudioHandlerSessionWiring on PulsrAudioHandler {
   void wireSessionStreams(AudioSession session) {
     _subscriptions.add(
       session.interruptionEventStream.listen((event) async {
-        if (event.begin) {
-          switch (event.type) {
-            case AudioInterruptionType.duck:
-              unawaited(AudioSessionLog.instance
-                  .recordInterruption(AudioInterruptionKind.duck));
-              // F7: ducking behavior is user-controllable (duck/pause/ignore).
-              if (duckingController.shouldIgnore) break;
-              if (duckingController.shouldPause) {
-                _interruption.begin(InterruptionKind.duck,
-                    playing: _activePlayer.playing);
-                if (_crossfadeManager.isCrossfading) {
-                  await _crossfadeManager.cancel(
-                      _inactivePlayer, _activePlayer,
-                      restoreVolume: _preCrossfadeVolume ?? _volume);
+        try {
+          if (event.begin) {
+            switch (event.type) {
+              case AudioInterruptionType.duck:
+                unawaited(AudioSessionLog.instance
+                    .recordInterruption(AudioInterruptionKind.duck));
+                // F7: ducking behavior is user-controllable (duck/pause/ignore).
+                if (duckingController.shouldIgnore) break;
+                if (duckingController.shouldPause) {
+                  _interruption.begin(InterruptionKind.duck,
+                      playing: _isEffectivelyPlaying);
+                  if (_crossfadeManager.isCrossfading) {
+                    await _crossfadeManager.cancel(
+                        _inactivePlayer, _activePlayer,
+                        restoreVolume: _preCrossfadeVolume ?? _volume);
+                  }
+                  // The system-behaviour policy may already deliver this pause
+                  // (with its own fade/USB handling). Only pause here when it
+                  // declined, so a duck never pauses twice.
+                  final SystemBehaviorHooks? duckHooks = _systemBehaviorHooks;
+                  final bool duckDelivered =
+                      duckHooks != null && await duckHooks.onNotificationSound();
+                  if (!duckDelivered) await pause();
+                  break;
                 }
-                // The system-behaviour policy may already deliver this pause
-                // (with its own fade/USB handling). Only pause here when it
-                // declined, so a duck never pauses twice.
-                final SystemBehaviorHooks? duckHooks = _systemBehaviorHooks;
-                final bool duckDelivered =
-                    duckHooks != null && await duckHooks.onNotificationSound();
-                if (!duckDelivered) await _activePlayer.pause();
-                break;
-              }
-              // Stack-safe: a second duck begin while already ducked must not
-              // clobber the saved pre-duck level. Duck both engines so a
-              // navigation prompt during a crossfade doesn't blast the fade-in.
-              // Count depth only for ducks that are really engaged. Counting a
-              // begin that arrived while paused left the counter one too high,
-              // so the matching end never reached 0 and the volume stayed
-              // ducked after playback resumed.
-              if (_duckActive) {
-                _duckDepthCounter++;
-              } else if (_activePlayer.playing) {
-                _duckDepthCounter = 1;
-                // Capture the clean (un-ducked) RG target and song identity
-                // first so a later duck-end can restore the EXACT pre-duck
-                // level when nothing changed during the duck.
-                _preDuckRgTarget = _calculateReplayGainVolume(currentSong);
+                // Stack-safe: a second duck begin while already ducked must not
+                // clobber the saved pre-duck level. Duck both engines so a
+                // navigation prompt during a crossfade doesn't blast the fade-in.
+                // Count depth only for ducks that are really engaged. Counting a
+                // begin that arrived while paused left the counter one too high,
+                // so the matching end never reached 0 and the volume stayed
+                // ducked after playback resumed.
+                if (_duckActive) {
+                  _duckDepthCounter++;
+                } else if (_isEffectivelyPlaying) {
+                  _duckDepthCounter = 1;
+                  // Capture the clean (un-ducked) RG target and song identity
+                  // first so a later duck-end can restore the EXACT pre-duck
+                  // level when nothing changed during the duck.
+                  _preDuckRgTarget = _calculateReplayGainVolume(currentSong);
                 _preDuckSongId = currentSong?.id;
                 _duckActive = true;
                 _duckSafetyTimer?.cancel();
@@ -72,7 +73,10 @@ extension AudioHandlerSessionWiring on PulsrAudioHandler {
                         await _inactivePlayer
                             .setVolume(rf * (_preDuckInactiveVolume ?? 0.0));
                       }
-                    } catch (_) {}
+                    } catch (e, st) {
+                      ErrorLogger.log('Failed to re-assert duck safety volume',
+                          error: e, stackTrace: st, category: 'AudioHandler');
+                    }
                   }
                 });
                 _preDuckVolume = _activePlayer.volume;
@@ -100,7 +104,7 @@ extension AudioHandlerSessionWiring on PulsrAudioHandler {
               // Stack-safe: keep the original pre-interruption state so an
               // overlapping duck + call doesn't lose the resume decision.
               _interruption.begin(InterruptionKind.pause,
-                  playing: _activePlayer.playing);
+                  playing: _isEffectivelyPlaying);
               if (_interruption.wasPlayingBeforeInterruption) {
                 if (_crossfadeManager.isCrossfading) {
                   await _crossfadeManager.cancel(
@@ -113,7 +117,7 @@ extension AudioHandlerSessionWiring on PulsrAudioHandler {
                 final SystemBehaviorHooks? hooks = _systemBehaviorHooks;
                 final bool delivered = hooks != null &&
                     await hooks.onAudioFocusLoss(permanent: false);
-                if (!delivered) await _activePlayer.pause();
+                if (!delivered) await pause();
               }
               break;
             case AudioInterruptionType.unknown:
@@ -121,7 +125,7 @@ extension AudioHandlerSessionWiring on PulsrAudioHandler {
                   .recordInterruption(AudioInterruptionKind.unknown));
               // Permanent/unknown loss: pause, never auto-resume, free DSP.
               _interruption.begin(InterruptionKind.unknown,
-                  playing: _activePlayer.playing);
+                  playing: _isEffectivelyPlaying);
               _interruption.neverResume();
               if (_crossfadeManager.isCrossfading) {
                 await _crossfadeManager.cancel(_inactivePlayer, _activePlayer,
@@ -131,7 +135,7 @@ extension AudioHandlerSessionWiring on PulsrAudioHandler {
                   _systemBehaviorHooks;
               final bool permanentDelivered = permanentHooks != null &&
                   await permanentHooks.onAudioFocusLoss(permanent: true);
-              if (!permanentDelivered) await _activePlayer.pause();
+              if (!permanentDelivered) await pause();
               break;
           }
         } else {
@@ -208,7 +212,7 @@ extension AudioHandlerSessionWiring on PulsrAudioHandler {
                 resumeAfterInterruption: _cachedPrefs
                         ?.getBool(PrefsKeys.resumeAfterInterruption) ??
                     true,
-                currentlyPlaying: _activePlayer.playing,
+                currentlyPlaying: _isEffectivelyPlaying,
               )) {
                 // The system-behaviour service may own this resume (and the
                 // volume restore that precedes it); it reports whether it
@@ -246,7 +250,7 @@ extension AudioHandlerSessionWiring on PulsrAudioHandler {
                     resumeAfterInterruption: _cachedPrefs
                             ?.getBool(PrefsKeys.resumeAfterInterruption) ??
                         true,
-                    currentlyPlaying: _activePlayer.playing,
+                    currentlyPlaying: _isEffectivelyPlaying,
                   )) {
                 // Route through the public play() (not a bare
                 // _activePlayer.play()) so the resume runs setActive(true),
@@ -270,40 +274,49 @@ extension AudioHandlerSessionWiring on PulsrAudioHandler {
               break;
           }
         }
+      } catch (e, st) {
+        ErrorLogger.log('Error handling audio interruption event',
+            error: e, stackTrace: st, category: 'AudioHandler');
+      }
       }),
     );
 
     _subscriptions.add(
       session.becomingNoisyEventStream.listen((_) async {
-        // Debounce: wired + BT stacks can emit noisy twice for one unplug.
-        final now = DateTime.now();
-        if (_lastNoisyTime != null &&
-            now.difference(_lastNoisyTime!) <
-                const Duration(milliseconds: 800)) {
-          return;
+        try {
+          // Debounce: wired + BT stacks can emit noisy twice for one unplug.
+          final now = DateTime.now();
+          if (_lastNoisyTime != null &&
+              now.difference(_lastNoisyTime!) <
+                  const Duration(milliseconds: 800)) {
+            return;
+          }
+          _lastNoisyTime = now;
+          unawaited(AudioSessionLog.instance
+              .recordInterruption(AudioInterruptionKind.becomingNoisy));
+          if (!_isEffectivelyPlaying && !_crossfadeManager.isCrossfading) {
+            return;
+          }
+          if (_crossfadeManager.isCrossfading) {
+            await _crossfadeManager.cancel(_inactivePlayer, _activePlayer,
+                restoreVolume: _preCrossfadeVolume ?? _volume);
+          }
+          // Pause first (pause() clears _pausedForNoisy, like a user pause),
+          // THEN arm the auto-resume window so ONLY a becoming-noisy pause keeps
+          // it armed for a quick reconnect. The system-behaviour service owns
+          // the delivery when attached (it may keep the USB claim), so it is
+          // asked first and this path only pauses when it declined.
+          final SystemBehaviorHooks? noisyHooks = _systemBehaviorHooks;
+          final bool noisyDelivered =
+              noisyHooks != null && await noisyHooks.onHeadsetUnplug();
+          if (!noisyDelivered) await pause();
+          _noisyPauseTime = now;
+          _pausedForNoisy = true;
+          await _captureOutputDeviceBaseline();
+        } catch (e, st) {
+          ErrorLogger.log('Error handling becoming noisy event',
+              error: e, stackTrace: st, category: 'AudioHandler');
         }
-        _lastNoisyTime = now;
-        unawaited(AudioSessionLog.instance
-            .recordInterruption(AudioInterruptionKind.becomingNoisy));
-        if (!_activePlayer.playing && !_crossfadeManager.isCrossfading) {
-          return;
-        }
-        if (_crossfadeManager.isCrossfading) {
-          await _crossfadeManager.cancel(_inactivePlayer, _activePlayer,
-              restoreVolume: _preCrossfadeVolume ?? _volume);
-        }
-        // Pause first (pause() clears _pausedForNoisy, like a user pause),
-        // THEN arm the auto-resume window so ONLY a becoming-noisy pause keeps
-        // it armed for a quick reconnect. The system-behaviour service owns
-        // the delivery when attached (it may keep the USB claim), so it is
-        // asked first and this path only pauses when it declined.
-        final SystemBehaviorHooks? noisyHooks = _systemBehaviorHooks;
-        final bool noisyDelivered =
-            noisyHooks != null && await noisyHooks.onHeadsetUnplug();
-        if (!noisyDelivered) await pause();
-        _noisyPauseTime = now;
-        _pausedForNoisy = true;
-        await _captureOutputDeviceBaseline();
       }),
     );
 

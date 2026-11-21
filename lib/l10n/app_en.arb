@@ -8394,6 +8394,42 @@
   "@commandPaletteActionAudioQuality": {
     "description": "Action to open audio quality sheet"
   },
+  "commandPaletteNavRadioSubtitle": "Stream online radio stations",
+  "@commandPaletteNavRadioSubtitle": {
+    "description": "Subtitle for Radio command in Command Palette"
+  },
+  "commandPaletteNavDiagnostics": "Diagnostics",
+  "@commandPaletteNavDiagnostics": {
+    "description": "Title for Diagnostics command in Command Palette"
+  },
+  "commandPaletteNavDiagnosticsSubtitle": "System logs, USB audio checks and safe mode",
+  "@commandPaletteNavDiagnosticsSubtitle": {
+    "description": "Subtitle for Diagnostics command in Command Palette"
+  },
+  "commandPaletteNavAudioProfiles": "Audio Profiles",
+  "@commandPaletteNavAudioProfiles": {
+    "description": "Title for Audio Profiles command in Command Palette"
+  },
+  "commandPaletteNavAudioProfilesSubtitle": "Saved sound and DSP presets",
+  "@commandPaletteNavAudioProfilesSubtitle": {
+    "description": "Subtitle for Audio Profiles command in Command Palette"
+  },
+  "commandPaletteNavDlna": "DLNA / UPnP Cast",
+  "@commandPaletteNavDlna": {
+    "description": "Title for DLNA / UPnP Cast command in Command Palette"
+  },
+  "commandPaletteNavDlnaSubtitle": "Cast audio to network renderers and speakers",
+  "@commandPaletteNavDlnaSubtitle": {
+    "description": "Subtitle for DLNA / UPnP Cast command in Command Palette"
+  },
+  "commandPaletteNavPodcasts": "Podcasts & Audiobooks",
+  "@commandPaletteNavPodcasts": {
+    "description": "Title for Podcasts & Audiobooks command in Command Palette"
+  },
+  "commandPaletteNavPodcastsSubtitle": "Long-form spoken word with position bookmarks",
+  "@commandPaletteNavPodcastsSubtitle": {
+    "description": "Subtitle for Podcasts & Audiobooks command in Command Palette"
+  },
   "coachMarkDspTitle": "Essential & Studio DSP",
   "@coachMarkDspTitle": {
     "description": "Coach mark title for DSP mode"

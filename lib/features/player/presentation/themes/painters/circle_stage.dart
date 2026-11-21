@@ -73,6 +73,7 @@ class _CircleArtworkState extends State<_CircleArtwork>
     if (oldWidget.props.state.currentSong?.id !=
         widget.props.state.currentSong?.id) {
       _rotationOffset.value = 0.0;
+      _resetScrub();
     }
   }
 

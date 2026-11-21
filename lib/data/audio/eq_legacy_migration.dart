@@ -1,6 +1,5 @@
 // lib/data/audio/eq_legacy_migration.dart
 import 'dart:convert';
-import 'dart:math' as math;
 
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -18,38 +17,8 @@ abstract class EqLegacyMigration {
   static const List<double> _legacyFrequencies = [60, 230, 910, 3600, 14000];
 
   /// Maps legacy 5-band [source] gains onto the 10 ISO centers.
-  static List<double> to10Band(List<double> source) {
-    if (source.isEmpty) {
-      return List<double>.filled(EqPreset.centerFrequencies.length, 0.0);
-    }
-    if (source.length == 1) {
-      return List<double>.filled(
-          EqPreset.centerFrequencies.length, source.first);
-    }
-    if (source.length != _legacyFrequencies.length) {
-      return EqPreset.interpolateGains(source);
-    }
-    return [
-      for (final f in EqPreset.centerFrequencies)
-        _interpAtLogFreq(f, _legacyFrequencies, source)
-    ];
-  }
-
-  static double _interpAtLogFreq(
-      double freq, List<double> freqs, List<double> gains) {
-    final logF = math.log(freq);
-    if (logF <= math.log(freqs.first)) return gains.first;
-    if (logF >= math.log(freqs.last)) return gains.last;
-    for (var i = 0; i < freqs.length - 1; i++) {
-      final lo = math.log(freqs[i]);
-      final hi = math.log(freqs[i + 1]);
-      if (logF >= lo && logF <= hi) {
-        final t = (logF - lo) / (hi - lo);
-        return gains[i] + (gains[i + 1] - gains[i]) * t;
-      }
-    }
-    return gains.last;
-  }
+  static List<double> to10Band(List<double> source) =>
+      EqPreset.to10Band(source);
 
   /// Converts all persisted 5-band EQ data to 10 bands. Never throws; failures
   /// are logged via [ErrorLogger] so one corrupt key cannot block startup.

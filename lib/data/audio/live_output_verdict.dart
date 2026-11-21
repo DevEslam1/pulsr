@@ -69,6 +69,7 @@ class LiveOutputObservation {
   final double? softwareGain;
 
   final bool isDsdDop;
+  final bool isDsdNative;
   final bool oversamplingActive;
   final bool pcmToDsdActive;
 
@@ -96,6 +97,7 @@ class LiveOutputObservation {
     this.transportSamplesModified = false,
     this.softwareGain,
     this.isDsdDop = false,
+    this.isDsdNative = false,
     this.oversamplingActive = false,
     this.pcmToDsdActive = false,
   });
@@ -196,6 +198,7 @@ LiveOutputVerdict resolveLiveOutputVerdict(LiveOutputObservation observation) {
     channelsAltered: direct && observation.channelMismatchFrames > 0,
     rateVerified: !direct || observation.rateVerified,
     isDsdDop: observation.isDsdDop,
+    isDsdNative: observation.isDsdNative,
     oversamplingActive: observation.oversamplingActive,
     pcmToDsdActive: observation.pcmToDsdActive,
     sourceLossy: observation.isRadioSource ||

@@ -49,6 +49,9 @@ mixin PulsrAudioTransport on BaseAudioHandler {
     // widget play button — replays it instead of no-opping in `completed`.
     // A merely paused (ready) track is untouched, so it still resumes in place.
     if (player.processingState == ProcessingState.completed) {
+      if (!_gaplessMode || !_gaplessLoaded) {
+        return playSongAt(0, initialPosition: Duration.zero);
+      }
       try {
         if (_songs.isNotEmpty) {
           await player.seek(Duration.zero, index: 0);
@@ -63,7 +66,10 @@ mixin PulsrAudioTransport on BaseAudioHandler {
         } else {
           await player.seek(Duration.zero);
         }
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('Failed to seek completed player to start',
+            error: e, stackTrace: st, category: 'AudioHandler');
+      }
       final f = player.play();
       _broadcastState(player.playbackEvent);
       await f;
@@ -498,7 +504,7 @@ mixin PulsrAudioTransport on BaseAudioHandler {
     final seekSecs = config.seekSeconds;
     switch (action) {
       case HeadsetClickAction.playPause:
-        if (_activePlayer.playing) {
+        if (_isEffectivelyPlaying) {
           await pause();
         } else {
           await play();
@@ -532,13 +538,20 @@ mixin PulsrAudioTransport on BaseAudioHandler {
   /// and the `seekRelative` custom action (notification/widget long-press).
   Future<void> seekRelative(Duration offset) async {
     try {
-      final pos = _activePlayer.position;
-      final dur = _activePlayer.duration;
+      final pos = nativeDsdActive
+          ? (_nativeDsdSession?.position ?? Duration.zero)
+          : _activePlayer.position;
+      final dur = nativeDsdActive
+          ? _nativeDsdSession?.duration
+          : _activePlayer.duration;
       var target = pos + offset;
       if (target < Duration.zero) target = Duration.zero;
       if (dur != null && target > dur) target = dur;
       await seek(target);
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Error in seekRelative',
+          error: e, stackTrace: st, category: 'AudioHandler');
+    }
   }
 
   @override
@@ -589,7 +602,7 @@ mixin PulsrAudioTransport on BaseAudioHandler {
   double get userBaseSpeed => _userBaseSpeed;
 
   Future<bool> playbackRateMustRemainUnity() async =>
-      AudioQualityInfo.dsdDopActive ||
+      DsdDecoderHelper.dsdDopActive ||
       (_bitPerfectTransportBypass ??
           await _isBitPerfectBypassActivePrefs(_cachedPrefs));
 
@@ -715,14 +728,39 @@ mixin PulsrAudioTransport on BaseAudioHandler {
         // Resolve the native source BEFORE mutating state: a resolve failure
         // must leave the queue (Dart model + native playlist) untouched rather
         // than desync them.
-        final nativeSource = (_gaplessMode && _gaplessLoaded)
-            ? await _buildGaplessChildAsync(song)
-            : null;
+        AudioSource? nativeSource;
+        if (_gaplessMode && _gaplessLoaded) {
+          try {
+            nativeSource = await _buildGaplessChildAsync(song);
+          } catch (e, st) {
+            ErrorLogger.log('Failed to build gapless child in addQueueItem',
+                error: e, stackTrace: st, category: 'AudioHandler');
+          }
+        }
         _songs.add(song);
         _streamPreResolver.onTrackEnqueuedOrTapped(song);
         _queueDirty = true;
-        if (nativeSource != null) {
-          await _activePlayer.addAudioSource(nativeSource);
+        if (_gaplessMode && _gaplessLoaded) {
+          if (nativeSource != null) {
+            try {
+              await _activePlayer.addAudioSource(nativeSource);
+            } catch (e, st) {
+              ErrorLogger.log(
+                  'Failed to addAudioSource in addQueueItem; reloading gapless queue',
+                  error: e,
+                  stackTrace: st,
+                  category: 'AudioHandler');
+              await _loadGaplessQueue(
+                initialPosition: _activePlayer.position,
+                preload: _activePlayer.playing,
+              );
+            }
+          } else {
+            await _loadGaplessQueue(
+              initialPosition: _activePlayer.position,
+              preload: _activePlayer.playing,
+            );
+          }
         }
         queue.add(_songs.map(PulsrAudioHandler._songToMediaItem).toList());
         _saveCurrentPosition();
@@ -752,9 +790,15 @@ mixin PulsrAudioTransport on BaseAudioHandler {
       return;
     }
     // Resolve before mutating so a resolve failure leaves the queue untouched.
-    final nativeSource = (_gaplessMode && _gaplessLoaded)
-        ? await _buildGaplessChildAsync(song)
-        : null;
+    AudioSource? nativeSource;
+    if (_gaplessMode && _gaplessLoaded) {
+      try {
+        nativeSource = await _buildGaplessChildAsync(song);
+      } catch (e, st) {
+        ErrorLogger.log('Failed to build gapless child in insertNextInQueue',
+            error: e, stackTrace: st, category: 'AudioHandler');
+      }
+    }
     final insertIdx =
         _songs.isEmpty ? 0 : (_currentIndex + 1).clamp(0, _songs.length);
     // Route through the state machine so _shuffleHistory is reindexed. The
@@ -762,9 +806,28 @@ mixin PulsrAudioTransport on BaseAudioHandler {
     _queueStateMachine.insertSong(insertIdx, song);
     _streamPreResolver.onTrackEnqueuedOrTapped(song);
     _queueDirty = true;
-    if (nativeSource != null) {
-      // Mirror the insert into the ExoPlayer concat at the same slot.
-      await _activePlayer.insertAudioSource(insertIdx, nativeSource);
+    if (_gaplessMode && _gaplessLoaded) {
+      if (nativeSource != null) {
+        try {
+          // Mirror the insert into the ExoPlayer concat at the same slot.
+          await _activePlayer.insertAudioSource(insertIdx, nativeSource);
+        } catch (e, st) {
+          ErrorLogger.log(
+              'Failed to insertAudioSource in insertNextInQueue; reloading gapless queue',
+              error: e,
+              stackTrace: st,
+              category: 'AudioHandler');
+          await _loadGaplessQueue(
+            initialPosition: _activePlayer.position,
+            preload: _activePlayer.playing,
+          );
+        }
+      } else {
+        await _loadGaplessQueue(
+          initialPosition: _activePlayer.position,
+          preload: _activePlayer.playing,
+        );
+      }
     }
     queue.add(_songs.map(PulsrAudioHandler._songToMediaItem).toList());
     _saveCurrentPosition();
@@ -790,14 +853,39 @@ mixin PulsrAudioTransport on BaseAudioHandler {
       return;
     }
     // Resolve before mutating so a resolve failure leaves the queue untouched.
-    final nativeSource = (_gaplessMode && _gaplessLoaded)
-        ? await _buildGaplessChildAsync(song)
-        : null;
+    AudioSource? nativeSource;
+    if (_gaplessMode && _gaplessLoaded) {
+      try {
+        nativeSource = await _buildGaplessChildAsync(song);
+      } catch (e, st) {
+        ErrorLogger.log('Failed to build gapless child in addToQueueEnd',
+            error: e, stackTrace: st, category: 'AudioHandler');
+      }
+    }
     _songs.add(song);
     _streamPreResolver.onTrackEnqueuedOrTapped(song);
     _queueDirty = true;
-    if (nativeSource != null) {
-      await _activePlayer.addAudioSource(nativeSource);
+    if (_gaplessMode && _gaplessLoaded) {
+      if (nativeSource != null) {
+        try {
+          await _activePlayer.addAudioSource(nativeSource);
+        } catch (e, st) {
+          ErrorLogger.log(
+              'Failed to addAudioSource in addToQueueEnd; reloading gapless queue',
+              error: e,
+              stackTrace: st,
+              category: 'AudioHandler');
+          await _loadGaplessQueue(
+            initialPosition: _activePlayer.position,
+            preload: _activePlayer.playing,
+          );
+        }
+      } else {
+        await _loadGaplessQueue(
+          initialPosition: _activePlayer.position,
+          preload: _activePlayer.playing,
+        );
+      }
     }
     queue.add(_songs.map(PulsrAudioHandler._songToMediaItem).toList());
     _saveCurrentPosition();
@@ -818,7 +906,10 @@ mixin PulsrAudioTransport on BaseAudioHandler {
       }
       _currentIndex = 0;
       if (_gaplessMode && _gaplessLoaded) {
-        await _loadGaplessQueue(preload: wasPlaying);
+        await _loadGaplessQueue(
+          initialPosition: _activePlayer.position,
+          preload: wasPlaying,
+        );
       }
     } else {
       _songs.clear();
@@ -1033,6 +1124,8 @@ mixin PulsrAudioTransport on BaseAudioHandler {
   set _playGeneration(int value);
 
   bool get nativeDsdActive;
+  NativeDsdSession? get _nativeDsdSession;
+  bool get _isEffectivelyPlaying;
   bool playNativeDsdIfActive();
   bool pauseNativeDsdIfActive();
   bool seekNativeDsdIfActive(Duration position);

@@ -1777,6 +1777,69 @@ void runTests() {
     await sub.cancel();
     await player.dispose();
   });
+
+  test('_proxyHandlerForSource completes cleanly on stream error', () async {
+    final player = AudioPlayer();
+    await player.setAudioSource(_ErrorStreamAudioSource());
+    final proxyUri = Uri.parse(player.icyMetadata!.info!.url!);
+    try {
+      final request = await HttpClient().getUrl(proxyUri);
+      final response = await request.close();
+      await response.drain<void>();
+    } catch (_) {}
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+    await player.dispose();
+  });
+
+  test('_proxyHandlerForSource completes cleanly on client disconnect', () async {
+    final player = AudioPlayer();
+    await player.setAudioSource(_EndlessStreamAudioSource());
+    final proxyUri = Uri.parse(player.icyMetadata!.info!.url!);
+    try {
+      final request = await HttpClient().getUrl(proxyUri);
+      final response = await request.close();
+      await response.first;
+      request.abort();
+    } catch (_) {}
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+    await player.dispose();
+  });
+}
+
+class _ErrorStreamAudioSource extends StreamAudioSource {
+  @override
+  Future<StreamAudioResponse> request([int? start, int? end]) async {
+    return StreamAudioResponse(
+      rangeRequestsSupported: false,
+      sourceLength: 100,
+      contentLength: 100,
+      offset: 0,
+      contentType: 'audio/mock',
+      stream: () async* {
+        yield [1, 2, 3];
+        throw Exception('Stream aborted abruptly');
+      }(),
+    );
+  }
+}
+
+class _EndlessStreamAudioSource extends StreamAudioSource {
+  @override
+  Future<StreamAudioResponse> request([int? start, int? end]) async {
+    return StreamAudioResponse(
+      rangeRequestsSupported: false,
+      sourceLength: 1000000,
+      contentLength: 1000000,
+      offset: 0,
+      contentType: 'audio/mock',
+      stream: () async* {
+        for (int i = 0; i < 100; i++) {
+          yield List.filled(50, i % 256);
+          await Future<void>.delayed(const Duration(milliseconds: 10));
+        }
+      }(),
+    );
+  }
 }
 
 class MockJustAudio extends Mock

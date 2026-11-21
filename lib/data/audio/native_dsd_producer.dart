@@ -70,6 +70,8 @@ class NativeDsdProducer {
 
   Future<void>? _pumpFuture;
   bool _stopRequested = false;
+  int _seekGeneration = 0;
+  void Function()? onPumpEnded;
 
   /// Chunk size per channel per write (16 KB = ~46 ms at DSD64).
   static const int kDefaultChunkBytes = 16384;
@@ -146,6 +148,7 @@ class NativeDsdProducer {
     _firstBlockWritten = false;
     _fallbackRequested = false;
     _stopRequested = false;
+    _seekGeneration++;
     _state = NativeDsdProducerState.idle;
   }
 
@@ -169,6 +172,7 @@ class NativeDsdProducer {
     _firstBlockWritten = false;
     _fallbackRequested = false;
     _stopRequested = false;
+    _seekGeneration++;
     _state = NativeDsdProducerState.idle;
   }
 
@@ -203,59 +207,68 @@ class NativeDsdProducer {
 
   Future<void> _runPump() async {
     final silence = dsdSilenceBlock(_chunkSize);
-    while (!_stopRequested) {
-      if (_state == NativeDsdProducerState.paused) {
-        // Keep the alt setting fed so the DAC clock stays locked. Pace the
-        // silence at the DSD byte rate: a sink that accepts writes instantly
-        // must not turn pause into a busy loop.
-        final ok = await _writeWithRetry(silence, silence);
+    try {
+      while (!_stopRequested) {
+        if (_state == NativeDsdProducerState.paused) {
+          // Keep the alt setting fed so the DAC clock stays locked. Pace the
+          // silence at the DSD byte rate: a sink that accepts writes instantly
+          // must not turn pause into a busy loop.
+          final ok = await _writeWithRetry(silence, silence);
+          if (!ok) break;
+          final us = _sampleRate > 0
+              ? (_chunkSize * 8 * 1000000) ~/ _sampleRate
+              : 20000;
+          if (!_stopRequested) {
+            await Future<void>.delayed(
+              Duration(microseconds: us.clamp(1000, 100000)),
+            );
+          }
+          continue;
+        }
+        if (_state == NativeDsdProducerState.stopped ||
+            _state == NativeDsdProducerState.completed) {
+          break;
+        }
+        final loopGen = _seekGeneration;
+        final Uint8List chunkL;
+        final Uint8List chunkR;
+        if (_source != null) {
+          final chunk = await _source!.readChunk(_chunkSize);
+          if (loopGen != _seekGeneration) continue;
+          if (chunk == null) {
+            _state = NativeDsdProducerState.completed;
+            break;
+          }
+          chunkL =
+              _sourceMsbFirst ? reverseBits(chunk.left) : chunk.left;
+          chunkR =
+              _sourceMsbFirst ? reverseBits(chunk.right) : chunk.right;
+        } else {
+          final offset = _currentByteOffset;
+          final remaining = _totalBytes - offset;
+          if (remaining <= 0) {
+            _state = NativeDsdProducerState.completed;
+            break;
+          }
+          final currentChunk = math.min(_chunkSize, remaining);
+          chunkL = Uint8List.sublistView(
+              _dsdLeft!, offset, offset + currentChunk);
+          chunkR = Uint8List.sublistView(
+              _dsdRight!, offset, offset + currentChunk);
+        }
+        final ok = await _writeWithRetry(chunkL, chunkR);
         if (!ok) break;
-        final us = _sampleRate > 0
-            ? (_chunkSize * 8 * 1000000) ~/ _sampleRate
-            : 20000;
-        if (!_stopRequested) {
-          await Future<void>.delayed(
-            Duration(microseconds: us.clamp(1000, 100000)),
-          );
+        if (loopGen == _seekGeneration) {
+          _currentByteOffset += chunkL.length;
         }
-        continue;
+        _firstBlockWritten = true;
       }
-      if (_state == NativeDsdProducerState.stopped ||
-          _state == NativeDsdProducerState.completed) {
-        break;
+    } finally {
+      _pumpFuture = null;
+      if (_stopRequested) {
+        _state = NativeDsdProducerState.stopped;
       }
-      final Uint8List chunkL;
-      final Uint8List chunkR;
-      if (_source != null) {
-        final chunk = await _source!.readChunk(_chunkSize);
-        if (chunk == null) {
-          _state = NativeDsdProducerState.completed;
-          break;
-        }
-        chunkL =
-            _sourceMsbFirst ? reverseBits(chunk.left) : chunk.left;
-        chunkR =
-            _sourceMsbFirst ? reverseBits(chunk.right) : chunk.right;
-      } else {
-        final remaining = _totalBytes - _currentByteOffset;
-        if (remaining <= 0) {
-          _state = NativeDsdProducerState.completed;
-          break;
-        }
-        final currentChunk = math.min(_chunkSize, remaining);
-        chunkL = Uint8List.sublistView(
-            _dsdLeft!, _currentByteOffset, _currentByteOffset + currentChunk);
-        chunkR = Uint8List.sublistView(
-            _dsdRight!, _currentByteOffset, _currentByteOffset + currentChunk);
-      }
-      final ok = await _writeWithRetry(chunkL, chunkR);
-      if (!ok) break;
-      _currentByteOffset += chunkL.length;
-      _firstBlockWritten = true;
-    }
-    _pumpFuture = null;
-    if (_stopRequested) {
-      _state = NativeDsdProducerState.stopped;
+      onPumpEnded?.call();
     }
   }
 
@@ -307,6 +320,7 @@ class NativeDsdProducer {
   /// native packer never starts mid-word.
   void seek(Duration position) {
     if (_sampleRate <= 0 || _totalBytes <= 0) return;
+    _seekGeneration++;
     final targetBits = (position.inMicroseconds * _sampleRate) ~/ 1000000;
     var targetByte = targetBits ~/ 8;
     targetByte = (targetByte ~/ 4) * 4;

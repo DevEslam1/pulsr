@@ -17,7 +17,7 @@
 //
 // Domain-only: no features/ imports, no Flutter, no I/O.
 
-import '../../data/audio/bit_perfect_chain.dart';
+import 'bit_perfect_chain.dart';
 
 /// How far the current output is from a verified bit-perfect chain.
 enum BitPerfectTier {
@@ -109,6 +109,7 @@ BitPerfectState resolveBitPerfectState({
   bool samplesModified = false,
   bool channelsAltered = false,
   bool isDsdDop = false,
+  bool isDsdNative = false,
   bool oversamplingActive = false,
   bool pcmToDsdActive = false,
   bool sourceLossy = false,
@@ -130,6 +131,7 @@ BitPerfectState resolveBitPerfectState({
     outputSampleRate: sinkSampleRate,
     outputBitDepth: sinkBitDepth,
     isDsdDop: isDsdDop,
+    isDsdNative: isDsdNative,
     oversamplingActive: oversamplingActive,
     pcmToDsdActive: pcmToDsdActive,
     samplesModified: samplesModified,
@@ -167,7 +169,7 @@ BitPerfectState resolveBitPerfectState({
   // hold *and* the chain must be verified; anything else is degraded.
   final allFactsHold =
       exclusive &&
-      integerBypass &&
+      (integerBypass || isDsdNative) &&
       halClean &&
       !systemEffectsCompromised &&
       unityGain &&

@@ -295,7 +295,22 @@ extension PlayerDspEqExtension on PlayerDspController {
   Future<bool> resetHeadphoneProfile() => applyHeadphoneProfile(null);
 
   Future<void> setAutoEqCorrectionMode(AutoEqCorrectionMode mode) async {
-    await _audioHandler.setAutoEqCorrectionMode(mode);
+    if (!guardDsp('AutoEQ')) return;
+    try {
+      await _audioHandler.setAutoEqCorrectionMode(mode);
+      if (_isClosed()) return;
+    } catch (e, st) {
+      ErrorLogger.log('Failed to set AutoEQ correction mode',
+          error: e, stackTrace: st, category: 'PlayerDspEq');
+      if (!_isClosed()) {
+        final s = _getState();
+        _emit(s.copyWith(
+          playback: s.playback.copyWith(
+            error: uiError('Failed to set AutoEQ correction mode: $e'),
+          ),
+        ));
+      }
+    }
   }
 
   Future<void> setBandGain(int bandIndex, double gain) async {

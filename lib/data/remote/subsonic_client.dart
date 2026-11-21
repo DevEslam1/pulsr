@@ -368,17 +368,11 @@ final class SubsonicClient {
     final container = _asMap(envelope['artists']);
     if (container == null) return const [];
     final artists = <SubsonicArtist>[];
-    final indexes = container['index'];
-    if (indexes is List) {
-      for (final index in indexes) {
-        final bucket = _asMap(index);
-        final entries = bucket?['artist'];
-        if (entries is List) {
-          for (final entry in entries) {
-            final artist = _artistFrom(entry);
-            if (artist != null) artists.add(artist);
-          }
-        }
+    for (final index in _asList(container['index'])) {
+      final bucket = _asMap(index);
+      for (final entry in _asList(bucket?['artist'])) {
+        final artist = _artistFrom(entry);
+        if (artist != null) artists.add(artist);
       }
     }
     return artists;
@@ -434,8 +428,8 @@ final class SubsonicClient {
   Future<List<SubsonicPlaylist>> getPlaylists() async {
     final envelope = await _call('getPlaylists');
     final container = _asMap(envelope['playlists']);
-    final entries = container?['playlist'];
-    if (entries is! List) return const [];
+    final entries = _asList(container?['playlist']);
+    if (entries.isEmpty) return const [];
     final playlists = <SubsonicPlaylist>[];
     for (final entry in entries) {
       final playlist = _playlistFrom(entry);
@@ -571,38 +565,20 @@ final class SubsonicClient {
     if (container == null) return const SubsonicSearchResult();
 
     final artists = <SubsonicArtist>[];
-    final artistEntries = container['artist'];
-    if (artistEntries is List) {
-      for (final entry in artistEntries) {
-        final artist = _artistFrom(entry);
-        if (artist != null) artists.add(artist);
-      }
-    } else if (artistEntries != null) {
-      final artist = _artistFrom(artistEntries);
+    for (final entry in _asList(container['artist'])) {
+      final artist = _artistFrom(entry);
       if (artist != null) artists.add(artist);
     }
 
     final albums = <SubsonicAlbum>[];
-    final albumEntries = container['album'];
-    if (albumEntries is List) {
-      for (final entry in albumEntries) {
-        final album = _albumFrom(entry);
-        if (album != null) albums.add(album);
-      }
-    } else if (albumEntries != null) {
-      final album = _albumFrom(albumEntries);
+    for (final entry in _asList(container['album'])) {
+      final album = _albumFrom(entry);
       if (album != null) albums.add(album);
     }
 
     final songs = <SubsonicSong>[];
-    final songEntries = container['song'];
-    if (songEntries is List) {
-      for (final entry in songEntries) {
-        final song = _songFrom(entry);
-        if (song != null) songs.add(song);
-      }
-    } else if (songEntries != null) {
-      final song = _songFrom(songEntries);
+    for (final entry in _asList(container['song'])) {
+      final song = _songFrom(entry);
       if (song != null) songs.add(song);
     }
 
@@ -620,14 +596,19 @@ final class SubsonicClient {
     final signed = _sign(method, params);
     final http.Response response;
     try {
-      response = await _client.get(signed.uri,
-          headers: const {'Accept': 'application/json'}).timeout(_timeout);
+      final request = http.Request('GET', signed.uri)
+        ..headers['Accept'] = 'application/json'
+        ..followRedirects = false;
+      final streamed = await _client.send(request).timeout(_timeout);
+      response = await http.Response.fromStream(streamed).timeout(_timeout);
     } on TimeoutException catch (error, stackTrace) {
       throw SubsonicError(
         code: 'SUBSONIC_TIMEOUT',
         userMessage: 'The music server did not answer in time.',
         method: method,
-        cause: error,
+        cause: error.message != null
+            ? _redact(error.message!, signed.auth)
+            : 'Timeout',
         stackTrace: stackTrace,
       );
     } on SocketException catch (error, stackTrace) {
@@ -635,7 +616,7 @@ final class SubsonicClient {
         code: 'SUBSONIC_NETWORK',
         userMessage: 'Could not reach the music server.',
         method: method,
-        cause: error.message,
+        cause: _redact(error.message, signed.auth),
         stackTrace: stackTrace,
       );
     } on http.ClientException catch (error, stackTrace) {
@@ -745,7 +726,7 @@ final class SubsonicClient {
   String _redact(String message, Map<String, String> auth) {
     var safe = message;
     for (final secret in <String>[
-      if (_password.length >= 3) _password,
+      if (_password.isNotEmpty) _password,
       if ((auth['t'] ?? '').length >= 3) auth['t']!,
       if ((auth['s'] ?? '').length >= 3) auth['s']!,
     ]) {
@@ -776,9 +757,8 @@ final class SubsonicClient {
     final id = _asString(map['id'])?.trim();
     if (id == null || id.isEmpty) return null;
     final albums = <SubsonicAlbum>[];
-    final entries = map['album'];
-    if (includeAlbums && entries is List) {
-      for (final entry in entries) {
+    if (includeAlbums) {
+      for (final entry in _asList(map['album'])) {
         final album = _albumFrom(entry);
         if (album != null) albums.add(album);
       }
@@ -843,9 +823,10 @@ final class SubsonicClient {
   }
 
   static List<SubsonicSong> _songList(Object? value) {
-    if (value is! List) return const [];
+    final list = _asList(value);
+    if (list.isEmpty) return const [];
     final songs = <SubsonicSong>[];
-    for (final entry in value) {
+    for (final entry in list) {
       final song = _songFrom(entry);
       if (song != null) songs.add(song);
     }
@@ -970,6 +951,13 @@ final class SubsonicClient {
       if (normalized == 'false' || normalized == '0') return false;
     }
     return null;
+  }
+
+  static List<dynamic> _asList(dynamic v) {
+    if (v == null) return const [];
+    if (v is List) return v;
+    if (v is Map) return [v];
+    return const [];
   }
 
   @override

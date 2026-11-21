@@ -4,7 +4,6 @@ import 'package:audio_service/audio_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/data/audio/dsd_decoder_helper.dart';
 import 'package:pulsr/data/db/app_database.dart';
-import 'package:pulsr/domain/models/audio_quality_info.dart';
 
 /// Locks the DoP container-width selection: 24-bit standard packing vs
 /// zero-padded 32-bit frames, plus fallback for invalid values.
@@ -77,7 +76,7 @@ void main() {
 
   group('DoP container width selection', () {
     tearDown(() {
-      AudioQualityInfo.dsdDopActive = false;
+      DsdDecoderHelper.dsdDopActive = false;
     });
 
     test('24-bit (default) frames 16 DSD bytes/channel into 48 PCM bytes',
@@ -93,7 +92,7 @@ void main() {
           dopContainerBits: 24,
         );
         expect(source, isA<DsdPcmStreamAudioSource>());
-        expect(AudioQualityInfo.dsdDopActive, isTrue);
+        expect(DsdDecoderHelper.dsdDopActive, isTrue);
         final wav = await readSourceBytes(source as DsdPcmStreamAudioSource);
         // 8 stereo frames x 6 bytes (24-bit packed) + 44-byte header.
         expect(wav.length, equals(44 + 48));

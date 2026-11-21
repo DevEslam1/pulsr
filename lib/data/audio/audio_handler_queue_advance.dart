@@ -68,7 +68,8 @@ mixin PulsrQueueAdvance on PulsrAudioQueueEngine, PulsrAudioNativeDsd {
 
       final outgoing = _activePlayer;
       final incoming = _inactivePlayer;
-      if (incoming.processingState == ProcessingState.completed) {
+      if (incoming.processingState == ProcessingState.idle ||
+          incoming.processingState == ProcessingState.completed) {
         return false;
       }
       await _applyPlayerOutputVolume(
@@ -76,10 +77,17 @@ mixin PulsrQueueAdvance on PulsrAudioQueueEngine, PulsrAudioNativeDsd {
         _calculateReplayGainVolume(song),
         song: song,
       );
-      unawaited(incoming.play());
+      unawaited(incoming.play().catchError((e, st) {
+        ErrorLogger.log('Failed to start incoming player on handover',
+            error: e, stackTrace: st, category: 'AudioHandler');
+      }));
 
+      _playGeneration++;
       _isPlayerAActive = !_isPlayerAActive;
-      _currentIndex = nextIndex;
+      _queueStateMachine.commitTransitionTo(
+        nextIndex,
+        shuffleModeEnabled: _activePlayer.shuffleModeEnabled,
+      );
       _savedQueueIndex = nextIndex;
       final currentSessionId =
           _isPlayerAActive ? _playerASessionId : _playerBSessionId;
@@ -94,7 +102,11 @@ mixin PulsrQueueAdvance on PulsrAudioQueueEngine, PulsrAudioNativeDsd {
       mediaItem.add(PulsrAudioHandler._songToMediaItem(song, fastArtUri));
       _notifyTrackChanged(song);
       _planNextStreamResolution();
-      _repository.recordPlayHistory(song.id);
+      _repository.recordPlayHistory(song.id).catchError((e, st) {
+        ErrorLogger.log('Failed to record play history on handover',
+            error: e, stackTrace: st, category: 'AudioHandler');
+        return Left<AppFailure, void>(DatabaseFailure(e.toString()));
+      });
       _broadcastState(_activePlayer.playbackEvent);
       _saveCurrentPosition();
 

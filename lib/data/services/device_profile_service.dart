@@ -101,19 +101,35 @@ class DeviceProfileService {
     await prefs.setBool(_keyEnabled, enabled);
   }
 
-  Future<Map<String, DeviceProfileLink>> getLinks() async {
+  /// Internal loader distinguishing missing key (returns empty map) from
+  /// corrupt storage (returns null) so writes never wipe corrupt data.
+  Future<Map<String, DeviceProfileLink>?> _loadLinksRaw() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final raw = prefs.getString(_keyLinks);
       if (raw == null) return {};
-      final decoded = json.decode(raw) as Map<String, dynamic>;
-      return decoded.map((k, v) =>
-          MapEntry(k, DeviceProfileLink.fromJson(v as Map<String, dynamic>)));
+      final dynamic decoded = json.decode(raw);
+      if (decoded is! Map) {
+        throw FormatException('Device profile links JSON is not a Map: $raw');
+      }
+      final result = <String, DeviceProfileLink>{};
+      for (final entry in decoded.entries) {
+        if (entry.value is Map) {
+          result[entry.key.toString()] = DeviceProfileLink.fromJson(
+              Map<String, dynamic>.from(entry.value as Map));
+        }
+      }
+      return result;
     } catch (e, st) {
       ErrorLogger.log('Failed to load device profile links',
           error: e, stackTrace: st, category: 'DeviceProfileService');
-      return {};
+      return null;
     }
+  }
+
+  Future<Map<String, DeviceProfileLink>> getLinks() async {
+    final links = await _loadLinksRaw();
+    return links ?? {};
   }
 
   Future<DeviceProfileLink?> linkForDeviceKey(String deviceKey) async {
@@ -127,7 +143,14 @@ class DeviceProfileService {
     required String profileId,
   }) =>
       _prefsMutex.protect(() async {
-        final links = await getLinks();
+        final links = await _loadLinksRaw();
+        if (links == null) {
+          ErrorLogger.log(
+            'Refusing to overwrite corrupt device profile links storage',
+            category: 'DeviceProfileService',
+          );
+          return;
+        }
         links[deviceKey] = DeviceProfileLink(
           deviceKey: deviceKey,
           profileId: profileId,
@@ -139,7 +162,14 @@ class DeviceProfileService {
       });
 
   Future<void> forgetLink(String deviceKey) => _prefsMutex.protect(() async {
-        final links = await getLinks();
+        final links = await _loadLinksRaw();
+        if (links == null) {
+          ErrorLogger.log(
+            'Refusing to overwrite corrupt device profile links storage',
+            category: 'DeviceProfileService',
+          );
+          return;
+        }
         if (links.remove(deviceKey) == null) return;
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString(_keyLinks,
@@ -154,13 +184,18 @@ class DeviceProfileService {
           final raw = prefs.getString(_keyRegistry);
           final entries = <DeviceProfileEntry>[];
           if (raw != null) {
-            final decoded = json.decode(raw) as List<dynamic>;
+            final dynamic decoded = json.decode(raw);
+            if (decoded is! List) {
+              throw FormatException('Device registry JSON is not a List: $raw');
+            }
             for (final e in decoded) {
-              final map = e as Map<String, dynamic>;
-              entries.add(DeviceProfileEntry(
-                deviceKey: map['deviceKey'] as String? ?? '',
-                deviceLabel: map['deviceLabel'] as String? ?? '',
-              ));
+              if (e is Map) {
+                final map = Map<String, dynamic>.from(e);
+                entries.add(DeviceProfileEntry(
+                  deviceKey: map['deviceKey'] as String? ?? '',
+                  deviceLabel: map['deviceLabel'] as String? ?? '',
+                ));
+              }
             }
           }
           entries.removeWhere((e) => e.deviceKey == deviceKey);
@@ -189,11 +224,15 @@ class DeviceProfileService {
       final prefs = await SharedPreferences.getInstance();
       final raw = prefs.getString(_keyRegistry);
       if (raw == null) return const [];
-      final decoded = json.decode(raw) as List<dynamic>;
+      final dynamic decoded = json.decode(raw);
+      if (decoded is! List) {
+        throw FormatException('Device registry JSON is not a List: $raw');
+      }
       return decoded
+          .whereType<Map>()
           .map((e) => DeviceProfileEntry(
                 deviceKey:
-                    (e as Map<String, dynamic>)['deviceKey'] as String? ?? '',
+                    Map<String, dynamic>.from(e)['deviceKey'] as String? ?? '',
                 deviceLabel: e['deviceLabel'] as String? ?? '',
               ))
           .toList();
@@ -213,14 +252,31 @@ class DeviceProfileService {
   /// Imports device-profile links from JSON (merging with existing links).
   Future<bool> importLinksJson(String jsonStr) => _prefsMutex.protect(() async {
         try {
-          final decoded = json.decode(jsonStr) as Map<String, dynamic>;
-          final links = await getLinks();
+          if (jsonStr.trim().isEmpty) return false;
+          final dynamic decoded = json.decode(jsonStr);
+          if (decoded is! Map) return false;
+          final links = await _loadLinksRaw();
+          if (links == null) {
+            ErrorLogger.log(
+              'Refusing to import into corrupt device profile links storage',
+              category: 'DeviceProfileService',
+            );
+            return false;
+          }
+          var importedCount = 0;
           for (final entry in decoded.entries) {
-            if (entry.value is Map<String, dynamic>) {
-              links[entry.key] = DeviceProfileLink.fromJson(
-                  entry.value as Map<String, dynamic>);
+            final key = entry.key?.toString() ?? '';
+            if (key.isEmpty) continue;
+            if (entry.value is Map) {
+              final valMap = Map<String, dynamic>.from(entry.value as Map);
+              final link = DeviceProfileLink.fromJson(valMap);
+              if (link.deviceKey.isNotEmpty && link.profileId.isNotEmpty) {
+                links[key] = link;
+                importedCount++;
+              }
             }
           }
+          if (importedCount == 0 && decoded.isNotEmpty) return false;
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString(_keyLinks,
               json.encode(links.map((k, v) => MapEntry(k, v.toJson()))));
@@ -242,8 +298,12 @@ class DeviceProfileService {
       final prefs = await SharedPreferences.getInstance();
       final raw = prefs.getString(_keyBtLatency);
       if (raw == null) return null;
-      final decoded = json.decode(raw) as Map<String, dynamic>;
-      return (decoded[deviceKey] as num?)?.toInt();
+      final dynamic decoded = json.decode(raw);
+      if (decoded is! Map) {
+        throw FormatException('BT latency JSON is not a Map: $raw');
+      }
+      final val = (decoded[deviceKey] as num?)?.toInt();
+      return val?.clamp(0, 1500);
     } catch (e, st) {
       ErrorLogger.log('Failed to read per-device BT latency',
           error: e, stackTrace: st, category: 'DeviceProfileService');
@@ -254,12 +314,20 @@ class DeviceProfileService {
   Future<void> rememberBtLatency(String deviceKey, int offsetMs) =>
       _prefsMutex.protect(() async {
         try {
+          final clamped = offsetMs.clamp(0, 1500);
           final prefs = await SharedPreferences.getInstance();
           final raw = prefs.getString(_keyBtLatency);
-          final map = raw == null
-              ? <String, dynamic>{}
-              : Map<String, dynamic>.from(json.decode(raw) as Map);
-          map[deviceKey] = offsetMs;
+          Map<String, dynamic> map;
+          if (raw == null) {
+            map = <String, dynamic>{};
+          } else {
+            final dynamic decoded = json.decode(raw);
+            if (decoded is! Map) {
+              throw FormatException('BT latency JSON is not a Map: $raw');
+            }
+            map = Map<String, dynamic>.from(decoded);
+          }
+          map[deviceKey] = clamped;
           await prefs.setString(_keyBtLatency, json.encode(map));
         } catch (e, st) {
           ErrorLogger.log('Failed to save per-device BT latency',

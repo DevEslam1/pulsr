@@ -144,7 +144,7 @@ extension _EqSheetShell on _EqualizerSheetState {
         bypassDspOnBitPerfect: settings.bypassDspOnBitPerfect,
         device: settings.currentOutputDevice,
         aaudioEnabled: settings.aaudioOutputEnabled,
-        dsdDopActive: AudioQualityInfo.dsdDopActive,
+        dsdDopActive: DsdDecoderHelper.dsdDopActive,
       );
     } catch (_) {
       return null;
@@ -920,7 +920,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                       ? 0.45
                       : 1.0,
                   child: Switch.adaptive(
-                    value: state.isDspEffectsActive,
+                    value: dspBlockedGlobal == null && state.isDspEffectsActive,
                     activeTrackColor: p.accent,
                     activeThumbColor: p.onAccent,
                     onChanged:
@@ -1907,7 +1907,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                   onPressed: dspBlocked != null || !_nativePcmEffectsAvailable
                       ? null
                       : () {
-                          _tabController.animateTo(1);
+                          _tabController.animateTo(2);
                           cubit.setDynamicBass(!state.isDynamicBassEnabled);
                         },
                 ),
@@ -3477,6 +3477,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                                     onPressed: () async {
                                       await _headphoneRepo
                                           .removeProfile(profile.id);
+                                      if (!mounted) return;
                                       if (isApplied) await cubit.resetToFlat();
                                       if (mounted) _setStateSafe(() {});
                                     },

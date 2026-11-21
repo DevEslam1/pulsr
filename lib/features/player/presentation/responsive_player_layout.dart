@@ -366,15 +366,16 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
                                 // Tab 0: Quran Mushaf View (when Quran track/mode) or Lyrics View
                                 if (isQuran)
                                   BlocSelector<PlayerCubit, PlayerState,
-                                      Duration>(
-                                    selector: (s) => s.position,
-                                    builder: (context, position) =>
+                                      int?>(
+                                    selector: (s) =>
+                                        _quranMetadata?.ayahAt(s.position),
+                                    builder: (context, activeAyah) =>
                                         QuranMushafView(
                                       key: ValueKey(
                                         'tablet_mushaf_${widget.state.currentSong?.uri ?? widget.state.currentSong?.path}_${_quranMetadata?.surahNumber}',
                                       ),
                                       metadata: _quranMetadata,
-                                      currentPosition: position,
+                                      activeAyah: activeAyah,
                                       onSeek: (pos) => widget.cubit.seek(pos),
                                       isExpanded: true,
                                     ),

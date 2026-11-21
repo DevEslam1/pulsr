@@ -42,7 +42,7 @@ void main() {
         'setting_streaming_quality': 'low',
       });
 
-      const settings = DownloadSettings(
+      final settings = DownloadSettings(
         wifiOnly: true,
         quality: 'high',
         maxConcurrent: 4,

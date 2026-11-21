@@ -55,8 +55,9 @@ class DacVoicingService {
       final index = prefs.getInt(PrefsKeys.dacVoicingCharacter) ?? 0;
       character = DacVoicingCharacter
           .values[index.clamp(0, DacVoicingCharacter.values.length - 1)];
-      amount = (prefs.getDouble(PrefsKeys.dacVoicingAmount) ?? 0.0)
-          .clamp(0.0, 1.0);
+      final rawAmount = prefs.getDouble(PrefsKeys.dacVoicingAmount) ?? 0.0;
+      amount =
+          rawAmount.isFinite ? rawAmount.clamp(0.0, 1.0).toDouble() : 0.0;
       loaded = true;
       await _push();
     } catch (_) {
@@ -77,7 +78,8 @@ class DacVoicingService {
   /// Even-order voicing strength, 0..1. Zero changes only the filter character
   /// and adds no harmonics.
   Future<void> setAmount(double value) async {
-    amount = value.clamp(0.0, 1.0);
+    if (!value.isFinite) return;
+    amount = value.clamp(0.0, 1.0).toDouble();
     await _persistAndPush();
   }
 

@@ -17,6 +17,9 @@ import '../../../../data/audio/audio_effects_channel.dart';
 import '../../../../data/audio/live_output_verdict.dart';
 import '../../../../domain/models/audio_output_info.dart';
 import '../../../../domain/models/bit_perfect_state.dart';
+import '../../../../core/presentation/audio_quality_presentation.dart';
+import '../../../../data/audio/dsd_decoder_helper.dart';
+import '../../../../data/audio/mqa_decoder_helper.dart';
 import '../../../../domain/models/audio_quality_info.dart';
 import '../../../../domain/models/audio_signal_path.dart';
 import 'audio_signal_path_card.dart';
@@ -105,6 +108,10 @@ class AudioQualitySheet extends StatelessWidget {
     final info = AudioQualityInfo.fromSong(
       resolvedSong,
       streamingQuality: streamingQuality,
+      isConfirmedMqa:
+          MqaDecoderHelper.isConfirmedMqaPath(resolvedSong.path),
+      dsdDopActive: DsdDecoderHelper.dsdDopActive,
+      dsdNativeActive: DsdDecoderHelper.dsdNativeActive,
     );
 
     return _buildLiveChainContent(
@@ -544,11 +551,11 @@ class AudioQualitySheet extends StatelessWidget {
             signalPath: AudioSignalPath.fromOutputInfo(
               sourceCodec: info.format,
               sourceSampleRate: effectiveSourceSampleRate(
-                tagged: song.sampleRate ?? 0,
+                tagged: resolvedSong.sampleRate ?? 0,
                 decoded: outputDevice?.decodedSampleRate ?? 0,
               ),
               sourceBitDepth: effectiveSourceBitDepth(
-                tagged: song.bitDepth ?? 0,
+                tagged: resolvedSong.bitDepth ?? 0,
                 decoded: outputDevice?.decodedBitDepth ?? 0,
               ),
               isDsdSource: info.format.toUpperCase().contains('DSD') ||
@@ -672,10 +679,10 @@ class AudioQualitySheet extends StatelessWidget {
       // An unreadable transport state is unknown, never "untouched".
       transportSamplesModified: handler?.transportSamplesModified ?? true,
       softwareGain: handler?.effectiveSoftwareGain,
-      isDsdDop: AudioQualityInfo.dsdDopActive,
-      oversamplingActive:
-          AudioEffectsChannel().activeOversampleMultiplier > 1 &&
-              settings?.bitPerfectOutput != true,
+      isDsdDop: DsdDecoderHelper.dsdDopActive,
+      isDsdNative:
+          DsdDecoderHelper.dsdNativeActive || (usb.streamingActive && usb.dsdActive),
+      oversamplingActive: AudioEffectsChannel().activeOversampleMultiplier > 1,
       pcmToDsdActive: AudioEffectsChannel().isPcmToDsdActive,
     ));
     return verdict.state;
@@ -992,10 +999,12 @@ class AudioQualitySheet extends StatelessWidget {
     PulsrPalette p,
     Color activeColor,
   ) {
-    final session = CastService().sessionStatus;
-    final isConnected = session.connected;
+    return ValueListenableBuilder<CastSessionStatus>(
+      valueListenable: CastService().sessionStatusListenable,
+      builder: (context, session, _) {
+        final isConnected = session.connected;
 
-    return InkWell(
+        return InkWell(
       borderRadius: AppRadii.r14All,
       onTap: () => PulsrCastSheet.show(context),
       child: Container(
@@ -1064,6 +1073,8 @@ class AudioQualitySheet extends StatelessWidget {
           ],
         ),
       ),
+    );
+      },
     );
   }
 

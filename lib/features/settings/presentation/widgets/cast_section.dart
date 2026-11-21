@@ -32,6 +32,7 @@ class _CastSectionState extends State<CastSection> {
   StreamSubscription<List<CastDevice>>? _deviceSub;
   StreamSubscription<List<CastRoute>>? _routeSub;
   StreamSubscription<CastSessionStatus>? _sessionSub;
+  Timer? _scanTimeoutTimer;
 
   List<CastDevice> _devices = const [];
   List<CastRoute> _routes = const [];
@@ -93,8 +94,11 @@ class _CastSectionState extends State<CastSection> {
       if (mounted) setState(() => _scanning = false);
     }
 
+    if (!mounted) return;
+
     // Safety timeout for the scanning spinner
-    Future.delayed(const Duration(seconds: 10), () {
+    _scanTimeoutTimer?.cancel();
+    _scanTimeoutTimer = Timer(const Duration(seconds: 10), () {
       if (mounted && _scanning) {
         setState(() => _scanning = false);
       }
@@ -115,7 +119,9 @@ class _CastSectionState extends State<CastSection> {
     } catch (_) {
       if (mounted) setState(() => _scanning = false);
     }
-    Future.delayed(const Duration(seconds: 10), () {
+    if (!mounted) return;
+    _scanTimeoutTimer?.cancel();
+    _scanTimeoutTimer = Timer(const Duration(seconds: 10), () {
       if (mounted && _scanning) {
         setState(() => _scanning = false);
       }
@@ -124,6 +130,7 @@ class _CastSectionState extends State<CastSection> {
 
   @override
   void dispose() {
+    _scanTimeoutTimer?.cancel();
     _deviceSub?.cancel();
     _routeSub?.cancel();
     _sessionSub?.cancel();

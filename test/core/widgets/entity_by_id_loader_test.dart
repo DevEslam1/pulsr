@@ -76,7 +76,7 @@ void main() {
   testWidgets(
       'watch renders notFoundMessage when emission lacks target id then renders when matching id arrives',
       (tester) async {
-    final controller = StreamController<Result<List<String>>>();
+    final controller = StreamController<Result<List<String>>>(sync: true);
     addTearDown(controller.close);
 
     await tester.pumpWidget(
@@ -105,10 +105,6 @@ void main() {
     // Emit a list containing the matching id: builder must render.
     controller.add(const Right(<String>['other', 'target:v1']));
     await tester.pump();
-    await tester.pump();
-    for (final text in find.byType(Text).evaluate()) {
-      print('FOUND TEXT: ${(text.widget as Text).data}');
-    }
     expect(find.text('Loaded: target:v1'), findsOneWidget);
     expect(find.text('Not found'), findsNothing);
 

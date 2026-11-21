@@ -72,7 +72,9 @@ extension PlayerDspFollowRate on PlayerDspController {
           dvcActive: settings.dvcEnabled,
           transportSamplesModified: _audioHandler.transportSamplesModified,
           softwareGain: _audioHandler.effectiveSoftwareGain,
-          isDsdDop: AudioQualityInfo.dsdDopActive,
+          isDsdDop: DsdDecoderHelper.dsdDopActive,
+          isDsdNative: DsdDecoderHelper.dsdNativeActive ||
+              (usbSnapshot.streamingActive && usbSnapshot.dsdActive),
           oversamplingActive: oversampleMult > 1,
           pcmToDsdActive: pcmToDsd,
         ));

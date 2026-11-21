@@ -44,6 +44,55 @@ struct EngineLease {
     AudioDspEngine* get() const { return lease.engine; }
 };
 
+struct JniUtfChars {
+    JNIEnv* env;
+    jstring jstr;
+    const char* chars = nullptr;
+    JniUtfChars(JNIEnv* e, jstring s)
+        : env(e), jstr(s), chars(s ? e->GetStringUTFChars(s, nullptr) : nullptr) {}
+    ~JniUtfChars() {
+        if (chars && jstr) env->ReleaseStringUTFChars(jstr, chars);
+    }
+    JniUtfChars(const JniUtfChars&) = delete;
+    JniUtfChars& operator=(const JniUtfChars&) = delete;
+    const char* get() const { return chars; }
+};
+
+template <typename JArray, typename Elem,
+          Elem* (JNIEnv::*Acquire)(JArray, jboolean*),
+          void (JNIEnv::*Release)(JArray, Elem*, jint)>
+struct JniArrayGuard {
+    JNIEnv* env;
+    JArray arr;
+    Elem* ptr = nullptr;
+    jint mode = JNI_ABORT;
+    JniArrayGuard(JNIEnv* e, JArray a, jint releaseMode = JNI_ABORT)
+        : env(e), arr(a),
+          ptr(a ? (e->*Acquire)(a, nullptr) : nullptr),
+          mode(releaseMode) {}
+    ~JniArrayGuard() {
+        if (ptr && arr) (env->*Release)(arr, ptr, mode);
+    }
+    JniArrayGuard(const JniArrayGuard&) = delete;
+    JniArrayGuard& operator=(const JniArrayGuard&) = delete;
+    Elem* get() const { return ptr; }
+    void commit() {
+        if (ptr && arr) {
+            (env->*Release)(arr, ptr, 0);
+            ptr = nullptr;
+        }
+    }
+};
+
+using JniFloatArrayGuard = JniArrayGuard<jfloatArray, jfloat,
+    &JNIEnv::GetFloatArrayElements, &JNIEnv::ReleaseFloatArrayElements>;
+using JniDoubleArrayGuard = JniArrayGuard<jdoubleArray, jdouble,
+    &JNIEnv::GetDoubleArrayElements, &JNIEnv::ReleaseDoubleArrayElements>;
+using JniIntArrayGuard = JniArrayGuard<jintArray, jint,
+    &JNIEnv::GetIntArrayElements, &JNIEnv::ReleaseIntArrayElements>;
+using JniByteArrayGuard = JniArrayGuard<jbyteArray, jbyte,
+    &JNIEnv::GetByteArrayElements, &JNIEnv::ReleaseByteArrayElements>;
+
 static inline double getEffectiveSampleRate() {
     double sr = DspEngineRegistry::instance().getAppliedSampleRate();
     if (sr <= 0.0) {
@@ -191,19 +240,17 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeSetEqBandsBulk(
     jsize count = freqLen < gainLen ? freqLen : gainLen;
     if (count <= 0 || count > EqParamSet::MAX_BANDS) return;
 
-    jdouble* freqs = env->GetDoubleArrayElements(jFreqs, nullptr);
-    jdouble* gains = env->GetDoubleArrayElements(jGains, nullptr);
+    JniDoubleArrayGuard freqsGuard(env, jFreqs);
+    JniDoubleArrayGuard gainsGuard(env, jGains);
     jsize qLen = jQs ? env->GetArrayLength(jQs) : 0;
-    jdouble* qs = (jQs && qLen > 0) ? env->GetDoubleArrayElements(jQs, nullptr) : nullptr;
+    JniDoubleArrayGuard qsGuard(env, (jQs && qLen > 0) ? jQs : nullptr);
     jsize typeLen = jTypes ? env->GetArrayLength(jTypes) : 0;
-    jint* types = (jTypes && typeLen > 0) ? env->GetIntArrayElements(jTypes, nullptr) : nullptr;
-    if (!freqs || !gains) {
-        if (freqs) env->ReleaseDoubleArrayElements(jFreqs, freqs, JNI_ABORT);
-        if (gains) env->ReleaseDoubleArrayElements(jGains, gains, JNI_ABORT);
-        if (qs && jQs) env->ReleaseDoubleArrayElements(jQs, qs, JNI_ABORT);
-        if (types && jTypes) env->ReleaseIntArrayElements(jTypes, types, JNI_ABORT);
-        return;
-    }
+    JniIntArrayGuard typesGuard(env, (jTypes && typeLen > 0) ? jTypes : nullptr);
+    const jdouble* freqs = freqsGuard.get();
+    const jdouble* gains = gainsGuard.get();
+    const jdouble* qs = qsGuard.get();
+    const jint* types = typesGuard.get();
+    if (!freqs || !gains) return;
 
     std::vector<double> vFreqs(freqs, freqs + count);
     std::vector<double> vGains(gains, gains + count);
@@ -226,11 +273,6 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeSetEqBandsBulk(
         const jsize limit = std::min(count, typeLen);
         for (jsize i = 0; i < limit; ++i) vTypes[i] = types[i];
     }
-
-    env->ReleaseDoubleArrayElements(jFreqs, freqs, JNI_ABORT);
-    env->ReleaseDoubleArrayElements(jGains, gains, JNI_ABORT);
-    if (qs && jQs) env->ReleaseDoubleArrayElements(jQs, qs, JNI_ABORT);
-    if (types && jTypes) env->ReleaseIntArrayElements(jTypes, types, JNI_ABORT);
 
     AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
         const int prevBandCount = snap.eq.bandCount;
@@ -351,16 +393,11 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeSetReverbEnabled(
 // FIX C-3: Retain last loaded custom IR so it can be restored when
 // the user switches back to the Custom preset from a synthetic one.
 //
-// FIX M-3 (threading): gLastCustomIr is a plain (non-atomic) static shared_ptr
-// read/written only from the AudioEffectsPlugin JNI setters
-// (nativeLoadImpulseResponse writes it; nativeSetReverbPreset reads it). These
-// are platform-channel calls, which the Flutter engine dispatches strictly
-// serially on the platform thread, so there is never a concurrent read/write of
-// this pointer. It is NEVER touched from the audio render thread (the engine
-// only ever sees the immutable PreparedIr it was handed via the snapshot), so
-// no lock is added here — doing so on an RT-reachable path is forbidden. If a
-// future caller accesses it off the platform thread, promote it to an
-// atomic<shared_ptr> rather than relying on this serialization assumption.
+// Control-thread only: guarded by gLastCustomIrMutex so concurrent JNI calls
+// (e.g. from AudioEffectsPlugin's reverbExecutor and platform thread) never
+// race on this shared_ptr. Never touched on the audio render thread, which
+// only reads immutable PreparedIr instances published through the snapshot.
+static std::mutex gLastCustomIrMutex;
 static std::shared_ptr<const PreparedIr> gLastCustomIr;
 
 JNIEXPORT void JNICALL
@@ -379,6 +416,7 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeSetReverbPreset(
                 effectiveSr, preset, static_cast<float>(current->reverb.damping));
         } else {
             // FIX C-3: Switching back to Custom — restore the last loaded custom IR
+            std::lock_guard<std::mutex> lock(gLastCustomIrMutex);
             ir = gLastCustomIr;
             // If no custom IR was ever loaded, ir stays nullptr;
             // the engine will be silent on Custom until the user loads an IR file.
@@ -445,23 +483,19 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeLoadImpulseResponse(
     if (!irSamples) return JNI_FALSE;
     jsize len = env->GetArrayLength(irSamples);
     if (!pulsr::ValidateIrShape(len, channels)) return JNI_FALSE;
-    jfloat* data = env->GetFloatArrayElements(irSamples, nullptr);
+    JniFloatArrayGuard dataGuard(env, irSamples);
+    const jfloat* data = dataGuard.get();
     if (!data) return JNI_FALSE;
 
-    // FIX M-3: Copy the samples out BEFORE any mutation, then release
-    // immediately with JNI_ABORT. GetFloatArrayElements may hand back a direct
-    // (pinned) pointer into the caller's float[]; normalizing in place and then
-    // releasing with JNI_ABORT does NOT undo the writes on a non-copy JVM,
-    // silently corrupting the caller's array. Working on a private copy and
-    // releasing right away guarantees the Java array is never mutated.
+    // FIX M-3: Copy the samples out BEFORE any mutation on a private vector.
+    // JniFloatArrayGuard always releases with JNI_ABORT so the JVM array is
+    // never mutated even on exception or truncation.
     std::vector<float> ir;
     try {
         ir.assign(data, data + len);
     } catch (...) {
-        env->ReleaseFloatArrayElements(irSamples, data, JNI_ABORT);
         return JNI_FALSE;
     }
-    env->ReleaseFloatArrayElements(irSamples, data, JNI_ABORT);
 
     int frames = (channels > 0) ? (len / channels) : len;
 
@@ -477,18 +511,17 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeLoadImpulseResponse(
             frames = pulsr::TruncateIrWithFade(ir, channels, maxFrames, fadeFrames);
         }
 
-        // Normalize the loaded IR to unit peak. A full-scale impulse response would
-        // otherwise drive the wet path far above the dry signal (createCustom does
-        // not normalize), forcing constant limiting/clipping. Normalizing here keeps
-        // the reverb's dry/wet balance meaningful for arbitrary user IRs.
+        // Normalize the loaded IR to unit peak. Use ir.size() (NOT stale `len`),
+        // since TruncateIrWithFade shrinks `ir` when trimming oversized files.
+        const size_t irLen = ir.size();
         float irPeak = 0.0f;
-        for (int i = 0; i < len; ++i) {
+        for (size_t i = 0; i < irLen; ++i) {
             const float a = std::abs(ir[i]);
             if (a > irPeak) irPeak = a;
         }
         if (irPeak > 1e-6f && std::isfinite(irPeak)) {
             const float invPeak = 1.0f / irPeak;
-            for (int i = 0; i < len; ++i) {
+            for (size_t i = 0; i < irLen; ++i) {
                 ir[i] *= invPeak;
             }
         }
@@ -497,7 +530,12 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeLoadImpulseResponse(
         auto customIr = PreparedIr::createCustom(effectiveSr, ir.data(), frames, channels, targetCoreRate);
 
         if (customIr) {
-            gLastCustomIr = customIr; // FIX C-3: persist for Custom preset restore
+            std::shared_ptr<const PreparedIr> prevIr;
+            {
+                std::lock_guard<std::mutex> lock(gLastCustomIrMutex);
+                prevIr = std::move(gLastCustomIr);
+                gLastCustomIr = customIr; // FIX C-3: persist for Custom preset restore
+            }
             AudioDspEngine::instance().updateParams([customIr](DspParamSnapshot& snap) {
                 snap.reverb.preset = static_cast<int>(ReverbPreset::Custom);
                 snap.reverb.preparedIr = customIr;
@@ -1361,12 +1399,14 @@ JNIEXPORT jboolean JNICALL
 Java_com_pulsr_music_AudioEffectsPlugin_nativeLoadViperDdc(
         JNIEnv* env, jobject /* thiz */, jstring jDdcContent, jstring jProfileName) {
     if (!jDdcContent) return JNI_FALSE;
-    const char* ddcStr = env->GetStringUTFChars(jDdcContent, nullptr);
-    const char* nameStr = jProfileName ? env->GetStringUTFChars(jProfileName, nullptr) : "";
-    std::string content(ddcStr ? ddcStr : "");
-    std::string name(nameStr ? nameStr : "");
-    if (ddcStr) env->ReleaseStringUTFChars(jDdcContent, ddcStr);
-    if (jProfileName && nameStr) env->ReleaseStringUTFChars(jProfileName, nameStr);
+    std::string content;
+    std::string name;
+    {
+        JniUtfChars ddcStr(env, jDdcContent);
+        JniUtfChars nameStr(env, jProfileName);
+        if (ddcStr.get()) content.assign(ddcStr.get());
+        if (nameStr.get()) name.assign(nameStr.get());
+    }
 
     // Parse off-thread and publish the prepared coefficient sets via the
     // snapshot so the audio-thread applyParams never parses/allocates.
@@ -1411,9 +1451,11 @@ JNIEXPORT jboolean JNICALL
 Java_com_pulsr_music_AudioEffectsPlugin_nativeLoadArbitraryEq(
         JNIEnv* env, jobject /* thiz */, jstring jEqString, jboolean linearPhase) {
     if (!jEqString) return JNI_FALSE;
-    const char* eqStr = env->GetStringUTFChars(jEqString, nullptr);
-    std::string content(eqStr ? eqStr : "");
-    if (eqStr) env->ReleaseStringUTFChars(jEqString, eqStr);
+    std::string content;
+    {
+        JniUtfChars eqStr(env, jEqString);
+        if (eqStr.get()) content.assign(eqStr.get());
+    }
 
     if (content.empty()) {
         AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
@@ -1465,9 +1507,11 @@ JNIEXPORT jstring JNICALL
 Java_com_pulsr_music_AudioEffectsPlugin_nativeLoadLiveProgCode(
         JNIEnv* env, jobject /* thiz */, jstring jCode) {
     if (!jCode) return env->NewStringUTF("Empty code");
-    const char* codeStr = env->GetStringUTFChars(jCode, nullptr);
-    std::string script(codeStr ? codeStr : "");
-    if (codeStr) env->ReleaseStringUTFChars(jCode, codeStr);
+    std::string script;
+    {
+        JniUtfChars codeStr(env, jCode);
+        if (codeStr.get()) script.assign(codeStr.get());
+    }
 
     if (script.empty()) {
         AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
@@ -1525,10 +1569,12 @@ JNIEXPORT jboolean JNICALL
 Java_com_pulsr_music_AudioEffectsPlugin_nativeLoadHrtfSofa(
         JNIEnv* env, jobject /* thiz */, jstring jPath) {
     if (!jPath) return JNI_FALSE;
-    const char* pathStr = env->GetStringUTFChars(jPath, nullptr);
-    if (!pathStr) return JNI_FALSE;
-    std::string path(pathStr);
-    env->ReleaseStringUTFChars(jPath, pathStr);
+    std::string path;
+    {
+        JniUtfChars pathStr(env, jPath);
+        if (!pathStr.get()) return JNI_FALSE;
+        path.assign(pathStr.get());
+    }
 
     // §8.9: parse on this (platform) thread, then publish the immutable dataset
     // through the parameter snapshot so every render engine adopts it and builds
@@ -1539,6 +1585,7 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeLoadHrtfSofa(
     auto dataset = hrtf.getDataset();
     AudioDspEngine::instance().updateParams([dataset](DspParamSnapshot& snap) {
         snap.hrtf.dataset = dataset;
+        snap.hrtf.customIr.reset();
     });
     return JNI_TRUE;
 }
@@ -1547,11 +1594,12 @@ JNIEXPORT jboolean JNICALL
 Java_com_pulsr_music_AudioEffectsPlugin_nativeClearHrtfSofa(
         JNIEnv* /* env */, jobject /* thiz */) {
     // Clear returns to the synthesized default on the control engine, then
-    // broadcasts "no dataset" so render engines do the same.
+    // broadcasts "no dataset/custom IR" so render engines do the same.
     pulsr::HrtfBinaural& hrtf = AudioDspEngine::instance().hrtf();
     if (!hrtf.clearDataset()) return JNI_FALSE;
     AudioDspEngine::instance().updateParams([](DspParamSnapshot& snap) {
         snap.hrtf.dataset.reset();
+        snap.hrtf.customIr.reset();
     });
     return JNI_TRUE;
 }
@@ -1564,32 +1612,40 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeLoadHrtfIr(
     if (!jLL || !jLR || !jRL || !jRR || taps <= 0 || taps > pulsr::HrtfBinaural::MAX_HRIR_TAPS) {
         return JNI_FALSE;
     }
-    jfloat* pLL = env->GetFloatArrayElements(jLL, nullptr);
-    jfloat* pLR = env->GetFloatArrayElements(jLR, nullptr);
-    jfloat* pRL = env->GetFloatArrayElements(jRL, nullptr);
-    jfloat* pRR = env->GetFloatArrayElements(jRR, nullptr);
+    if (env->GetArrayLength(jLL) < taps ||
+        env->GetArrayLength(jLR) < taps ||
+        env->GetArrayLength(jRL) < taps ||
+        env->GetArrayLength(jRR) < taps) {
+        return JNI_FALSE;
+    }
+    JniFloatArrayGuard gLL(env, jLL);
+    JniFloatArrayGuard gLR(env, jLR);
+    JniFloatArrayGuard gRL(env, jRL);
+    JniFloatArrayGuard gRR(env, jRR);
+    const jfloat* pLL = gLL.get();
+    const jfloat* pLR = gLR.get();
+    const jfloat* pRL = gRL.get();
+    const jfloat* pRR = gRR.get();
     if (!pLL || !pLR || !pRL || !pRR) {
-        if (pLL) env->ReleaseFloatArrayElements(jLL, pLL, JNI_ABORT);
-        if (pLR) env->ReleaseFloatArrayElements(jLR, pLR, JNI_ABORT);
-        if (pRL) env->ReleaseFloatArrayElements(jRL, pRL, JNI_ABORT);
-        if (pRR) env->ReleaseFloatArrayElements(jRR, pRR, JNI_ABORT);
         return JNI_FALSE;
     }
 
-    bool ok = AudioDspEngine::instance().hrtf().loadCustomIr(
-        pLL, pLR, pRL, pRR, taps, sampleRate);
-
-    env->ReleaseFloatArrayElements(jLL, pLL, JNI_ABORT);
-    env->ReleaseFloatArrayElements(jLR, pLR, JNI_ABORT);
-    env->ReleaseFloatArrayElements(jRL, pRL, JNI_ABORT);
-    env->ReleaseFloatArrayElements(jRR, pRR, JNI_ABORT);
+    pulsr::HrtfBinaural& hrtf = AudioDspEngine::instance().hrtf();
+    const bool ok = hrtf.loadCustomIr(pLL, pLR, pRL, pRR, taps, sampleRate);
+    if (ok) {
+        auto customIr = hrtf.getCustomIr();
+        AudioDspEngine::instance().updateParams([customIr](DspParamSnapshot& snap) {
+            snap.hrtf.customIr = customIr;
+            snap.hrtf.dataset.reset();
+        });
+    }
     return ok ? JNI_TRUE : JNI_FALSE;
 }
 
 JNIEXPORT jint JNICALL
 Java_com_pulsr_music_AudioEffectsPlugin_nativeGetHrtfLatencyFrames(
         JNIEnv* /* env */, jobject /* thiz */) {
-    return AudioDspEngine::instance().hrtf().getLatencyFrames();
+    return static_cast<jint>(DspEngineRegistry::instance().getMaxHrtfLatencyFrames());
 }
 
 JNIEXPORT void JNICALL
@@ -1762,16 +1818,9 @@ Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeProcessDirectFloatB
                     // retained source bytes (e.g. Media3 handed a Buffer without
                     // the original direct view). The float buffer still carries
                     // the same 24 significant bits, so writing it keeps the
-                    // samples exact; rejecting here left the USB ring empty and
-                    // the DAC streaming silence while status claimed streaming.
-                    static auto lastFallbackLog = std::chrono::steady_clock::time_point{};
-                    const auto now = std::chrono::steady_clock::now();
-                    if (now - lastFallbackLog >= std::chrono::seconds(1)) {
-                        lastFallbackLog = now;
-                        __android_log_print(ANDROID_LOG_WARN, "PulsrUsbTee",
-                                            "bit-perfect block had no source PCM; "
-                                            "writing float path (frames=%d ch=%d)", frameCount, channels);
-                    }
+                    // samples exact; track lock-free without RT logging.
+                    static std::atomic<uint64_t> sUsbFloatFallbackCount{0};
+                    sUsbFloatFallbackCount.fetch_add(1, std::memory_order_relaxed);
                 }
                 usb.SetProducerDop(false);
                 written = usb.WriteInterleaved(floatBuffer, frameCount, channels,
@@ -2322,7 +2371,8 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeCustodyTake(
     const jsize total = static_cast<jsize>(kCustodyHeaderBytes + payload * 2);
     jbyteArray result = env->NewByteArray(total);
     if (result == nullptr) return nullptr;  // OutOfMemoryError already pending
-    jbyte* bytes = env->GetByteArrayElements(result, nullptr);
+    JniByteArrayGuard resultGuard(env, result, JNI_ABORT);
+    jbyte* bytes = resultGuard.get();
     if (bytes == nullptr) return nullptr;  // OutOfMemoryError already pending
     writeLe32(bytes + 0, static_cast<uint32_t>(frames));
     writeLe32(bytes + 4, static_cast<uint32_t>(CustodyVerifier::kChannels));
@@ -2334,7 +2384,7 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeCustodyTake(
     bytes[34] = truncated ? 1 : 0;
     std::memcpy(bytes + kCustodyHeaderBytes, input.data(), payload);
     std::memcpy(bytes + kCustodyHeaderBytes + payload, output.data(), payload);
-    env->ReleaseByteArrayElements(result, bytes, 0);
+    resultGuard.commit();
     return result;
 }
 

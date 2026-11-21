@@ -157,12 +157,11 @@ class SpotifyImporterService {
       throw Exception('Network error loading Spotify playlist: $e');
     }
 
-    if (response.statusCode != 200 || response.body.trim().isEmpty) {
+    final html = utf8.decode(response.bodyBytes, allowMalformed: true);
+    if (response.statusCode != 200 || html.trim().isEmpty) {
       throw Exception(
           'Failed to load Spotify playlist (HTTP ${response.statusCode})');
     }
-
-    final html = response.body;
 
     // Extract NEXT_DATA script JSON
     final scriptRegex = RegExp(
@@ -232,8 +231,10 @@ class SpotifyImporterService {
           'User-Agent': userAgent
         }).timeout(const Duration(seconds: 6));
         if (oembedResp.statusCode == 200) {
+          final oembedBody =
+              utf8.decode(oembedResp.bodyBytes, allowMalformed: true);
           final oembedData =
-              jsonDecode(oembedResp.body) as Map<String, dynamic>;
+              jsonDecode(oembedBody) as Map<String, dynamic>;
           playlistTitle = oembedData['title'] as String?;
         }
       } catch (_) {}
@@ -281,9 +282,13 @@ class SpotifyImporterService {
     final out = <SpotifyImportTrack>[];
     var offset = startOffset;
     const pageSize = 100;
+    const maxPages = 50;
+    const maxTracks = 5000;
+    var pages = 0;
     var truncated = false;
 
-    while (true) {
+    while (pages < maxPages && out.length < maxTracks) {
+      pages++;
       final variables = jsonEncode({
         'uri': 'spotify:playlist:$playlistId',
         'offset': offset,
@@ -315,13 +320,18 @@ class SpotifyImporterService {
         break;
       }
 
-      final data = jsonDecode(resp.body) as Map<String, dynamic>;
+      final bodyStr = utf8.decode(resp.bodyBytes, allowMalformed: true);
+      final data = jsonDecode(bodyStr) as Map<String, dynamic>;
       final playlistV2 = data['data']?['playlistV2'] as Map<String, dynamic>?;
       final content = playlistV2?['content'] as Map<String, dynamic>?;
       final items = content?['items'] as List<dynamic>?;
       if (items == null || items.isEmpty) break;
 
       for (final item in items) {
+        if (out.length >= maxTracks) {
+          truncated = true;
+          break;
+        }
         if (item is Map<String, dynamic>) {
           final itemData = item['itemV2']?['data'] as Map<String, dynamic>?;
           final name = itemData?['name'] as String?;
@@ -342,9 +352,19 @@ class SpotifyImporterService {
         }
       }
 
+      final prevOffset = offset;
       final total = (content?['totalCount'] as num?)?.toInt();
       offset += items.length;
+      if (offset <= prevOffset) {
+        break;
+      }
       if (total == null || offset >= total) break;
+      if (out.length >= maxTracks || pages >= maxPages) {
+        if (offset < total) {
+          truncated = true;
+        }
+        break;
+      }
     }
 
     return (tracks: out, truncated: truncated);
@@ -355,6 +375,7 @@ class SpotifyImporterService {
       resolveTracks(
     List<SpotifyImportTrack> tracks, {
     void Function(int completed, int total)? onProgress,
+    bool Function()? isCancelled,
   }) async {
     final ytm = _effectiveYtmService;
     final total = tracks.length;
@@ -365,18 +386,42 @@ class SpotifyImporterService {
 
     // Process in batches of 3 to avoid hammering YTM and triggering rate limits
     const concurrency = 3;
+    var backoffDelayMs = 0;
+
     for (var i = 0; i < tracks.length; i += concurrency) {
+      if (isCancelled?.call() == true) {
+        for (var j = i; j < tracks.length; j++) {
+          unmatched.add(tracks[j]);
+        }
+        break;
+      }
+
+      if (backoffDelayMs > 0) {
+        await Future<void>.delayed(Duration(milliseconds: backoffDelayMs));
+      }
+
       final chunk = tracks.skip(i).take(concurrency).toList();
+      var hitRateLimit = false;
+
       final futures = chunk.map((track) async {
+        if (isCancelled?.call() == true) {
+          return (track: track, match: null, rateLimited: false);
+        }
         try {
           final query = '${track.title} ${track.artist}'.trim();
-          final results = await ytm.search(query, limit: 5);
+          final results = await ytm
+              .search(query, limit: 5)
+              .timeout(const Duration(seconds: 10));
           final match = _findBestMatch(track, results);
-          return (track: track, match: match);
-        } catch (e) {
+          return (track: track, match: match, rateLimited: false);
+        } catch (e, st) {
+          final err = e.toString().toLowerCase();
+          final is429 = err.contains('429') ||
+              err.contains('rate limit') ||
+              err.contains('too many requests');
           ErrorLogger.log('Error resolving track "${track.title}" on YTM',
-              error: e, category: 'SpotifyImporter');
-          return (track: track, match: null);
+              error: e, stackTrace: st, category: 'SpotifyImporter');
+          return (track: track, match: null, rateLimited: is429);
         }
       });
 
@@ -389,6 +434,17 @@ class SpotifyImporterService {
         } else {
           unmatched.add(r.track);
         }
+        if (r.rateLimited) {
+          hitRateLimit = true;
+        }
+      }
+
+      if (hitRateLimit) {
+        backoffDelayMs = (backoffDelayMs == 0)
+            ? 1000
+            : (backoffDelayMs * 2).clamp(1000, 8000);
+      } else if (backoffDelayMs > 0) {
+        backoffDelayMs = backoffDelayMs ~/ 2;
       }
     }
 
@@ -511,37 +567,46 @@ class SpotifyImporterService {
 
     await db.transaction(() async {
       for (final track in matchResult.resolved) {
-      final existing = await (db.select(db.songsTable)
-            ..where((t) => t.remoteId.equals(track.videoId))
-            ..limit(1))
-          .getSingleOrNull();
+        final existing = await (db.select(db.songsTable)
+              ..where((t) => t.remoteId.equals(track.videoId))
+              ..limit(1))
+            .getSingleOrNull();
 
-      if (existing != null) {
-        songIds.add(existing.id);
-      } else {
-        final songData = track.toSongData();
-        final id = await _resolveFreeSongId(db, songData.id);
-        await db.into(db.songsTable).insert(
-              SongsTableCompanion(
-                id: Value(id),
-                title: Value(songData.title),
-                artist: Value(songData.artist),
-                album: Value(songData.album),
-                durationMs: Value(songData.durationMs),
-                path: Value(songData.path),
-                source: const Value(SongSource.youtube),
-                remoteId: Value(track.videoId),
-                remoteArtworkUrl: Value(track.artworkUrl),
-                isFavorite: const Value(false),
-                isMissing: const Value(false),
-                dateAdded: Value(DateTime.now().millisecondsSinceEpoch),
-              ),
-              mode: InsertMode.insertOrIgnore,
-            );
-        songIds.add(id);
+        if (existing != null) {
+          songIds.add(existing.id);
+        } else {
+          final songData = track.toSongData();
+          final id = await _resolveFreeSongId(db, songData.id);
+          final inserted = await db.into(db.songsTable).insert(
+                SongsTableCompanion(
+                  id: Value(id),
+                  title: Value(songData.title),
+                  artist: Value(songData.artist),
+                  album: Value(songData.album),
+                  durationMs: Value(songData.durationMs),
+                  path: Value(songData.path),
+                  source: const Value(SongSource.youtube),
+                  remoteId: Value(track.videoId),
+                  remoteArtworkUrl: Value(track.artworkUrl),
+                  isFavorite: const Value(false),
+                  isMissing: const Value(false),
+                  dateAdded: Value(DateTime.now().millisecondsSinceEpoch),
+                ),
+                mode: InsertMode.insertOrIgnore,
+              );
+          if (inserted == 0) {
+            final reQueried = await (db.select(db.songsTable)
+                  ..where((t) => t.remoteId.equals(track.videoId))
+                  ..limit(1))
+                .getSingleOrNull();
+            if (reQueried != null) {
+              songIds.add(reQueried.id);
+            }
+          } else {
+            songIds.add(id);
+          }
+        }
       }
-    }
-
     });
 
     // Add songs to the playlist
@@ -551,10 +616,13 @@ class SpotifyImporterService {
         songIds,
       );
       addRes.fold(
-        (f) => ErrorLogger.log(
-          'Failed to add songs to imported playlist: ${f.message}',
-          category: 'SpotifyImporter',
-        ),
+        (f) {
+          ErrorLogger.log(
+            'Failed to add songs to imported playlist: ${f.message}',
+            category: 'SpotifyImporter',
+          );
+          throw Exception('Failed to add songs to playlist: ${f.message}');
+        },
         (_) => null,
       );
     }

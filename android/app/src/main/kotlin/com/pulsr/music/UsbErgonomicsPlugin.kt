@@ -590,18 +590,18 @@ private data class QuirkConfig(
  * other's speed. A device whose address cannot be resolved, or a kernel that
  * does not publish `speed`, reports "unknown" instead of guessing.
  */
-private object UsbSysfs {
+internal object UsbSysfs {
 
-    fun busSpeedMbps(device: UsbDevice): Map<String, Any?> {
+    fun busSpeedMbps(device: UsbDevice, sysfsRoot: File = File(SYS_USB_DEVICES)): Map<String, Any?> {
         val address = busAndDeviceAddress(device)
             ?: return mapOf("mbps" to null, "detail" to "device_address_unknown")
         val entries = try {
-            File(SYS_USB_DEVICES).listFiles()
+            sysfsRoot.listFiles()
         } catch (e: IOException) {
-            Log.w(TAG, "Listing $SYS_USB_DEVICES failed: ${e.message}")
+            Log.w(TAG, "Listing ${sysfsRoot.path} failed: ${e.message}")
             null
         } catch (e: SecurityException) {
-            Log.w(TAG, "Listing $SYS_USB_DEVICES was denied: ${e.message}")
+            Log.w(TAG, "Listing ${sysfsRoot.path} was denied: ${e.message}")
             null
         }
         if (entries == null) {
@@ -609,8 +609,8 @@ private object UsbSysfs {
         }
         for (entry in entries) {
             if (!entry.isDirectory) continue
-            if (readHex(File(entry, "busnum")) != address.first) continue
-            if (readHex(File(entry, "devnum")) != address.second) continue
+            if (readDecimal(File(entry, "busnum")) != address.first) continue
+            if (readDecimal(File(entry, "devnum")) != address.second) continue
             val speed = readDouble(File(entry, "speed"))
                 ?: return mapOf("mbps" to null, "detail" to "speed_not_published")
             return mapOf("mbps" to speed)
@@ -634,14 +634,13 @@ private object UsbSysfs {
 
     private val BUS_DEVICE_PATTERN = Regex("""bus/usb/(\d+)/(\d+)""")
 
-    private fun readHex(file: File): Int? {
+    private fun readDecimal(file: File): Int? {
         val text = readTextFile(file) ?: return null
-        return try {
-            text.trim().toInt(16)
-        } catch (e: NumberFormatException) {
-            Log.w(TAG, "Reading ${file.name} produced an unexpected value: ${e.message}")
-            null
+        val parsed = text.trim().toIntOrNull()
+        if (parsed == null) {
+            Log.w(TAG, "Reading ${file.name} produced an unexpected value: ${text.trim()}")
         }
+        return parsed
     }
 
     private fun readDouble(file: File): Double? {

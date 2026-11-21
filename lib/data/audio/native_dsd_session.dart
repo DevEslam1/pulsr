@@ -14,7 +14,6 @@ import 'dart:io';
 import 'package:audio_service/audio_service.dart';
 
 import '../../core/utils/error_logger.dart';
-import '../../domain/models/audio_quality_info.dart';
 import '../services/usb_exclusive_service.dart';
 import 'dsd_decoder_helper.dart';
 import 'native_dsd_file_source.dart';
@@ -174,9 +173,8 @@ class NativeDsdSession implements PlaybackBackend {
     _startTimers();
 
     // Keep the DAC clocked while loaded. play() switches to real data.
-    unawaited(
-      producer.startPumping(startPaused: true).then((_) => _onPumpEnded()),
-    );
+    producer.onPumpEnded = _onPumpEnded;
+    unawaited(producer.startPumping(startPaused: true));
 
     if (autoPlay) await play();
   }
@@ -204,6 +202,9 @@ class NativeDsdSession implements PlaybackBackend {
   Future<void> seek(Duration position) async {
     if (_disposed || !_prepared) return;
     producer.seek(position);
+    if (producer.isRunning && !producer.isPumping) {
+      unawaited(producer.startPumping(startPaused: producer.isPaused));
+    }
     _positionController.add(producer.currentPosition);
     _emitState(
       AudioProcessingState.ready,
@@ -256,7 +257,8 @@ class NativeDsdSession implements PlaybackBackend {
     _fallbackFired = false;
     _currentItem = null;
     _nativeStatusActive = false;
-    AudioQualityInfo.dsdNativeActive = false;
+    producer.onPumpEnded = null;
+    DsdDecoderHelper.dsdNativeActive = false;
     try {
       await producer.stop();
     } catch (e, st) {
@@ -284,14 +286,14 @@ class NativeDsdSession implements PlaybackBackend {
   void _updateNativeStatus() {
     if (!_nativeStatusActive && producer.firstBlockWritten) {
       _nativeStatusActive = true;
-      AudioQualityInfo.dsdNativeActive = true;
-      AudioQualityInfo.dsdDopActive = false;
+      DsdDecoderHelper.dsdNativeActive = true;
+      DsdDecoderHelper.dsdDopActive = false;
       onNativeActive?.call();
     }
     if (!_fallbackFired && producer.fallbackRequested) {
       _fallbackFired = true;
       _stopPositionTimer();
-      AudioQualityInfo.dsdNativeActive = false;
+      DsdDecoderHelper.dsdNativeActive = false;
       _emitState(AudioProcessingState.error, playing: false);
       onFallbackRequired?.call(producer.currentPosition);
     }

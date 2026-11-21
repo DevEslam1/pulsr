@@ -77,14 +77,15 @@ class DsdAltSettingTuple {
   });
 
   factory DsdAltSettingTuple.fromList(List<dynamic> list) {
+    int toInt(dynamic v, int fallback) => v is num ? v.toInt() : fallback;
     return DsdAltSettingTuple(
-      interfaceNumber: list[0] as int,
-      altSetting: list[1] as int,
-      endpointAddress: list[2] as int,
-      channels: list.length > 3 ? (list[3] as int) : 2,
-      bytesPerSample: list.length > 4 ? (list[4] as int) : 4,
-      framesPerSecond: list.length > 5 ? (list[5] as int) : 0,
-      dsdRate: list.length > 6 ? (list[6] as int) : 0,
+      interfaceNumber: list.isNotEmpty ? toInt(list[0], 0) : 0,
+      altSetting: list.length > 1 ? toInt(list[1], 0) : 0,
+      endpointAddress: list.length > 2 ? toInt(list[2], 0) : 0,
+      channels: list.length > 3 ? toInt(list[3], 2) : 2,
+      bytesPerSample: list.length > 4 ? toInt(list[4], 4) : 4,
+      framesPerSecond: list.length > 5 ? toInt(list[5], 0) : 0,
+      dsdRate: list.length > 6 ? toInt(list[6], 0) : 0,
     );
   }
 
@@ -204,6 +205,7 @@ class UsbExclusiveStatus {
   final double? maxVolumeDb;
   final int? interfaceNumber;
   final bool streamingActive;
+  final bool dsdActive;
   final bool streamingSupported;
   final List<int> supportedRates;
   final int? lastError;
@@ -278,6 +280,7 @@ class UsbExclusiveStatus {
     this.maxVolumeDb,
     this.interfaceNumber,
     this.streamingActive = false,
+    this.dsdActive = false,
     this.streamingSupported = false,
     this.supportedRates = const [],
     this.lastError,
@@ -323,6 +326,7 @@ class UsbExclusiveStatus {
     double? maxVolumeDb,
     int? interfaceNumber,
     bool? streamingActive,
+    bool? dsdActive,
     bool? streamingSupported,
     List<int>? supportedRates,
     int? lastError,
@@ -368,6 +372,7 @@ class UsbExclusiveStatus {
       maxVolumeDb: maxVolumeDb ?? this.maxVolumeDb,
       interfaceNumber: interfaceNumber ?? this.interfaceNumber,
       streamingActive: streamingActive ?? this.streamingActive,
+      dsdActive: dsdActive ?? this.dsdActive,
       streamingSupported: streamingSupported ?? this.streamingSupported,
       supportedRates: supportedRates ?? this.supportedRates,
       lastError: lastError ?? this.lastError,
@@ -428,19 +433,24 @@ class UsbExclusiveStatus {
       maxVolumeDb: d(map['maxVolumeDb']),
       interfaceNumber: i(map['interfaceNumber']),
       streamingActive: map['streamingActive'] == true,
+      dsdActive: map['dsdActive'] == true,
       streamingSupported: map['streamingSupported'] == true,
-      supportedRates: (map['supportedRates'] as List<dynamic>?)
-              ?.map((e) => (e as num).toInt())
-              .toList() ??
-          const [],
+      supportedRates: (map['supportedRates'] is List)
+          ? (map['supportedRates'] as List)
+              .whereType<num>()
+              .map((e) => e.toInt())
+              .toList()
+          : const [],
       lastError: i(map['lastError']),
       lastStreamErrorCode: i(map['resultCode']),
       channelMismatchFrames: i(map['channelMismatchFrames']) ?? 0,
       rateVerified: map['streamingActive'] == true && map['rateVerified'] == true,
-      advertisedFormats: (map['advertisedFormats'] as List<dynamic>?)
-              ?.map((e) => Map<String, dynamic>.from(e as Map))
-              .toList() ??
-          const [],
+      advertisedFormats: (map['advertisedFormats'] is List)
+          ? (map['advertisedFormats'] as List)
+              .whereType<Map>()
+              .map((e) => Map<String, dynamic>.from(e))
+              .toList()
+          : const [],
       clockDomain: UsbClockDomain.fromWire(map['clockDomain']),
       clockDriftPpm: i(map['clockDriftPpm']) ?? 0,
       ringFillMs: i(map['ringFillMs']) ?? 0,
@@ -449,14 +459,16 @@ class UsbExclusiveStatus {
       overrunCount: i(map['overrunCount']) ?? 0,
       drainPending: map['drainPending'] == true,
       sessionState: (map['sessionState'] as String?) ?? 'unknown',
-      quirkApplied: (map['quirkApplied'] as List<dynamic>?)
-              ?.map((e) => '$e')
-              .toList() ??
-          const [],
-      quirkRejected: (map['quirkRejected'] as Map?)?.map(
-            (key, value) => MapEntry('$key', '$value'),
-          ) ??
-          const {},
+      quirkApplied: (map['quirkApplied'] is List)
+          ? (map['quirkApplied'] as List)
+              .map((e) => '$e')
+              .toList()
+          : const [],
+      quirkRejected: (map['quirkRejected'] is Map)
+          ? (map['quirkRejected'] as Map).map(
+              (key, value) => MapEntry('$key', '$value'),
+            )
+          : const {},
       quirkBitPerfectAffected: map['quirkBitPerfectAffected'] == true,
       quirkBitPerfectReason: map['quirkBitPerfectReason'] as String?,
     );
@@ -602,7 +614,9 @@ class UsbExclusiveService {
       final dynamic res = await _methodChannel.invokeMethod<dynamic>(
           'setHardwareVolume',
           {'db': clamped}).timeout(const Duration(seconds: 5));
-      if (res is Map && res['error'] != null) return false;
+      final bool ok = res == true ||
+          (res is Map && res['error'] == null && res['success'] != false);
+      if (!ok) return false;
       await getStatus();
       return true;
     } catch (e, st) {
@@ -620,7 +634,9 @@ class UsbExclusiveService {
       final dynamic res = await _methodChannel
           .invokeMethod<dynamic>('resetHardwareVolume')
           .timeout(const Duration(seconds: 5));
-      if (res is Map && res['error'] != null) return false;
+      final bool ok = res == true ||
+          (res is Map && res['error'] == null && res['success'] != false);
+      if (!ok) return false;
       await getStatus();
       return true;
     } catch (e, st) {
@@ -638,7 +654,9 @@ class UsbExclusiveService {
           .invokeMethod<dynamic>('setUsbHardwareVolumeEnabled', {'enabled': enabled})
           .timeout(const Duration(seconds: 2));
       return res == true;
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('Failed to setUsbHardwareVolumeEnabled($enabled)',
+          error: e, stackTrace: st, category: 'UsbExclusive');
       return false;
     }
   }
@@ -694,13 +712,21 @@ class UsbExclusiveService {
               ? openedDepth == bitDepth
               : (openedDepth >= bitDepth &&
                   (openedDepth == 16 || openedDepth == 24 || openedDepth == 32));
-          return status != null && status.attached && status.permitted &&
-                  status.streamingActive && status.deviceId == before.deviceId &&
-                  status.deviceId != null &&
-                  status.streamingSampleRate == sampleRate &&
-                  depthSatisfied &&
-                  status.streamingChannels == channels
-              ? UsbStreamResult.ok : UsbStreamResult.unknown;
+          final satisfied = status != null &&
+              status.attached &&
+              status.permitted &&
+              status.streamingActive &&
+              status.deviceId == before.deviceId &&
+              status.deviceId != null &&
+              status.streamingSampleRate == sampleRate &&
+              depthSatisfied &&
+              status.streamingChannels == channels;
+          if (satisfied) {
+            return UsbStreamResult.ok;
+          } else {
+            await stopStreaming();
+            return UsbStreamResult.unknown;
+          }
         }
         final err = res['error'] as String?;
         switch (err) {
@@ -778,7 +804,9 @@ class UsbExclusiveService {
           .invokeMethod<dynamic>('getBufferedMs')
           .timeout(const Duration(milliseconds: 250));
       return (res as num?)?.toDouble() ?? 0.0;
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('Failed to getBufferedMs',
+          error: e, stackTrace: st, category: 'UsbExclusive');
       return 0.0;
     }
   }
@@ -788,7 +816,9 @@ class UsbExclusiveService {
   Future<void> resetChannelMismatchFrames() async {
     if (!_isAndroid) return;
     try {
-      await _methodChannel.invokeMethod<void>('resetChannelMismatchFrames');
+      await _methodChannel
+          .invokeMethod<void>('resetChannelMismatchFrames')
+          .timeout(const Duration(seconds: 3));
     } catch (e, st) {
       ErrorLogger.log('Failed to reset channel mismatch frames',
           error: e, stackTrace: st, category: 'UsbExclusive');
@@ -889,7 +919,9 @@ class UsbExclusiveService {
           .invokeMethod<bool>('hasPcmFileSource')
           .timeout(const Duration(milliseconds: 500));
       return res ?? false;
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('Failed to check hasPcmFileSource',
+          error: e, stackTrace: st, category: 'UsbExclusive');
       return false;
     }
   }
@@ -897,6 +929,24 @@ class UsbExclusiveService {
   /// Starts native DSD streaming with the probed alternate setting tuple.
   Future<bool> startDsdStreaming(DsdAltSettingTuple tuple, {bool strict = true}) async {
     if (!_isAndroid) return false;
+    if (tuple.interfaceNumber < 0 ||
+        tuple.altSetting < 0 ||
+        tuple.endpointAddress <= 0 ||
+        tuple.channels < 1 ||
+        tuple.channels > 8 ||
+        tuple.bytesPerSample <= 0 ||
+        tuple.framesPerSecond < 0 ||
+        tuple.dsdRate < 0) {
+      ErrorLogger.log('startDsdStreaming: invalid tuple $tuple',
+          category: 'UsbExclusive');
+      return false;
+    }
+    final before = await _readStatus();
+    if (before == null || !before.attached || !before.permitted) {
+      ErrorLogger.log('startDsdStreaming: DAC not attached/permitted',
+          category: 'UsbExclusive');
+      return false;
+    }
     try {
       final res = await _methodChannel.invokeMapMethod<String, dynamic>(
         'startDsdStreaming',
@@ -905,9 +955,11 @@ class UsbExclusiveService {
           'strict': strict,
         },
       ).timeout(const Duration(seconds: 10));
+      await _readStatus();
       return res?['success'] == true;
     } catch (e, st) {
-      ErrorLogger.log('startDsdStreaming failed', error: e, stackTrace: st, category: 'UsbExclusive');
+      ErrorLogger.log('startDsdStreaming failed',
+          error: e, stackTrace: st, category: 'UsbExclusive');
       return false;
     }
   }
@@ -923,7 +975,9 @@ class UsbExclusiveService {
         'producerId': producerId,
       }).timeout(const Duration(seconds: 2));
       return res == true;
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('writeDsd failed',
+          error: e, stackTrace: st, category: 'UsbExclusive');
       return false;
     }
   }
@@ -932,9 +986,13 @@ class UsbExclusiveService {
   Future<bool> isDsdActive() async {
     if (!_isAndroid) return false;
     try {
-      final res = await _methodChannel.invokeMethod<bool>('isDsdActive').timeout(const Duration(seconds: 2));
+      final res = await _methodChannel
+          .invokeMethod<bool>('isDsdActive')
+          .timeout(const Duration(seconds: 2));
       return res == true;
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('isDsdActive failed',
+          error: e, stackTrace: st, category: 'UsbExclusive');
       return false;
     }
   }
@@ -962,8 +1020,5 @@ class UsbExclusiveService {
     _subscription?.cancel();
     _subscription = null;
     if (!_controller.isClosed) _controller.close();
-    if (identical(_instance, this)) {
-      _instance = null;
-    }
   }
 }

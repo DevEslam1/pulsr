@@ -19,6 +19,8 @@ import android.os.Looper
 import android.os.SystemClock
 import android.util.Log
 import androidx.core.content.ContextCompat
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
@@ -246,8 +248,9 @@ class UsbExclusivePlugin(
     private val eventChannel = EventChannel(messenger, EVENT_CHANNEL)
 
     @Volatile private var eventSink: EventChannel.EventSink? = null
+    @Volatile private var disposed = false
     private var connection: UsbDeviceConnection? = null
-    private var openedDevice: UsbDevice? = null
+    @Volatile private var openedDevice: UsbDevice? = null
     private var volumeUnit: UsbAudioControlParser.FeatureUnitVolume? = null
     private var claimedInterface: UsbInterface? = null
     private var uacVersion: Int = UsbAudioControlParser.UAC_NONE
@@ -896,6 +899,9 @@ class UsbExclusivePlugin(
                         }
                         emitState()
                     }
+                    if (pendingPermissionResult != null && findAudioDevice() == null) {
+                        finishPermission(false)
+                    }
                 }
                 UsbManager.ACTION_USB_DEVICE_ATTACHED -> emitState()
             }
@@ -1163,6 +1169,7 @@ class UsbExclusivePlugin(
     }
 
     fun dispose() {
+        disposed = true
         // A permission prompt the user never answered still has to be answered:
         // the Dart caller awaits requestPermission(), and tearing the plugin
         // down underneath it would leave that future pending forever.
@@ -2109,7 +2116,7 @@ class UsbExclusivePlugin(
                 val ok = volume.setDb(target / 256.0)
                 buildStatus()
                 emitState()
-                if (ok && volume.applied) return true
+                return ok && volume.applied
             }
             val payload = byteArrayOf(
                 (target and 0xFF).toByte(),
@@ -2365,9 +2372,7 @@ class UsbExclusivePlugin(
         var started = false
         try {
             releaseClaim()
-            try {
-                com.ryanheise.just_audio.PulsrOutputRouting.select(null)
-            } catch (_: Throwable) {}
+            clearPreferredOutputRoute()
             val claimed = try { conn.claimInterface(streamingIface, true) } catch (_: Exception) { false }
             if (!claimed) {
                 lastStreamResultCode = 1
@@ -2648,13 +2653,7 @@ class UsbExclusivePlugin(
         }
 
         releaseClaim()
-        // Unpin ExoPlayer's silent pacing AudioTrack from the USB HAL before
-        // detaching snd-usb-audio: if it stayed pinned to the stolen USB device,
-        // AudioFlinger HAL write timeouts would throttle ExoPlayer's playback
-        // thread and starve the USB ring (glitchy/slow audio).
-        try {
-            com.ryanheise.just_audio.PulsrOutputRouting.select(null)
-        } catch (_: Throwable) {}
+        clearPreferredOutputRoute()
         val claimed = try { conn.claimInterface(iface, true) } catch (_: Exception) { false }
         if (!claimed) {
             lastStreamResultCode = 1
@@ -2752,10 +2751,11 @@ class UsbExclusivePlugin(
             val silenceMs = resolved.silenceMs.coerceIn(0, MAX_QUIRK_SILENCE_MS)
             if (silenceMs > 0) {
                 Log.i(TAG, "Quirk silence: waiting ${silenceMs}ms before native start")
-                try {
-                    Thread.sleep(silenceMs.toLong())
-                } catch (_: InterruptedException) {
-                    Thread.currentThread().interrupt()
+                if (!awaitQuirkSilence(silenceMs)) {
+                    val reason = if (disposed) "plugin_disposed" else "device_detached"
+                    lastStreamResultCode = -1
+                    Log.w(TAG, "Quirk silence aborted before native start: $reason")
+                    return startFailure(reason)
                 }
             }
             val resultCode = nativeUsbStreamStartWithFormat(
@@ -2798,6 +2798,37 @@ class UsbExclusivePlugin(
             // the next start then refuses with usb_drain_incomplete.
             if (!started) clearStreaming()
         }
+    }
+
+    internal fun isOpenedDeviceAttached(): Boolean {
+        val open = openedDevice ?: return false
+        return try {
+            usbManager?.deviceList?.values?.any { it.deviceId == open.deviceId } == true
+        } catch (_: Throwable) {
+            false
+        }
+    }
+
+    internal fun awaitQuirkSilence(
+        silenceMs: Int,
+        stepMs: Long = 50L,
+        sleepFn: (Long) -> Unit = { Thread.sleep(it) },
+        isAttached: () -> Boolean = { isOpenedDeviceAttached() },
+        isDisposed: () -> Boolean = { disposed },
+    ): Boolean {
+        var remaining = silenceMs.toLong()
+        while (remaining > 0L) {
+            if (isDisposed() || !isAttached()) return false
+            val slice = minOf(remaining, stepMs)
+            try {
+                sleepFn(slice)
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+                return false
+            }
+            remaining -= slice
+        }
+        return !isDisposed() && isAttached()
     }
 
     /**
@@ -2850,6 +2881,31 @@ class UsbExclusivePlugin(
             }
             return
         }
+    }
+
+    private fun clearPreferredOutputRoute() {
+        // Unpin ExoPlayer's silent pacing AudioTrack from the USB HAL on its
+        // application looper before detaching snd-usb-audio: if it stayed pinned
+        // to the stolen USB device, AudioFlinger HAL write timeouts would throttle
+        // ExoPlayer's playback thread and starve the USB ring (glitchy/slow audio).
+        try {
+            if (Looper.myLooper() == Looper.getMainLooper()) {
+                com.ryanheise.just_audio.PulsrOutputRouting.select(null)
+            } else {
+                val done = CountDownLatch(1)
+                val posted = mainHandler.post {
+                    try {
+                        com.ryanheise.just_audio.PulsrOutputRouting.select(null)
+                    } catch (_: Throwable) {
+                    } finally {
+                        done.countDown()
+                    }
+                }
+                if (posted) {
+                    done.await(200, TimeUnit.MILLISECONDS)
+                }
+            }
+        } catch (_: Throwable) {}
     }
 
     private fun isNativeActive(): Boolean = nativeLoaded && try {

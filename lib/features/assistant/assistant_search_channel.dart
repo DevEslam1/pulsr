@@ -5,6 +5,8 @@
 // best-effort side channel: the app keeps working when the host has no
 // handler (tests, desktop, an old APK), so every call is guarded and logged.
 
+import 'dart:async';
+
 import 'package:flutter/services.dart';
 
 import '../../core/utils/error_logger.dart';
@@ -76,8 +78,18 @@ class AssistantSearchChannel {
         .map((suggestion) => suggestion.toMap())
         .toList(growable: false);
     try {
-      await _channel.invokeMethod<void>(methodUpdateSuggestions, rows);
+      await _channel
+          .invokeMethod<void>(methodUpdateSuggestions, rows)
+          .timeout(const Duration(seconds: 3));
       return true;
+    } on TimeoutException catch (e, st) {
+      ErrorLogger.log(
+        'Suggestion push timed out after 3s',
+        error: e,
+        stackTrace: st,
+        category: 'Assistant',
+      );
+      return false;
     } on MissingPluginException {
       ErrorLogger.log(
         'Suggestion channel is not available on this host',
@@ -109,8 +121,18 @@ class AssistantSearchChannel {
   /// failed; the failure is logged, never thrown.
   Future<bool> clear() async {
     try {
-      await _channel.invokeMethod<void>(methodClear);
+      await _channel
+          .invokeMethod<void>(methodClear)
+          .timeout(const Duration(seconds: 3));
       return true;
+    } on TimeoutException catch (e, st) {
+      ErrorLogger.log(
+        'Suggestion clear timed out after 3s',
+        error: e,
+        stackTrace: st,
+        category: 'Assistant',
+      );
+      return false;
     } on MissingPluginException {
       ErrorLogger.log(
         'Suggestion channel is not available on this host',

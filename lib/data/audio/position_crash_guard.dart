@@ -170,14 +170,14 @@ class PositionCrashGuard {
   }
 
   /// Checks if an unclean shutdown occurred and if crash guard snapshot is newer than DB.
-  static Future<bool> shouldPreferCrashGuard(int dbTimestampMs) async {
+  static Future<bool> shouldPreferCrashGuard([int? dbTimestampMs]) async {
     try {
       final snapshot = await readSnapshot();
       if (snapshot == null) return false;
 
       // If snapshot is newer than DB last saved timestamp, prefer crash guard
-      if (snapshot.timestamp > dbTimestampMs) {
-        return true;
+      if (dbTimestampMs != null) {
+        return snapshot.timestamp > dbTimestampMs;
       }
 
       // Check last clean shutdown

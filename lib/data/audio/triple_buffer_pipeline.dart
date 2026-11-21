@@ -71,7 +71,8 @@ class TripleBufferPipeline {
 
   Future<bool> claimInactive(PlayerClaim claim) async {
     return _claimMutex.protect(() async {
-      if (_inactiveClaim != PlayerClaim.none && _inactiveClaim != claim) {
+      if (_inactiveClaim != PlayerClaim.none &&
+          (_inactiveClaim != claim || claim == PlayerClaim.prefetch)) {
         if (claim == PlayerClaim.crossfade &&
             _inactiveClaim == PlayerClaim.prefetch) {
           _inactiveClaim = claim;
@@ -84,10 +85,12 @@ class TripleBufferPipeline {
     });
   }
 
-  void releaseInactive(PlayerClaim claim) {
-    if (_inactiveClaim == claim) {
-      _inactiveClaim = PlayerClaim.none;
-    }
+  Future<void> releaseInactive(PlayerClaim claim) async {
+    await _claimMutex.protect(() async {
+      if (_inactiveClaim == claim) {
+        _inactiveClaim = PlayerClaim.none;
+      }
+    });
   }
 
   TripleBufferPipeline({
@@ -128,7 +131,7 @@ class TripleBufferPipeline {
       _preloadFailedExpiry.remove(nextSong.id);
       analytics?.recordPreloadSuccess();
     } finally {
-      releaseInactive(PlayerClaim.prefetch);
+      await releaseInactive(PlayerClaim.prefetch);
     }
   }
 
@@ -154,21 +157,26 @@ class TripleBufferPipeline {
         return false;
       }
       await inactivePlayer.setAudioSource(source, preload: true);
+      if (_inactiveClaim != PlayerClaim.prefetch ||
+          (scheduledGen != null && scheduledGen != getGeneration?.call())) {
+        return false;
+      }
       _preloadedSongId = nextSong.id;
       _preloadedSource = source;
       if (nextSong.path.isNotEmpty && !nextSong.path.startsWith('http')) {
         try {
           final file = File(nextSong.path);
-          if (file.existsSync()) {
-            final raf = file.openSync(mode: FileMode.read);
-            try {
-              final len = file.lengthSync();
-              preloadedHeaderBytes = raf.readSync(len < 65536 ? len : 65536);
-            } finally {
-              raf.closeSync();
+          if (await file.exists()) {
+            final builder = BytesBuilder(copy: false);
+            await for (final chunk in file.openRead(0, 65536)) {
+              builder.add(chunk);
             }
+            preloadedHeaderBytes = builder.takeBytes();
           }
-        } catch (_) {}
+        } catch (e, st) {
+          ErrorLogger.log('Failed to read preloaded header bytes',
+              error: e, stackTrace: st, category: 'TripleBuffer');
+        }
       }
       return true;
     } catch (e) {

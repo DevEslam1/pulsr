@@ -10,6 +10,7 @@
 #include <numeric>
 #include <atomic>
 #include <thread>
+#include <limits>
 
 namespace {
 
@@ -511,6 +512,170 @@ void test_hrtf_concurrent_load() {
           "Synthetic quad is restored at the default tap count");
 }
 
+void test_hrtf_zero_lag_and_safety_guards() {
+    std::cout << "--- test_hrtf_zero_lag_and_safety_guards ---" << std::endl;
+    // 1. Custom Dirac delta at k=0 must produce output at n=0 (no 1-sample circular lag).
+    pulsr::HrtfBinaural hrtf;
+    hrtf.setSampleRate(48000.0);
+    std::vector<float> ll(16, 0.0f), lr(16, 0.0f), rl(16, 0.0f), rr(16, 0.0f);
+    ll[0] = 1.0f;
+    rr[0] = 1.0f;
+    check(hrtf.loadCustomIr(ll.data(), lr.data(), rl.data(), rr.data(), 16, 48000.0),
+          "Custom Dirac quad loaded");
+    hrtf.setEnabled(true);
+    hrtf.reset();
+    std::vector<float> buf(32 * 2, 0.0f);
+    buf[0] = 1.0f;
+    buf[1] = -0.5f;
+    hrtf.processInterleaved(buf.data(), 32, 2);
+    check(std::abs(buf[0] - 1.0f) < 1e-4f && std::abs(buf[1] - (-0.5f)) < 1e-4f,
+          "Impulse appears at exact n=0 without circular buffer off-by-one lag");
+
+    // 2. NaN inputs must be scrubbed to finite output.
+    std::vector<float> nanBuf(16 * 2, std::numeric_limits<float>::quiet_NaN());
+    hrtf.processInterleaved(nanBuf.data(), 16, 2);
+    bool allFinite = std::all_of(nanBuf.begin(), nanBuf.end(),
+                                 [](float v) { return std::isfinite(v); });
+    check(allFinite, "Non-finite input samples are scrubbed before convolution history");
+
+    // 3. Disable must ramp smoothly (~20ms) instead of snapping to 0 in one small block.
+    hrtf.setEnabled(false);
+    std::vector<float> stepBuf(16 * 2, 1.0f);
+    hrtf.processInterleaved(stepBuf.data(), 16, 2);
+    check(hrtf.isRamping(), "Short block after disable stays mid-ramp without click snap");
+
+    // 4. High sample-rate (192 kHz) synthetic quad must scale taps to avoid ITD clamping.
+    pulsr::HrtfBinaural hiSrHrtf;
+    hiSrHrtf.setSampleRate(192000.0);
+    hiSrHrtf.setAzimuth(60.0);
+    hiSrHrtf.applyPrepared();
+    pulsr::HrirQuad hiQuad;
+    check(hiSrHrtf.copyActiveQuad(hiQuad), "192 kHz synthetic quad copied");
+    check(hiQuad.taps >= pulsr::HrtfBinaural::DEFAULT_HRIR_TAPS * 4,
+          "192 kHz synthetic quad scales tap window with sample rate");
+
+    // 5. Malformed SOFA dimension count / R < 2 / truncated payload rejected cleanly.
+    auto badSofa = createSyntheticSofaNetCdf3(3, 1, 64); // R=1 < 2
+    pulsr::SofaDataset badDs;
+    check(!pulsr::HrtfBinaural::parseSofaNetCdf3(badSofa.data(), badSofa.size(), badDs),
+          "SOFA with R < 2 receivers is rejected safely");
+}
+
+void test_hrtf_settled_bypass_and_old_slot_release() {
+    std::cout << "--- test_hrtf_settled_bypass_and_old_slot_release ---" << std::endl;
+
+    // 1. Settled bypass: bit-exact passthrough (planar & interleaved) without running FIR convolution.
+    {
+        pulsr::HrtfBinaural hrtf;
+        hrtf.setSampleRate(48000.0);
+        std::vector<float> ll(16, 0.0f), lr(16, 0.0f), rl(16, 0.0f), rr(16, 0.0f);
+        ll[1] = 1.0f; // Pure 1-sample delay IR so any history write leaks on next sample
+        rr[1] = 1.0f;
+        check(hrtf.loadCustomIr(ll.data(), lr.data(), rl.data(), rr.data(), 16, 48000.0),
+              "1-sample delay custom IR loaded for bypass test");
+        hrtf.setEnabled(false);
+        hrtf.reset();
+
+        // Planar with distinct out buffers
+        const int frames = 64;
+        std::vector<float> inL(frames), inR(frames), outL(frames, -999.0f), outR(frames, -999.0f);
+        for (int i = 0; i < frames; ++i) {
+            inL[i] = (i == 0) ? 1e-40f : (0.1234567f * static_cast<float>(i + 1));
+            inR[i] = -0.7654321f * static_cast<float>(i + 1);
+        }
+        hrtf.process(inL.data(), inR.data(), outL.data(), outR.data(), frames);
+        check(std::memcmp(inL.data(), outL.data(), frames * sizeof(float)) == 0 &&
+              std::memcmp(inR.data(), outR.data(), frames * sizeof(float)) == 0,
+              "Planar settled bypass is bit-exact passthrough");
+
+        // Interleaved in-place
+        std::vector<float> inter(frames * 2);
+        for (int i = 0; i < frames; ++i) {
+            inter[i * 2] = 0.75f;
+            inter[i * 2 + 1] = -0.5f;
+        }
+        std::vector<float> interCopy = inter;
+        hrtf.processInterleaved(inter.data(), frames, 2);
+        check(std::memcmp(inter.data(), interCopy.data(), inter.size() * sizeof(float)) == 0,
+              "Interleaved settled bypass is bit-exact passthrough");
+
+        // Verify FIR convolution was truly skipped: history must still be all zeros,
+        // so enabling and processing 1 sample of silence yields 0 (no 1-sample delayed leak).
+        hrtf.setEnabled(true);
+        float zInL = 0.0f, zInR = 0.0f, zOutL = -1.0f, zOutR = -1.0f;
+        hrtf.process(&zInL, &zInR, &zOutL, &zOutR, 1);
+        check(zOutL == 0.0f && zOutR == 0.0f,
+              "Settled bypass skips 4x FIR convolution and leaves FIR history untouched");
+    }
+
+    // 2. While disabled & settled, geometry changes still applyPrepared() and release oldSlotAtomic_.
+    {
+        pulsr::HrtfBinaural hrtf;
+        hrtf.setSampleRate(48000.0);
+        hrtf.setEnabled(false);
+        hrtf.reset();
+        std::vector<float> buf(32 * 2, 0.25f);
+        hrtf.processInterleaved(buf.data(), 32, 2);
+        hrtf.setAzimuth(-45.0);
+        std::vector<float> before = buf;
+        hrtf.processInterleaved(buf.data(), 32, 2);
+        check(std::memcmp(buf.data(), before.data(), buf.size() * sizeof(float)) == 0,
+              "Disabled geometry update keeps bit-exact passthrough");
+        check(!hrtf.hasPendingOldSlotForTesting(),
+              "Disabled block still claims prepared slot and releases oldSlotAtomic_");
+    }
+
+    // 3. Active crossfade releases oldSlotAtomic_ at the END of the completing block (interleaved).
+    {
+        pulsr::HrtfBinaural hrtf;
+        hrtf.setSampleRate(48000.0);
+        hrtf.setAzimuth(30.0);
+        hrtf.setEnabled(true);
+        hrtf.reset();
+
+        std::vector<float> initBuf(64 * 2, 0.1f);
+        hrtf.processInterleaved(initBuf.data(), 64, 2);
+        check(!hrtf.hasPendingOldSlotForTesting(), "No pending old slot after initial block");
+
+        hrtf.setAzimuth(-45.0);
+        // Short block (128 < 720 frames @ 48kHz) stays mid-crossfade -> old slot still pinned.
+        std::vector<float> shortBuf(128 * 2, 0.1f);
+        hrtf.processInterleaved(shortBuf.data(), 128, 2);
+        check(hrtf.hasPendingOldSlotForTesting(),
+              "Interleaved mid-crossfade keeps oldSlotAtomic_ pinned");
+
+        // Completing block (1024 frames finishes 15 ms fade) must release oldSlotAtomic_ immediately.
+        std::vector<float> doneBuf(1024 * 2, 0.1f);
+        hrtf.processInterleaved(doneBuf.data(), 1024, 2);
+        check(!hrtf.hasPendingOldSlotForTesting(),
+              "Interleaved processInterleaved releases oldSlotAtomic_ at end of completing block");
+    }
+
+    // 4. Active crossfade releases oldSlotAtomic_ at the END of the completing block (planar).
+    {
+        pulsr::HrtfBinaural hrtf;
+        hrtf.setSampleRate(48000.0);
+        hrtf.setAzimuth(30.0);
+        hrtf.setEnabled(true);
+        hrtf.reset();
+
+        std::vector<float> inL(64, 0.1f), inR(64, -0.1f), outL(64), outR(64);
+        hrtf.process(inL.data(), inR.data(), outL.data(), outR.data(), 64);
+        check(!hrtf.hasPendingOldSlotForTesting(), "Planar: no pending old slot after initial block");
+
+        hrtf.setAzimuth(60.0);
+        std::vector<float> sL(128, 0.1f), sR(128, -0.1f), soL(128), soR(128);
+        hrtf.process(sL.data(), sR.data(), soL.data(), soR.data(), 128);
+        check(hrtf.hasPendingOldSlotForTesting(),
+              "Planar mid-crossfade keeps oldSlotAtomic_ pinned");
+
+        std::vector<float> dL(1024, 0.1f), dR(1024, -0.1f), doL(1024), doR(1024);
+        hrtf.process(dL.data(), dR.data(), doL.data(), doR.data(), 1024);
+        check(!hrtf.hasPendingOldSlotForTesting(),
+              "Planar process() releases oldSlotAtomic_ at end of completing block");
+    }
+}
+
 } // namespace
 
 int main() {
@@ -524,6 +689,8 @@ int main() {
     test_sofa_interpolation();
     test_sofa_resampling_44k_to_48k();
     test_hrtf_concurrent_load();
+    test_hrtf_zero_lag_and_safety_guards();
+    test_hrtf_settled_bypass_and_old_slot_release();
 
     if (gFailures == 0) {
         std::cout << "[ALL TESTS PASSED] test_hrtf_binaural succeeded completely!" << std::endl;

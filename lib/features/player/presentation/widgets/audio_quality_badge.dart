@@ -1,5 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../core/presentation/audio_quality_presentation.dart';
+import '../../../../data/audio/dsd_decoder_helper.dart';
 import '../../../../data/db/app_database.dart';
 import '../../../../domain/models/audio_output_info.dart';
 import '../../../../domain/models/audio_quality_info.dart';
@@ -39,8 +41,12 @@ class AudioQualityBadge extends StatelessWidget {
         (c) => c.state.streamingQuality);
     final output = context.select<SettingsCubit, AudioOutputInfo?>(
         (c) => c.state.currentOutputDevice);
-    final info =
-        AudioQualityInfo.fromSong(song, streamingQuality: streamingQuality);
+    final info = AudioQualityInfo.fromSong(
+      song,
+      streamingQuality: streamingQuality,
+      dsdDopActive: DsdDecoderHelper.dsdDopActive,
+      dsdNativeActive: DsdDecoderHelper.dsdNativeActive,
+    );
     final isUsb = output?.isUsbDac == true;
     final isBitPerfect = output?.isBitPerfectActive == true;
     final isUsbStreaming =

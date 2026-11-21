@@ -313,7 +313,7 @@ class AppDatabase extends _$AppDatabase {
       // Local file rows: one row per (lowercased path, cue window). YouTube
       // sentinel rows (ytmusic://) are excluded — many share a path prefix.
       await executeSql(
-        "CREATE UNIQUE INDEX IF NOT EXISTS idx_songs_path_cue ON songs (path, ifnull(cue_start_ms, -1)) WHERE source = 'local';",
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_songs_path_cue ON songs (lower(path), ifnull(cue_start_ms, -1)) WHERE source = 'local';",
       );
       // One membership per (playlist, song); insertOrIgnore turns a race into
       // a no-op instead of a duplicate row.
@@ -499,6 +499,10 @@ class AppDatabase extends _$AppDatabase {
             // risking a failed upgrade.
             await customStatement('DROP INDEX IF EXISTS idx_songs_pending_dl;');
             await m.alterTable(TableMigration(songsTable));
+            await _createV11Constraints(customStatement, db: this);
+            await _createFtsTable(customStatement);
+            await customStatement(
+                "INSERT INTO songs_fts(songs_fts) VALUES('rebuild');");
           }
           // Must run after every addColumn above: several indexes cover columns a
           // later branch introduces, so creating them mid-ladder fails on an older

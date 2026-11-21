@@ -23,8 +23,10 @@ constexpr uint8_t kAudioStreamingSubclass = 0x02;
 constexpr uint8_t kProtocolUac1 = 0x00;
 constexpr uint8_t kProtocolUac2 = 0x20;
 
+constexpr uint8_t kCsSubtypeAsGeneral = 0x01;
 constexpr uint8_t kCsSubtypeFormatType = 0x02;
 constexpr uint8_t kFormatTypeI = 0x01;
+constexpr uint32_t kUac2FormatTypeIRawData = 0x80000000u;
 
 constexpr uint8_t kEndpointTransferMask = 0x03;
 constexpr uint8_t kEndpointTransferIsochronous = 0x01;
@@ -87,6 +89,8 @@ struct AltSummary {
     std::vector<MappedRate> rates;  // DSD-mapped rates, descriptor order
     int primaryRung = -1;           // ladder rung of the first mapped rate
     bool uac2 = true;               // layout selector, not part of the result
+    bool isUac2RawData = false;     // UAC2 AS_GENERAL bmFormats == TYPE_I_RAW_DATA
+    int asGeneralChannels = 0;      // UAC2 AS_GENERAL bNrChannels for 6-byte FORMAT_TYPE_I
 };
 
 // A UAC2/UAC1 FORMAT_TYPE_I payload. `d` points at the descriptor start and
@@ -102,6 +106,28 @@ bool ReadFormatTypeI(const uint8_t* d, int dlen, bool uac2, AltSummary* alt) {
     const int subslotOff = uac2 ? 4 : 5;
     const int freqTypeOff = uac2 ? 6 : 7;
     const int freqOff = uac2 ? 7 : 8;
+    // Standard USB Audio 2.0 FORMAT_TYPE_I is 6 bytes (bLength=6, no inline
+    // tSamFreq[]); channels and bmFormats come from the preceding AS_GENERAL.
+    // Valid 6-byte PCM alt settings emit no DSD rates without aborting parsing
+    // of sibling alt settings.
+    if (uac2 && dlen == 6) {
+        alt->rates.clear();
+        alt->primaryRung = -1;
+        const int subslot = d[4];
+        const int bitResolution = d[5];
+        if (subslot == 4 && bitResolution == 32 && alt->isUac2RawData &&
+            alt->asGeneralChannels >= 1 &&
+            alt->asGeneralChannels <= kMaxChannels) {
+            alt->channels = alt->asGeneralChannels;
+            alt->primaryRung = 0;
+            for (int r = 0; r < 4; ++r) {
+                const int fps = kDsdLadderFramesPerSecond[r];
+                const int rate = DsdRateForAltSetting(fps, 4);
+                if (rate > 0) alt->rates.push_back(MappedRate{fps, rate});
+            }
+        }
+        return true;
+    }
     if (dlen <= freqTypeOff) return false;
 
     alt->rates.clear();
@@ -208,7 +234,19 @@ std::vector<DsdAltSetting> ParseImpl(const uint8_t* config, size_t len,
             alt.uac2 = proto != kProtocolUac1;
         } else if (dtype == kDescTypeCsInterface) {
             if (dlen < 3) return {};
-            if (isAudioStreaming && !hasFormat && config[i + 2] == kCsSubtypeFormatType) {
+            if (isAudioStreaming && alt.uac2 &&
+                config[i + 2] == kCsSubtypeAsGeneral && dlen >= 16) {
+                if (config[i + 5] == kFormatTypeI) {
+                    const uint32_t bmFormats =
+                        static_cast<uint32_t>(config[i + 6]) |
+                        (static_cast<uint32_t>(config[i + 7]) << 8) |
+                        (static_cast<uint32_t>(config[i + 8]) << 16) |
+                        (static_cast<uint32_t>(config[i + 9]) << 24);
+                    alt.isUac2RawData = (bmFormats == kUac2FormatTypeIRawData);
+                    alt.asGeneralChannels = config[i + 10];
+                }
+            } else if (isAudioStreaming && !hasFormat &&
+                       config[i + 2] == kCsSubtypeFormatType) {
                 if (dlen < 4) return {};
                 if (config[i + 3] == kFormatTypeI) {
                     hasFormat = true;
@@ -238,7 +276,8 @@ std::vector<DsdAltSetting> ParseImpl(const uint8_t* config, size_t len,
     for (size_t index = 0; index < alts.size(); ++index) {
         const AltSummary& altSetting = alts[index];
         const bool mono = altSetting.channels == 1;
-        if (!mono && !quirkListed && !HasAdjacentLadderRung(alts, index)) {
+        if (!mono && !quirkListed && !altSetting.isUac2RawData &&
+            !HasAdjacentLadderRung(alts, index)) {
             continue;
         }
         for (const MappedRate& rate : altSetting.rates) {

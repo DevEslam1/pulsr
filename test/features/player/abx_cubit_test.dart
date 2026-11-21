@@ -228,4 +228,24 @@ void main() {
 
     await cubit.close();
   });
+
+  test('playCondition handles switch failure without unhandled exception and rolls back active condition', () async {
+    var shouldThrow = false;
+    final cubit = AbxCubit(
+      switchCondition: (bypass) async {
+        if (shouldThrow) throw StateError('switch error');
+      },
+      isReady: () => true,
+    );
+    expect(cubit.start(), isTrue);
+
+    await cubit.playCondition(AbxStimulus.a);
+    expect(cubit.state.activeCondition, AbxStimulus.a);
+
+    shouldThrow = true;
+    await cubit.playCondition(AbxStimulus.b);
+    expect(cubit.state.activeCondition, AbxStimulus.a);
+
+    await cubit.close();
+  });
 }

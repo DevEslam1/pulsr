@@ -50,29 +50,31 @@ inline int16_t readLeInt16(const uint8_t* p) {
 
 // Bounded string read helper for NetCDF-3
 bool readNetCdfString(const uint8_t* data, size_t size, size_t& offset, std::string& outStr) {
-    if (offset + 4 > size) return false;
+    if (offset > size || size - offset < 4) return false;
     uint32_t len = readBe32(data + offset);
     offset += 4;
-    size_t paddedLen = ((len + 3) / 4) * 4;
-    if (offset + paddedLen > size) return false;
+    if (len > 1024 * 1024) return false;
+    uint64_t paddedLen = ((static_cast<uint64_t>(len) + 3ULL) / 4ULL) * 4ULL;
+    if (paddedLen > static_cast<uint64_t>(size - offset)) return false;
     outStr.assign(reinterpret_cast<const char*>(data + offset), len);
-    offset += paddedLen;
+    offset += static_cast<size_t>(paddedLen);
     return true;
 }
 
 bool skipNetCdfAttrs(const uint8_t* data, size_t size, size_t& offset) {
-    if (offset + 4 > size) return false;
+    if (offset > size || size - offset < 4) return false;
     uint32_t tag = readBe32(data + offset);
     offset += 4;
     if (tag == 0) return true; // NC_UNSPECIFIED
     if (tag != 0x0000000C) return false; // NC_ATTRIBUTE
-    if (offset + 4 > size) return false;
+    if (offset > size || size - offset < 4) return false;
     uint32_t count = readBe32(data + offset);
     offset += 4;
+    if (count > 65536) return false;
     for (uint32_t i = 0; i < count; ++i) {
         std::string name;
         if (!readNetCdfString(data, size, offset, name)) return false;
-        if (offset + 8 > size) return false;
+        if (offset > size || size - offset < 8) return false;
         uint32_t type = readBe32(data + offset);
         uint32_t len = readBe32(data + offset + 4);
         offset += 8;
@@ -80,10 +82,10 @@ bool skipNetCdfAttrs(const uint8_t* data, size_t size, size_t& offset) {
         if (type == 3) elemSize = 2; // short
         else if (type == 4 || type == 5) elemSize = 4; // int/float
         else if (type == 6) elemSize = 8; // double
-        size_t bytes = len * elemSize;
-        size_t paddedBytes = ((bytes + 3) / 4) * 4;
-        if (offset + paddedBytes > size) return false;
-        offset += paddedBytes;
+        uint64_t bytes = static_cast<uint64_t>(len) * static_cast<uint64_t>(elemSize);
+        uint64_t paddedBytes = ((bytes + 3ULL) / 4ULL) * 4ULL;
+        if (paddedBytes > static_cast<uint64_t>(size - offset)) return false;
+        offset += static_cast<size_t>(paddedBytes);
     }
     return true;
 }
@@ -181,6 +183,8 @@ void fillSyntheticQuad(HrirQuad& quad, double azimuthDeg, double elevationDeg,
     const double maxDelaySec = headRadius / speedOfSound * (M_PI / 2.0 + 1.0); // ~0.65ms
 
     // Woodworth model for angle theta (radians)
+    const double safeSr = (sampleRate > 0.0 && std::isfinite(sampleRate)) ? sampleRate : 48000.0;
+    const double srScale = safeSr / 48000.0;
     auto computeEarImpulse = [&](double thetaRad, std::vector<float>& ipsi, std::vector<float>& contra) {
         double sinTheta = std::sin(thetaRad);
         double delaySec = 0.0;
@@ -191,14 +195,16 @@ void fillSyntheticQuad(HrirQuad& quad, double azimuthDeg, double elevationDeg,
         }
         delaySec = std::clamp(delaySec, 0.0, maxDelaySec);
 
-        int delaySamples = static_cast<int>(std::round(delaySec * sampleRate));
+        int delaySamples = static_cast<int>(std::round(delaySec * safeSr));
         delaySamples = std::clamp(delaySamples, 0, quad.taps / 2);
 
-        // Ipsilateral ear receives direct arrival with slight pinna reflection
-        int ipsiOnset = 4;
+        // Ipsilateral ear receives direct arrival with sample-rate-scaled pinna reflections
+        const int ipsiOnset = std::clamp(static_cast<int>(std::round(4.0 * srScale)), 1, quad.taps / 4);
+        const int notch1 = std::max(1, static_cast<int>(std::round(3.0 * srScale)));
+        const int notch2 = std::max(notch1 + 1, static_cast<int>(std::round(7.0 * srScale)));
         if (ipsiOnset < quad.taps) ipsi[ipsiOnset] = 0.95f;
-        if (ipsiOnset + 3 < quad.taps) ipsi[ipsiOnset + 3] = -0.15f; // pinna notch
-        if (ipsiOnset + 7 < quad.taps) ipsi[ipsiOnset + 7] = 0.08f;
+        if (ipsiOnset + notch1 < quad.taps) ipsi[ipsiOnset + notch1] = -0.15f; // pinna notch
+        if (ipsiOnset + notch2 < quad.taps) ipsi[ipsiOnset + notch2] = 0.08f;
 
         // Contralateral ear receives head-shadowed arrival with ITD delay and low-pass filter
         int contraOnset = ipsiOnset + delaySamples;
@@ -212,7 +218,7 @@ void fillSyntheticQuad(HrirQuad& quad, double azimuthDeg, double elevationDeg,
         if (contraOnset + 2 < quad.taps) contra[contraOnset + 2] = h2;
 
         // Apply smooth cosine taper to tail to prevent truncation clicks
-        int taperLen = std::min(16, quad.taps / 4);
+        int taperLen = std::min(quad.taps / 4, std::max(16, static_cast<int>(std::round(16.0 * srScale))));
         int taperStart = quad.taps - taperLen;
         for (int i = taperStart; i < quad.taps; ++i) {
             float phase = static_cast<float>(i - taperStart) / static_cast<float>(taperLen);
@@ -397,13 +403,18 @@ bool HrtfBinaural::parseSofaNetCdf3(const uint8_t* data, size_t size, SofaDatase
     offset += 4;
 
     // Dimensions
-    if (offset + 4 > size) return false;
+    if (offset > size || size - offset < 4) return false;
     uint32_t dimTag = readBe32(data + offset);
     offset += 4;
     if (dimTag != 0 && dimTag != 0x0000000A) return false;
 
-    uint32_t dimCount = (dimTag == 0x0000000A) ? readBe32(data + offset) : 0;
-    if (dimTag == 0x0000000A) offset += 4;
+    uint32_t dimCount = 0;
+    if (dimTag == 0x0000000A) {
+        if (offset > size || size - offset < 4) return false;
+        dimCount = readBe32(data + offset);
+        offset += 4;
+    }
+    if (dimCount > 1024) return false;
 
     int dimM = 0; // measurements
     int dimR = 2; // receivers
@@ -412,12 +423,14 @@ bool HrtfBinaural::parseSofaNetCdf3(const uint8_t* data, size_t size, SofaDatase
     int dimE = 1; // emitters
 
     std::vector<std::pair<std::string, uint32_t>> dims;
+    dims.reserve(dimCount);
     for (uint32_t i = 0; i < dimCount; ++i) {
         std::string dimName;
         if (!readNetCdfString(data, size, offset, dimName)) return false;
-        if (offset + 4 > size) return false;
+        if (offset > size || size - offset < 4) return false;
         uint32_t len = readBe32(data + offset);
         offset += 4;
+        if (len > 0x7FFFFFFFu) return false;
         dims.push_back({dimName, len});
 
         if (dimName == "M") dimM = static_cast<int>(len);
@@ -431,13 +444,18 @@ bool HrtfBinaural::parseSofaNetCdf3(const uint8_t* data, size_t size, SofaDatase
     if (!skipNetCdfAttrs(data, size, offset)) return false;
 
     // Variables
-    if (offset + 4 > size) return false;
+    if (offset > size || size - offset < 4) return false;
     uint32_t varTag = readBe32(data + offset);
     offset += 4;
     if (varTag != 0 && varTag != 0x0000000B) return false;
 
-    uint32_t varCount = (varTag == 0x0000000B) ? readBe32(data + offset) : 0;
-    if (varTag == 0x0000000B) offset += 4;
+    uint32_t varCount = 0;
+    if (varTag == 0x0000000B) {
+        if (offset > size || size - offset < 4) return false;
+        varCount = readBe32(data + offset);
+        offset += 4;
+    }
+    if (varCount > 4096) return false;
 
     struct VarInfo {
         std::string name;
@@ -447,34 +465,37 @@ bool HrtfBinaural::parseSofaNetCdf3(const uint8_t* data, size_t size, SofaDatase
         uint64_t begin = 0;
     };
     std::vector<VarInfo> vars;
+    vars.reserve(varCount);
 
     for (uint32_t i = 0; i < varCount; ++i) {
         VarInfo vi;
         if (!readNetCdfString(data, size, offset, vi.name)) return false;
-        if (offset + 4 > size) return false;
+        if (offset > size || size - offset < 4) return false;
         uint32_t vDimCount = readBe32(data + offset);
         offset += 4;
+        if (vDimCount > 64) return false;
+        vi.dimIds.reserve(vDimCount);
         for (uint32_t d = 0; d < vDimCount; ++d) {
-            if (offset + 4 > size) return false;
+            if (offset > size || size - offset < 4) return false;
             vi.dimIds.push_back(readBe32(data + offset));
             offset += 4;
         }
         if (!skipNetCdfAttrs(data, size, offset)) return false;
-        if (offset + 8 > size) return false;
+        if (offset > size || size - offset < 8) return false;
         vi.type = readBe32(data + offset);
         vi.vsize = readBe32(data + offset + 4);
         offset += 8;
 
         if (is64BitOffset) {
-            if (offset + 8 > size) return false;
+            if (offset > size || size - offset < 8) return false;
             vi.begin = readBe64(data + offset);
             offset += 8;
         } else {
-            if (offset + 4 > size) return false;
+            if (offset > size || size - offset < 4) return false;
             vi.begin = readBe32(data + offset);
             offset += 4;
         }
-        vars.push_back(vi);
+        vars.push_back(std::move(vi));
     }
 
     // Find variables: Data.IR, SourcePosition, Data.SamplingRate
@@ -489,7 +510,12 @@ bool HrtfBinaural::parseSofaNetCdf3(const uint8_t* data, size_t size, SofaDatase
     }
 
     if (!irVar || !posVar) return false;
-    if (dimM <= 0 || dimN <= 0 || dimN > MAX_HRIR_TAPS) return false;
+    if (dimM <= 0 || dimM > 100000 ||
+        dimR < 2 || dimR > 8 ||
+        dimC < 2 || dimC > 16 ||
+        dimN <= 0 || dimN > MAX_HRIR_TAPS) {
+        return false;
+    }
 
     outDataset.numMeasurements = dimM;
     outDataset.numReceivers = dimR;
@@ -498,9 +524,9 @@ bool HrtfBinaural::parseSofaNetCdf3(const uint8_t* data, size_t size, SofaDatase
 
     // Parse sampling rate if present
     if (srVar && srVar->begin < size) {
-        if (srVar->type == 6 && srVar->begin + 8 <= size) {
+        if (srVar->type == 6 && size - srVar->begin >= 8) {
             outDataset.sampleRate = readBeDouble(data + srVar->begin);
-        } else if (srVar->type == 5 && srVar->begin + 4 <= size) {
+        } else if (srVar->type == 5 && size - srVar->begin >= 4) {
             outDataset.sampleRate = readBeFloat(data + srVar->begin);
         }
     }
@@ -508,44 +534,59 @@ bool HrtfBinaural::parseSofaNetCdf3(const uint8_t* data, size_t size, SofaDatase
         outDataset.sampleRate = 48000.0;
     }
 
-    // Parse SourcePosition [M, C=3]: azimuth, elevation, distance
+    // Parse SourcePosition [M, C]: azimuth, elevation, (optional distance)
+    const uint64_t posElemSize = (posVar->type == 6) ? 8ULL : (posVar->type == 5 ? 4ULL : 0ULL);
+    if (posElemSize == 0) return false;
+    const uint64_t posStrideBytes = static_cast<uint64_t>(dimC) * posElemSize;
+    const uint64_t totalPosBytes = static_cast<uint64_t>(dimM) * posStrideBytes;
+    if (totalPosBytes > static_cast<uint64_t>(size) ||
+        posVar->begin > static_cast<uint64_t>(size) - totalPosBytes) {
+        return false;
+    }
+
     outDataset.azimuths.resize(dimM);
     outDataset.elevations.resize(dimM);
-    size_t posOffset = posVar->begin;
+    size_t posOffset = static_cast<size_t>(posVar->begin);
     for (int m = 0; m < dimM; ++m) {
         double az = 0.0, el = 0.0;
         if (posVar->type == 6) { // double
-            if (posOffset + 16 > size) return false;
             az = readBeDouble(data + posOffset);
             el = readBeDouble(data + posOffset + 8);
-            posOffset += dimC * 8;
-        } else if (posVar->type == 5) { // float
-            if (posOffset + 8 > size) return false;
+        } else { // float
             az = readBeFloat(data + posOffset);
             el = readBeFloat(data + posOffset + 4);
-            posOffset += dimC * 4;
         }
-        outDataset.azimuths[m] = az;
-        outDataset.elevations[m] = el;
+        posOffset += static_cast<size_t>(posStrideBytes);
+        outDataset.azimuths[m] = std::isfinite(az) ? az : 0.0;
+        outDataset.elevations[m] = std::isfinite(el) ? el : 0.0;
     }
 
     // Parse Data.IR [M, R, N]
-    size_t totalSamples = static_cast<size_t>(dimM) * dimR * dimN;
+    const uint64_t totalSamples64 =
+        static_cast<uint64_t>(dimM) * static_cast<uint64_t>(dimR) * static_cast<uint64_t>(dimN);
+    if (totalSamples64 == 0 || totalSamples64 > 64ULL * 1024ULL * 1024ULL) return false;
+    const uint64_t irElemSize = (irVar->type == 6) ? 8ULL : (irVar->type == 5 ? 4ULL : 0ULL);
+    if (irElemSize == 0) return false;
+    const uint64_t totalIrBytes = totalSamples64 * irElemSize;
+    if (totalIrBytes > static_cast<uint64_t>(size) ||
+        irVar->begin > static_cast<uint64_t>(size) - totalIrBytes) {
+        return false;
+    }
+
+    const size_t totalSamples = static_cast<size_t>(totalSamples64);
     outDataset.irData.resize(totalSamples);
-    size_t irOffset = irVar->begin;
+    const size_t irOffset = static_cast<size_t>(irVar->begin);
 
     if (irVar->type == 6) { // double
-        if (irOffset + totalSamples * 8 > size) return false;
         for (size_t i = 0; i < totalSamples; ++i) {
-            outDataset.irData[i] = static_cast<float>(readBeDouble(data + irOffset + i * 8));
+            float v = static_cast<float>(readBeDouble(data + irOffset + i * 8));
+            outDataset.irData[i] = std::isfinite(v) ? v : 0.0f;
         }
-    } else if (irVar->type == 5) { // float
-        if (irOffset + totalSamples * 4 > size) return false;
+    } else { // float
         for (size_t i = 0; i < totalSamples; ++i) {
-            outDataset.irData[i] = readBeFloat(data + irOffset + i * 4);
+            float v = readBeFloat(data + irOffset + i * 4);
+            outDataset.irData[i] = std::isfinite(v) ? v : 0.0f;
         }
-    } else {
-        return false;
     }
 
     return true;
@@ -793,16 +834,17 @@ bool HrtfBinaural::buildQuadLocked(int slot, double azimuthDeg, double elevation
     }
 
     if (source_ == IrSource::Custom) {
-        const int srcTaps = customIrSource_.taps;
+        if (!customIrSource_) return false;
+        const int srcTaps = customIrSource_->taps;
         if (srcTaps <= 0 ||
-            customIrSource_.hLL.size() < static_cast<size_t>(srcTaps) ||
-            customIrSource_.hLR.size() < static_cast<size_t>(srcTaps) ||
-            customIrSource_.hRL.size() < static_cast<size_t>(srcTaps) ||
-            customIrSource_.hRR.size() < static_cast<size_t>(srcTaps)) {
+            customIrSource_->hLL.size() < static_cast<size_t>(srcTaps) ||
+            customIrSource_->hLR.size() < static_cast<size_t>(srcTaps) ||
+            customIrSource_->hRL.size() < static_cast<size_t>(srcTaps) ||
+            customIrSource_->hRR.size() < static_cast<size_t>(srcTaps)) {
             return false;
         }
-        const double srcRate = customIrSource_.sampleRate > 0.0
-                                   ? customIrSource_.sampleRate
+        const double srcRate = customIrSource_->sampleRate > 0.0
+                                   ? customIrSource_->sampleRate
                                    : 48000.0;
         int taps = static_cast<int>(
             std::ceil(static_cast<double>(srcTaps) * engineSampleRate / srcRate));
@@ -812,18 +854,22 @@ bool HrtfBinaural::buildQuadLocked(int slot, double azimuthDeg, double elevation
         quad.hLR.resize(static_cast<size_t>(taps));
         quad.hRL.resize(static_cast<size_t>(taps));
         quad.hRR.resize(static_cast<size_t>(taps));
-        resampleIr(customIrSource_.hLL.data(), srcTaps, srcRate, engineSampleRate,
+        resampleIr(customIrSource_->hLL.data(), srcTaps, srcRate, engineSampleRate,
                    quad.hLL.data(), taps);
-        resampleIr(customIrSource_.hLR.data(), srcTaps, srcRate, engineSampleRate,
+        resampleIr(customIrSource_->hLR.data(), srcTaps, srcRate, engineSampleRate,
                    quad.hLR.data(), taps);
-        resampleIr(customIrSource_.hRL.data(), srcTaps, srcRate, engineSampleRate,
+        resampleIr(customIrSource_->hRL.data(), srcTaps, srcRate, engineSampleRate,
                    quad.hRL.data(), taps);
-        resampleIr(customIrSource_.hRR.data(), srcTaps, srcRate, engineSampleRate,
+        resampleIr(customIrSource_->hRR.data(), srcTaps, srcRate, engineSampleRate,
                    quad.hRR.data(), taps);
         return true;
     }
 
-    fillSyntheticQuad(quad, azimuthDeg, elevationDeg, engineSampleRate, DEFAULT_HRIR_TAPS);
+    const int synthTaps = std::clamp(
+        static_cast<int>(std::round(static_cast<double>(DEFAULT_HRIR_TAPS) *
+                                    (engineSampleRate / 48000.0))),
+        DEFAULT_HRIR_TAPS, MAX_HRIR_TAPS);
+    fillSyntheticQuad(quad, azimuthDeg, elevationDeg, engineSampleRate, synthTaps);
     return true;
 }
 
@@ -882,6 +928,7 @@ bool HrtfBinaural::loadSofaMemory(const uint8_t* data, size_t size) {
     // ever reads one of the immutable, preallocated quad slots, so installing a
     // dataset never mutates memory the render thread is convolving.
     dataset_ = std::move(dataset);
+    customIrSource_.reset();
     source_ = IrSource::Dataset;
     hasDataset_.store(true, std::memory_order_relaxed);
     hasPublished_ = false;
@@ -898,6 +945,7 @@ bool HrtfBinaural::loadSofaMemory(const uint8_t* data, size_t size) {
 bool HrtfBinaural::clearDataset() {
     std::lock_guard<std::mutex> lock(prepareMutex_);
     dataset_.reset();
+    customIrSource_.reset();
     hasDataset_.store(false, std::memory_order_relaxed);
     source_ = IrSource::Synthetic;
     hasPublished_ = false;
@@ -911,6 +959,7 @@ void HrtfBinaural::setDataset(std::shared_ptr<const SofaDataset> dataset) {
     if (dataset == dataset_) return;
     if (dataset) {
         dataset_ = std::move(dataset);
+        customIrSource_.reset();
         source_ = IrSource::Dataset;
         hasDataset_.store(true, std::memory_order_relaxed);
     } else {
@@ -928,6 +977,58 @@ void HrtfBinaural::setDataset(std::shared_ptr<const SofaDataset> dataset) {
 std::shared_ptr<const SofaDataset> HrtfBinaural::getDataset() const {
     std::lock_guard<std::mutex> lock(prepareMutex_);
     return dataset_;
+}
+
+void HrtfBinaural::setCustomIr(std::shared_ptr<const HrirQuad> customIr) {
+    std::lock_guard<std::mutex> lock(prepareMutex_);
+    if (customIr == customIrSource_) return;
+    if (customIr) {
+        customIrSource_ = std::move(customIr);
+        dataset_.reset();
+        source_ = IrSource::Custom;
+        hasDataset_.store(false, std::memory_order_relaxed);
+    } else {
+        if (source_ != IrSource::Custom) return;
+        customIrSource_.reset();
+        source_ = IrSource::Synthetic;
+        hasDataset_.store(false, std::memory_order_relaxed);
+    }
+    hasPublished_ = false;
+}
+
+std::shared_ptr<const HrirQuad> HrtfBinaural::getCustomIr() const {
+    std::lock_guard<std::mutex> lock(prepareMutex_);
+    return customIrSource_;
+}
+
+void HrtfBinaural::applySnapshotSources(std::shared_ptr<const SofaDataset> dataset,
+                                        std::shared_ptr<const HrirQuad> customIr) {
+    std::lock_guard<std::mutex> lock(prepareMutex_);
+    if (customIr) {
+        if (customIr == customIrSource_ && source_ == IrSource::Custom) return;
+        customIrSource_ = std::move(customIr);
+        dataset_.reset();
+        source_ = IrSource::Custom;
+        hasDataset_.store(false, std::memory_order_relaxed);
+        hasPublished_ = false;
+        return;
+    }
+    if (dataset) {
+        if (dataset == dataset_ && source_ == IrSource::Dataset) return;
+        dataset_ = std::move(dataset);
+        customIrSource_.reset();
+        source_ = IrSource::Dataset;
+        hasDataset_.store(true, std::memory_order_relaxed);
+        hasPublished_ = false;
+        return;
+    }
+    if (source_ != IrSource::Synthetic || dataset_ || customIrSource_) {
+        dataset_.reset();
+        customIrSource_.reset();
+        source_ = IrSource::Synthetic;
+        hasDataset_.store(false, std::memory_order_relaxed);
+        hasPublished_ = false;
+    }
 }
 
 bool HrtfBinaural::loadWavHrir(const std::string& path) {
@@ -949,17 +1050,17 @@ bool HrtfBinaural::loadWavHrirMemory(const uint8_t* data, size_t size) {
     double wavSr = 48000.0;
     if (!parseWavHrir(data, size, wavL, wavR, channels, wavSr)) return false;
 
-    HrirQuad source;
-    source.taps = std::min<int>(static_cast<int>(wavL.size()), MAX_HRIR_TAPS);
-    source.sampleRate = wavSr;
-    source.azimuthDeg = targetAzimuthDeg_.load(std::memory_order_relaxed);
-    source.elevationDeg = targetElevationDeg_.load(std::memory_order_relaxed);
+    auto source = std::make_shared<HrirQuad>();
+    source->taps = std::min<int>(static_cast<int>(wavL.size()), MAX_HRIR_TAPS);
+    source->sampleRate = wavSr;
+    source->azimuthDeg = targetAzimuthDeg_.load(std::memory_order_relaxed);
+    source->elevationDeg = targetElevationDeg_.load(std::memory_order_relaxed);
 
-    source.hLL.assign(wavL.begin(), wavL.begin() + source.taps);
-    source.hLR.assign(wavR.begin(), wavR.begin() + source.taps);
+    source->hLL.assign(wavL.begin(), wavL.begin() + source->taps);
+    source->hLR.assign(wavR.begin(), wavR.begin() + source->taps);
     // Mirror for symmetric virtual stereo pair
-    source.hRR = source.hLL;
-    source.hRL = source.hLR;
+    source->hRR = source->hLL;
+    source->hRL = source->hLR;
 
     std::lock_guard<std::mutex> lock(prepareMutex_);
     customIrSource_ = std::move(source);
@@ -976,16 +1077,16 @@ bool HrtfBinaural::loadCustomIr(const float* ll, const float* lr, const float* r
                                int taps, double irSampleRate) {
     if (!ll || !lr || !rl || !rr || taps <= 0 || taps > MAX_HRIR_TAPS) return false;
 
-    HrirQuad source;
-    source.taps = taps;
-    source.sampleRate = irSampleRate > 0.0 ? irSampleRate : 48000.0;
-    source.azimuthDeg = targetAzimuthDeg_.load(std::memory_order_relaxed);
-    source.elevationDeg = targetElevationDeg_.load(std::memory_order_relaxed);
+    auto source = std::make_shared<HrirQuad>();
+    source->taps = taps;
+    source->sampleRate = irSampleRate > 0.0 ? irSampleRate : 48000.0;
+    source->azimuthDeg = targetAzimuthDeg_.load(std::memory_order_relaxed);
+    source->elevationDeg = targetElevationDeg_.load(std::memory_order_relaxed);
 
-    source.hLL.assign(ll, ll + taps);
-    source.hLR.assign(lr, lr + taps);
-    source.hRL.assign(rl, rl + taps);
-    source.hRR.assign(rr, rr + taps);
+    source->hLL.assign(ll, ll + taps);
+    source->hLR.assign(lr, lr + taps);
+    source->hRL.assign(rl, rl + taps);
+    source->hRR.assign(rr, rr + taps);
 
     std::lock_guard<std::mutex> lock(prepareMutex_);
     customIrSource_ = std::move(source);
@@ -1008,14 +1109,17 @@ bool HrtfBinaural::copyActiveQuad(HrirQuad& out) const {
 inline void HrtfBinaural::processFrame(float inL, float inR, float& outL, float& outR,
                                       float currentEnabledMix, float crossfadeStep,
                                       const HrirQuad* qNew, const HrirQuad* qOld) {
-    // Write new sample to circular buffer (doubled write for contiguous indexing)
+    if (!std::isfinite(inL)) inL = 0.0f;
+    if (!std::isfinite(inR)) inR = 0.0f;
+    // Write new sample to circular buffer (doubled write for contiguous indexing).
+    // Reading from `historyIdx_` places x[n] at index 0, x[n-1] at 1, ...
     historyL_[historyIdx_] = inL;
     historyL_[historyIdx_ + MAX_HRIR_TAPS] = inL;
     historyR_[historyIdx_] = inR;
     historyR_[historyIdx_ + MAX_HRIR_TAPS] = inR;
 
-    const float* histL = historyL_ + historyIdx_ + 1;
-    const float* histR = historyR_ + historyIdx_ + 1;
+    const float* histL = historyL_ + historyIdx_;
+    const float* histR = historyR_ + historyIdx_;
 
     historyIdx_--;
     if (historyIdx_ < 0) {
@@ -1090,11 +1194,19 @@ void HrtfBinaural::process(const float* inL, const float* inR, float* outL, floa
         oldSlotAtomic_.store(activeSlot_, std::memory_order_release);
     }
 
-    bool enabled = enabled_.load(std::memory_order_relaxed);
-    float targetMix = enabled ? 1.0f : 0.0f;
-    float mixStep = (targetMix - smoothedEnabledMix_) / static_cast<float>(frames);
+    const bool enabled = enabled_.load(std::memory_order_relaxed);
+    if (!enabled && smoothedEnabledMix_ <= 1e-6f) {
+        smoothedEnabledMix_ = 0.0f;
+        if (outL != inL) std::memcpy(outL, inL, static_cast<size_t>(frames) * sizeof(float));
+        if (outR != inR) std::memcpy(outR, inR, static_cast<size_t>(frames) * sizeof(float));
+        return;
+    }
+
+    const float targetMix = enabled ? 1.0f : 0.0f;
     const double sr = engineSampleRate_.load(std::memory_order_relaxed);
-    float crossfadeStep = (sr > 0.0) ? (1.0f / (0.015f * static_cast<float>(sr))) : 0.001f;
+    const float effSr = (sr > 0.0 && std::isfinite(sr)) ? static_cast<float>(sr) : 48000.0f;
+    const float mixStep = 1.0f / std::max(1.0f, 0.020f * effSr);
+    const float crossfadeStep = 1.0f / std::max(1.0f, 0.015f * effSr);
 
     const HrirQuad* qNew = (activeSlot_ >= 0 && activeSlot_ < kHrirSlotCount)
                                ? &slots_[activeSlot_]
@@ -1105,11 +1217,19 @@ void HrtfBinaural::process(const float* inL, const float* inR, float* outL, floa
                                : nullptr;
 
     for (int i = 0; i < frames; ++i) {
-        smoothedEnabledMix_ += mixStep;
+        if (smoothedEnabledMix_ < targetMix) {
+            smoothedEnabledMix_ = std::min(targetMix, smoothedEnabledMix_ + mixStep);
+        } else if (smoothedEnabledMix_ > targetMix) {
+            smoothedEnabledMix_ = std::max(targetMix, smoothedEnabledMix_ - mixStep);
+        }
         processFrame(inL[i], inR[i], outL[i], outR[i], smoothedEnabledMix_,
                      crossfadeStep, qNew, qOld);
     }
-    smoothedEnabledMix_ = targetMix;
+
+    if (oldSlot_ != activeSlot_ && crossfadeProgress_ >= 1.0f) {
+        oldSlot_ = activeSlot_;
+        oldSlotAtomic_.store(activeSlot_, std::memory_order_release);
+    }
 }
 
 void HrtfBinaural::processInterleaved(float* buffer, int frames, int channels) {
@@ -1123,11 +1243,17 @@ void HrtfBinaural::processInterleaved(float* buffer, int frames, int channels) {
         oldSlotAtomic_.store(activeSlot_, std::memory_order_release);
     }
 
-    bool enabled = enabled_.load(std::memory_order_relaxed);
-    float targetMix = enabled ? 1.0f : 0.0f;
-    float mixStep = (targetMix - smoothedEnabledMix_) / static_cast<float>(frames);
+    const bool enabled = enabled_.load(std::memory_order_relaxed);
+    if (!enabled && smoothedEnabledMix_ <= 1e-6f) {
+        smoothedEnabledMix_ = 0.0f;
+        return;
+    }
+
+    const float targetMix = enabled ? 1.0f : 0.0f;
     const double sr = engineSampleRate_.load(std::memory_order_relaxed);
-    float crossfadeStep = (sr > 0.0) ? (1.0f / (0.015f * static_cast<float>(sr))) : 0.001f;
+    const float effSr = (sr > 0.0 && std::isfinite(sr)) ? static_cast<float>(sr) : 48000.0f;
+    const float mixStep = 1.0f / std::max(1.0f, 0.020f * effSr);
+    const float crossfadeStep = 1.0f / std::max(1.0f, 0.015f * effSr);
 
     const HrirQuad* qNew = (activeSlot_ >= 0 && activeSlot_ < kHrirSlotCount)
                                ? &slots_[activeSlot_]
@@ -1137,7 +1263,11 @@ void HrtfBinaural::processInterleaved(float* buffer, int frames, int channels) {
                                ? &slots_[oldSlot_]
                                : nullptr;
     for (int i = 0; i < frames; ++i) {
-        smoothedEnabledMix_ += mixStep;
+        if (smoothedEnabledMix_ < targetMix) {
+            smoothedEnabledMix_ = std::min(targetMix, smoothedEnabledMix_ + mixStep);
+        } else if (smoothedEnabledMix_ > targetMix) {
+            smoothedEnabledMix_ = std::max(targetMix, smoothedEnabledMix_ - mixStep);
+        }
         float inL = buffer[i * channels];
         float inR = buffer[i * channels + 1];
         float outL = inL, outR = inR;
@@ -1146,7 +1276,11 @@ void HrtfBinaural::processInterleaved(float* buffer, int frames, int channels) {
         buffer[i * channels] = outL;
         buffer[i * channels + 1] = outR;
     }
-    smoothedEnabledMix_ = targetMix;
+
+    if (oldSlot_ != activeSlot_ && crossfadeProgress_ >= 1.0f) {
+        oldSlot_ = activeSlot_;
+        oldSlotAtomic_.store(activeSlot_, std::memory_order_release);
+    }
 }
 
 } // namespace pulsr

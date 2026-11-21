@@ -28,6 +28,15 @@ class _VinylTurntableDeckState extends State<_VinylTurntableDeck> {
   );
 
   @override
+  void didUpdateWidget(covariant _VinylTurntableDeck oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.props.state.currentSong?.id !=
+        widget.props.state.currentSong?.id) {
+      _scrub.cancel();
+    }
+  }
+
+  @override
   void dispose() {
     _scrub.dispose();
     super.dispose();
@@ -340,7 +349,9 @@ class _VinylTurntableDeckState extends State<_VinylTurntableDeck> {
                                       (step / 120.0).clamp(0.0, 1.0);
                                   final playAngle = 0.35 + (progress * 0.14);
                                   return AnimatedBuilder(
-                                    animation: widget.tonearmAnimation,
+                                    animation: Listenable.merge(
+                                      [widget.tonearmAnimation, _scrub],
+                                    ),
                                     builder: (context, child) {
                                       final currentAngle = -0.06 +
                                           ((playAngle - (-0.06)) *

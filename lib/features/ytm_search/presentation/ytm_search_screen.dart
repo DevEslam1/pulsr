@@ -520,8 +520,7 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
         Expanded(
           child: PulsrRefreshIndicator(
             onRefresh: () async {
-              cubit.retry();
-              await Future.delayed(const Duration(milliseconds: 300));
+              await cubit.retry();
             },
             child: NotificationListener<ScrollNotification>(
               onNotification: (notification) {

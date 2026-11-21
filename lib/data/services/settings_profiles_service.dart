@@ -231,53 +231,75 @@ class SettingsProfile {
 @singleton
 class SettingsProfilesService {
   static const String _keyProfiles = 'setting_custom_profiles';
+  static const String _keyInitialized = 'setting_custom_profiles_initialized';
 
   /// Serializes the read-modify-write of the profiles list. Without it, two
   /// concurrent [saveProfile]/[deleteProfile] calls can read the same snapshot
   /// and the later write silently drops the other mutation.
   final Mutex _prefsMutex = Mutex();
 
-  Future<List<SettingsProfile>> getProfiles() async {
+  Future<List<SettingsProfile>?> _loadProfilesRaw() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      final isInitialized = prefs.getBool(_keyInitialized) ?? false;
       final jsonStr = prefs.getString(_keyProfiles);
-      if (jsonStr != null) {
-        final list = json.decode(jsonStr);
-        if (list is List) {
-          final profiles = <SettingsProfile>[];
-          for (final item in list) {
-            if (item is Map) {
-              try {
-                final map = Map<String, dynamic>.from(item);
-                final profile = SettingsProfile.fromJson(map);
-                if (profile.id.isNotEmpty) {
-                  profiles.add(profile);
-                }
-              } catch (e, st) {
-                ErrorLogger.log(
-                  'Skipping malformed settings profile entry',
-                  error: e,
-                  stackTrace: st,
-                  category: 'SettingsProfilesService',
-                );
-              }
+
+      if (jsonStr == null) {
+        if (!isInitialized) {
+          // Never initialized: return default profiles
+          return List<SettingsProfile>.from(SettingsProfile.defaultProfiles);
+        }
+        // Explicitly initialized, but key is missing
+        return <SettingsProfile>[];
+      }
+
+      final dynamic list = json.decode(jsonStr);
+      if (list is! List) {
+        throw FormatException('Settings profiles JSON is not a List: $jsonStr');
+      }
+
+      final profiles = <SettingsProfile>[];
+      for (final item in list) {
+        if (item is Map) {
+          try {
+            final map = Map<String, dynamic>.from(item);
+            final profile = SettingsProfile.fromJson(map);
+            if (profile.id.isNotEmpty) {
+              profiles.add(profile);
             }
-          }
-          if (profiles.isNotEmpty) {
-            return profiles;
+          } catch (e, st) {
+            ErrorLogger.log(
+              'Skipping malformed settings profile entry',
+              error: e,
+              stackTrace: st,
+              category: 'SettingsProfilesService',
+            );
           }
         }
       }
+      return profiles;
     } catch (e, st) {
       ErrorLogger.log('Failed to load settings profiles',
           error: e, stackTrace: st, category: 'SettingsProfilesService');
+      return null;
     }
-    return SettingsProfile.defaultProfiles;
+  }
+
+  Future<List<SettingsProfile>> getProfiles() async {
+    final profiles = await _loadProfilesRaw();
+    return profiles ?? SettingsProfile.defaultProfiles;
   }
 
   Future<void> saveProfile(SettingsProfile profile) =>
       _prefsMutex.protect(() async {
-        final list = await getProfiles();
+        final list = await _loadProfilesRaw();
+        if (list == null) {
+          ErrorLogger.log(
+            'Refusing to save profile into corrupt settings profiles storage',
+            category: 'SettingsProfilesService',
+          );
+          return;
+        }
         final updated = List<SettingsProfile>.from(list);
         final idx = updated.indexWhere((p) => p.id == profile.id);
         if (idx >= 0) {
@@ -286,15 +308,24 @@ class SettingsProfilesService {
           updated.add(profile);
         }
         final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool(_keyInitialized, true);
         await prefs.setString(
             _keyProfiles, json.encode(updated.map((p) => p.toJson()).toList()));
       });
 
   Future<void> deleteProfile(String profileId) => _prefsMutex.protect(() async {
-        final list = await getProfiles();
+        final list = await _loadProfilesRaw();
+        if (list == null) {
+          ErrorLogger.log(
+            'Refusing to delete profile from corrupt settings profiles storage',
+            category: 'SettingsProfilesService',
+          );
+          return;
+        }
         final updated = List<SettingsProfile>.from(list);
         updated.removeWhere((p) => p.id == profileId);
         final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool(_keyInitialized, true);
         await prefs.setString(
             _keyProfiles, json.encode(updated.map((p) => p.toJson()).toList()));
       });

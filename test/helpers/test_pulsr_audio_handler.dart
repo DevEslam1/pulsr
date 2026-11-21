@@ -424,6 +424,15 @@ class TestPulsrAudioHandler extends BaseAudioHandler
     int? mode,
     bool? preferenceEnabled,
   }) async {}
+
+  @override
+  Future<void> setHrtfBinaural(
+    bool enabled, {
+    double? azimuth,
+    double? elevation,
+    String? sofaPath,
+    bool? preferenceEnabled,
+  }) async {}
   @override
   Future<void> setLookaheadLimiter(
     bool enabled, {

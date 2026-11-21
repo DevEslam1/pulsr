@@ -18884,6 +18884,60 @@ abstract class AppLocalizations {
   /// **'Audio Quality & Output'**
   String get commandPaletteActionAudioQuality;
 
+  /// Subtitle for Radio command in Command Palette
+  ///
+  /// In en, this message translates to:
+  /// **'Stream online radio stations'**
+  String get commandPaletteNavRadioSubtitle;
+
+  /// Title for Diagnostics command in Command Palette
+  ///
+  /// In en, this message translates to:
+  /// **'Diagnostics'**
+  String get commandPaletteNavDiagnostics;
+
+  /// Subtitle for Diagnostics command in Command Palette
+  ///
+  /// In en, this message translates to:
+  /// **'System logs, USB audio checks and safe mode'**
+  String get commandPaletteNavDiagnosticsSubtitle;
+
+  /// Title for Audio Profiles command in Command Palette
+  ///
+  /// In en, this message translates to:
+  /// **'Audio Profiles'**
+  String get commandPaletteNavAudioProfiles;
+
+  /// Subtitle for Audio Profiles command in Command Palette
+  ///
+  /// In en, this message translates to:
+  /// **'Saved sound and DSP presets'**
+  String get commandPaletteNavAudioProfilesSubtitle;
+
+  /// Title for DLNA / UPnP Cast command in Command Palette
+  ///
+  /// In en, this message translates to:
+  /// **'DLNA / UPnP Cast'**
+  String get commandPaletteNavDlna;
+
+  /// Subtitle for DLNA / UPnP Cast command in Command Palette
+  ///
+  /// In en, this message translates to:
+  /// **'Cast audio to network renderers and speakers'**
+  String get commandPaletteNavDlnaSubtitle;
+
+  /// Title for Podcasts & Audiobooks command in Command Palette
+  ///
+  /// In en, this message translates to:
+  /// **'Podcasts & Audiobooks'**
+  String get commandPaletteNavPodcasts;
+
+  /// Subtitle for Podcasts & Audiobooks command in Command Palette
+  ///
+  /// In en, this message translates to:
+  /// **'Long-form spoken word with position bookmarks'**
+  String get commandPaletteNavPodcastsSubtitle;
+
   /// Coach mark title for DSP mode
   ///
   /// In en, this message translates to:

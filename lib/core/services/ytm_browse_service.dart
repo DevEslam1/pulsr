@@ -218,11 +218,12 @@ class YtmBrowseService {
       items: items,
     );
     final cached = _cachedSections;
-    if (cached != null) {
+    if (cached != null && items.isNotEmpty) {
       _cachedSections = List<YtmBrowseSection>.unmodifiable([
         for (final existing in cached)
           if (existing.id == id) refreshed else existing,
       ]);
+      _lastFetchTime = _now();
     }
     return refreshed;
   }

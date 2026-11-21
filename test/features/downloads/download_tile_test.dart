@@ -9,6 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/theme/aura_theme.dart';
+import 'package:pulsr/core/widgets/pulsr_progress.dart';
 import 'package:pulsr/domain/models/download_task.dart';
 import 'package:pulsr/features/downloads/cubit/downloads_cubit.dart';
 import 'package:pulsr/features/downloads/cubit/downloads_state.dart';
@@ -113,7 +114,7 @@ void main() {
 
     expect(find.byIcon(Icons.downloading_rounded), findsOneWidget);
     expect(find.text(l10n.statusDownloading), findsOneWidget);
-    expect(find.byType(LinearProgressIndicator), findsOneWidget);
+    expect(find.byType(PulsrProgressBar), findsOneWidget);
     expect(find.text('50%'), findsOneWidget);
     expect(find.textContaining('KB/s'), findsOneWidget);
     expect(find.textContaining('0:05'), findsOneWidget);
@@ -128,8 +129,8 @@ void main() {
 
     expect(find.byIcon(Icons.tune_rounded), findsOneWidget);
     expect(find.text(l10n.statusEmbedding), findsOneWidget);
-    final bar = tester.widget<LinearProgressIndicator>(
-      find.byType(LinearProgressIndicator),
+    final bar = tester.widget<PulsrProgressBar>(
+      find.byType(PulsrProgressBar),
     );
     expect(bar.value, isNull);
   });
@@ -160,8 +161,8 @@ void main() {
     );
 
     expect(find.text('40%'), findsOneWidget);
-    final bar = tester.widget<LinearProgressIndicator>(
-      find.byType(LinearProgressIndicator),
+    final bar = tester.widget<PulsrProgressBar>(
+      find.byType(PulsrProgressBar),
     );
     expect(bar.value, closeTo(0.4, 0.001));
   });

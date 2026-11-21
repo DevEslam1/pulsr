@@ -50,6 +50,7 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
   StreamSubscription? _favoritesSub;
   StreamSubscription? _downloadedSub;
   int _songsToken = 0;
+  int _songsEmissionSeq = 0;
   int _genresToken = 0;
   int _yearsToken = 0;
   int _downloadedToken = 0;
@@ -210,6 +211,7 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
                 error: failure, isLoading: false, isLoadingMore: false));
           },
           (songs) async {
+            final emissionSeq = ++_songsEmissionSeq;
             if (isClosed || t != _songsToken) return;
             // Same optimistic-favorite overlay as the favorites watch: a live
             // DB emission can still carry the pre-toggle truth while a
@@ -229,7 +231,11 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
               final hasHitCap = songs.length >= ratingSortCap;
               final sortedSongs =
                   await _sortByRating(songs, ascending: state.ascending);
-              if (isClosed || t != _songsToken) return;
+              if (isClosed ||
+                  t != _songsToken ||
+                  emissionSeq != _songsEmissionSeq) {
+                return;
+              }
               // FIX-M02: Emit 5,000-cap notice as informational message rather than error
               safeEmit(state.copyWith(
                   songs: List<SongsTableData>.unmodifiable(sortedSongs),
@@ -244,7 +250,11 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
             // Hitting the cap means the DB may hold more rows.
             _hasMoreSongs = !isRatingSort && songs.length >= window;
             _isLoadingMoreSongs = false;
-            if (isClosed || t != _songsToken) return;
+            if (isClosed ||
+                t != _songsToken ||
+                emissionSeq != _songsEmissionSeq) {
+              return;
+            }
             safeEmit(state.copyWith(
                 songs: List<SongsTableData>.unmodifiable(songs),
                 error: null,

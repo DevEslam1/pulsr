@@ -49,9 +49,12 @@ public:
     /// engine's reported pipeline latency so 0..50 ms channel delays are not
     /// invisible to lyrics/gapless compensation.
     int getLatencyFrames() const {
+        if (!isEnabled() && !isRamping()) return 0;
+        const int activeCh = std::clamp(params_.channelCount, 2, MAX_CHANNELS);
         int maxDelay = 0;
-        for (int ch = 0; ch < MAX_CHANNELS; ++ch) {
-            if (delaySamples_[ch] > maxDelay) maxDelay = delaySamples_[ch];
+        for (int ch = 0; ch < activeCh; ++ch) {
+            const int smoothedCeiling = static_cast<int>(std::ceil(std::max(0.0f, smoothedDelaySamples_[ch])));
+            maxDelay = std::max(maxDelay, std::max(delaySamples_[ch], smoothedCeiling));
         }
         return maxDelay;
     }

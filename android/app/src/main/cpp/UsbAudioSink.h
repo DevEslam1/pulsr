@@ -319,6 +319,18 @@ private:
     // updates rawDepth (0 for the ASRC path, validBitDepth_ for raw pull).
     size_t fillPullPacket(uint8_t* dst, int framesInPacket, int& rawDepth);
     size_t fillAsrcPacket(uint8_t* dst, int framesInPacket, int& rawDepth);
+    // Live clock-drift ratio for ClockSyncAsrc (worker-thread only, lock-free).
+    // Uses feedbackRatePerSec_ / sampleRate_ when an explicit feedback endpoint
+    // is active, or proportional reservoir fillMs vs midpoint when feedback is
+    // absent; always clamped to [UsbAsrcClockSync::kMinRatio, kMaxRatio].
+    double computeAsrcRatio() const;
+    // Sizes ASRC staging buffers against maxFramesPerPacket_ (with a 2048-frame
+    // floor) so high-rate 10 ms packets cannot overflow asrcPack_/asrcOut_.
+    void allocateAsrcBuffers();
+    // Parses and validates the feedback endpoint descriptor, applying
+    // disableExplicitFeedback_ only after validation succeeds so malformed
+    // descriptors are never masked and feedbackPacketSize_ is cleanly zeroed.
+    bool configureFeedbackFromDescriptor(const uint8_t* config, size_t len);
     using UrbSubmit = int (*)(int fd, void* urb);
     static int submitUsbfsUrb(int fd, void* urb);
     // Establishes startup exclusivity before submitting; injectable syscall for
@@ -375,6 +387,8 @@ private:
     std::atomic<bool> exclusive_{false};
     std::atomic<bool> running_{false};
     std::atomic<int> lastError_{0};
+    std::atomic<int64_t> lastFaultLogNs_{0};
+    std::atomic<int64_t> lastRejectLogNs_{0};
     std::atomic<uint64_t> underrunCount_{0};
     std::atomic<uint64_t> overrunCount_{0};
     std::atomic<uint64_t> channelMismatchFrames_{0};

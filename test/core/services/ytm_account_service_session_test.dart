@@ -17,6 +17,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/constants/channels.dart';
 import 'package:pulsr/core/di/injection.dart';
 import 'package:pulsr/core/services/ytm_account_service.dart';
+import 'package:pulsr/core/services/ytm_browse_service.dart';
 import 'package:pulsr/core/services/ytm_circuit_breaker.dart';
 import 'package:pulsr/core/services/ytm_client_version_resolver.dart';
 import 'package:pulsr/core/services/ytm_service.dart';
@@ -27,6 +28,8 @@ import 'package:pulsr/domain/models/ytm_track.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class MockYtmService extends Mock implements YtmService {}
+
+class MockYtmBrowseService extends Mock implements YtmBrowseService {}
 
 class MockSecureStorage extends Mock implements FlutterSecureStorage {}
 
@@ -499,6 +502,77 @@ void main() {
       await service.ensureDataSyncId();
       expect(requestCount, afterInit,
           reason: 'the bootstrap throttle is 60s, so a second call is free');
+    });
+  });
+
+  group('account-scoped cache reset and re-login notification', () {
+    test(
+        'saveSession resets dataSyncId, clears YtmBrowseService and YtmUrlCache, and notifies loginState even when already logged in',
+        () async {
+      final browse = MockYtmBrowseService();
+      when(() => browse.clearCache()).thenReturn(null);
+      getIt.registerSingleton<YtmBrowseService>(browse);
+
+      final urlCache = YtmUrlCache.withClock(FakeClock(DateTime(2026)));
+      getIt.registerSingleton<YtmUrlCache>(urlCache);
+
+      responder = (_) => _authHome(datasyncId: 'dsid-old||');
+      final service = _service();
+      expect(await service.saveSession(_validJar), isTrue);
+      await _settle();
+      expect(service.dataSyncId, 'dsid-old||');
+
+      urlCache.putStream(
+        YtmStream(
+          videoId: 'vidSwitch',
+          url:
+              'https://rr1---sn-x.googlevideo.com/videoplayback?expire=1800000000',
+          mimeType: 'audio/mp4',
+          container: 'm4a',
+          bitrateKbps: 128,
+          duration: const Duration(minutes: 3),
+          title: 'T',
+          artist: 'A',
+        ),
+        quality: 'high',
+      );
+      expect(urlCache.get('vidSwitch'), isNotNull);
+      clearInteractions(browse);
+
+      final transitions = <bool>[];
+      void listener() => transitions.add(service.loginState.value);
+      service.loginState.addListener(listener);
+
+      responder = (_) => _authHome();
+      expect(
+        await service.saveSession('SAPISID=newid; __Secure-3PSID=newpsid'),
+        isTrue,
+      );
+      await _settle();
+
+      service.loginState.removeListener(listener);
+      expect(service.dataSyncId, isNull);
+      expect(urlCache.get('vidSwitch'), isNull);
+      verify(() => browse.clearCache()).called(1);
+      expect(transitions, [false, true]);
+    });
+
+    test('logout clears registered YtmBrowseService alongside URL cache',
+        () async {
+      final browse = MockYtmBrowseService();
+      when(() => browse.clearCache()).thenReturn(null);
+      getIt.registerSingleton<YtmBrowseService>(browse);
+
+      responder = (_) => _authHome(datasyncId: 'dsid-old||');
+      final service = _service();
+      expect(await service.saveSession(_validJar), isTrue);
+      await _settle();
+      clearInteractions(browse);
+
+      await service.logout();
+
+      expect(service.dataSyncId, isNull);
+      verify(() => browse.clearCache()).called(1);
     });
   });
 }

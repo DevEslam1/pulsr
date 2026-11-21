@@ -24,6 +24,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
@@ -337,9 +338,17 @@ final class UpnpContentDirectory {
         action: browseAction,
       );
     }
+    final host = controlUrl.host;
+    if (_isLoopbackOrLinkLocal(host)) {
+      throw const UpnpBrowseError(
+        code: 'UPNP_CONTROL_URL_PRIVATENETWORK',
+        userMessage: 'The media server address is not allowed.',
+        action: browseAction,
+      );
+    }
     final allowed = <String>{
       ..._allowedHostSuffixes,
-      if (_trustRequestHost && controlUrl.host.isNotEmpty) controlUrl.host,
+      if (_trustRequestHost && host.isNotEmpty) host,
     };
     final verdict = RemoteTargetPolicy.classify(
       controlUrl.toString(),
@@ -355,16 +364,77 @@ final class UpnpContentDirectory {
     return controlUrl;
   }
 
+  static bool _isLoopbackOrLinkLocal(String rawHost) {
+    var lower = rawHost.trim().toLowerCase();
+    if (lower.startsWith('[') && lower.endsWith(']')) {
+      lower = lower.substring(1, lower.length - 1).trim();
+    }
+    final zoneIdx = lower.indexOf('%');
+    if (zoneIdx != -1) lower = lower.substring(0, zoneIdx);
+    if (lower.isEmpty) return true;
+    if (lower == 'localhost' || lower.endsWith('.localhost')) return true;
+
+    if (lower.contains(':')) {
+      const loopbacks = {'::', '::1', '0:0:0:0:0:0:0:0', '0:0:0:0:0:0:0:1'};
+      if (loopbacks.contains(lower)) return true;
+      final embedded = RemoteTargetPolicy.embeddedIpv4(lower);
+      if (embedded != null) {
+        return _isLoopbackOrLinkLocalIpv4(embedded);
+      }
+      final firstGroup = lower.split(':').first;
+      final value = int.tryParse(firstGroup, radix: 16);
+      if (value != null) {
+        if ((value & 0xffc0) == 0xfe80) return true; // fe80::/10 link-local
+      }
+      return false;
+    }
+
+    return _isLoopbackOrLinkLocalIpv4(lower);
+  }
+
+  static bool _isLoopbackOrLinkLocalIpv4(String host) {
+    final parts = host.split('.');
+    if (parts.length != 4) return false;
+    final octets = <int>[];
+    for (final part in parts) {
+      final value = int.tryParse(part);
+      if (value == null || value < 0 || value > 255) return false;
+      octets.add(value);
+    }
+    final a = octets[0];
+    final b = octets[1];
+    if (a == 0) return true; // 0.0.0.0/8
+    if (a == 127) return true; // 127.0.0.0/8 loopback
+    if (a == 169 && b == 254) return true; // 169.254.0.0/16 link-local
+    return false;
+  }
+
   Future<String> _invoke(Uri controlUrl, String action, String envelope) async {
     final request = http.Request('POST', controlUrl)
+      ..followRedirects = false
       ..headers['Content-Type'] = 'text/xml; charset="utf-8"'
       ..headers['SOAPACTION'] = soapAction(action)
       ..bodyBytes = utf8.encode(envelope);
 
-    final http.Response response;
+    final http.StreamedResponse streamed;
+    final Uint8List bodyBytes;
     try {
-      final streamed = await _client.send(request).timeout(_timeout);
-      response = await http.Response.fromStream(streamed).timeout(_timeout);
+      streamed = await _client.send(request).timeout(_timeout);
+      final limit = maxPayloadBytes * 2;
+      final bytesBuilder = BytesBuilder(copy: false);
+      var totalBytes = 0;
+      await for (final chunk in streamed.stream.timeout(_timeout)) {
+        totalBytes += chunk.length;
+        if (totalBytes > limit) {
+          throw UpnpBrowseError(
+            code: 'UPNP_RESULT_TOO_LARGE',
+            userMessage: 'The media server returned too much data.',
+            action: action,
+          );
+        }
+        bytesBuilder.add(chunk);
+      }
+      bodyBytes = bytesBuilder.takeBytes();
     } on TimeoutException catch (error, stackTrace) {
       throw UpnpBrowseError(
         code: 'UPNP_TIMEOUT',
@@ -391,21 +461,14 @@ final class UpnpContentDirectory {
       );
     }
 
-    if (response.bodyBytes.length > maxPayloadBytes * 2) {
-      throw UpnpBrowseError(
-        code: 'UPNP_RESULT_TOO_LARGE',
-        userMessage: 'The media server returned too much data.',
-        action: action,
-      );
-    }
-    final body = utf8.decode(response.bodyBytes, allowMalformed: true);
+    final body = utf8.decode(bodyBytes, allowMalformed: true);
     final fault = _faultFrom(body, action);
-    if (response.statusCode != 200) {
+    if (streamed.statusCode != 200) {
       if (fault != null) throw fault;
       throw UpnpBrowseError(
-        code: 'UPNP_HTTP_${response.statusCode}',
+        code: 'UPNP_HTTP_${streamed.statusCode}',
         userMessage: 'The media server rejected the browse request '
-            '(HTTP ${response.statusCode}).',
+            '(HTTP ${streamed.statusCode}).',
         action: action,
       );
     }
@@ -616,14 +679,14 @@ final class UpnpContentDirectory {
       }
     }
     for (final resource in resources) {
-      if ((resource.attributes['protocolInfo'] ?? '')
-          .toLowerCase()
-          .startsWith('http-get')) {
+      final info = (resource.attributes['protocolInfo'] ?? '').toLowerCase();
+      if (info.startsWith('http-get')) {
         return resource;
       }
     }
     for (final resource in resources) {
-      if ((resource.attributes['protocolInfo'] ?? '').contains('audio/')) {
+      final info = (resource.attributes['protocolInfo'] ?? '').toLowerCase();
+      if (info.contains('audio/')) {
         return resource;
       }
     }
@@ -931,6 +994,15 @@ final class _XmlParser {
           radix: isHex ? 16 : 10,
         );
         if (code == null || code < 0 || code > 0x10FFFF) {
+          return match.group(0)!;
+        }
+        // Reject UTF-16 surrogates (0xD800–0xDFFF)
+        if (code >= 0xD800 && code <= 0xDFFF) {
+          return match.group(0)!;
+        }
+        // Reject illegal XML 1.0 control characters
+        // Legal chars: #x9 | #xA | #xD | [#x20-#xD7FF] | [#xE000-#xFFFD] | [#x10000-#x10FFFF]
+        if (code < 0x20 && code != 0x9 && code != 0xA && code != 0xD) {
           return match.group(0)!;
         }
         return String.fromCharCode(code);

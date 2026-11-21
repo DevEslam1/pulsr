@@ -191,5 +191,31 @@ void main() {
       await waitForMarker(marker);
       expect(prefs.getBool(flagKey), isTrue);
     });
+
+    test(
+        'AudioProfileBootstrap runs trailing pass when USB status arrives during active apply',
+        () async {
+      final service = buildService();
+      final profile = await service.captureCurrent(
+        'USB DAC',
+        deviceVid: 0x152A,
+        devicePid: 0x8757,
+      );
+      expect(await service.setGlobalDefaults(profile.id), isTrue);
+      await prefs.setBool(flagKey, false);
+
+      final usb = UsbExclusiveService();
+      final bootstrap =
+          AudioProfileBootstrap(service: service, usbExclusive: usb);
+      addTearDown(bootstrap.dispose);
+
+      await bootstrap.start();
+
+      final marker = '${profile.id}@usb:5418:34647';
+      usb.debugPublishStatus(detached);
+      usb.debugPublishStatus(matchingDac);
+      await waitForMarker(marker);
+      expect(prefs.getBool(flagKey), isTrue);
+    });
   });
 }

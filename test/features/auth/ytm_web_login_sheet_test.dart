@@ -10,6 +10,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/di/injection.dart';
 import 'package:pulsr/core/constants/embedded_browser_ua.dart';
 import 'package:pulsr/core/services/ytm_account_service.dart';
+
 import 'package:pulsr/core/theme/aura_theme.dart';
 import 'package:pulsr/features/auth/presentation/ytm_web_login_sheet.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
@@ -189,5 +190,15 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
     expect(find.byType(YtmWebLoginSheet), findsNothing);
+  });
+
+  testWidgets('session validation error during init is handled cleanly', (tester) async {
+    when(() => account.isLoggedIn).thenReturn(true);
+    when(() => account.validateSessionDetailed())
+        .thenAnswer((_) => Future.error(Exception('Network error')));
+
+    await pumpSheet(tester);
+    expect(find.byType(YtmWebLoginSheet), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
   });
 }

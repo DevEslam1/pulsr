@@ -31,6 +31,21 @@ void main() {
       expect(restored.end, const Duration(seconds: 5));
       expect(restored, timing);
     });
+
+    test('clamps non-positive ayahNumber to 1 without tripping assert', () {
+      final timing0 = QuranAyahTiming.fromMap({
+        'ayahNumber': 0,
+        'startMs': 0,
+        'endMs': 1000,
+      });
+      expect(timing0.ayahNumber, 1);
+      final timingNeg = QuranAyahTiming.fromMap({
+        'ayahNumber': -5,
+        'startMs': 0,
+        'endMs': 1000,
+      });
+      expect(timingNeg.ayahNumber, 1);
+    });
   });
 
   group('QuranMetadata', () {

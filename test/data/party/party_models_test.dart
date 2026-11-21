@@ -19,6 +19,7 @@ void main() {
       // t0 = 1000 (sent), server = 5050, t1 = 1100 (received)
       // roundTrip = 100ms, midpoint = 1050ms
       // offset = 5050 - 1050 = 4000ms
+      clock.registerPing(1000);
       clock.record(1000, 5050, 1100);
 
       expect(clock.synced, isTrue);
@@ -35,18 +36,21 @@ void main() {
 
       // Sample 1: high jitter (roundTrip = 300ms)
       // t0 = 1000, server = 6150, t1 = 1300 -> midpoint = 1150, offset = 5000
+      clock.registerPing(1000);
       clock.record(1000, 6150, 1300);
       expect(clock.roundTripMs, 300);
       expect(clock.offsetMs, 5000);
 
       // Sample 2: low jitter (roundTrip = 40ms)
       // t0 = 1400, server = 6440, t1 = 1440 -> midpoint = 1420, offset = 5020
+      clock.registerPing(1400);
       clock.record(1400, 6440, 1440);
       expect(clock.roundTripMs, 40);
       expect(clock.offsetMs, 5020);
 
       // Sample 3: high jitter again (roundTrip = 200ms)
       // t0 = 1500, server = 6620, t1 = 1700 -> midpoint = 1600, offset = 5020
+      clock.registerPing(1500);
       clock.record(1500, 6620, 1700);
       // Sample 2 should still win
       expect(clock.roundTripMs, 40);
@@ -58,6 +62,7 @@ void main() {
       final clock = ServerClock(localNowMs: () => fakeLocalTime);
 
       // Sample 1 taken at t = 1000 with low roundTrip
+      clock.registerPing(980);
       clock.record(980, 5000, 1000);
       expect(clock.offsetMs, 4010);
       expect(clock.roundTripMs, 20);
@@ -66,6 +71,7 @@ void main() {
       fakeLocalTime = 150000;
 
       // Sample 2 taken at t = 150000 with slightly higher roundTrip
+      clock.registerPing(149950);
       clock.record(149950, 154000, 150000);
       // Sample 1 is stale (>120s old), so Sample 2 must be chosen
       expect(clock.offsetMs, 4025);
@@ -74,6 +80,7 @@ void main() {
 
     test('reset clears all samples and offsets', () {
       final clock = ServerClock();
+      clock.registerPing(100);
       clock.record(100, 500, 200);
       expect(clock.synced, isTrue);
 
@@ -81,6 +88,38 @@ void main() {
       expect(clock.synced, isFalse);
       expect(clock.offsetMs, isNull);
       expect(clock.roundTripMs, 0);
+    });
+
+    test('rejects negative RTT', () {
+      final clock = ServerClock();
+      clock.registerPing(1000);
+      clock.record(1000, 5000, 900);
+      expect(clock.synced, isFalse);
+    });
+
+    test('rejects RTT > 5000ms', () {
+      final clock = ServerClock();
+      clock.registerPing(1000);
+      clock.record(1000, 5000, 6001);
+      expect(clock.synced, isFalse);
+    });
+
+    test('rejects unrecorded sentAtLocalMs (not in pending-ping set)', () {
+      final clock = ServerClock();
+      clock.record(1000, 5000, 1100);
+      expect(clock.synced, isFalse);
+    });
+
+    test('rejects replay of already consumed ping', () {
+      final clock = ServerClock();
+      clock.registerPing(1000);
+      clock.record(1000, 5050, 1100);
+      expect(clock.synced, isTrue);
+      expect(clock.offsetMs, 4000);
+
+      // Replaying the same ping timestamp without registering
+      clock.record(1000, 6000, 1200);
+      expect(clock.offsetMs, 4000); // unchanged
     });
   });
 

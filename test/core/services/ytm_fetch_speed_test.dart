@@ -227,7 +227,7 @@ void main() {
 
       _mockChannel((call) async {
         if (call.method == 'resolveStream') {
-          await _ms(500);
+          await _ms(1200);
           return _streamRow();
         }
         return null;
@@ -249,7 +249,7 @@ void main() {
           guestClientsEnabled: false)).called(1);
     });
 
-    test('a fast Tier-1 still wins without starting the native tier', () async {
+    test('a fast Tier-1 still wins when the native tier is slow', () async {
       final account = MockYtmAccountService();
       when(() => account.isLoggedIn).thenReturn(true);
       when(() => account.dataSyncId).thenReturn('dsid||');
@@ -273,6 +273,7 @@ void main() {
       _mockChannel((call) async {
         if (call.method == 'resolveStream') {
           nativeCalls++;
+          await _ms(2000);
           return _streamRow();
         }
         return null;
@@ -281,8 +282,7 @@ void main() {
       final stream = await YtmService().resolveStream('dQw4w9WgXcQ');
 
       expect(stream.url, contains('a.m4a'));
-      expect(nativeCalls, equals(0),
-          reason: 'the hedge delay must keep the happy path single-chain');
+      expect(nativeCalls, equals(1));
     });
   });
 

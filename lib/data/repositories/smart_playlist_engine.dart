@@ -5,6 +5,7 @@ import '../../core/di/injection.dart';
 import '../../core/utils/error_logger.dart';
 import '../../core/utils/search_algorithm_utils.dart';
 import '../audio/audio_handler.dart';
+import '../audio/bpm_override_store.dart';
 import '../audio/song_rating_store.dart';
 import '../../domain/models/smart_playlist_criteria.dart';
 import '../../domain/repositories/smart_playlist_engine_interface.dart';
@@ -15,13 +16,16 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
   final AppDatabase _db;
   final SongRatingStore? _injectedRatingStore;
   final PulsrAudioHandler? _injectedAudioHandler;
+  final BpmOverrideStore? _injectedBpmOverrideStore;
 
   SmartPlaylistEngine(
     this._db, {
     @ignoreParam SongRatingStore? ratingStore,
     @ignoreParam PulsrAudioHandler? audioHandler,
+    @ignoreParam BpmOverrideStore? bpmOverrideStore,
   })  : _injectedRatingStore = ratingStore,
-        _injectedAudioHandler = audioHandler;
+        _injectedAudioHandler = audioHandler,
+        _injectedBpmOverrideStore = bpmOverrideStore;
 
   @override
   List<SmartRule> validateRules(SmartCriteria criteria) {
@@ -31,10 +35,10 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
       if (_isDartRule(rule.field)) {
         if (rule.field == SmartRuleField.rating) {
           if (rule.operator == SmartOperator.between) {
-            final b = _parseDoubleBetween(valStr);
+            final b = _parseIntBetween(valStr);
             if (b == null || b.$1 < 0 || b.$2 > 5) invalid.add(rule);
           } else {
-            final r = double.tryParse(valStr);
+            final r = int.tryParse(valStr);
             if (r == null || r < 0 || r > 5) invalid.add(rule);
           }
         } else if (rule.field == SmartRuleField.bpm) {
@@ -232,6 +236,11 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
   bool _isDartPostRule(SmartRule rule) =>
       _isDartRule(rule.field) || _needsDartTextRule(rule);
 
+  /// Escapes LIKE metacharacters (%, _, \) so user input matches literally.
+  /// Use with `escapeChar: r'\'`.
+  static String _likeEscape(String s) =>
+      s.replaceAll(r'\', r'\\').replaceAll('%', r'\%').replaceAll('_', r'\_');
+
   Expression<bool>? _buildRuleExpression($SongsTableTable t, SmartRule rule) {
     final valStr = rule.value.trim();
     final valInt = int.tryParse(valStr);
@@ -265,7 +274,8 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
             return t.artist.lower().equals(valStr.toLowerCase());
           case SmartOperator.contains:
           default:
-            return t.artist.lower().contains(valStr.toLowerCase());
+            final escaped = _likeEscape(valStr.toLowerCase());
+            return t.artist.lower().like('%$escaped%', escapeChar: r'\');
         }
 
       case SmartRuleField.album:
@@ -275,7 +285,8 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
             return t.album.lower().equals(valStr.toLowerCase());
           case SmartOperator.contains:
           default:
-            return t.album.lower().contains(valStr.toLowerCase());
+            final escaped = _likeEscape(valStr.toLowerCase());
+            return t.album.lower().like('%$escaped%', escapeChar: r'\');
         }
 
       case SmartRuleField.title:
@@ -285,7 +296,8 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
             return t.title.lower().equals(valStr.toLowerCase());
           case SmartOperator.contains:
           default:
-            return t.title.lower().contains(valStr.toLowerCase());
+            final escaped = _likeEscape(valStr.toLowerCase());
+            return t.title.lower().like('%$escaped%', escapeChar: r'\');
         }
 
       case SmartRuleField.isLossless:
@@ -335,8 +347,9 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
                 t.genre.lower().equals(valStr.toLowerCase());
           case SmartOperator.contains:
           default:
+            final escaped = _likeEscape(valStr.toLowerCase());
             return t.genre.isNotNull() &
-                t.genre.lower().contains(valStr.toLowerCase());
+                t.genre.lower().like('%$escaped%', escapeChar: r'\');
         }
 
       case SmartRuleField.year:
@@ -607,18 +620,34 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
   @override
   Stream<List<SongsTableData>> watchCriteria(SmartCriteria criteria) {
     final dartRules = criteria.rules.where(_isDartPostRule).toList();
+    final trigger = _buildExternalTrigger(criteria);
+
     if (dartRules.isEmpty) {
-      final stream = _buildQuery(criteria)
-          .watch()
-          .debounceTime(const Duration(milliseconds: 500));
+      Stream<List<SongsTableData>> queryStream = _buildQuery(criteria).watch();
+      if (trigger != null) {
+        queryStream = Rx.combineLatest2(
+          queryStream,
+          trigger,
+          (list, _) => list,
+        );
+      }
+      final stream =
+          queryStream.debounceTime(const Duration(milliseconds: 500));
       if (criteria.sortBy == 'rating') {
         return stream.map((list) => _postProcess(list, criteria, const []));
       }
       return stream;
     }
     if (criteria.matchAll) {
-      return _buildQuery(criteria)
-          .watch()
+      Stream<List<SongsTableData>> queryStream = _buildQuery(criteria).watch();
+      if (trigger != null) {
+        queryStream = Rx.combineLatest2(
+          queryStream,
+          trigger,
+          (list, _) => list,
+        );
+      }
+      return queryStream
           .debounceTime(const Duration(milliseconds: 500))
           .map((list) => _postProcess(list, criteria, dartRules));
     }
@@ -626,17 +655,48 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
     final baseStream = sqlRules.isEmpty
         ? Stream.value(<SongsTableData>[])
         : _buildQuery(_withoutDartRules(criteria)).watch();
-    return Rx.combineLatest2(
+    final allStream = _buildQuery(_allLocal(criteria)).watch();
+    Stream<(List<SongsTableData>, Set<int>)> combinedStream =
+        Rx.combineLatest2(
       baseStream,
-      _buildQuery(_allLocal(criteria)).watch(),
+      allStream,
       (List<SongsTableData> base, List<SongsTableData> all) {
         final baseIds = base.map((s) => s.id).toSet();
         final merged = List<SongsTableData>.from(base)
           ..addAll(all.where((s) => !baseIds.contains(s.id)));
         return (merged, baseIds);
       },
-    ).debounceTime(const Duration(milliseconds: 500)).map(
-        (parts) => _postProcessAny(parts.$1, parts.$2, criteria, dartRules));
+    );
+
+    if (trigger != null) {
+      combinedStream = Rx.combineLatest2(
+        combinedStream,
+        trigger,
+        (parts, _) => parts,
+      );
+    }
+
+    return combinedStream
+        .debounceTime(const Duration(milliseconds: 500))
+        .map((parts) => _postProcessAny(parts.$1, parts.$2, criteria, dartRules));
+  }
+
+  Stream<void>? _buildExternalTrigger(SmartCriteria criteria) {
+    final hasRatingRule =
+        criteria.rules.any((r) => r.field == SmartRuleField.rating);
+    final hasBpmRule =
+        criteria.rules.any((r) => r.field == SmartRuleField.bpm);
+    final hasRatingSort = criteria.sortBy == 'rating';
+
+    final triggers = <Stream<void>>[];
+    if ((hasRatingRule || hasRatingSort) && _ratingStore != null) {
+      triggers.add(_ratingStore!.changes);
+    }
+    if (hasBpmRule && _bpmOverrideStore != null) {
+      triggers.add(_bpmOverrideStore!.changes);
+    }
+    if (triggers.isEmpty) return null;
+    return Rx.merge(triggers).startWith(null);
   }
 
   /// [criteria] with Dart-backed rules removed (SQL shape only). The sort
@@ -658,6 +718,18 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
     try {
       if (getIt.isRegistered<SongRatingStore>()) {
         return getIt<SongRatingStore>();
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  BpmOverrideStore? get _bpmOverrideStore {
+    if (_injectedBpmOverrideStore != null) return _injectedBpmOverrideStore;
+    try {
+      final handler = _audioHandler;
+      if (handler != null) return handler.bpmOverrideStore;
+      if (getIt.isRegistered<BpmOverrideStore>()) {
+        return getIt<BpmOverrideStore>();
       }
     } catch (_) {}
     return null;

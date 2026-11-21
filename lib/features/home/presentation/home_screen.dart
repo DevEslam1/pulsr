@@ -88,7 +88,8 @@ class _HomeScreenContent extends StatefulWidget {
   State<_HomeScreenContent> createState() => _HomeScreenContentState();
 }
 
-class _HomeScreenContentState extends State<_HomeScreenContent> {
+class _HomeScreenContentState extends State<_HomeScreenContent>
+    with WidgetsBindingObserver {
   SourceScope _scope = SourceScope.local;
   int get _selectedTab => _scope == SourceScope.online ? 1 : 0;
   String _selectedOnlineCategory = 'Recommended For You';
@@ -198,11 +199,11 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _homeCubit = context.read<HomeCubit>();
     final isLoggedIn = _ytmAccountService.isLoggedIn;
     _selectedOnlineCategory =
         isLoggedIn ? 'Recommended For You' : 'Trending Egypt';
-    _ytmAccountService.loginState.addListener(_onLoginStateChanged);
     _checkNotificationDenied();
     final libraryCubit = context.read<LibraryCubit?>();
     if (libraryCubit != null) {
@@ -222,9 +223,10 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
   }
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _checkNotificationDenied();
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkNotificationDenied();
+    }
   }
 
   Future<void> _checkNotificationDenied() async {
@@ -237,23 +239,13 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
     } catch (_) {}
   }
 
-  void _onLoginStateChanged() {
-    if (!mounted) return;
-    context.read<HomeCubit>().clearCache();
-    setState(() {
-      final isLoggedIn = _ytmAccountService.isLoggedIn;
-      _selectedOnlineCategory =
-          isLoggedIn ? 'Recommended For You' : 'Trending Egypt';
-    });
-  }
-
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _librarySub?.cancel();
     _cachedFocusFlowStopwatch?.stop();
     _cachedFocusFlowStopwatch = null;
     _cachedFocusFlowSongs = null;
-    _ytmAccountService.loginState.removeListener(_onLoginStateChanged);
     super.dispose();
   }
 
@@ -318,7 +310,20 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
         ? math.max(0.0, safePadding.right - basePad + 4.0)
         : 0.0;
 
-    return Scaffold(
+    return BlocConsumer<HomeCubit, HomeState>(
+      listenWhen: (prev, curr) => prev.loginEpoch != curr.loginEpoch,
+      listener: (context, homeState) {
+        if (!mounted) return;
+        if (homeState.isLoggedIn) {
+          setState(() => _selectedOnlineCategory = 'Recommended For You');
+        } else if (!_onlineCategories.contains(_selectedOnlineCategory)) {
+          setState(() {
+            _selectedOnlineCategory =
+                _onlineCategories.firstOrNull ?? 'Trending Egypt';
+          });
+        }
+      },
+      builder: (context, homeState) => Scaffold(
       body: SafeArea(
         top: true,
         bottom: false,
@@ -348,7 +353,9 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                     );
                   }
                 } else {
-                  context.read<HomeCubit>().clearCache();
+                  await context
+                      .read<HomeCubit>()
+                      .refreshCategory(_selectedOnlineCategory);
                 }
               },
               child: ValueListenableBuilder<double>(
@@ -589,6 +596,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
           ),
         ),
         ),
+      ),
       ),
     );
   }

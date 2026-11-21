@@ -159,12 +159,14 @@ class EqPreset {
       };
 
   factory EqPreset.fromJson(Map<String, dynamic> json) {
+    double parseNum(dynamic e) => e is num && e.isFinite ? e.toDouble() : 0.0;
+
     final rawGains = json['gains'] as List<dynamic>? ?? [];
-    final gains = rawGains.map((e) => (e as num).toDouble()).toList();
+    final gains = rawGains.map(parseNum).toList();
     final rawFreqs = json['customFrequencies'] as List<dynamic>?;
-    final customFreqs = rawFreqs?.map((e) => (e as num).toDouble()).toList();
+    final customFreqs = rawFreqs?.map(parseNum).toList();
     final rawQs = json['qFactors'] as List<dynamic>?;
-    final qs = rawQs?.map((e) => (e as num).toDouble()).toList();
+    final qs = rawQs?.map(parseNum).toList();
 
     final rawBandsMap = json['bandsMap'] as Map<String, dynamic>?;
     final parsedBandsMap = <int, List<double>>{};
@@ -172,16 +174,18 @@ class EqPreset {
       rawBandsMap.forEach((key, value) {
         final intKey = int.tryParse(key);
         if (intKey != null && value is List) {
-          parsedBandsMap[intKey] =
-              value.map((e) => (e as num).toDouble()).toList();
+          parsedBandsMap[intKey] = value.map(parseNum).toList();
         }
       });
     }
 
+    final rawBassBoost = (json['bassBoost'] as num?)?.toDouble() ?? 0.0;
+    final bassBoost = rawBassBoost.isFinite ? rawBassBoost : 0.0;
+
     return EqPreset(
       name: json['name'] as String? ?? 'Custom',
       gains: gains,
-      bassBoost: (json['bassBoost'] as num?)?.toDouble() ?? 0.0,
+      bassBoost: bassBoost,
       customFrequencies: customFreqs,
       qFactors: qs,
       bandsMap: parsedBandsMap,
@@ -201,6 +205,28 @@ class EqPreset {
     8000,
     16000,
   ];
+
+  /// Legacy 5-band centers (Hz) used before the 10-band migration.
+  static const List<double> legacy5Frequencies = [60, 230, 910, 3600, 14000];
+
+  /// Maps legacy 5-band [source] gains onto the 10 ISO centers.
+  static List<double> to10Band(List<double> source) {
+    if (source.isEmpty) {
+      return List<double>.filled(centerFrequencies.length, 0.0);
+    }
+    if (source.length == 1) {
+      final first = source.first;
+      return List<double>.filled(
+          centerFrequencies.length, first.isFinite ? first : 0.0);
+    }
+    if (source.length != legacy5Frequencies.length) {
+      return interpolateGains(source);
+    }
+    return [
+      for (final f in centerFrequencies)
+        _interpAtLogFreq(f, legacy5Frequencies, source)
+    ];
+  }
 
   /// ISO 31-band 1/3-octave studio parametric EQ centers (Hz).
   static const List<double> iso31Frequencies = [
@@ -301,14 +327,29 @@ class EqPreset {
 
   static double _interpAtLogFreq(
       double freq, List<double> freqs, List<double> gains) {
+    if (freqs.isEmpty || gains.isEmpty) return 0.0;
+    if (freqs.length == 1 || gains.length == 1) return gains.first;
+    if (freq <= 0 || !freq.isFinite) return gains.first;
+
+    final firstFreq = freqs.first;
+    if (firstFreq > 0 && freq <= firstFreq) return gains.first;
+    final lastFreq = freqs.last;
+    if (lastFreq > 0 && freq >= lastFreq) return gains.last;
+
     final logF = math.log(freq);
-    if (logF <= math.log(freqs.first)) return gains.first;
-    if (logF >= math.log(freqs.last)) return gains.last;
-    for (int i = 0; i < freqs.length - 1; i++) {
-      final lo = math.log(freqs[i]);
-      final hi = math.log(freqs[i + 1]);
-      if (logF >= lo && logF <= hi) {
-        final t = (logF - lo) / (hi - lo);
+    for (int i = 0; i < freqs.length - 1 && i < gains.length - 1; i++) {
+      final lo = freqs[i];
+      final hi = freqs[i + 1];
+      if (lo <= 0 || hi <= 0 || hi == lo) {
+        return freq <= lo ? gains[i] : gains[i + 1];
+      }
+      final logLo = math.log(lo);
+      final logHi = math.log(hi);
+      if (logHi == logLo) {
+        return gains[i];
+      }
+      if (logF >= logLo && logF <= logHi) {
+        final t = (logF - logLo) / (logHi - logLo);
         return gains[i] + (gains[i + 1] - gains[i]) * t;
       }
     }

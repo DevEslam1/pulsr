@@ -142,7 +142,7 @@ object ProxyManager {
                 )
                 ProxyPool.setProxies(listOf(node), isExplicit = false)
             }
-        } else if (!enabled) {
+        } else {
             if (!ProxyPool.hasExplicitPool) {
                 ProxyPool.setProxies(emptyList(), isExplicit = false)
             }

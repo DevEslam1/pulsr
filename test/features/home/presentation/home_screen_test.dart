@@ -246,4 +246,19 @@ void main() {
     expect(carouselRect.left, greaterThanOrEqualTo(50.0));
     expect(carouselRect.left, lessThan(58.0));
   });
+
+  testWidgets('notification-denied is re-checked when app lifecycle resumes',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await pumpScreen(tester);
+    expect(find.text('Playback stops when screen is off?'), findsNothing);
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('notification_permission_denied', true);
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Playback stops when screen is off?'), findsOneWidget);
+  });
 }

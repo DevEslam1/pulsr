@@ -26,17 +26,19 @@ void StereoWidth::setSampleRate(double sampleRate) {
 }
 
 void StereoWidth::configure(double width) {
+    if (!std::isfinite(width)) width = 1.0;
     targetWidth_ = std::clamp(width, 0.0, 2.0);
 }
 
 void StereoWidth::configureMultiband(bool multiband, double lowWidth, double midWidth, double highWidth,
                                     double lowCrossoverHz, double highCrossoverHz) {
     multiband_ = multiband;
-    targetLowWidth_ = std::clamp(lowWidth, 0.0, 2.0);
-    targetMidWidth_ = std::clamp(midWidth, 0.0, 2.0);
-    targetHighWidth_ = std::clamp(highWidth, 0.0, 2.0);
-    lowCrossoverHz_ = std::clamp(lowCrossoverHz, 40.0, 1000.0);
-    highCrossoverHz_ = std::clamp(highCrossoverHz, lowCrossoverHz_ + 100.0, sampleRate_ * 0.45);
+    targetLowWidth_ = std::clamp(std::isfinite(lowWidth) ? lowWidth : 0.0, 0.0, 2.0);
+    targetMidWidth_ = std::clamp(std::isfinite(midWidth) ? midWidth : 1.0, 0.0, 2.0);
+    targetHighWidth_ = std::clamp(std::isfinite(highWidth) ? highWidth : 1.5, 0.0, 2.0);
+    lowCrossoverHz_ = std::clamp(std::isfinite(lowCrossoverHz) ? lowCrossoverHz : 160.0, 40.0, 1000.0);
+    highCrossoverHz_ = std::clamp(std::isfinite(highCrossoverHz) ? highCrossoverHz : 4000.0,
+                                  lowCrossoverHz_ + 100.0, sampleRate_ * 0.45);
     updateCrossovers();
 }
 
@@ -75,51 +77,77 @@ void StereoWidth::process(float* L, float* R, int frames) {
 
     if (!multiband_) {
         // Broadband mode
+        const double prevWidth = smoothedWidth_;
         const double effTarget = enabled_ ? targetWidth_ : 1.0;
         smoothedWidth_ += smoothFactor * (effTarget - smoothedWidth_);
         if (smoothedWidth_ < 1e-15) smoothedWidth_ = 0.0;
-        if (!enabled_ && std::abs(smoothedWidth_ - 1.0) < 1e-4) return;
-        if (std::abs(smoothedWidth_ - 1.0) < 1e-5 && std::abs(effTarget - 1.0) < 1e-5) return;
+        if (!enabled_ && std::abs(smoothedWidth_ - 1.0) < 1e-4) {
+            smoothedWidth_ = 1.0;
+            if (std::abs(prevWidth - 1.0) < 1e-4) return;
+        }
+        if (std::abs(prevWidth - 1.0) < 1e-5 && std::abs(smoothedWidth_ - 1.0) < 1e-5 &&
+            std::abs(effTarget - 1.0) < 1e-5) {
+            return;
+        }
 
-        const float w = static_cast<float>(smoothedWidth_);
-        int i = 0;
+        const float wStart = static_cast<float>(prevWidth);
+        const float wEnd = static_cast<float>(smoothedWidth_);
+        if (std::abs(wEnd - wStart) < 1e-6f) {
+            const float w = wEnd;
+            int i = 0;
 #if defined(PULSR_HAS_NEON)
-        for (; i + 4 <= frames; i += 4) {
-            float32x4_t vL = vld1q_f32(&L[i]);
-            float32x4_t vR = vld1q_f32(&R[i]);
-            float32x4_t vMid = vmulq_n_f32(vaddq_f32(vL, vR), 0.5f);
-            float32x4_t vSide = vmulq_n_f32(vsubq_f32(vL, vR), 0.5f);
-            float32x4_t vOutL = vfmaq_n_f32(vMid, vSide, w);
-            float32x4_t vOutR = vfmsq_n_f32(vMid, vSide, w);
-            vst1q_f32(&L[i], vOutL);
-            vst1q_f32(&R[i], vOutR);
-        }
+            for (; i + 4 <= frames; i += 4) {
+                float32x4_t vL = vld1q_f32(&L[i]);
+                float32x4_t vR = vld1q_f32(&R[i]);
+                float32x4_t vMid = vmulq_n_f32(vaddq_f32(vL, vR), 0.5f);
+                float32x4_t vSide = vmulq_n_f32(vsubq_f32(vL, vR), 0.5f);
+                float32x4_t vOutL = vfmaq_n_f32(vMid, vSide, w);
+                float32x4_t vOutR = vfmsq_n_f32(vMid, vSide, w);
+                vst1q_f32(&L[i], vOutL);
+                vst1q_f32(&R[i], vOutR);
+            }
 #elif defined(PULSR_HAS_SSE)
-        const __m128 vHalf = _mm_set1_ps(0.5f);
-        const __m128 vW = _mm_set1_ps(w);
-        for (; i + 4 <= frames; i += 4) {
-            __m128 vL = _mm_loadu_ps(&L[i]);
-            __m128 vR = _mm_loadu_ps(&R[i]);
-            __m128 vMid = _mm_mul_ps(_mm_add_ps(vL, vR), vHalf);
-            __m128 vSide = _mm_mul_ps(_mm_sub_ps(vL, vR), vHalf);
-            __m128 vOutL = _mm_add_ps(vMid, _mm_mul_ps(vW, vSide));
-            __m128 vOutR = _mm_sub_ps(vMid, _mm_mul_ps(vW, vSide));
-            _mm_storeu_ps(&L[i], vOutL);
-            _mm_storeu_ps(&R[i], vOutR);
-        }
+            const __m128 vHalf = _mm_set1_ps(0.5f);
+            const __m128 vW = _mm_set1_ps(w);
+            for (; i + 4 <= frames; i += 4) {
+                __m128 vL = _mm_loadu_ps(&L[i]);
+                __m128 vR = _mm_loadu_ps(&R[i]);
+                __m128 vMid = _mm_mul_ps(_mm_add_ps(vL, vR), vHalf);
+                __m128 vSide = _mm_mul_ps(_mm_sub_ps(vL, vR), vHalf);
+                __m128 vOutL = _mm_add_ps(vMid, _mm_mul_ps(vW, vSide));
+                __m128 vOutR = _mm_sub_ps(vMid, _mm_mul_ps(vW, vSide));
+                _mm_storeu_ps(&L[i], vOutL);
+                _mm_storeu_ps(&R[i], vOutR);
+            }
 #endif
-        for (; i < frames; ++i) {
-            const float l = L[i];
-            const float r = R[i];
-            const float mid = 0.5f * (l + r);
-            const float side = 0.5f * (l - r);
-            L[i] = mid + w * side;
-            R[i] = mid - w * side;
+            for (; i < frames; ++i) {
+                const float l = L[i];
+                const float r = R[i];
+                const float mid = 0.5f * (l + r);
+                const float side = 0.5f * (l - r);
+                L[i] = mid + w * side;
+                R[i] = mid - w * side;
+            }
+        } else {
+            const float wStep = (wEnd - wStart) / static_cast<float>(frames);
+            float w = wStart;
+            for (int i = 0; i < frames; ++i) {
+                const float l = L[i];
+                const float r = R[i];
+                const float mid = 0.5f * (l + r);
+                const float side = 0.5f * (l - r);
+                L[i] = mid + w * side;
+                R[i] = mid - w * side;
+                w += wStep;
+            }
         }
         return;
     }
 
     // 3-Band Multiband Stereo Imager with Bass Mono
+    const double prevLow = smoothedLowWidth_;
+    const double prevMid = smoothedMidWidth_;
+    const double prevHigh = smoothedHighWidth_;
     const double effLow = enabled_ ? targetLowWidth_ : 1.0;
     const double effMid = enabled_ ? targetMidWidth_ : 1.0;
     const double effHigh = enabled_ ? targetHighWidth_ : 1.0;
@@ -129,16 +157,27 @@ void StereoWidth::process(float* L, float* R, int frames) {
 
     if (!enabled_ && std::abs(smoothedLowWidth_ - 1.0) < 1e-4 &&
         std::abs(smoothedMidWidth_ - 1.0) < 1e-4 && std::abs(smoothedHighWidth_ - 1.0) < 1e-4) {
-        return;
+        smoothedLowWidth_ = 1.0;
+        smoothedMidWidth_ = 1.0;
+        smoothedHighWidth_ = 1.0;
+        if (std::abs(prevLow - 1.0) < 1e-4 &&
+            std::abs(prevMid - 1.0) < 1e-4 &&
+            std::abs(prevHigh - 1.0) < 1e-4) {
+            return;
+        }
     }
 
-    const float wLow = static_cast<float>(smoothedLowWidth_);
-    const float wMid = static_cast<float>(smoothedMidWidth_);
-    const float wHigh = static_cast<float>(smoothedHighWidth_);
+    const double invFrames = 1.0 / static_cast<double>(frames);
+    const double stepLow = (smoothedLowWidth_ - prevLow) * invFrames;
+    const double stepMid = (smoothedMidWidth_ - prevMid) * invFrames;
+    const double stepHigh = (smoothedHighWidth_ - prevHigh) * invFrames;
+    double wLow = prevLow;
+    double wMid = prevMid;
+    double wHigh = prevHigh;
 
     for (int i = 0; i < frames; ++i) {
-        const double inL = L[i];
-        const double inR = R[i];
+        const double inL = std::isfinite(L[i]) ? static_cast<double>(L[i]) : 0.0;
+        const double inR = std::isfinite(R[i]) ? static_cast<double>(R[i]) : 0.0;
 
         // 1. Split low vs (mid+high)
         double lowL, lowR, midHighL, midHighR;
@@ -182,6 +221,10 @@ void StereoWidth::process(float* L, float* R, int frames) {
         // 4. Sum bands back together
         L[i] = static_cast<float>(outLowL + outMidL + outHighL);
         R[i] = static_cast<float>(outLowR + outMidR + outHighR);
+
+        wLow += stepLow;
+        wMid += stepMid;
+        wHigh += stepHigh;
     }
 }
 
@@ -193,52 +236,77 @@ void StereoWidth::processInterleaved(float* buffer, int frames, int channels) {
 
     if (!multiband_) {
         // Broadband mode
+        const double prevWidth = smoothedWidth_;
         const double effTarget = enabled_ ? targetWidth_ : 1.0;
         smoothedWidth_ += smoothFactor * (effTarget - smoothedWidth_);
         if (smoothedWidth_ < 1e-15) smoothedWidth_ = 0.0;
-        if (!enabled_ && std::abs(smoothedWidth_ - 1.0) < 1e-4) return;
-        if (std::abs(smoothedWidth_ - 1.0) < 1e-5 && std::abs(effTarget - 1.0) < 1e-5) return;
+        if (!enabled_ && std::abs(smoothedWidth_ - 1.0) < 1e-4) {
+            smoothedWidth_ = 1.0;
+            if (std::abs(prevWidth - 1.0) < 1e-4) return;
+        }
+        if (std::abs(prevWidth - 1.0) < 1e-5 && std::abs(smoothedWidth_ - 1.0) < 1e-5 &&
+            std::abs(effTarget - 1.0) < 1e-5) {
+            return;
+        }
 
-        const float w = static_cast<float>(smoothedWidth_);
+        const float wStart = static_cast<float>(prevWidth);
+        const float wEnd = static_cast<float>(smoothedWidth_);
+        const float wStep = (wEnd - wStart) / static_cast<float>(frames);
+        const bool isSteady = std::abs(wEnd - wStart) < 1e-6f;
         if (channels == 2) {
-            int i = 0;
+            if (isSteady) {
+                const float w = wEnd;
+                int i = 0;
 #if defined(PULSR_HAS_NEON)
-            for (; i + 4 <= frames; i += 4) {
-                float32x4x2_t vIn = vld2q_f32(buffer + i * 2);
-                float32x4_t vMid = vmulq_n_f32(vaddq_f32(vIn.val[0], vIn.val[1]), 0.5f);
-                float32x4_t vSide = vmulq_n_f32(vsubq_f32(vIn.val[0], vIn.val[1]), 0.5f);
-                float32x4x2_t vOut;
-                vOut.val[0] = vfmaq_n_f32(vMid, vSide, w);
-                vOut.val[1] = vfmsq_n_f32(vMid, vSide, w);
-                vst2q_f32(buffer + i * 2, vOut);
-            }
+                for (; i + 4 <= frames; i += 4) {
+                    float32x4x2_t vIn = vld2q_f32(buffer + i * 2);
+                    float32x4_t vMid = vmulq_n_f32(vaddq_f32(vIn.val[0], vIn.val[1]), 0.5f);
+                    float32x4_t vSide = vmulq_n_f32(vsubq_f32(vIn.val[0], vIn.val[1]), 0.5f);
+                    float32x4x2_t vOut;
+                    vOut.val[0] = vfmaq_n_f32(vMid, vSide, w);
+                    vOut.val[1] = vfmsq_n_f32(vMid, vSide, w);
+                    vst2q_f32(buffer + i * 2, vOut);
+                }
 #elif defined(PULSR_HAS_SSE)
-            const __m128 vHalf = _mm_set1_ps(0.5f);
-            const __m128 vW = _mm_set1_ps(w);
-            for (; i + 4 <= frames; i += 4) {
-                __m128 v0 = _mm_loadu_ps(buffer + i * 2);     // [L0, R0, L1, R1]
-                __m128 v1 = _mm_loadu_ps(buffer + i * 2 + 4); // [L2, R2, L3, R3]
-                __m128 vL = _mm_shuffle_ps(v0, v1, _MM_SHUFFLE(2, 0, 2, 0)); // [L0, L1, L2, L3]
-                __m128 vR = _mm_shuffle_ps(v0, v1, _MM_SHUFFLE(3, 1, 3, 1)); // [R0, R1, R2, R3]
-                __m128 vMid = _mm_mul_ps(_mm_add_ps(vL, vR), vHalf);
-                __m128 vSide = _mm_mul_ps(_mm_sub_ps(vL, vR), vHalf);
-                __m128 vOutL = _mm_add_ps(vMid, _mm_mul_ps(vW, vSide));
-                __m128 vOutR = _mm_sub_ps(vMid, _mm_mul_ps(vW, vSide));
-                __m128 out0 = _mm_unpacklo_ps(vOutL, vOutR); // [L0, R0, L1, R1]
-                __m128 out1 = _mm_unpackhi_ps(vOutL, vOutR); // [L2, R2, L3, R3]
-                _mm_storeu_ps(buffer + i * 2, out0);
-                _mm_storeu_ps(buffer + i * 2 + 4, out1);
-            }
+                const __m128 vHalf = _mm_set1_ps(0.5f);
+                const __m128 vW = _mm_set1_ps(w);
+                for (; i + 4 <= frames; i += 4) {
+                    __m128 v0 = _mm_loadu_ps(buffer + i * 2);     // [L0, R0, L1, R1]
+                    __m128 v1 = _mm_loadu_ps(buffer + i * 2 + 4); // [L2, R2, L3, R3]
+                    __m128 vL = _mm_shuffle_ps(v0, v1, _MM_SHUFFLE(2, 0, 2, 0)); // [L0, L1, L2, L3]
+                    __m128 vR = _mm_shuffle_ps(v0, v1, _MM_SHUFFLE(3, 1, 3, 1)); // [R0, R1, R2, R3]
+                    __m128 vMid = _mm_mul_ps(_mm_add_ps(vL, vR), vHalf);
+                    __m128 vSide = _mm_mul_ps(_mm_sub_ps(vL, vR), vHalf);
+                    __m128 vOutL = _mm_add_ps(vMid, _mm_mul_ps(vW, vSide));
+                    __m128 vOutR = _mm_sub_ps(vMid, _mm_mul_ps(vW, vSide));
+                    __m128 out0 = _mm_unpacklo_ps(vOutL, vOutR); // [L0, R0, L1, R1]
+                    __m128 out1 = _mm_unpackhi_ps(vOutL, vOutR); // [L2, R2, L3, R3]
+                    _mm_storeu_ps(buffer + i * 2, out0);
+                    _mm_storeu_ps(buffer + i * 2 + 4, out1);
+                }
 #endif
-            for (; i < frames; ++i) {
-                const float l = buffer[i * 2];
-                const float r = buffer[i * 2 + 1];
-                const float mid = 0.5f * (l + r);
-                const float side = 0.5f * (l - r);
-                buffer[i * 2] = mid + w * side;
-                buffer[i * 2 + 1] = mid - w * side;
+                for (; i < frames; ++i) {
+                    const float l = buffer[i * 2];
+                    const float r = buffer[i * 2 + 1];
+                    const float mid = 0.5f * (l + r);
+                    const float side = 0.5f * (l - r);
+                    buffer[i * 2] = mid + w * side;
+                    buffer[i * 2 + 1] = mid - w * side;
+                }
+            } else {
+                float w = wStart;
+                for (int i = 0; i < frames; ++i) {
+                    const float l = buffer[i * 2];
+                    const float r = buffer[i * 2 + 1];
+                    const float mid = 0.5f * (l + r);
+                    const float side = 0.5f * (l - r);
+                    buffer[i * 2] = mid + w * side;
+                    buffer[i * 2 + 1] = mid - w * side;
+                    w += wStep;
+                }
             }
         } else {
+            float w = wStart;
             for (int i = 0; i < frames; ++i) {
                 for (int ch = 0; ch + 1 < channels; ch += 2) {
                     const float l = buffer[i * channels + ch];
@@ -248,12 +316,16 @@ void StereoWidth::processInterleaved(float* buffer, int frames, int channels) {
                     buffer[i * channels + ch] = mid + w * side;
                     buffer[i * channels + ch + 1] = mid - w * side;
                 }
+                w += wStep;
             }
         }
         return;
     }
 
     // 3-Band Multiband Stereo Imager with Bass Mono
+    const double prevLow = smoothedLowWidth_;
+    const double prevMid = smoothedMidWidth_;
+    const double prevHigh = smoothedHighWidth_;
     const double effLow = enabled_ ? targetLowWidth_ : 1.0;
     const double effMid = enabled_ ? targetMidWidth_ : 1.0;
     const double effHigh = enabled_ ? targetHighWidth_ : 1.0;
@@ -263,18 +335,31 @@ void StereoWidth::processInterleaved(float* buffer, int frames, int channels) {
 
     if (!enabled_ && std::abs(smoothedLowWidth_ - 1.0) < 1e-4 &&
         std::abs(smoothedMidWidth_ - 1.0) < 1e-4 && std::abs(smoothedHighWidth_ - 1.0) < 1e-4) {
-        return;
+        smoothedLowWidth_ = 1.0;
+        smoothedMidWidth_ = 1.0;
+        smoothedHighWidth_ = 1.0;
+        if (std::abs(prevLow - 1.0) < 1e-4 &&
+            std::abs(prevMid - 1.0) < 1e-4 &&
+            std::abs(prevHigh - 1.0) < 1e-4) {
+            return;
+        }
     }
 
-    const float wLow = static_cast<float>(smoothedLowWidth_);
-    const float wMid = static_cast<float>(smoothedMidWidth_);
-    const float wHigh = static_cast<float>(smoothedHighWidth_);
+    const double invFrames = 1.0 / static_cast<double>(frames);
+    const double stepLow = (smoothedLowWidth_ - prevLow) * invFrames;
+    const double stepMid = (smoothedMidWidth_ - prevMid) * invFrames;
+    const double stepHigh = (smoothedHighWidth_ - prevHigh) * invFrames;
+    double wLow = prevLow;
+    double wMid = prevMid;
+    double wHigh = prevHigh;
 
     for (int i = 0; i < frames; ++i) {
         for (int ch = 0; ch + 1 < channels; ch += 2) {
             const int p = std::min(ch / 2, MAX_PAIRS - 1);
-            const double inL = buffer[i * channels + ch];
-            const double inR = buffer[i * channels + ch + 1];
+            const float rawL = buffer[i * channels + ch];
+            const float rawR = buffer[i * channels + ch + 1];
+            const double inL = std::isfinite(rawL) ? static_cast<double>(rawL) : 0.0;
+            const double inR = std::isfinite(rawR) ? static_cast<double>(rawR) : 0.0;
 
             double lowL, lowR, midHighL, midHighR;
             crossoverLow_[p].process(inL, inR, lowL, lowR, midHighL, midHighR);
@@ -306,5 +391,8 @@ void StereoWidth::processInterleaved(float* buffer, int frames, int channels) {
             buffer[i * channels + ch] = static_cast<float>(outLowL + outMidL + outHighL);
             buffer[i * channels + ch + 1] = static_cast<float>(outLowR + outMidR + outHighR);
         }
+        wLow += stepLow;
+        wMid += stepMid;
+        wHigh += stepHigh;
     }
 }

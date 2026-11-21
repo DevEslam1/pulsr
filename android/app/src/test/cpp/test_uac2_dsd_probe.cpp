@@ -579,6 +579,41 @@ int main() {
               "DsdRatesFor sorts and drops rate 0");
     }
 
+    // ---------------------------------------------------------------------
+    // 12. Standard 6-byte UAC2 FORMAT_TYPE_I + AS_GENERAL TYPE_I_RAW_DATA.
+    // ---------------------------------------------------------------------
+    {
+        // Standard hardware UAC2 DSD alt setting: AS_GENERAL with bmFormats =
+        // TYPE_I_RAW_DATA (0x80000000 LE) and bNrChannels = 2, plus 6-byte
+        // FORMAT_TYPE_I (subslot 4, bitResolution 32).
+        Blob b;
+        b.Config(1);
+        b.Interface(1, 0, 0, 0x20);
+        // Alt 1: PCM 6-byte FORMAT_TYPE_I (bmFormats = 0x00000001) -> ignored
+        b.Interface(1, 1, 1, 0x20);
+        b.Raw({16, 0x24, 0x01, 1, 0, 1, 0x01, 0x00, 0x00, 0x00, 2, 0x03, 0, 0, 0, 0});
+        b.Raw({6, 0x24, 0x02, 0x01, 4, 32});
+        b.Endpoint(0x01);
+        // Alt 2: RAW_DATA 6-byte FORMAT_TYPE_I with 2-byte subslot -> rejected
+        b.Interface(1, 2, 1, 0x20);
+        b.Raw({16, 0x24, 0x01, 1, 0, 1, 0x00, 0x00, 0x00, 0x80, 2, 0x03, 0, 0, 0, 0});
+        b.Raw({6, 0x24, 0x02, 0x01, 2, 16});
+        b.Endpoint(0x01);
+        // Alt 3: RAW_DATA 6-byte FORMAT_TYPE_I (4-byte, 32-bit, 2ch) -> DSD64..DSD512
+        b.Interface(1, 3, 1, 0x20);
+        b.Raw({16, 0x24, 0x01, 1, 0, 1, 0x00, 0x00, 0x00, 0x80, 2, 0x03, 0, 0, 0, 0});
+        b.Raw({6, 0x24, 0x02, 0x01, 4, 32});
+        b.Endpoint(0x01);
+        const auto got = Parse(b.Finish());
+        const auto rates = pulsr::DsdRatesFor(got);
+        const bool ok = got.size() == 4 &&
+                        Matches(got[0], 1, 3, 0x01, 2, 88200, 64) &&
+                        Matches(got[3], 1, 3, 0x01, 2, 705600, 512) &&
+                        rates.size() == 4;
+        Check(ok, "standard 6-byte UAC2 FORMAT_TYPE_I TYPE_I_RAW_DATA emits DSD64..DSD512");
+        if (!ok) Dump(got);
+    }
+
     if (gFailures == 0) {
         std::cout << "[TEST] UAC2 native-DSD probe: all checks passed." << std::endl;
         return 0;

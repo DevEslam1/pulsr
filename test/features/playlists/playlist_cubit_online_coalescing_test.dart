@@ -6,11 +6,14 @@ import 'dart:async';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fpdart/fpdart.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/di/injection.dart';
 import 'package:pulsr/core/network/connectivity_guard.dart';
 import 'package:pulsr/core/services/ytm_account_service.dart';
+import 'package:pulsr/data/db/app_database.dart';
 import 'package:pulsr/domain/models/ytm_track.dart';
+import 'package:pulsr/domain/repositories/music_repository_interface.dart';
 import 'package:pulsr/domain/usecases/playlist_usecases.dart';
 import 'package:pulsr/features/playlists/cubit/playlist_cubit.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -20,6 +23,8 @@ class _PlaylistUseCases extends Mock implements PlaylistUseCases {}
 class _Account extends Mock implements YtmAccountService {}
 
 class _Connectivity extends Mock implements Connectivity {}
+
+class _MusicRepo extends Mock implements IMusicRepository {}
 
 const _track = YtmTrack(
     videoId: 'v1', title: 'T', artist: 'A', duration: Duration(seconds: 1));
@@ -40,6 +45,7 @@ void main() {
   setUpAll(() {
     registerFallbackValue('');
     registerFallbackValue(<int>[]);
+    registerFallbackValue(const <YtmTrack>[]);
   });
 
   setUp(() {
@@ -129,6 +135,181 @@ void main() {
     final matches =
         cubit.onlineState.customPlaylists.where((p) => p.id == 'PL1');
     expect(matches, hasLength(1));
+    await cubit.close();
+  });
+
+  test('syncUpdatedPlaylistFromDetail updates liked, custom, and account playlists',
+      () async {
+    when(() => account.fetchAccountPlaylists()).thenAnswer((_) async => const [
+          YtmAccountPlaylist(
+            playlistId: 'VLPL_ACC',
+            title: 'Old Account Title',
+            subtitle: 'YouTube Music',
+          ),
+        ]);
+    final cubit = create();
+    await cubit.fetchAccountPlaylistsForTesting();
+    cubit.restoreCustomPlaylist(const OnlinePlaylistEntry(
+      id: 'PL_CUST',
+      title: 'Old Custom',
+      uploader: 'Old Author',
+      tracks: [],
+    ));
+
+    cubit.syncUpdatedPlaylistFromDetail(
+      playlistId: 'LM',
+      kind: OnlineLibraryKind.liked,
+      title: 'Liked Music',
+      author: 'YouTube Music',
+      tracks: const [_track],
+    );
+    expect(cubit.onlineState.likedTracks, const [_track]);
+    expect(cubit.onlineState.likedStatus, YtmFetchStatus.done);
+
+    cubit.syncUpdatedPlaylistFromDetail(
+      playlistId: 'PL_CUST',
+      kind: OnlineLibraryKind.custom,
+      title: 'New Custom Title',
+      author: 'New Author',
+      tracks: const [_track],
+    );
+    expect(cubit.onlineState.customPlaylists.single.title, 'New Custom Title');
+    expect(cubit.onlineState.customPlaylists.single.uploader, 'New Author');
+    expect(cubit.onlineState.customPlaylists.single.tracks, const [_track]);
+
+    cubit.syncUpdatedPlaylistFromDetail(
+      playlistId: 'PL_ACC',
+      kind: OnlineLibraryKind.account,
+      title: 'New Account Title',
+      author: 'Creator',
+      artworkUrl: 'https://art/new.jpg',
+      tracks: const [_track],
+    );
+    expect(cubit.onlineState.accountPlaylists.single.title, 'New Account Title');
+    expect(
+      cubit.onlineState.accountPlaylists.single.artworkUrl,
+      'https://art/new.jpg',
+    );
+    await cubit.close();
+  });
+
+  test(
+      'forced syncOnlineLibraryCacheForTesting chains after an in-flight non-forced sync instead of being skipped',
+      () async {
+    final repo = _MusicRepo();
+    getIt.registerSingleton<IMusicRepository>(repo);
+
+    final now = DateTime.now();
+    when(() => repo.getOnlinePlaylists()).thenAnswer((_) async => Right([
+          OnlinePlaylistsTableData(
+            playlistId: 'PL_FRESH',
+            title: 'Fresh Custom',
+            author: 'A',
+            kind: OnlineLibraryKind.custom,
+            sortOrder: 0,
+            hasCustomOrder: false,
+            cachedAt: now,
+            updatedAt: now,
+          ),
+        ]));
+    when(() => repo.cacheOnlinePlaylist(
+          playlistId: any(named: 'playlistId'),
+          kind: any(named: 'kind'),
+          title: any(named: 'title'),
+          author: any(named: 'author'),
+          artworkUrl: any(named: 'artworkUrl'),
+          sortOrder: any(named: 'sortOrder'),
+          tracks: any(named: 'tracks'),
+          fullSnapshot: any(named: 'fullSnapshot'),
+        )).thenAnswer((_) async => const Right(null));
+
+    final likedGate = Completer<List<YtmTrack>>();
+    var likedCalls = 0;
+    when(() => account.fetchLikedSongs(maxTracks: any(named: 'maxTracks')))
+        .thenAnswer((_) {
+      likedCalls++;
+      return likedCalls == 1 ? likedGate.future : Future.value(const [_track]);
+    });
+    when(() => account.fetchPlaylistDetails('PL_FRESH',
+            maxTracks: any(named: 'maxTracks')))
+        .thenAnswer((_) async => const YtmPlaylistDetails(
+              id: 'PL_FRESH',
+              title: 'Fresh Custom',
+              author: 'A',
+              tracks: [_track],
+            ));
+
+    final cubit = create();
+    cubit.restoreCustomPlaylist(const OnlinePlaylistEntry(
+      id: 'PL_FRESH',
+      title: 'Fresh Custom',
+      uploader: 'A',
+      tracks: [],
+    ));
+
+    final nonForced = cubit.syncOnlineLibraryCacheForTesting(force: false);
+    await pumpEventQueue(times: 10);
+    // PL_FRESH is fresh so non-forced sync does not queue it; a forced sync
+    // requested mid-flight must chain afterwards with force=true.
+    verifyNever(() => account.fetchPlaylistDetails('PL_FRESH',
+        maxTracks: any(named: 'maxTracks')));
+
+    final forced = cubit.syncOnlineLibraryCacheForTesting(force: true);
+    likedGate.complete(const [_track]);
+    await Future.wait([nonForced, forced]);
+
+    verify(() => account.fetchPlaylistDetails('PL_FRESH',
+        maxTracks: any(named: 'maxTracks'))).called(1);
+    expect(likedCalls, 2);
+    await cubit.close();
+  });
+
+  test('custom playlists still sync when signed out of YouTube Music',
+      () async {
+    when(() => account.isLoggedIn).thenReturn(false);
+    final repo = _MusicRepo();
+    getIt.registerSingleton<IMusicRepository>(repo);
+
+    when(() => repo.getOnlinePlaylists())
+        .thenAnswer((_) async => const Right(<OnlinePlaylistsTableData>[]));
+    when(() => repo.cacheOnlinePlaylist(
+          playlistId: any(named: 'playlistId'),
+          kind: any(named: 'kind'),
+          title: any(named: 'title'),
+          author: any(named: 'author'),
+          artworkUrl: any(named: 'artworkUrl'),
+          sortOrder: any(named: 'sortOrder'),
+          tracks: any(named: 'tracks'),
+          fullSnapshot: any(named: 'fullSnapshot'),
+        )).thenAnswer((_) async => const Right(null));
+    when(() => account.fetchPlaylistDetails('PL1',
+            maxTracks: any(named: 'maxTracks')))
+        .thenAnswer((_) async => const YtmPlaylistDetails(
+              id: 'PL1',
+              title: 'Updated Public Playlist',
+              author: 'Public Author',
+              tracks: [_track],
+            ));
+
+    final cubit = create();
+    cubit.restoreCustomPlaylist(const OnlinePlaylistEntry(
+      id: 'PL1',
+      title: 'Old Custom',
+      uploader: 'Old Author',
+      tracks: [],
+    ));
+
+    await cubit.syncOnlineLibraryCacheForTesting(force: true);
+
+    verifyNever(
+        () => account.fetchLikedSongs(maxTracks: any(named: 'maxTracks')));
+    verify(() => account.fetchPlaylistDetails('PL1',
+        maxTracks: any(named: 'maxTracks'))).called(1);
+    expect(
+      cubit.onlineState.customPlaylists.single.title,
+      'Updated Public Playlist',
+    );
+    expect(cubit.onlineState.customPlaylists.single.tracks, const [_track]);
     await cubit.close();
   });
 }

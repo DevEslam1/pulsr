@@ -11,16 +11,28 @@ import '../../../core/utils/error_logger.dart';
 import '../../../domain/models/ytm_track.dart';
 
 /// Minimal state: [loginEpoch] bumps whenever the account login state flips so
-/// the screen can reset its selected category, and [isLoggedIn] mirrors the
+/// the screen can reset its selected category, [refreshEpoch] bumps when a
+/// category cache is refreshed or retried, and [isLoggedIn] mirrors the
 /// account service.
 class HomeState {
-  const HomeState({this.loginEpoch = 0, this.isLoggedIn = false});
+  const HomeState({
+    this.loginEpoch = 0,
+    this.refreshEpoch = 0,
+    this.isLoggedIn = false,
+  });
 
   final int loginEpoch;
+  final int refreshEpoch;
   final bool isLoggedIn;
 
-  HomeState copyWith({int? loginEpoch, bool? isLoggedIn}) => HomeState(
+  HomeState copyWith({
+    int? loginEpoch,
+    int? refreshEpoch,
+    bool? isLoggedIn,
+  }) =>
+      HomeState(
         loginEpoch: loginEpoch ?? this.loginEpoch,
+        refreshEpoch: refreshEpoch ?? this.refreshEpoch,
         isLoggedIn: isLoggedIn ?? this.isLoggedIn,
       );
 
@@ -30,10 +42,11 @@ class HomeState {
       other is HomeState &&
           runtimeType == other.runtimeType &&
           loginEpoch == other.loginEpoch &&
+          refreshEpoch == other.refreshEpoch &&
           isLoggedIn == other.isLoggedIn;
 
   @override
-  int get hashCode => Object.hash(loginEpoch, isLoggedIn);
+  int get hashCode => Object.hash(loginEpoch, refreshEpoch, isLoggedIn);
 }
 
 /// Owns the Home online-category data fetching and its TTL cache so the UI no
@@ -273,11 +286,25 @@ class HomeCubit extends PulsrCubit<HomeState> {
     }
   }
 
+  /// Clears cached category futures, forces a refetch for [category], and bumps
+  /// [HomeState.refreshEpoch] so listeners rebind to the new future.
+  Future<List<YtmTrack>> refreshCategory(String category) {
+    clearCache();
+    final future = categoryFuture(category);
+    if (!isClosed) {
+      safeEmit(state.copyWith(refreshEpoch: state.refreshEpoch + 1));
+    }
+    return future;
+  }
+
   void retryCategory(String category) {
     _categoryTokens[category] = (_categoryTokens[category] ?? 0) + 1;
     _inFlightCategories.remove(category);
     _categoryFutures.remove(category);
     _categoryFetchTimestamps.remove(category);
+    if (!isClosed) {
+      safeEmit(state.copyWith(refreshEpoch: state.refreshEpoch + 1));
+    }
   }
 
   void clearCache() {

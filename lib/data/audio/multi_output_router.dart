@@ -26,21 +26,13 @@ class MultiOutputRouter {
   Stream<MultiOutputMode> get changes => _changeSubject.stream;
 
   Future<bool> setMode(MultiOutputMode next) async {
-    if (next == MultiOutputMode.systemDefault) {
-      mode = next;
-      lastRouteSupported = true;
-      lastError = null;
-      if (!_changeSubject.isClosed) _changeSubject.add(next);
-      return true;
-    }
-
     final previous = mode;
     try {
       final result =
           await _channel.invokeMethod<String>('setMultiOutputRoute', {
         'mode': next.name,
       }).timeout(const Duration(seconds: 3));
-      if (result == 'unsupported') {
+      if (result == 'unsupported' && next != MultiOutputMode.systemDefault) {
         mode = previous;
         lastRouteSupported = false;
         lastError = 'unsupported';
@@ -52,12 +44,27 @@ class MultiOutputRouter {
       if (!_changeSubject.isClosed) _changeSubject.add(next);
       return true;
     } on MissingPluginException catch (e) {
+      if (next == MultiOutputMode.systemDefault) {
+        mode = next;
+        lastRouteSupported = true;
+        lastError = null;
+        if (!_changeSubject.isClosed) _changeSubject.add(next);
+        return true;
+      }
       mode = previous;
       lastRouteSupported = false;
       lastError = e.toString();
       return false;
     } catch (e) {
-      // Timeout / platform errors: keep playback alive on the last known route.
+      // Timeout / platform errors: keep playback alive on the last known route,
+      // except systemDefault resets local tracking gracefully as documented.
+      if (next == MultiOutputMode.systemDefault) {
+        mode = next;
+        lastRouteSupported = true;
+        lastError = e.toString();
+        if (!_changeSubject.isClosed) _changeSubject.add(next);
+        return true;
+      }
       mode = previous;
       lastRouteSupported = false;
       lastError = e.toString();

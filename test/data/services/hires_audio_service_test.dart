@@ -311,4 +311,28 @@ void main() {
     // Granted permission means the native settings fallback is not reached.
     expect(calls.any((c) => c.method == 'requestBluetoothPermission'), isFalse);
   });
+
+  test('setBitPerfectModeDetailed returns structured record', () async {
+    responder = (call) => <String, Object?>{'success': true};
+    final (okSuccess, failureSuccess) =
+        await service.setBitPerfectModeDetailed(true);
+    expect(okSuccess, isTrue);
+    expect(failureSuccess, isNull);
+
+    responder = (call) => <String, Object?>{
+          'success': false,
+          'reason': 'target_format_unavailable',
+        };
+    final (okFail, failureFail) =
+        await service.setBitPerfectModeDetailed(true);
+    expect(okFail, isFalse);
+    expect(failureFail, 'target_format_unavailable');
+    expect(service.lastBitPerfectFailureReason, 'target_format_unavailable');
+  });
+
+  test('Bluetooth helpers reject invalid allowlist parameters', () async {
+    expect(await service.setBluetoothCodec('INVALID_CODEC'), isFalse);
+    expect(await service.setBluetoothBitDepth(20), isFalse);
+    expect(await service.setBluetoothLdacQuality(99), isFalse);
+  });
 }

@@ -47,6 +47,16 @@ class _GenreDetailScreenState extends State<GenreDetailScreen> {
     _updateStream();
   }
 
+  @override
+  void didUpdateWidget(GenreDetailScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.genreItem.name != widget.genreItem.name ||
+        oldWidget.getGenresUseCase != widget.getGenresUseCase) {
+      _useCase = widget.getGenresUseCase ?? getIt<GetGenresUseCase>();
+      setState(_updateStream);
+    }
+  }
+
   void _updateStream() {
     _songsStream = _useCase.watchGenreSongs(widget.genreItem.name).distinct();
   }

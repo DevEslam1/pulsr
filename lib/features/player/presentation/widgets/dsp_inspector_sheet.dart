@@ -14,9 +14,9 @@ import '../../../../data/audio/audio_effects_channel.dart';
 import '../../../../data/audio/equalizer_manager.dart';
 import '../../../../data/audio/live_output_verdict.dart';
 import '../../../../data/audio/audio_handler.dart';
+import '../../../../data/audio/dsd_decoder_helper.dart';
 import '../../../../data/db/app_database.dart';
 import '../../../../data/services/usb_exclusive_service.dart';
-import '../../../../domain/models/audio_quality_info.dart';
 import '../../../../domain/models/dsp_battery_estimate.dart';
 import '../../../settings/cubit/settings_state.dart';
 import '../../../../domain/models/audio_output_info.dart';
@@ -841,9 +841,11 @@ class _DspInspectorSheetState extends State<DspInspectorSheet>
                     transportSamplesModified:
                         handler?.transportSamplesModified ?? true,
                     softwareGain: handler?.effectiveSoftwareGain,
-                    isDsdDop: AudioQualityInfo.dsdDopActive,
+                    isDsdDop: DsdDecoderHelper.dsdDopActive,
+                    isDsdNative: DsdDecoderHelper.dsdNativeActive ||
+                        (usb.streamingActive && usb.dsdActive),
                     oversamplingActive:
-                        AudioEffectsChannel().currentOversampleMultiplier > 1,
+                        AudioEffectsChannel().activeOversampleMultiplier > 1,
                     pcmToDsdActive: AudioEffectsChannel().isPcmToDsdActive,
                   ));
                   final v = OutputPathVerdict.of(currentOutputDevice,

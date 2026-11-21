@@ -379,8 +379,10 @@ class AudioVisualizerState extends State<AudioVisualizer>
           _lastNativeDataTime = DateTime.now();
           final len = math.min(event.length, _numBands);
           for (int i = 0; i < len; i++) {
-            final val = (event[i] as num).toDouble();
-            _targetData[i] = val.clamp(0.0, 1.0);
+            final raw = event[i];
+            if (raw is num && raw.isFinite) {
+              _targetData[i] = raw.toDouble().clamp(0.0, 1.0);
+            }
           }
         }
       },
@@ -822,7 +824,7 @@ class _WaveVisualizerPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (data.isEmpty) return;
+    if (data.length < 2) return;
 
     final count = data.length;
     final stepX = size.width / (count - 1);
@@ -959,7 +961,7 @@ class _Terrain3DVisualizerPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (data.isEmpty) return;
+    if (data.length < 2) return;
 
     _paint.color = color.withValues(alpha: 0.6);
 

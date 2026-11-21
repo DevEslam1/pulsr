@@ -551,12 +551,9 @@ void main() {
       await tester.pumpAndSettle();
 
       final headerBefore = tester.widget<Text>(find.text('Quran Mode'));
-      expect(
-        tester
-            .widget<QuranMushafView>(find.byType(QuranMushafView))
-            .currentPosition,
-        const Duration(seconds: 1),
-      );
+      final mushafBefore =
+          tester.widget<QuranMushafView>(find.byType(QuranMushafView));
+      expect(mushafBefore, isNotNull);
 
       for (var s = 2; s <= 5; s++) {
         current = current.copyWith(
@@ -572,11 +569,13 @@ void main() {
         isTrue,
         reason: 'Outer QuranModePanel must not rebuild on position ticks',
       );
+      final mushafAfter =
+          tester.widget<QuranMushafView>(find.byType(QuranMushafView));
       expect(
-        tester
-            .widget<QuranMushafView>(find.byType(QuranMushafView))
-            .currentPosition,
-        const Duration(seconds: 5),
+        identical(mushafBefore, mushafAfter),
+        isTrue,
+        reason:
+            'QuranMushafView must not rebuild on position ticks when activeAyah has not changed',
       );
     });
   });

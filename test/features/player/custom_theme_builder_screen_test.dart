@@ -137,6 +137,23 @@ void main() {
     verify(() => settings.setCustomThemeGlow(false)).called(1);
   });
 
+  testWidgets('rejects NaN radius and clamps persisted radius to 0..48',
+      (tester) async {
+    await tester.pumpWidget(host());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.file_upload_outlined));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byType(TextField),
+      '{"accentColor": 4288388853, "cornerRadius": 999.0}',
+    );
+    await tester.tap(find.byType(FilledButton));
+    await tester.pumpAndSettle();
+
+    verify(() => settings.setCustomThemeRadius(48.0)).called(1);
+  });
+
   testWidgets('JSON without an accent colour is reported as invalid',
       (tester) async {
     await tester.pumpWidget(host());

@@ -92,6 +92,55 @@ void main() {
       expect(decoded.gains, isEmpty);
       expect(decoded.bassBoost, 0.0);
     });
+
+    test('safely parses numeric lists with null, non-num, and non-finite elements', () {
+      final decoded = EqPreset.fromJson({
+        'name': 'CorruptData',
+        'gains': [1.5, 'bad', null, double.nan, double.infinity, 3],
+        'customFrequencies': [100, 'x', 200.5],
+        'qFactors': ['bad', 1.414],
+        'bandsMap': {
+          '10': [0, null, 'string', 5.0],
+        },
+      });
+      expect(decoded.gains, [1.5, 0.0, 0.0, 0.0, 0.0, 3.0]);
+      expect(decoded.customFrequencies, [100.0, 0.0, 200.5]);
+      expect(decoded.qFactors, [0.0, 1.414]);
+      expect(decoded.bandsMap[10], [0.0, 0.0, 0.0, 5.0]);
+    });
+  });
+
+  group('EqPreset edge-case frequency interpolation guards', () {
+    test('interpolateGains guards non-positive frequencies and identical bounds', () {
+      final out = EqPreset.interpolateGains(
+        [1.0, 5.0],
+        sourceFrequencies: [0.0, 1000.0],
+        targetFrequencies: [-10.0, 0.0, 500.0, 1000.0],
+      );
+      expect(out.length, 4);
+      for (final g in out) {
+        expect(g.isFinite, isTrue);
+      }
+
+      final outIdentical = EqPreset.interpolateGains(
+        [2.0, 4.0],
+        sourceFrequencies: [1000.0, 1000.0],
+        targetFrequencies: [500.0, 1000.0, 1500.0],
+      );
+      expect(outIdentical.length, 3);
+      for (final g in outIdentical) {
+        expect(g.isFinite, isTrue);
+      }
+    });
+
+    test('to10Band maps legacy 5-band accurately and handles empty/single', () {
+      expect(EqPreset.to10Band([]), List<double>.filled(10, 0.0));
+      expect(EqPreset.to10Band([3.0]), List<double>.filled(10, 3.0));
+      final mapped = EqPreset.to10Band([6.0, 4.0, 1.0, 0.0, -3.0]);
+      expect(mapped.length, 10);
+      expect(mapped.first, closeTo(6.0, 0.001));
+      expect(mapped.last, closeTo(-3.0, 0.001));
+    });
   });
 
   group('EqPreset 32-band plan alignment', () {

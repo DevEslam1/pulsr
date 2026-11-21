@@ -8,7 +8,8 @@ import android.util.Log
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
-import java.util.concurrent.atomic.AtomicInteger
+import java.util.Collections
+import java.util.WeakHashMap
 
 /**
  * Native half of the system-behaviour pack.
@@ -29,13 +30,14 @@ import java.util.concurrent.atomic.AtomicInteger
  *
  * Channel: `com.pulsr.music/system_behavior`.
  */
-class SystemBehaviorPlugin private constructor(
+class SystemBehaviorPlugin internal constructor(
     private val application: Application?,
     private val channel: MethodChannel,
 ) : MethodChannel.MethodCallHandler, Application.ActivityLifecycleCallbacks {
 
-    /** Number of live activities; task removal finishes the last one. */
-    private val liveActivities = AtomicInteger(0)
+    /** Live activities tracked weakly; task removal finishes the last one. */
+    private val liveActivities: MutableSet<Activity> =
+        Collections.synchronizedSet(Collections.newSetFromMap(WeakHashMap<Activity, Boolean>()))
 
     companion object {
         /** Platform channel name shared with the Dart client. */
@@ -94,12 +96,16 @@ class SystemBehaviorPlugin private constructor(
     // ---- Activity lifecycle: the real task-removal signal ----
 
     override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {
-        liveActivities.incrementAndGet()
+        liveActivities.add(activity)
     }
 
-    override fun onActivityStarted(activity: Activity) = Unit
+    override fun onActivityStarted(activity: Activity) {
+        liveActivities.add(activity)
+    }
 
-    override fun onActivityResumed(activity: Activity) = Unit
+    override fun onActivityResumed(activity: Activity) {
+        liveActivities.add(activity)
+    }
 
     override fun onActivityPaused(activity: Activity) = Unit
 
@@ -108,9 +114,10 @@ class SystemBehaviorPlugin private constructor(
     override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) = Unit
 
     override fun onActivityDestroyed(activity: Activity) {
-        // Callbacks start after the first activity exists, so the counter can
-        // briefly be 0; clamp instead of going negative.
-        val remaining = liveActivities.updateAndGet { count -> maxOf(count - 1, 0) }
+        val remaining = synchronized(liveActivities) {
+            liveActivities.remove(activity)
+            liveActivities.size
+        }
         if (!activity.isFinishing) return
         if (activity.isChangingConfigurations) return
         if (!activity.isTaskRoot) return
@@ -134,6 +141,7 @@ class SystemBehaviorPlugin private constructor(
 
     /** Detaches the channel handler and the activity watcher. */
     fun dispose() {
+        liveActivities.clear()
         try {
             application?.unregisterActivityLifecycleCallbacks(this)
         } catch (e: Exception) {

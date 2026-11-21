@@ -41,7 +41,14 @@ class _PlayerVolumeBarState extends State<PlayerVolumeBar> {
       }
     }();
     final effectiveVolume = _dragVolume ?? currentVolume;
-    final isMuted = effectiveVolume <= 0.01;
+    final stateMuted = () {
+      try {
+        return context.select<PlayerCubit, bool>((c) => c.state.isMuted);
+      } catch (_) {
+        return widget.cubit.state.isMuted;
+      }
+    }();
+    final isMuted = stateMuted || effectiveVolume <= 0.01;
 
     return Padding(
       padding: const EdgeInsets.symmetric(

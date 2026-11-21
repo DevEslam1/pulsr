@@ -153,4 +153,17 @@ void main() {
 
     expect(find.text('Native DSP unavailable on this device'), findsOneWidget);
   });
+
+  testWidgets(
+      'RemasterControlCard does not call native setters when blockedReason != null',
+      (tester) async {
+    channelCalls.clear();
+    await tester.pumpWidget(buildCard(blockedReason: 'Bit-perfect locked'));
+    await tester.pumpAndSettle();
+
+    final setterCalls = channelCalls.where((c) =>
+        c.method.startsWith('setOversample') ||
+        c.method.startsWith('setPcmToDsd'));
+    expect(setterCalls, isEmpty);
+  });
 }

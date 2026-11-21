@@ -41,6 +41,10 @@ extension AudioEffectsPcmToDsdOps on AudioEffectsChannel {
       return true;
     } on PlatformException {
       return false;
+    } on MissingPluginException {
+      return false;
+    } on TimeoutException {
+      return false;
     }
   }
 
@@ -72,6 +76,10 @@ extension AudioEffectsPcmToDsdOps on AudioEffectsChannel {
       return true;
     } on PlatformException {
       return false;
+    } on MissingPluginException {
+      return false;
+    } on TimeoutException {
+      return false;
     }
   }
 
@@ -102,6 +110,10 @@ extension AudioEffectsPcmToDsdOps on AudioEffectsChannel {
       _cachedPcmToDsdOrder = valid;
       return true;
     } on PlatformException {
+      return false;
+    } on MissingPluginException {
+      return false;
+    } on TimeoutException {
       return false;
     }
   }

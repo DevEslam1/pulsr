@@ -13,7 +13,7 @@
 // booleans exactly as the platform reported them; this file owns the rules for
 // which observation wins and what it means.
 
-import '../../data/audio/bit_perfect_chain.dart';
+import 'bit_perfect_chain.dart';
 import 'bit_perfect_state.dart';
 
 /// Raw observations of the live output chain.
@@ -101,6 +101,7 @@ class BitPerfectOutputFacts {
   final bool rateVerified;
 
   final bool isDsdDop;
+  final bool isDsdNative;
   final bool oversamplingActive;
   final bool pcmToDsdActive;
   final bool sourceLossy;
@@ -132,6 +133,7 @@ class BitPerfectOutputFacts {
     this.channelsAltered = false,
     this.rateVerified = true,
     this.isDsdDop = false,
+    this.isDsdNative = false,
     this.oversamplingActive = false,
     this.pcmToDsdActive = false,
     this.sourceLossy = false,
@@ -172,8 +174,9 @@ BitPerfectState resolveBitPerfectOutput(BitPerfectOutputFacts facts) {
   // can be delivered while the rate is still unverified, and the assessment
   // must be able to say so instead of blaming a float carrier.
   final directRawBypass = direct &&
-      facts.sourceBitDepth > 0 &&
-      facts.directRawPcmBitDepth >= facts.sourceBitDepth;
+      (facts.isDsdNative ||
+          (facts.sourceBitDepth > 0 &&
+              facts.directRawPcmBitDepth >= facts.sourceBitDepth));
   // A sink bypass is only meaningful when the sink's container is at least as
   // wide as the source; otherwise the platform truncated ahead of the bypass.
   final sinkBypass = facts.sinkIntegerBypass &&
@@ -199,6 +202,7 @@ BitPerfectState resolveBitPerfectOutput(BitPerfectOutputFacts facts) {
     samplesModified: facts.dspProcessing || facts.transportSamplesModified,
     channelsAltered: facts.channelsAltered,
     isDsdDop: facts.isDsdDop,
+    isDsdNative: facts.isDsdNative,
     oversamplingActive: facts.oversamplingActive,
     pcmToDsdActive: facts.pcmToDsdActive,
     sourceLossy: facts.sourceLossy,

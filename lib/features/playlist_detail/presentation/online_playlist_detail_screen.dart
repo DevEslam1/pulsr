@@ -38,6 +38,7 @@ import '../../../domain/repositories/music_repository_interface.dart';
 import '../../../domain/usecases/playlist_usecases.dart';
 import '../../library/cubit/library_cubit.dart';
 import '../../player/cubit/player_cubit.dart';
+import '../../playlists/cubit/playlist_cubit.dart';
 import '../../sheets/song_options_sheet.dart';
 import '../../ytm_search/cubit/ytm_download_cubit.dart';
 import '../../ytm_search/presentation/widgets/ytm_download_button.dart';
@@ -283,6 +284,15 @@ class _OnlinePlaylistDetailScreenState
             _isOfflineCache = true;
             _errorMessage = null;
           });
+          if (!isBackgroundRefresh && mounted) {
+            PulsrToast.show(
+              context,
+              message: isTimeout
+                  ? 'Connection timed out. Check your network and try again.'
+                  : context.l10n.browseCouldNotLoadTracks,
+              isError: true,
+            );
+          }
           return;
         }
         if (!isBackgroundRefresh) {
@@ -307,6 +317,13 @@ class _OnlinePlaylistDetailScreenState
             _isLoading = false;
             _isOfflineCache = true;
           });
+          if (!isBackgroundRefresh && mounted) {
+            PulsrToast.show(
+              context,
+              message: context.l10n.browseCouldNotLoadTracks,
+              isError: true,
+            );
+          }
           return;
         }
         if (!isBackgroundRefresh) {
@@ -372,6 +389,16 @@ class _OnlinePlaylistDetailScreenState
         _subtitle = resolvedSubtitle;
         _artworkUrl = resolvedArtwork;
       });
+      try {
+        context.read<PlaylistCubit?>()?.syncUpdatedPlaylistFromDetail(
+              playlistId: _cachePlaylistId,
+              kind: _kind,
+              title: resolvedTitle,
+              author: resolvedSubtitle,
+              artworkUrl: resolvedArtwork,
+              tracks: orderedTracks,
+            );
+      } catch (_) {}
       _warmStreamHead();
     } catch (e) {
       if (_disposed || !mounted || gen != _fetchGen) return;
@@ -381,6 +408,15 @@ class _OnlinePlaylistDetailScreenState
           _isOfflineCache = true;
           _errorMessage = null;
         });
+        if (!isBackgroundRefresh && mounted) {
+          PulsrToast.show(
+            context,
+            message: e is TimeoutException
+                ? 'Connection timed out. Check your network and try again.'
+                : context.l10n.browseCouldNotLoadTracks,
+            isError: true,
+          );
+        }
         return;
       }
       setState(() {

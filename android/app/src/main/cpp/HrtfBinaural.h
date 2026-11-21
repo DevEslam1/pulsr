@@ -93,10 +93,11 @@ public:
     void setEnabled(bool enabled);
     bool isEnabled() const { return enabled_.load(std::memory_order_relaxed); }
     bool isRamping() const {
-        return (!enabled_.load(std::memory_order_relaxed) && smoothedEnabledMix_ >= 1e-4f) ||
-               (enabled_.load(std::memory_order_relaxed) && smoothedEnabledMix_ < 0.9999f) ||
-               (crossfadeProgress_ < 1.0f) ||
-               (readySlot_.load(std::memory_order_acquire) >= 0);
+        const bool en = enabled_.load(std::memory_order_relaxed);
+        return (!en && smoothedEnabledMix_ >= 1e-4f) ||
+               (en && smoothedEnabledMix_ < 0.9999f) ||
+               ((en || smoothedEnabledMix_ >= 1e-4f) &&
+                (crossfadeProgress_ < 1.0f || readySlot_.load(std::memory_order_acquire) >= 0));
     }
 
     double getAzimuth() const { return targetAzimuthDeg_.load(std::memory_order_relaxed); }
@@ -144,6 +145,14 @@ public:
     bool loadCustomIr(const float* ll, const float* lr, const float* rl, const float* rr,
                       int taps, double irSampleRate);
 
+    /// Control thread: adopts an immutable custom/WAV HRIR quad (shared via
+    /// DspParamSnapshot::hrtf.customIr) or restores the dataset/synthetic
+    /// source when cleared without clobbering an active dataset unless desired.
+    void setCustomIr(std::shared_ptr<const HrirQuad> customIr);
+    std::shared_ptr<const HrirQuad> getCustomIr() const;
+    void applySnapshotSources(std::shared_ptr<const SofaDataset> dataset,
+                              std::shared_ptr<const HrirQuad> customIr);
+
     // Audio-thread processing: allocation-free, lock-free, log-free.
     void process(const float* inL, const float* inR, float* outL, float* outR, int frames);
     void processInterleaved(float* buffer, int frames, int channels = 2);
@@ -163,6 +172,14 @@ public:
     /// render thread. Allocates (vector copies); never call on the render
     /// thread. The active slot is not mutated by the control writer.
     bool copyActiveQuad(HrirQuad& out) const;
+
+    /// Diagnostics/tests only: returns true while the render thread still pins
+    /// a previous crossfade source slot distinct from activeSlotAtomic_.
+    bool hasPendingOldSlotForTesting() const {
+        const int active = activeSlotAtomic_.load(std::memory_order_acquire);
+        const int old = oldSlotAtomic_.load(std::memory_order_acquire);
+        return old >= 0 && old != active;
+    }
 
 private:
     enum class IrSource { Synthetic, Dataset, Custom };
@@ -191,7 +208,7 @@ private:
     // calls (slider + SOFA load) cannot race the slot handoff.
     mutable std::mutex prepareMutex_;
     std::shared_ptr<const SofaDataset> dataset_;
-    HrirQuad customIrSource_;
+    std::shared_ptr<const HrirQuad> customIrSource_;
     IrSource source_ = IrSource::Synthetic;
     bool hasPublished_ = false;
     double lastPreparedAzimuthDeg_ = 0.0;

@@ -66,6 +66,10 @@ android {
     lint {
         disable += listOf("AndroidGradlePluginVersion", "InvalidPackage", "GradleDependency", "NewerVersionAvailable")
     }
+
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+    }
 }
 
 dependencies {
@@ -73,4 +77,5 @@ dependencies {
     implementation("androidx.media3:media3-exoplayer:$exoplayerVersion")
     implementation("androidx.media3:media3-exoplayer-dash:$exoplayerVersion")
     implementation("androidx.media3:media3-exoplayer-hls:$exoplayerVersion")
+    testImplementation("junit:junit:4.13.2")
 }

@@ -4,10 +4,12 @@
 // tests can assert the exact bytes sent to a renderer, and responses are read
 // with a namespace-tolerant local-name lookup.
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
 import '../../core/errors/app_error_base.dart';
+import 'upnp_entities.dart';
 
 /// Renderer transport state as reported by `GetTransportInfo`.
 enum TransportState {
@@ -203,30 +205,43 @@ class AvTransportClient {
 
   Future<String> _invoke(String action, String envelope) async {
     final request = http.Request('POST', controlUrl)
+      ..followRedirects = false
       ..headers['Content-Type'] = 'text/xml; charset="utf-8"'
       ..headers['SOAPACTION'] = soapAction(action)
       ..bodyBytes = utf8.encode(envelope);
 
     final streamed = await _client.send(request).timeout(_timeout);
-    final response = await http.Response.fromStream(streamed).timeout(_timeout);
-    final body = utf8.decode(response.bodyBytes, allowMalformed: true);
+    const maxBytes = 256 * 1024;
+    final builder = BytesBuilder(copy: false);
+    await for (final chunk in streamed.stream.timeout(_timeout)) {
+      if (builder.length + chunk.length > maxBytes) {
+        throw UpnpActionError(
+          code: 'DLNA_RESPONSE_TOO_LARGE',
+          userMessage: 'The renderer returned an oversized response ($action).',
+          action: action,
+        );
+      }
+      builder.add(chunk);
+    }
+    final bodyBytes = builder.takeBytes();
+    final body = utf8.decode(bodyBytes, allowMalformed: true);
 
     final fault = _faultFrom(body, action);
-    if (response.statusCode >= 400) {
+    if (streamed.statusCode >= 400) {
       if (fault != null) throw fault;
       throw UpnpActionError(
-        code: 'DLNA_HTTP_${response.statusCode}',
+        code: 'DLNA_HTTP_${streamed.statusCode}',
         userMessage:
-            'The renderer rejected $action (HTTP ${response.statusCode}).',
+            'The renderer rejected $action (HTTP ${streamed.statusCode}).',
         action: action,
       );
     }
     if (fault != null) throw fault;
-    if (response.statusCode != 200) {
+    if (streamed.statusCode != 200) {
       throw UpnpActionError(
-        code: 'DLNA_HTTP_${response.statusCode}',
+        code: 'DLNA_HTTP_${streamed.statusCode}',
         userMessage:
-            'The renderer rejected $action (HTTP ${response.statusCode}).',
+            'The renderer rejected $action (HTTP ${streamed.statusCode}).',
         action: action,
       );
     }
@@ -516,34 +531,5 @@ class AvTransportClient {
     );
   }
 
-  static String _decodeEntities(String value) {
-    if (!value.contains('&')) return value;
-    return value.replaceAllMapped(
-      RegExp(r'&(#x?[0-9A-Fa-f]+|[A-Za-z]+);'),
-      (match) {
-        final token = match.group(1) ?? '';
-        switch (token) {
-          case 'amp':
-            return '&';
-          case 'lt':
-            return '<';
-          case 'gt':
-            return '>';
-          case 'quot':
-            return '"';
-          case 'apos':
-            return "'";
-        }
-        if (token.startsWith('#x') || token.startsWith('#X')) {
-          final code = int.tryParse(token.substring(2), radix: 16);
-          return code == null ? match.group(0)! : String.fromCharCode(code);
-        }
-        if (token.startsWith('#')) {
-          final code = int.tryParse(token.substring(1));
-          return code == null ? match.group(0)! : String.fromCharCode(code);
-        }
-        return match.group(0)!;
-      },
-    );
-  }
+  static String _decodeEntities(String value) => decodeXmlEntities(value);
 }

@@ -199,7 +199,7 @@ class AutomixTransitionPlanner {
       );
     }
 
-    if (outConf < minDjConfidence && inConf < minDjConfidence) {
+    if (outConf < minDjConfidence || inConf < minDjConfidence) {
       return TransitionPolicyVerdict(
         tier: TransitionTier.plainCrossfade,
         reasons: ['beat-confidence-too-low'],
@@ -378,8 +378,16 @@ class AutomixTransitionPlanner {
       if (cue < length * 0.25) return cue;
     }
     if (analysis.mixInCandidates.isNotEmpty) {
-      final best = analysis.mixInCandidates.first;
-      if (best.time < length * 0.25) return best.time;
+      MixCandidate? best;
+      for (final candidate in analysis.mixInCandidates) {
+        if (candidate.time < 0 || candidate.time >= length * 0.25) continue;
+        if (best == null ||
+            candidate.score > best.score ||
+            (candidate.score == best.score && candidate.time < best.time)) {
+          best = candidate;
+        }
+      }
+      if (best != null) return best.time;
     }
     final audible = _findAudibleStart(analysis);
     return audible;

@@ -273,6 +273,33 @@ UsbStreamResult UsbAudioSink::Open(int fd, int endpointAddress, int interfaceNum
         gapFader_.configure(sampleRate, channels, bytesPerSample_);
     }
     asrcOutAvail_ = 0;
+
+#if defined(__linux__) || defined(__ANDROID__)
+    const int speed = ioctl(fd_, USBDEVFS_GET_SPEED);
+    const auto config = fetchConfigDescriptor(fd_);
+    const auto timing = ParseEndpointTiming(config.data(), config.size(),
+                                           interfaceNumber_, altSetting_, endpoint_, speed);
+    if (timing.intervalUs <= 0 || timing.maxPacketBytes <= 0) {
+        lastError_.store(EINVAL, std::memory_order_relaxed);
+        releaseResources();
+        return UsbStreamResult::InvalidArgs;
+    }
+    if (!configureFeedbackFromDescriptor(config.data(), config.size())) {
+        lastError_.store(EINVAL, std::memory_order_relaxed);
+        releaseResources();
+        return UsbStreamResult::InvalidArgs;
+    }
+    serviceIntervalUs_ = timing.intervalUs;
+    const int frameBytes = channels_ * bytesPerSample_;
+    const int capacityFrames = timing.maxPacketBytes / frameBytes;
+    const uint64_t samplesPerInterval = static_cast<uint64_t>(sampleRate_) * serviceIntervalUs_;
+    const int nominalFrames = static_cast<int>((samplesPerInterval + 999999) / 1000000);
+    if (capacityFrames < nominalFrames) {
+        lastError_.store(EINVAL, std::memory_order_relaxed);
+        releaseResources();
+        return UsbStreamResult::RateUnsupported;
+    }
+    maxFramesPerPacket_ = std::min(capacityFrames, nominalFrames + 1);
     if (IsReservoirMode(renderMode_)) {
         const int reservoirMs = tunedBufferMs_ > 0 ? tunedBufferMs_ : 3000;
         // Pull mode stores the wire bytes verbatim, so its frame size is the
@@ -295,64 +322,11 @@ UsbStreamResult UsbAudioSink::Open(int fd, int endpointAddress, int interfaceNum
                 releaseResources();
                 return UsbStreamResult::InvalidArgs;
             }
-            // One packet of output plus lookahead, and a bounded input chunk.
-            // maxFramesPerPacket_ is computed later in Open, so size against a
-            // floor here; the packet loop clamps to the real packet size.
-            const size_t packetFloor = static_cast<size_t>(
-                std::max(maxFramesPerPacket_, 2048));
-            const size_t outCap = (packetFloor + 64) * static_cast<size_t>(channels_);
-            asrcOut_.assign(outCap, 0.0f);
-            asrcPack_.assign(packetFloor * static_cast<size_t>(channels_), 0.0f);
-            asrcInputCapacityFrames_ = 1024;
-            asrcIn_.assign(asrcInputCapacityFrames_ * static_cast<size_t>(channels_), 0.0f);
-            // Typical decoder blocks are 256-4096 frames; 8192 covers them
-            // without allocating in the producer path.
-            asrcRawScratchFrames_ = 8192;
-            asrcRawScratch_.assign(asrcRawScratchFrames_ * static_cast<size_t>(channels_), 0.0f);
+            // maxFramesPerPacket_ is now known, so high-rate 10 ms packets
+            // cannot overflow asrcPack_ or asrcOut_.
+            allocateAsrcBuffers();
         }
     }
-
-#if defined(__linux__) || defined(__ANDROID__)
-    const int speed = ioctl(fd_, USBDEVFS_GET_SPEED);
-    const auto config = fetchConfigDescriptor(fd_);
-    const auto timing = ParseEndpointTiming(config.data(), config.size(),
-                                           interfaceNumber_, altSetting_, endpoint_, speed);
-    if (timing.intervalUs <= 0 || timing.maxPacketBytes <= 0) {
-        lastError_.store(EINVAL, std::memory_order_relaxed);
-        releaseResources();
-        return UsbStreamResult::InvalidArgs;
-    }
-    feedbackEndpoint_ = findFeedbackEndpoint(config.data(), config.size(),
-                                             interfaceNumber_, altSetting_,
-                                             &feedbackPacketSize_);
-    if (disableExplicitFeedback_) feedbackEndpoint_ = 0;
-    if (feedbackEndpoint_ < 0) {
-        lastError_.store(EINVAL, std::memory_order_relaxed);
-        releaseResources();
-        return UsbStreamResult::InvalidArgs;
-    }
-    // Stream tuning: a DAC whose feedback IN endpoint steers badly can be
-    // pinned to ring-fill steering. Treat the endpoint as absent so no feedback
-    // URB is ever submitted; the worker's steering fallback then owns cadence
-    // (the same path a DAC without feedback already takes).
-    if (disableExplicitFeedback_ && feedbackEndpoint_ != 0) {
-        PULSR_USB_LOG(ANDROID_LOG_INFO,
-                      "tuning: ignoring advertised feedback endpoint 0x%02x",
-                      feedbackEndpoint_);
-        feedbackEndpoint_ = 0;
-        feedbackPacketSize_ = 0;
-    }
-    serviceIntervalUs_ = timing.intervalUs;
-    const int frameBytes = channels_ * bytesPerSample_;
-    const int capacityFrames = timing.maxPacketBytes / frameBytes;
-    const uint64_t samplesPerInterval = static_cast<uint64_t>(sampleRate_) * serviceIntervalUs_;
-    const int nominalFrames = static_cast<int>((samplesPerInterval + 999999) / 1000000);
-    if (capacityFrames < nominalFrames) {
-        lastError_.store(EINVAL, std::memory_order_relaxed);
-        releaseResources();
-        return UsbStreamResult::RateUnsupported;
-    }
-    maxFramesPerPacket_ = std::min(capacityFrames, nominalFrames + 1);
     // When Kotlin already claimed the interface, selected the alternate setting
     // and programmed+verified the DAC sample clock, do NOT send a second
     // USBDEVFS_SETINTERFACE here: on many UAC1/UAC2 DACs a redundant
@@ -884,6 +858,70 @@ int UsbAudioSink::findFeedbackEndpoint(const uint8_t* cfg, size_t len,
     return endpoint;
 }
 
+bool UsbAudioSink::configureFeedbackFromDescriptor(const uint8_t* config, size_t len) {
+    feedbackEndpoint_ = findFeedbackEndpoint(config, len,
+                                             interfaceNumber_, altSetting_,
+                                             &feedbackPacketSize_);
+    if (feedbackEndpoint_ < 0) {
+        feedbackEndpoint_ = 0;
+        feedbackPacketSize_ = 0;
+        return false;
+    }
+    // Stream tuning: a DAC whose feedback IN endpoint steers badly can be
+    // pinned to ring-fill steering. Treat the endpoint as absent so no feedback
+    // URB is ever submitted; the worker's steering fallback then owns cadence
+    // (the same path a DAC without feedback already takes).
+    if (disableExplicitFeedback_ && feedbackEndpoint_ != 0) {
+        PULSR_USB_LOG(ANDROID_LOG_INFO,
+                      "tuning: ignoring advertised feedback endpoint 0x%02x",
+                      feedbackEndpoint_);
+        feedbackEndpoint_ = 0;
+        feedbackPacketSize_ = 0;
+    }
+    return true;
+}
+
+void UsbAudioSink::allocateAsrcBuffers() {
+    const size_t ch = static_cast<size_t>(std::max(1, channels_));
+    // One packet of output plus lookahead, and a bounded input chunk.
+    // Sized after maxFramesPerPacket_ is computed so high-rate 10 ms packets
+    // (e.g. 768 kHz -> 7681 frames) never overflow asrcPack_ or asrcOut_.
+    const size_t packetFloor = static_cast<size_t>(
+        std::max(maxFramesPerPacket_, 2048));
+    const size_t outCap = (packetFloor + 64) * ch;
+    asrcOut_.assign(outCap, 0.0f);
+    asrcPack_.assign(packetFloor * ch, 0.0f);
+    asrcInputCapacityFrames_ = 1024;
+    asrcIn_.assign(asrcInputCapacityFrames_ * ch, 0.0f);
+    // Typical decoder blocks are 256-4096 frames; 8192 covers them
+    // without allocating in the producer path.
+    asrcRawScratchFrames_ = 8192;
+    asrcRawScratch_.assign(asrcRawScratchFrames_ * ch, 0.0f);
+    asrcOutAvail_ = 0;
+}
+
+double UsbAudioSink::computeAsrcRatio() const {
+    double ratio = 1.0;
+    if (feedbackEndpoint_ != 0) {
+        const int fbRate = feedbackRatePerSec_.load(std::memory_order_relaxed);
+        if (sampleRate_ > 0 && fbRate > 0) {
+            ratio = static_cast<double>(fbRate) / static_cast<double>(sampleRate_);
+        }
+    } else {
+        const int targetMs = pullRenderer_.bufferMs();
+        if (targetMs > 0) {
+            const double targetMidMs = static_cast<double>(targetMs) * 0.5;
+            const double currentFillMs = static_cast<double>(pullRenderer_.fillMs());
+            // Low reservoir fill (DAC running faster than producer) needs
+            // ratio > 1 so fewer input frames are consumed per output frame;
+            // high reservoir fill needs ratio < 1 to drain the surplus.
+            const double error = (targetMidMs - currentFillMs) / targetMidMs;
+            ratio = 1.0 + error * UsbAsrcClockSync::kMaxRatioDeviation;
+        }
+    }
+    return std::clamp(ratio, UsbAsrcClockSync::kMinRatio, UsbAsrcClockSync::kMaxRatio);
+}
+
 void UsbAudioSink::freeFeedbackResources() {
     for (uint8_t* b : feedbackBuffers_) {
         delete[] b;
@@ -1270,10 +1308,10 @@ void UsbAudioSink::workerLoop() {
         }
         if (fault != 0) {
             ReportWriteError(fault);
-            static auto lastFaultLog = std::chrono::steady_clock::time_point{};
-            const auto faultNow = std::chrono::steady_clock::now();
-            if (faultNow - lastFaultLog >= std::chrono::seconds(1)) {
-                lastFaultLog = faultNow;
+            const auto faultNowNs = std::chrono::steady_clock::now().time_since_epoch().count();
+            const int64_t prevFaultNs = lastFaultLogNs_.load(std::memory_order_relaxed);
+            if (prevFaultNs == 0 || (faultNowNs - prevFaultNs) >= 1'000'000'000LL) {
+                lastFaultLogNs_.store(faultNowNs, std::memory_order_relaxed);
                 PULSR_USB_LOG(ANDROID_LOG_WARN,
                               "urb fault=%d consecutive=%d underruns=%llu errno=%d",
                               fault, consecutiveOutFaults + 1,
@@ -1385,6 +1423,7 @@ void UsbAudioSink::workerLoop() {
             } else if (renderMode_ == static_cast<int>(UsbRenderMode::BitPerfectPull)) {
                 pktLen = fillPullPacket(dst, framesInPacket, rawDepth);
             } else if (renderMode_ == static_cast<int>(UsbRenderMode::ClockSyncAsrc)) {
+                asrc_.setRatio(computeAsrcRatio());
                 pktLen = fillAsrcPacket(dst, framesInPacket, rawDepth);
             } else {
                 pktLen = fillPacketFromRing(
@@ -1549,11 +1588,11 @@ bool UsbAudioSink::writeBlock(const float* floats, const uint8_t* pcm, int frame
     } exit{this};
     // Rate-limited rejection diagnostics: a silent ring while the status says
     // "streaming" is invisible otherwise, and the reason is one of these three.
-    static auto lastRejectLog = std::chrono::steady_clock::time_point{};
     const auto rejectLog = [&](const char* reason) {
-        const auto now = std::chrono::steady_clock::now();
-        if (now - lastRejectLog < std::chrono::seconds(1)) return;
-        lastRejectLog = now;
+        const auto nowNs = std::chrono::steady_clock::now().time_since_epoch().count();
+        const int64_t prevNs = lastRejectLogNs_.load(std::memory_order_relaxed);
+        if (prevNs != 0 && (nowNs - prevNs) < 1'000'000'000LL) return;
+        lastRejectLogNs_.store(nowNs, std::memory_order_relaxed);
         PULSR_USB_LOG(ANDROID_LOG_WARN,
                       "write rejected (%s): frames=%d ch=%d/%d rate=%d/%d "
                       "depth=%d/%d lastError=%d",
@@ -1730,13 +1769,20 @@ size_t UsbAudioSink::fillPullPacket(uint8_t* dst, int framesInPacket, int& rawDe
 }
 
 size_t UsbAudioSink::fillAsrcPacket(uint8_t* dst, int framesInPacket, int& rawDepth) {
+    if (framesInPacket <= 0 || channels_ <= 0) {
+        rawDepth = 0;
+        return 0;
+    }
+    asrc_.setRatio(computeAsrcRatio());
     const size_t ch = static_cast<size_t>(channels_);
     const size_t frameBytes = ch * static_cast<size_t>(bytesPerSample_);
+    const int packCapFrames = static_cast<int>(asrcPack_.size() / ch);
+    const int targetFrames = std::min(framesInPacket, packCapFrames);
     int produced = 0;
     const size_t outCapacityFrames = asrcOut_.size() / ch;
-    while (produced < framesInPacket) {
+    while (produced < targetFrames) {
         if (asrcOutAvail_ > 0) {
-            const int take = std::min(framesInPacket - produced, asrcOutAvail_);
+            const int take = std::min(targetFrames - produced, asrcOutAvail_);
             std::memcpy(asrcPack_.data() + static_cast<size_t>(produced) * ch,
                         asrcOut_.data(), static_cast<size_t>(take) * ch * sizeof(float));
             produced += take;
@@ -1746,7 +1792,7 @@ size_t UsbAudioSink::fillAsrcPacket(uint8_t* dst, int framesInPacket, int& rawDe
                              asrcOut_.data() + static_cast<size_t>(take) * ch,
                              static_cast<size_t>(asrcOutAvail_) * ch * sizeof(float));
             }
-            if (produced >= framesInPacket) break;
+            if (produced >= targetFrames) break;
         }
         const int got = pullRenderer_.pull(asrcIn_.data(),
                                           static_cast<int>(asrcInputCapacityFrames_));
@@ -1759,12 +1805,12 @@ size_t UsbAudioSink::fillAsrcPacket(uint8_t* dst, int framesInPacket, int& rawDe
         asrcOutAvail_ += made;
         if (made == 0) break;  // needs more input than one chunk can supply
     }
-    if (produced < framesInPacket) {
+    if (produced < targetFrames) {
         std::memset(asrcPack_.data() + static_cast<size_t>(produced) * ch, 0,
-                    static_cast<size_t>(framesInPacket - produced) * ch * sizeof(float));
+                    static_cast<size_t>(targetFrames - produced) * ch * sizeof(float));
         underrunCount_.fetch_add(1, std::memory_order_relaxed);
     }
-    for (int f = 0; f < framesInPacket; ++f) {
+    for (int f = 0; f < targetFrames; ++f) {
         for (size_t c = 0; c < ch; ++c) {
             uint8_t packed[4] = {0, 0, 0, 0};
             PackPcmSample(asrcPack_[static_cast<size_t>(f) * ch + c], packed,
@@ -1773,6 +1819,11 @@ size_t UsbAudioSink::fillAsrcPacket(uint8_t* dst, int framesInPacket, int& rawDe
                             c * static_cast<size_t>(bytesPerSample_),
                         packed, static_cast<size_t>(bytesPerSample_));
         }
+    }
+    if (targetFrames < framesInPacket) {
+        std::memset(dst + static_cast<size_t>(targetFrames) * frameBytes, 0,
+                    static_cast<size_t>(framesInPacket - targetFrames) * frameBytes);
+        underrunCount_.fetch_add(1, std::memory_order_relaxed);
     }
     // Resampled output is never a raw-integer copy, regardless of the source.
     rawDepth = 0;

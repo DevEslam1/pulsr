@@ -191,7 +191,7 @@ class AudioProfileService {
 
   static Future<void> _defaultResyncEffects() async {
     if (!getIt.isRegistered<EqualizerManager>()) return;
-    await getIt<EqualizerManager>().resyncActiveEffects();
+    await getIt<EqualizerManager>().reloadFromPreferences();
   }
 
   /// Id of the profile marked as the device default, if any.
@@ -204,7 +204,10 @@ class AudioProfileService {
   ///
   /// Returns `false` when [profileId] is not a saved profile (the preference is
   /// left untouched), and throws [AudioProfileStoreError] for an unsafe id.
-  Future<bool> setGlobalDefaults(String? profileId) async {
+  Future<bool> setGlobalDefaults(String? profileId) =>
+      _mutex.protect(() => _setGlobalDefaultsUnlocked(profileId));
+
+  Future<bool> _setGlobalDefaultsUnlocked(String? profileId) async {
     if (profileId == null) {
       // Changing the default frees the scheduler marker so the next matching
       // event (startup or attach) can act on the new selection immediately.
@@ -575,6 +578,19 @@ class AudioProfileService {
     int? deviceVid,
     int? devicePid,
     String? deviceKey,
+  }) =>
+      _mutex.protect(() => _applyDefaultProfileUnlocked(
+            startup: startup,
+            deviceVid: deviceVid,
+            devicePid: devicePid,
+            deviceKey: deviceKey,
+          ));
+
+  Future<AudioProfileApplyReport?> _applyDefaultProfileUnlocked({
+    bool startup = false,
+    int? deviceVid,
+    int? devicePid,
+    String? deviceKey,
   }) async {
     final id = defaultProfileId;
     if (id == null) return null;
@@ -603,7 +619,7 @@ class AudioProfileService {
       return null;
     }
 
-    final report = await apply(profile);
+    final report = await _applyUnlocked(profile);
     // Only a completed apply marks the marker: a rolled-back apply must be
     // retried on the next event instead of being treated as done.
     await _prefs.setString(lastAppliedProfileKey, marker);
@@ -676,22 +692,22 @@ class AudioProfileService {
   Future<bool> _refreshLiveState() async {
     var refreshed = true;
     try {
-      await _reloadSettings();
+      await _resyncEffects();
     } catch (e, st) {
       refreshed = false;
       ErrorLogger.log(
-        'Reloading settings after an audio profile change failed',
+        'Resyncing audio effects after an audio profile change failed',
         error: e,
         stackTrace: st,
         category: 'AudioProfileService',
       );
     }
     try {
-      await _resyncEffects();
+      await _reloadSettings();
     } catch (e, st) {
       refreshed = false;
       ErrorLogger.log(
-        'Resyncing audio effects after an audio profile change failed',
+        'Reloading settings after an audio profile change failed',
         error: e,
         stackTrace: st,
         category: 'AudioProfileService',
@@ -712,7 +728,16 @@ class AudioProfileService {
         target = target.withId(_newId());
         file = File(p.join(directory.path, '${target.id}.json'));
       }
-      await file.writeAsString(target.toJsonString(), flush: true);
+      final tempFile = File(p.join(directory.path, '${target.id}.json.tmp'));
+      await tempFile.writeAsString(target.toJsonString(), flush: true);
+      try {
+        await tempFile.rename(file.path);
+      } on FileSystemException {
+        if (await file.exists()) {
+          await file.delete();
+        }
+        await tempFile.rename(file.path);
+      }
       return target;
     } catch (e, st) {
       ErrorLogger.log(

@@ -134,6 +134,8 @@ struct ResamplerParamSet {
     // 1 = Standard (16-tap polyphase), 2 = High (32-tap), 3 = Ultra (64-tap,
     // full table; the historical behaviour and default).
     int quality = 3;
+    // Tap-side SincResampler kernel quality: 0..3 -> 64/128/256/512 taps.
+    int tapSrcQuality = 2;
 };
 
 struct SaturationParamSet {
@@ -415,6 +417,7 @@ struct DacVoicingParamSet {
 // can prepare its own resampled quad from the same immutable dataset.
 namespace pulsr {
 struct SofaDataset;
+struct HrirQuad;
 }
 
 struct HrtfBinauralParamSet {
@@ -426,6 +429,9 @@ struct HrtfBinauralParamSet {
     // thread reads; each engine's HrtfBinaural prepares its quad on the control
     // thread when it applies the snapshot.
     std::shared_ptr<const pulsr::SofaDataset> dataset;
+    // Parsed WAV/raw custom HRIR quad (immutable after load), shared via snapshot
+    // so live playback engines adopt the same custom HRIR as the singleton.
+    std::shared_ptr<const pulsr::HrirQuad> customIr;
 };
 
 // Remaster: Reconstruction Filter & Output Oversampling (2x/4x/8x)

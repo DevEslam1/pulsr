@@ -110,6 +110,9 @@ mixin PulsrAudioNativeDsd on BaseAudioHandler {
   void _emitPosition(Duration position);
   void _saveCurrentPosition();
   Future<void> saveCurrentPositionImmediate();
+  void notifySleepTrackCompleted();
+  int? _getNextIndex({bool peek = false});
+  SleepTimerManager get _sleepTimerManager;
 
   /// A DSD track is eligible for the native session only when the user chose
   /// native output, the bit-perfect path is active, the file is local, and a
@@ -146,6 +149,7 @@ mixin PulsrAudioNativeDsd on BaseAudioHandler {
   }) async {
     if (_nativeDsdPreparing) return false;
     _nativeDsdPreparing = true;
+    NativeDsdSession? session;
     try {
       await stopNativeDsd(clearStatus: false);
       unawaited(() async {
@@ -157,21 +161,23 @@ mixin PulsrAudioNativeDsd on BaseAudioHandler {
               error: e, stackTrace: st, category: 'AudioHandler');
         }
       }());
-      final session = NativeDsdSession();
+      session = NativeDsdSession();
       final hardwareVolume = _isUsbHardwareVolumeEnabled();
       session.setHardwareVolumeEnabled(hardwareVolume);
       if (!hardwareVolume && !_nativeDsdFixedVolumeNoticeShown) {
         _nativeDsdFixedVolumeNoticeShown = true;
-        _errorSubject.add(
-          'Native DSD cannot be scaled in software. Enable USB hardware '
-          'volume to change the level on the DAC.',
-        );
+        if (!_errorSubject.isClosed) {
+          _errorSubject.add(
+            'Native DSD cannot be scaled in software. Enable USB hardware '
+            'volume to change the level on the DAC.',
+          );
+        }
       }
       session.onNativeActive = () {
         _recordResolvedDsdTransport(song.id,
             isDop: false, isNativeDsd: true);
-        AudioQualityInfo.dsdNativeActive = true;
-        AudioQualityInfo.dsdDopActive = false;
+        DsdDecoderHelper.dsdNativeActive = true;
+        DsdDecoderHelper.dsdDopActive = false;
         if (!_onTrackChangedSubject.isClosed) {
           _onTrackChangedSubject.add(song);
         }
@@ -196,7 +202,11 @@ mixin PulsrAudioNativeDsd on BaseAudioHandler {
       );
 
       if (generation != _playGeneration || _nativeDsdSession != session) {
-        await stopNativeDsd(clearStatus: true);
+        if (identical(_nativeDsdSession, session)) {
+          await stopNativeDsd(clearStatus: true);
+        } else {
+          await session.dispose();
+        }
         return true;
       }
 
@@ -222,13 +232,21 @@ mixin PulsrAudioNativeDsd on BaseAudioHandler {
           'falling back to DoP/PCM',
           category: 'AudioHandler');
       _nativeDsdFallbackAttempted.add(song.id);
-      await stopNativeDsd(clearStatus: true);
+      if (identical(_nativeDsdSession, session)) {
+        await stopNativeDsd(clearStatus: true);
+      } else {
+        await session?.dispose();
+      }
       return false;
     } catch (e, st) {
       ErrorLogger.log('Native DSD session failed for "${song.title}"',
           error: e, stackTrace: st, category: 'AudioHandler');
       _nativeDsdFallbackAttempted.add(song.id);
-      await stopNativeDsd(clearStatus: true);
+      if (identical(_nativeDsdSession, session)) {
+        await stopNativeDsd(clearStatus: true);
+      } else {
+        await session?.dispose();
+      }
       return false;
     } finally {
       _nativeDsdPreparing = false;
@@ -255,7 +273,7 @@ mixin PulsrAudioNativeDsd on BaseAudioHandler {
       }
     }
     if (clearStatus) {
-      AudioQualityInfo.dsdNativeActive = false;
+      DsdDecoderHelper.dsdNativeActive = false;
     }
   }
 
@@ -287,6 +305,11 @@ mixin PulsrAudioNativeDsd on BaseAudioHandler {
     });
     _nativeDsdCompleteSub = session.completedStream.listen((_) {
       if (!_nativeDsdActive || _nativeDsdSession != session) return;
+      notifySleepTrackCompleted();
+      final nextIdx = _getNextIndex(peek: true);
+      if (nextIdx == null && _activePlayer.loopMode == LoopMode.off) {
+        unawaited(_sleepTimerManager.onQueueCompleted());
+      }
       unawaited(_advanceAtTrackBoundary().catchError((Object e, StackTrace st) {
         ErrorLogger.log('Native DSD auto-advance failed',
             error: e, stackTrace: st, category: 'AudioHandler');
@@ -350,7 +373,10 @@ mixin PulsrAudioNativeDsd on BaseAudioHandler {
     if (session == null) return false;
     _pendingPlaybackStart = false;
     _nativeDsdPlaying = true;
-    unawaited(session.play());
+    unawaited(session.play().catchError((e, st) {
+      ErrorLogger.log('Native DSD play failed',
+          error: e, stackTrace: st, category: 'AudioHandler');
+    }));
     return true;
   }
 
@@ -359,7 +385,10 @@ mixin PulsrAudioNativeDsd on BaseAudioHandler {
     final session = _nativeDsdSession;
     if (session == null) return false;
     _nativeDsdPlaying = false;
-    unawaited(session.pause());
+    unawaited(session.pause().catchError((e, st) {
+      ErrorLogger.log('Native DSD pause failed',
+          error: e, stackTrace: st, category: 'AudioHandler');
+    }));
     _saveCurrentPosition();
     unawaited(saveCurrentPositionImmediate());
     return true;
@@ -369,8 +398,11 @@ mixin PulsrAudioNativeDsd on BaseAudioHandler {
     if (!_nativeDsdActive) return false;
     final session = _nativeDsdSession;
     if (session == null) return false;
-    unawaited(session.seek(position));
-    _emitPosition(session.position);
+    unawaited(session.seek(position).catchError((e, st) {
+      ErrorLogger.log('Native DSD seek failed',
+          error: e, stackTrace: st, category: 'AudioHandler');
+    }));
+    _emitPosition(position);
     _saveCurrentPosition();
     return true;
   }

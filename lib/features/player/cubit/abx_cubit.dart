@@ -12,8 +12,10 @@
 //   X = a hidden copy of exactly one of them, chosen by the trial plan.
 
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:mutex/mutex.dart';
 
 import '../../../core/services/abx_report_export.dart';
+import '../../../core/utils/error_logger.dart';
 import '../../../domain/models/abx_session.dart';
 
 /// Switches the live signal path between the two conditions under test.
@@ -146,6 +148,7 @@ class AbxCubit extends Cubit<AbxState> {
   final AbxConditionSwitch _switchCondition;
   final AbxReadinessProbe _isReady;
   final AbxSession _session;
+  final Mutex _playConditionMutex = Mutex();
 
   bool _started = false;
   AbxStimulus? _active;
@@ -224,15 +227,34 @@ class AbxCubit extends Cubit<AbxState> {
   /// is. Resolving it here is what keeps the test blind — mapping X straight
   /// to B would make every X audible as the DSP condition.
   Future<void> playCondition(AbxStimulus condition) async {
-    if (!_started || _session.isComplete) return;
-    final AbxStimulus resolved =
-        condition == AbxStimulus.x ? _session.current.hiddenX : condition;
-    _active = condition;
-    // Drop the previous trial's verdict: it must not read as feedback on the
-    // stimulus that is playing now.
-    _lastAnswerCorrect = null;
-    _publish();
-    await _switchCondition(resolved == AbxStimulus.a);
+    return _playConditionMutex.protect(() async {
+      if (isClosed || !_started || _session.isComplete) return;
+      final prevActive = _active;
+      final AbxStimulus resolved =
+          condition == AbxStimulus.x ? _session.current.hiddenX : condition;
+      _active = condition;
+      // Drop the previous trial's verdict: it must not read as feedback on the
+      // stimulus that is playing now.
+      _lastAnswerCorrect = null;
+      _publish();
+
+      try {
+        await _switchCondition(resolved == AbxStimulus.a);
+      } catch (e, st) {
+        ErrorLogger.log(
+          'Failed to switch ABX condition to $condition',
+          error: e,
+          stackTrace: st,
+          category: 'AbxCubit',
+        );
+        if (!isClosed) {
+          _active = prevActive;
+          _publish();
+        }
+        return;
+      }
+      if (isClosed) return;
+    });
   }
 
   /// Records an answer for the pending trial.
@@ -259,6 +281,7 @@ class AbxCubit extends Cubit<AbxState> {
     _lastAnswerCorrect = null;
     _publish();
     await _restore();
+    if (isClosed) return;
   }
 
   /// Re-evaluates [AbxState.canStart] after playback or DSP toggles.

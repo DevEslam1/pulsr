@@ -165,7 +165,7 @@ class DiagnosticsBundleService {
       RegExp(r'\b(Bearer|Basic)\s+[A-Za-z0-9._~+/=\-]+', caseSensitive: false);
   static final RegExp _sensitiveKey = RegExp(
     r'(password|passwd|pwd|secret|token|cookie|authorization|credential|'
-    r'api[_-]?key|session)',
+    r'api[_-]?key|session|email|phone|account|user_id|auth|proxy)',
     caseSensitive: false,
   );
 
@@ -562,6 +562,7 @@ class DiagnosticsBundleService {
           '${entry.key}': _redactValue('${entry.key}', entry.value),
       };
     }
+    if (_sensitiveKey.hasMatch(key)) return '[REDACTED]';
     return value;
   }
 
@@ -602,27 +603,43 @@ class DiagnosticsBundleService {
       ];
     }
     if (value is Map) {
-      if (_sensitiveKey.hasMatch(key)) return '[REDACTED]';
       return <String, Object?>{
         for (final entry in value.entries)
           '${entry.key}': _sanitizeValue('${entry.key}', entry.value),
       };
     }
+    if (_sensitiveKey.hasMatch(key)) return '[REDACTED]';
     return value;
   }
 
   static Future<Map<String, Object?>> _defaultUsbDiagnostics() async {
     final usb = UsbExclusiveService();
-    final raw = await usb.getDiagnostics();
+    const timeout = Duration(milliseconds: 1500);
+
+    final diagFuture = usb
+        .getDiagnostics()
+        .timeout(timeout, onTimeout: () => <String, Object?>{});
+    final eventsFuture = usb
+        .getUsbEvents()
+        .timeout(timeout, onTimeout: () => <Map<String, Object?>>[]);
+    final statusFuture =
+        (!usb.lastStatus.attached && usb.lastStatus.deviceId == null)
+            ? usb.getStatus().timeout(timeout, onTimeout: () => usb.lastStatus)
+            : Future.value(usb.lastStatus);
+
+    final results = await Future.wait([
+      diagFuture,
+      eventsFuture,
+      statusFuture,
+    ]);
+
+    final raw = results[0] as Map<String, Object?>;
+    final events = results[1] as List<Map<String, Object?>>;
+    final status = results[2] as UsbExclusiveStatus;
+
     final section = Map<String, Object?>.from(raw);
-    // Clock-domain evidence belongs in every export even when an older native
-    // build does not fold the event ring into getDiagnostics.
     if (!section.containsKey('events')) {
-      section['events'] = await usb.getUsbEvents();
-    }
-    var status = usb.lastStatus;
-    if (!status.attached && status.deviceId == null) {
-      status = await usb.getStatus();
+      section['events'] = events;
     }
     section.putIfAbsent('clockDomain', () => status.clockDomain.wireName);
     section.putIfAbsent('clockDriftPpm', () => status.clockDriftPpm);

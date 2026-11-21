@@ -336,6 +336,11 @@ class DlnaRendererService extends ChangeNotifier {
       _lastError = null;
 
       await client.setAvTransportUri(url, metadata);
+      if (_disposed || op != _opSequence) {
+        _mediaServer.unregister(token);
+        if (_token == token) _token = null;
+        return;
+      }
       await client.play();
       if (_disposed || op != _opSequence) {
         _mediaServer.unregister(token);
@@ -378,6 +383,18 @@ class DlnaRendererService extends ChangeNotifier {
       );
       return;
     }
+    final parsedUri = Uri.tryParse(url);
+    final scheme = parsedUri?.scheme.toLowerCase();
+    if (parsedUri == null ||
+        (scheme != 'http' && scheme != 'https') ||
+        parsedUri.host.isEmpty) {
+      _fail(
+        uiError('Invalid DLNA stream URL: $url', code: 'DLNA_INVALID_URL'),
+        StackTrace.empty,
+        'DLNA play rejected',
+      );
+      return;
+    }
     final resolvedTitle = title ?? url;
     _lastCastPath = null;
     _lastCastUrl = url;
@@ -404,6 +421,7 @@ class DlnaRendererService extends ChangeNotifier {
       _lastError = null;
 
       await client.setAvTransportUri(url, metadata);
+      if (_disposed || op != _opSequence) return;
       await client.play();
       if (_disposed || op != _opSequence) return;
       _state = DlnaState.playing;
@@ -428,6 +446,18 @@ class DlnaRendererService extends ChangeNotifier {
     if (_disposed) return;
     final client = _avTransport;
     if (client == null) return;
+    final parsedUri = Uri.tryParse(url);
+    final scheme = parsedUri?.scheme.toLowerCase();
+    if (parsedUri == null ||
+        (scheme != 'http' && scheme != 'https') ||
+        parsedUri.host.isEmpty) {
+      _fail(
+        uiError('Invalid DLNA stream URL: $url', code: 'DLNA_INVALID_URL'),
+        StackTrace.empty,
+        'DLNA queue rejected',
+      );
+      return;
+    }
     try {
       final metadata = AvTransportClient.buildDidlLiteMetadata(
         url: url,

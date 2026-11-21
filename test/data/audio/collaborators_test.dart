@@ -19,6 +19,7 @@ import 'package:pulsr/data/db/app_database.dart';
 import 'package:pulsr/domain/models/ytm_track.dart';
 import 'package:pulsr/domain/repositories/music_repository_interface.dart';
 
+import 'package:pulsr/core/di/injection.dart';
 import 'package:pulsr/core/services/ytm_service.dart';
 import 'package:pulsr/data/audio/collaborators/stream_resolution_pipeline.dart';
 
@@ -220,6 +221,58 @@ void main() {
       );
       expect(
           controller.calculateTargetVolume(untaggedSong), closeTo(0.9, 0.001));
+    });
+
+    test(
+        'Gates YouTube loudnessDb normalization on replayGainMode and nativeRgActive',
+        () async {
+      final mockYtm = MockYtmService();
+      when(() => mockYtm.getLoudnessDb('yt_vid_1')).thenReturn(-6.0);
+      final hadPrevious = getIt.isRegistered<YtmService>();
+      YtmService? previous;
+      if (hadPrevious) {
+        previous = getIt<YtmService>();
+        await getIt.unregister<YtmService>();
+      }
+      getIt.registerSingleton<YtmService>(mockYtm);
+      addTearDown(() async {
+        if (getIt.isRegistered<YtmService>()) {
+          await getIt.unregister<YtmService>();
+        }
+        if (hadPrevious && previous != null) {
+          getIt.registerSingleton<YtmService>(previous);
+        }
+      });
+
+      final ytSong = _createMockSong(
+        99,
+        remoteId: 'yt_vid_1',
+        source: SongSource.youtube,
+      );
+
+      // replayGainMode == 'off': skips YouTube loudnessDb normalization.
+      controller.updateSettings(
+        userVolume: 0.4,
+        replayGainMode: 'off',
+        nativeRgActive: false,
+      );
+      expect(controller.calculateTargetVolume(ytSong), closeTo(0.4, 0.001));
+
+      // replayGainMode == 'track' & !nativeRgActive: applies +6 dB (~1.995x).
+      controller.updateSettings(
+        userVolume: 0.4,
+        replayGainMode: 'track',
+        nativeRgActive: false,
+      );
+      expect(controller.calculateTargetVolume(ytSong), closeTo(0.798, 0.01));
+
+      // nativeRgActive == true: native DSP handles normalization; skips Dart boost.
+      controller.updateSettings(
+        userVolume: 0.4,
+        replayGainMode: 'track',
+        nativeRgActive: true,
+      );
+      expect(controller.calculateTargetVolume(ytSong), closeTo(0.4, 0.001));
     });
   });
 

@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cstring>
 #include <cstdint>
+#include <atomic>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -65,6 +66,10 @@ public:
             (static_cast<double>(availableFrames_) + inFrames) / ratio_));
     }
 
+    uint64_t getOverflowCount() const {
+        return fifoOverflowCount_.load(std::memory_order_relaxed);
+    }
+
 private:
     void generatePolyphaseTable();
     // Recomputes the per-phase DC-gain correction for the active tap window.
@@ -101,4 +106,5 @@ private:
     int writePos_ = 0;
     int availableFrames_ = 0;
     int historyFrames_ = 0;
+    std::atomic<uint64_t> fifoOverflowCount_{0};
 };

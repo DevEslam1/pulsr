@@ -11,7 +11,6 @@ import 'package:just_audio/just_audio.dart';
 import '../db/app_database.dart';
 import '../../core/constants/channels.dart';
 import '../../core/utils/platform_capabilities.dart';
-import '../../domain/models/audio_quality_info.dart';
 import 'audio_effects_channel.dart';
 import 'dop_encoder.dart';
 import 'sacd/sacd_limits.dart';
@@ -162,6 +161,14 @@ class DsdPcmStreamAudioSource extends StreamAudioSource {
 /// Helper for parsing Sony DSF and Philips/EA DFF audio files and feeding
 /// them into the native DSD-to-PCM decoder.
 class DsdDecoderHelper {
+  /// Whether the most recent DSD (DSF/DFF) track was routed through the DoP
+  /// (DSD over PCM) encoder rather than decoded to PCM.
+  static bool dsdDopActive = false;
+
+  /// Whether the most recent DSD (DSF/DFF) track was routed via Direct Native DSD
+  /// (raw bitstream without DoP encapsulation).
+  static bool dsdNativeActive = false;
+
   /// Injected decoder for tests when running outside of the Android runtime.
   static DsdDecodeFunction? testDecoder;
 
@@ -216,7 +223,7 @@ class DsdDecoderHelper {
   /// the native probe confirmed a compatible USB DAC. Even then it is honored
   /// only when the file's DSD rate has a standard DoP carrier and
   /// [dopCapabilities] (when supplied) advertises it; otherwise playback falls
-  /// back to the PCM decode path and [AudioQualityInfo.dsdDopActive] stays false.
+  /// back to the PCM decode path and [dsdDopActive] stays false.
   ///
   /// [dopContainerBits] selects the PCM container width: 24 (standard DoP
   /// packing, default) or 32 (zero-padded 32-bit frames for DACs that require
@@ -277,8 +284,8 @@ class DsdDecoderHelper {
 
     // Reset transport flags until framing is verified
     if (updateGlobalState) {
-      AudioQualityInfo.dsdDopActive = false;
-      AudioQualityInfo.dsdNativeActive = false;
+      dsdDopActive = false;
+      dsdNativeActive = false;
     }
 
     // Native DSD never enters ExoPlayer: the handler's NativeDsdSession owns
@@ -289,7 +296,9 @@ class DsdDecoderHelper {
     final bool canFallbackToDop =
         (forceDop || wantNativeFallback) &&
         dopSampleRate > 0 &&
-        (dopCapabilities == null || dopCapabilities.supportsRate(dsdRate));
+        (dopCapabilities == null ||
+            (dopCapabilities.canUseDop &&
+                dopCapabilities.supportsRate(dsdRate)));
 
     if (canFallbackToDop) {
       // DoP framing (DSD over PCM v1.1): pack 16-bit DSD chunks with alternating 0x05/0xFA markers
@@ -330,7 +339,7 @@ class DsdDecoderHelper {
       );
 
       if (updateGlobalState) {
-        AudioQualityInfo.dsdDopActive = true;
+        dsdDopActive = true;
       }
       onTransportResolved?.call(true, false);
       return DsdPcmStreamAudioSource(wavBytes, tag: tag);
@@ -385,8 +394,8 @@ class DsdDecoderHelper {
     );
 
     if (updateGlobalState) {
-      AudioQualityInfo.dsdDopActive = false;
-      AudioQualityInfo.dsdNativeActive = false;
+      dsdDopActive = false;
+      dsdNativeActive = false;
     }
     onTransportResolved?.call(false, false);
     return DsdPcmStreamAudioSource(wavBytes, tag: tag);

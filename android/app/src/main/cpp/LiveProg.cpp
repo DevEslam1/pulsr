@@ -83,25 +83,26 @@ private:
             // that the whole script (not just a pre-split body) is lexed.
             ++pos_;
             const size_t start = pos_;
-            while (pos_ < src_.size() && std::isalpha(src_[pos_])) ++pos_;
+            while (pos_ < src_.size() && std::isalpha(static_cast<unsigned char>(src_[pos_]))) ++pos_;
             std::string tag = "@" + src_.substr(start, pos_ - start);
             if (tag == "@init") return {TokenType::AtInit, 0.0, tag};
             if (tag == "@sample") return {TokenType::AtSample, 0.0, tag};
             return {TokenType::Ident, 0.0, tag};
         }
 
-        if (std::isalpha(c) || c == '_') {
+        if (std::isalpha(static_cast<unsigned char>(c)) || c == '_') {
             size_t start = pos_;
-            while (pos_ < src_.size() && (std::isalnum(src_[pos_]) || src_[pos_] == '_')) ++pos_;
+            while (pos_ < src_.size() && (std::isalnum(static_cast<unsigned char>(src_[pos_])) || src_[pos_] == '_')) ++pos_;
             std::string ident = src_.substr(start, pos_ - start);
             if (ident == "if") return {TokenType::If, 0.0, ident};
             if (ident == "else") return {TokenType::Else, 0.0, ident};
             return {TokenType::Ident, 0.0, ident};
         }
 
-        if (std::isdigit(c) || (c == '.' && pos_ + 1 < src_.size() && std::isdigit(src_[pos_ + 1]))) {
+        if (std::isdigit(static_cast<unsigned char>(c)) ||
+            (c == '.' && pos_ + 1 < src_.size() && std::isdigit(static_cast<unsigned char>(src_[pos_ + 1])))) {
             size_t start = pos_;
-            while (pos_ < src_.size() && (std::isdigit(src_[pos_]) || src_[pos_] == '.' || src_[pos_] == 'e' || src_[pos_] == 'E')) {
+            while (pos_ < src_.size() && (std::isdigit(static_cast<unsigned char>(src_[pos_])) || src_[pos_] == '.' || src_[pos_] == 'e' || src_[pos_] == 'E')) {
                 if ((src_[pos_] == 'e' || src_[pos_] == 'E') && pos_ + 1 < src_.size() && (src_[pos_ + 1] == '+' || src_[pos_ + 1] == '-')) {
                     pos_ += 2;
                 } else {
@@ -150,7 +151,7 @@ private:
 private:
     void skipWhitespace() {
         while (pos_ < src_.size()) {
-            if (std::isspace(src_[pos_])) {
+            if (std::isspace(static_cast<unsigned char>(src_[pos_]))) {
                 ++pos_;
             } else if (src_[pos_] == '/' && pos_ + 1 < src_.size() && src_[pos_ + 1] == '/') {
                 pos_ += 2;
@@ -974,8 +975,8 @@ void LiveProg::process(float* L, float* R, int frames) {
                        prevIdxSpl1_ >= 0 && prevIdxSpl1_ < prevMem);
 
     for (int i = 0; i < frames; ++i) {
-        const float inL = L[i];
-        const float inR = R[i];
+        const float inL = std::isfinite(L[i]) ? L[i] : 0.0f;
+        const float inR = std::isfinite(R[i]) ? R[i] : 0.0f;
 
         memory_[idxSpl0_] = static_cast<double>(inL);
         memory_[idxSpl1_] = static_cast<double>(inR);
@@ -1062,8 +1063,10 @@ void LiveProg::processInterleaved(float* buffer, int frames, int channels) {
                        prevIdxSpl1_ >= 0 && prevIdxSpl1_ < prevMem);
 
     for (int i = 0; i < frames; ++i) {
-        const float inL = buffer[i * channels];
-        const float inR = (channels > 1) ? buffer[i * channels + 1] : inL;
+        const float rawL = buffer[i * channels];
+        const float rawR = (channels > 1) ? buffer[i * channels + 1] : rawL;
+        const float inL = std::isfinite(rawL) ? rawL : 0.0f;
+        const float inR = std::isfinite(rawR) ? rawR : 0.0f;
 
         memory_[idxSpl0_] = static_cast<double>(inL);
         memory_[idxSpl1_] = static_cast<double>(inR);

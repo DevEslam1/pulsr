@@ -111,7 +111,7 @@ void main() {
       expect(CastRoute.fromMap(const {}), isNull);
     });
 
-    test('CastSessionStatus.fromMap is always available', () {
+    test('CastSessionStatus.fromMap is available unless explicitly false', () {
       final status = CastSessionStatus.fromMap({
         'connected': true,
         'deviceName': 'TV',
@@ -124,6 +124,18 @@ void main() {
       expect(status.positionMs, 1500);
       expect(status.error, 'warn');
       expect(CastSessionStatus.unavailable.available, isFalse);
+
+      final availableStatus = CastSessionStatus.fromMap({
+        'available': true,
+        'connected': true,
+      });
+      expect(availableStatus.available, isTrue);
+
+      final explicitlyUnavailable = CastSessionStatus.fromMap({
+        'available': false,
+        'connected': false,
+      });
+      expect(explicitlyUnavailable.available, isFalse);
     });
   });
 

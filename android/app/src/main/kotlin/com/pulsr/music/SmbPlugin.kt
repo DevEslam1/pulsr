@@ -57,7 +57,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  * The `com.hierynomus:smbj` Gradle dependency is added by the app wiring; without
  * it the class fails to load and `register()` must not be called.
  */
-class SmbPlugin private constructor() : MethodChannel.MethodCallHandler {
+class SmbPlugin internal constructor() : MethodChannel.MethodCallHandler {
 
     private class SessionHolder(
         val key: String,
@@ -75,6 +75,9 @@ class SmbPlugin private constructor() : MethodChannel.MethodCallHandler {
         }
     private val sessions = ConcurrentHashMap<String, SessionHolder>()
     private val closed = AtomicBoolean(false)
+    internal var clientFactory: (SmbConfig) -> SMBClient = { config -> SMBClient(config) }
+
+    internal fun cachedSessionCount(): Int = sessions.size
 
     companion object {
         private const val TAG = "SmbPlugin"
@@ -211,7 +214,7 @@ class SmbPlugin private constructor() : MethodChannel.MethodCallHandler {
         )
     }
 
-    private fun openReadChunk(args: Map<*, *>): ByteArray {
+    internal fun openReadChunk(args: Map<*, *>): ByteArray {
         val basePath = normalizeBasePath(args["basePath"] as? String)
         val path = joinPath(basePath, args["path"] as? String)
         val offset = (args["offset"] as? Number)?.toLong() ?: 0L
@@ -221,7 +224,7 @@ class SmbPlugin private constructor() : MethodChannel.MethodCallHandler {
         val safeLength = minOf(length, MAX_CHUNK_BYTES)
         val share = shareFor(args)
         val buffer = ByteArray(safeLength)
-        var read = 0
+        var totalRead = 0
         share.openFile(
             path,
             EnumSet.of(AccessMask.GENERIC_READ),
@@ -230,10 +233,19 @@ class SmbPlugin private constructor() : MethodChannel.MethodCallHandler {
             SMB2CreateDisposition.FILE_OPEN,
             null,
         ).use { file ->
-            read = file.read(buffer, offset)
+            while (totalRead < safeLength) {
+                val read = file.read(
+                    buffer,
+                    offset + totalRead,
+                    totalRead,
+                    safeLength - totalRead,
+                )
+                if (read <= 0) break
+                totalRead += read
+            }
         }
-        if (read <= 0) return ByteArray(0)
-        return if (read == safeLength) buffer else buffer.copyOf(read)
+        if (totalRead <= 0) return ByteArray(0)
+        return if (totalRead == safeLength) buffer else buffer.copyOf(totalRead)
     }
 
     private fun closeSession(args: Map<*, *>): Boolean {
@@ -246,7 +258,7 @@ class SmbPlugin private constructor() : MethodChannel.MethodCallHandler {
         return true
     }
 
-    private fun shareFor(args: Map<*, *>): DiskShare {
+    internal fun shareFor(args: Map<*, *>): DiskShare {
         val host = args["host"] as? String
         if (host.isNullOrBlank()) throw IllegalArgumentException("host is required")
         val port = (args["port"] as? Number)?.toInt() ?: DEFAULT_PORT
@@ -260,8 +272,8 @@ class SmbPlugin private constructor() : MethodChannel.MethodCallHandler {
         val userKey = if (domain.isEmpty()) username else "$domain\\$username"
         // The password digest is part of the key: a session authenticated with
         // an old secret must never be reused after the user changed it.
-        val key = "${host.lowercase()}:$port/$shareName/$userKey#" +
-            secretDigest(domain, username, password)
+        val keyPrefix = "${host.lowercase()}:$port/$shareName/$userKey#"
+        val key = keyPrefix + secretDigest(domain, username, password)
         val cached = sessions[key]
         if (cached != null) {
             if (cached.connection.isConnected) return cached.share
@@ -269,7 +281,7 @@ class SmbPlugin private constructor() : MethodChannel.MethodCallHandler {
             closeQuietly(cached)
         }
         Log.d(TAG, "Opening SMB session to $host:$port/$shareName")
-        val client = SMBClient(
+        val client = clientFactory(
             SmbConfig.builder()
                 .withTimeout(CONNECT_TIMEOUT_MS, TimeUnit.MILLISECONDS)
                 .withSoTimeout(CONNECT_TIMEOUT_MS, TimeUnit.MILLISECONDS)
@@ -285,6 +297,10 @@ class SmbPlugin private constructor() : MethodChannel.MethodCallHandler {
             val session = connection.authenticate(authentication)
             val share = session.connectShare(shareName) as? DiskShare
                 ?: throw IllegalArgumentException("Share is not a disk share")
+            val staleKeys = sessions.keys.filter { it.startsWith(keyPrefix) }
+            staleKeys.forEach { staleKey ->
+                sessions.remove(staleKey)?.let { closeQuietly(it) }
+            }
             sessions[key] = SessionHolder(key, client, connection, session, share)
             return share
         } catch (error: Throwable) {

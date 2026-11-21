@@ -12,6 +12,7 @@ import 'package:pulsr/core/di/injection.dart';
 import 'package:pulsr/core/services/ytm_client_version_resolver.dart';
 import 'package:pulsr/core/services/ytm_oauth_service.dart';
 import 'package:pulsr/core/services/ytm_account_models.dart';
+import 'package:pulsr/core/services/ytm_browse_service.dart';
 import 'package:pulsr/core/services/ytm_service.dart';
 import 'package:pulsr/core/services/ytm_url_cache.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -404,6 +405,34 @@ class YtmAccountService {
   static String scopeCookiesForYouTube(String raw) =>
       YtmCookieCodec.scopeCookiesForYouTube(raw);
 
+  void _clearAccountScopedCaches() {
+    _dataSyncId = null;
+    _sessionVisitorData = null;
+    _cachedLikedSongsBrowseId = null;
+    try {
+      if (getIt.isRegistered<YtmUrlCache>()) {
+        getIt<YtmUrlCache>().clear();
+      }
+    } catch (_) {
+      // Best-effort: failure intentionally ignored on this non-critical path.
+    }
+    try {
+      if (getIt.isRegistered<YtmBrowseService>()) {
+        getIt<YtmBrowseService>().clearCache();
+      }
+    } catch (_) {
+      // Best-effort: failure intentionally ignored on this non-critical path.
+    }
+  }
+
+  void _notifyLoginState(bool loggedIn) {
+    if (loginState.value == loggedIn && loggedIn) {
+      // Force notification on re-login / account switch while already marked logged in.
+      loginState.value = false;
+    }
+    loginState.value = loggedIn;
+  }
+
   /// Saves extracted web cookies, warms the session, and triggers fresh attestation.
   Future<bool> saveSession(String rawCookies) async {
     final jar = scopeCookiesForYouTube(rawCookies);
@@ -417,6 +446,9 @@ class YtmAccountService {
           '[YTM_ACCOUNT] Refusing to save a cookie jar with no session cookies');
       return false;
     }
+    _oauthAccessToken = null;
+    _accountAvatar = null;
+    _clearAccountScopedCaches();
     _cookies = jar;
     await _persistCookies(jar);
 
@@ -431,8 +463,10 @@ class YtmAccountService {
     _accountName = name;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_accountNamePrefKey, name);
+    await prefs.remove(_accountAvatarPrefKey);
+    await prefs.remove(_dataSyncIdPrefKey);
 
-    loginState.value = true;
+    _notifyLoginState(true);
 
     // Eagerly bootstrap session state in the background so dataSyncId is ready
     // before the first playSong call. Run in unawaited block so saveSession
@@ -466,12 +500,16 @@ class YtmAccountService {
     final oauth = YtmOAuthService.shared;
     await oauth.init();
     if (!await oauth.ensureFresh()) return;
+    _cookies = null;
+    _clearAccountScopedCaches();
     _oauthAccessToken = oauth.accessToken;
-    _accountName ??= 'Google TV';
+    _accountName = 'Google TV';
     _accountAvatar = null;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_accountNamePrefKey, _accountName!);
-    loginState.value = isLoggedIn;
+    await prefs.remove(_accountAvatarPrefKey);
+    await prefs.remove(_dataSyncIdPrefKey);
+    _notifyLoginState(isLoggedIn);
     // Warm session state (visitorData) off the critical path.
     unawaited(() async {
       try {
@@ -487,11 +525,9 @@ class YtmAccountService {
     _oauthAccessToken = null;
     _accountName = null;
     _accountAvatar = null;
-    _dataSyncId = null;
-    _sessionVisitorData = null;
-    // Account-scoped browse cache: must not leak into the next account's
-    // library fetch after a switch.
-    _cachedLikedSongsBrowseId = null;
+    // Account-scoped browse and stream caches: must not leak into the next
+    // account's library fetch or playback after a switch.
+    _clearAccountScopedCaches();
     await _deleteStoredCookies();
     try {
       await YtmOAuthService.shared.signOut();
@@ -503,17 +539,6 @@ class YtmAccountService {
     await prefs.remove(_accountAvatarPrefKey);
     await prefs.remove(_dataSyncIdPrefKey);
     loginState.value = false;
-
-    // Resolved stream URLs are cached with the cookie header they were resolved
-    // under, so leaving the cache in place kept serving the disconnected
-    // session's URLs — and its cookies — until every entry aged out.
-    try {
-      if (getIt.isRegistered<YtmUrlCache>()) {
-        getIt<YtmUrlCache>().clear();
-      }
-    } catch (_) {
-      // Best-effort: failure intentionally ignored on this non-critical path.
-    }
 
     // The WebView jar first: the native store re-reads it whenever its own prefs
     // are empty, so clearing native before the jar leaves a window (and, if the
@@ -1041,7 +1066,72 @@ class YtmAccountService {
 
           _harvestSessionState(json);
           final playlists = _parseInnertubeAccountPlaylists(json);
+          var currentJson = json;
+          final seenTokens = <String>{};
+
+          if (playlists.isEmpty) {
+            final initToken = _extractContinuationToken(json);
+            if (initToken != null &&
+                initToken.isNotEmpty &&
+                seenTokens.add(initToken)) {
+              final contRes = await _postWithRetry(
+                Uri.parse('$_innertubeBrowseUrl&key=$_apiKey'),
+                headers: headers,
+                body: jsonEncode({
+                  'context': _buildClientContext('WEB_REMIX'),
+                  'continuation': initToken,
+                }),
+              );
+              if (contRes.statusCode == 200) {
+                final contJson =
+                    jsonDecode(contRes.body) as Map<String, dynamic>;
+                _harvestSessionState(contJson);
+                final contPlaylists =
+                    _parseInnertubeAccountPlaylists(contJson);
+                if (contPlaylists.isNotEmpty) {
+                  playlists.addAll(contPlaylists);
+                  currentJson = contJson;
+                }
+              }
+            }
+          }
+
           if (playlists.isNotEmpty) {
+            final seenIds = {for (final p in playlists) p.playlistId};
+            var pageCount = 0;
+            const maxPages = 10;
+            while (pageCount < maxPages) {
+              pageCount++;
+              final ctoken = _extractContinuationToken(currentJson);
+              if (ctoken == null ||
+                  ctoken.isEmpty ||
+                  !seenTokens.add(ctoken)) {
+                break;
+              }
+              try {
+                final contRes = await _postWithRetry(
+                  Uri.parse('$_innertubeBrowseUrl&key=$_apiKey'),
+                  headers: headers,
+                  body: jsonEncode({
+                    'context': _buildClientContext('WEB_REMIX'),
+                    'continuation': ctoken,
+                  }),
+                );
+                if (contRes.statusCode != 200) break;
+                currentJson =
+                    jsonDecode(contRes.body) as Map<String, dynamic>;
+                _harvestSessionState(currentJson);
+                final more = _parseInnertubeAccountPlaylists(currentJson);
+                final added =
+                    more.where((p) => seenIds.add(p.playlistId)).toList();
+                if (added.isEmpty) break;
+                playlists.addAll(added);
+              } catch (e) {
+                debugPrint(
+                    '[YTM_ACCOUNT] Account playlists continuation error on page $pageCount: $e');
+                break;
+              }
+            }
             return playlists;
           }
         }
@@ -2733,6 +2823,48 @@ class YtmAccountService {
       final vd = rc['visitorData'];
       if (vd is String && vd.isNotEmpty) {
         _sessionVisitorData = vd;
+      }
+    }
+    final accountHeader = _findShelfNode(json, 'activeAccountHeaderRenderer');
+    if (accountHeader != null) {
+      String? harvestedName;
+      final nameNode = accountHeader['accountName'];
+      if (nameNode is String && nameNode.trim().isNotEmpty) {
+        harvestedName = nameNode.trim();
+      } else if (nameNode is Map<String, dynamic>) {
+        final runs = nameNode['runs'];
+        if (runs is List && runs.isNotEmpty) {
+          final joined =
+              runs.map((r) => r['text']?.toString() ?? '').join().trim();
+          if (joined.isNotEmpty) harvestedName = joined;
+        } else if (nameNode['simpleText'] is String) {
+          final text = (nameNode['simpleText'] as String).trim();
+          if (text.isNotEmpty) harvestedName = text;
+        }
+      }
+      if (harvestedName != null && harvestedName != _accountName) {
+        _accountName = harvestedName;
+        unawaited(SharedPreferences.getInstance().then((p) {
+          p.setString(_accountNamePrefKey, harvestedName!);
+        }).catchError((e) {
+          debugPrint('[YTM_ACCOUNT] Failed to persist accountName: $e');
+        }));
+      }
+
+      final thumbs = accountHeader['accountPhoto']?['thumbnails'];
+      if (thumbs is List && thumbs.isNotEmpty) {
+        final last = thumbs.last;
+        final avatarUrl = last is Map ? last['url'] as String? : null;
+        if (avatarUrl != null &&
+            avatarUrl.isNotEmpty &&
+            avatarUrl != _accountAvatar) {
+          _accountAvatar = avatarUrl;
+          unawaited(SharedPreferences.getInstance().then((p) {
+            p.setString(_accountAvatarPrefKey, avatarUrl);
+          }).catchError((e) {
+            debugPrint('[YTM_ACCOUNT] Failed to persist accountAvatar: $e');
+          }));
+        }
       }
     }
   }

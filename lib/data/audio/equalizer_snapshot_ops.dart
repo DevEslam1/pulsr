@@ -72,6 +72,11 @@ extension EqualizerSnapshotOps on EqualizerManager {
       'crossfeedFeedDb': crossfeedFeedDb,
       'crossfeedFcut': crossfeedFcut,
       'crossfeedMode': crossfeedMode,
+      // HRTF / 3D binaural spatialization
+      'hrtfEnabled': isHrtfEnabled,
+      'hrtfAzimuth': hrtfAzimuth,
+      'hrtfElevation': hrtfElevation,
+      if (hrtfSofaPath != null) 'hrtfSofaPath': hrtfSofaPath,
       // Lookahead limiter + compressor knobs
       'limiterEnabled': isLimiterEnabled,
       'limiterThresholdDb': limiterThresholdDb,
@@ -312,6 +317,26 @@ extension EqualizerSnapshotOps on EqualizerManager {
       mode: i('crossfeedMode', crossfeedMode),
       preferenceEnabled: recalledCrossfeedPref,
     );
+
+    // HRTF / 3D binaural spatialization (only apply when present in snapshot
+    // so older snapshots without HRTF keys never re-enable HRTF over Crossfeed).
+    if (m.containsKey('hrtfEnabled') ||
+        m.containsKey('hrtfAzimuth') ||
+        m.containsKey('hrtfElevation') ||
+        m.containsKey('hrtfSofaPath')) {
+      final snapSofa = m['hrtfSofaPath'] as String?;
+      final resolvedSofa = snapSofa ??
+          ((hrtfSofaPath != null && hrtfSofaPath!.isNotEmpty) ? '' : null);
+      await guarded(
+        'hrtfBinaural',
+        () => setHrtfBinaural(
+          b('hrtfEnabled', isHrtfEnabled),
+          azimuth: d('hrtfAzimuth', hrtfAzimuth),
+          elevation: d('hrtfElevation', hrtfElevation),
+          sofaPath: resolvedSofa,
+        ),
+      );
+    }
 
     // Lookahead limiter (+ compressor knobs when the snapshot owns them).
     await setLookaheadLimiter(

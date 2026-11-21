@@ -275,43 +275,61 @@ class HiResAudioService {
   /// Why the last [setBitPerfectMode] enable attempt was rejected (native
   /// `lastBitPerfectReason`), or null when it succeeded. Captured BEFORE the
   /// rollback call below, which resets the native reason.
-  String? lastBitPerfectFailureReason;
+  String? _lastBitPerfectFailureReason;
 
-  Future<bool> setBitPerfectMode(bool enabled) async {
-    if (!PlatformCapabilities.isAndroid) return false;
+  /// Retained for backwards compatibility. Prefer structured return from
+  /// [setBitPerfectModeDetailed].
+  String? get lastBitPerfectFailureReason => _lastBitPerfectFailureReason;
+
+  /// Enables or disables bit-perfect mode and returns a structured record
+  /// `(bool ok, String? failureReason)`.
+  Future<(bool ok, String? failureReason)> setBitPerfectModeDetailed(
+      bool enabled) async {
+    if (!PlatformCapabilities.isAndroid) {
+      return (false, 'unsupported_platform');
+    }
     try {
       final Map<dynamic, dynamic>? res = await _methodChannel
           .invokeMethod<Map<dynamic, dynamic>>('setBitPerfectModeDetailed',
               {'enabled': enabled}).timeout(const Duration(seconds: 8));
       final success = res?['success'] == true;
-      lastBitPerfectFailureReason =
-          success ? null : (res?['reason'] as String?);
+      final reason = success ? null : (res?['reason'] as String?);
+      _lastBitPerfectFailureReason = reason;
       await getAudioOutputInfo();
       if (!success && enabled) {
         // Unsupported hardware: fall back to DSP path and refresh state so
         // the UI never shows bit-perfect as active when it isn't.
         ErrorLogger.log(
-            'Bit-perfect rejected by device (${lastBitPerfectFailureReason ?? 'unknown'}) — falling back to DSP path',
+            'Bit-perfect rejected by device (${reason ?? 'unknown'}) — falling back to DSP path',
             category: 'HiResAudio');
         try {
           await _methodChannel
-              .invokeMethod<bool>('setBitPerfectMode', {'enabled': false});
-        } catch (_) {}
+              .invokeMethod<dynamic>('setBitPerfectMode', {'enabled': false})
+              .timeout(const Duration(seconds: 5));
+        } catch (e, st) {
+          ErrorLogger.log('Failed to rollback bit-perfect mode',
+              error: e, stackTrace: st, category: 'HiResAudio');
+        }
         await getAudioOutputInfo();
-        return false;
+        return (false, reason);
       }
-      return success;
+      return (success, reason);
     } catch (e, st) {
       ErrorLogger.log('Failed to setBitPerfectMode($enabled)',
           error: e, stackTrace: st, category: 'HiResAudio');
-      lastBitPerfectFailureReason = 'channel_error';
+      _lastBitPerfectFailureReason = 'channel_error';
       // Device may have disconnected mid-call — refresh so stale
       // bit-perfect state is never displayed.
       try {
         await getAudioOutputInfo();
       } catch (_) {}
-      return false;
+      return (false, 'channel_error');
     }
+  }
+
+  Future<bool> setBitPerfectMode(bool enabled) async {
+    final (ok, _) = await setBitPerfectModeDetailed(enabled);
+    return ok;
   }
 
   /// Asks the platform to route media to [deviceId].
@@ -475,8 +493,32 @@ class HiResAudioService {
 
   // -- Bluetooth codec control --
 
+  static const Set<String> validBluetoothCodecs = <String>{
+    'SBC',
+    'AAC',
+    'APTX',
+    'APTX HD',
+    'APTX ADAPTIVE',
+    'APTX LOSSLESS',
+    'LDAC',
+    'LC3',
+    'OPUS',
+    'LHDC',
+    'LHDC-V',
+  };
+
+  static const Set<int> validBluetoothBitDepths = <int>{16, 24, 32};
+
+  static const Set<int> validLdacQualityModes = <int>{0, 1, 2, 3};
+
   Future<bool> setBluetoothCodec(String codec) async {
     if (!PlatformCapabilities.isAndroid) return false;
+    final normalized = codec.trim().toUpperCase();
+    if (!validBluetoothCodecs.contains(normalized)) {
+      ErrorLogger.log('Rejected invalid Bluetooth codec: $codec',
+          category: 'HiResAudio');
+      return false;
+    }
     try {
       final bool? ok = await _methodChannel.invokeMethod<bool>(
           'setBluetoothCodec',
@@ -515,6 +557,11 @@ class HiResAudioService {
 
   Future<bool> setBluetoothBitDepth(int bits) async {
     if (!PlatformCapabilities.isAndroid) return false;
+    if (!validBluetoothBitDepths.contains(bits)) {
+      ErrorLogger.log('Rejected invalid BT bit depth $bits',
+          category: 'HiResAudio');
+      return false;
+    }
     try {
       final bool? ok = await _methodChannel.invokeMethod<bool>(
           'setBluetoothBitDepth',
@@ -531,6 +578,11 @@ class HiResAudioService {
 
   Future<bool> setBluetoothLdacQuality(int mode) async {
     if (!PlatformCapabilities.isAndroid) return false;
+    if (!validLdacQualityModes.contains(mode)) {
+      ErrorLogger.log('Rejected invalid LDAC quality mode $mode',
+          category: 'HiResAudio');
+      return false;
+    }
     try {
       final bool? ok = await _methodChannel.invokeMethod<bool>(
           'setBluetoothLdacQuality',

@@ -82,6 +82,7 @@ void SanitizeSnapshot(DspParamSnapshot& s) {
     s.resampler.inRate = clampFinite(s.resampler.inRate, 8000.0, 768000.0, 48000.0);
     s.resampler.outRate = clampFinite(s.resampler.outRate, 8000.0, 768000.0, 48000.0);
     s.resampler.quality = clampInt(s.resampler.quality, 0, 3);
+    s.resampler.tapSrcQuality = clampInt(s.resampler.tapSrcQuality, 0, 3);
 
     s.saturation.drive = clampFinite(s.saturation.drive, 0.0, 1.0, 0.0);
     s.saturation.mix = clampFinite(s.saturation.mix, 0.0, 1.0, 0.5);
@@ -267,33 +268,6 @@ void SanitizeSnapshot(DspParamSnapshot& s) {
                                             dsp::ranges::kDirectUsbGain.max,
                                             dsp::ranges::kDirectUsbGain.fallback);
 
-    s.lfeCrossover.crossoverHz = clampFinite(s.lfeCrossover.crossoverHz,
-                                             dsp::ranges::kLfeCrossoverHz.min,
-                                             dsp::ranges::kLfeCrossoverHz.max,
-                                             dsp::ranges::kLfeCrossoverHz.fallback);
-    s.lfeCrossover.lfeLowPassHz = clampFinite(s.lfeCrossover.lfeLowPassHz,
-                                              dsp::ranges::kLfeLowPassHz.min,
-                                              dsp::ranges::kLfeLowPassHz.max,
-                                              dsp::ranges::kLfeLowPassHz.fallback);
-    s.lfeCrossover.slopeDbPerOct = (!std::isfinite(s.lfeCrossover.slopeDbPerOct) || s.lfeCrossover.slopeDbPerOct >= 18.0) ? 24.0 : 12.0;
-    s.lfeCrossover.lfeGainDb = clampFinite(s.lfeCrossover.lfeGainDb,
-                                           dsp::ranges::kLfeGainDb.min,
-                                           dsp::ranges::kLfeGainDb.max,
-                                           dsp::ranges::kLfeGainDb.fallback);
-    s.lfeCrossover.lfeChannelIndex = clampInt(s.lfeCrossover.lfeChannelIndex, 0, LfeCrossover::MAX_CHANNELS - 1);
-
-    s.channelManager.channelCount = clampInt(s.channelManager.channelCount, 2, ChannelManager::MAX_CHANNELS);
-    for (int i = 0; i < ChannelManager::MAX_CHANNELS; ++i) {
-        s.channelManager.trimDb[i] = clampFinite(s.channelManager.trimDb[i],
-                                                 dsp::ranges::kChannelManagerTrimDb.min,
-                                                 dsp::ranges::kChannelManagerTrimDb.max,
-                                                 dsp::ranges::kChannelManagerTrimDb.fallback);
-        s.channelManager.delayMs[i] = clampFinite(s.channelManager.delayMs[i],
-                                                  dsp::ranges::kChannelManagerDelayMs.min,
-                                                  dsp::ranges::kChannelManagerDelayMs.max,
-                                                  dsp::ranges::kChannelManagerDelayMs.fallback);
-    }
-
     s.bypassCompare.gainCompensationLinear =
         clampFinite(s.bypassCompare.gainCompensationLinear, 0.001, 16.0, 1.0);
     s.bypassCompare.gainCompensationDb =
@@ -417,7 +391,7 @@ void AudioDspEngine::applySampleRateLocked(double sampleRate) {
     ensureArbitraryEqPrepared(*updated);
     // §8.9: an engine rate change also resamples the loaded HRIR here, never on
     // the render thread.
-    hrtf_.setDataset(updated->hrtf.dataset);
+    hrtf_.applySnapshotSources(updated->hrtf.dataset, updated->hrtf.customIr);
     hrtf_.prepare(updated->hrtf.azimuthDeg, updated->hrtf.elevationDeg,
                   updated->sampleRate);
     swapCurrentLocked(std::const_pointer_cast<const DspParamSnapshot>(updated));
@@ -721,6 +695,20 @@ int DspEngineRegistry::getMaxPipelineLatencyFrames() {
     return maxLatency;
 }
 
+int DspEngineRegistry::getMaxHrtfLatencyFrames() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (engines_.empty()) {
+        return AudioDspEngine::instance().getHrtfLatencyFrames();
+    }
+    int maxLatency = 0;
+    for (auto* engine : engines_) {
+        if (engine) {
+            maxLatency = std::max(maxLatency, engine->getHrtfLatencyFrames());
+        }
+    }
+    return maxLatency;
+}
+
 bool DspEngineRegistry::custodyArm(int frames, double sampleRate, bool bitPerfect,
                                    bool bypassCompare) {
     std::lock_guard<std::mutex> lock(mutex_);
@@ -999,7 +987,7 @@ void AudioDspEngine::updateParams(SnapshotMutator mutator) {
         // control thread, before the snapshot is published. The render thread
         // only claims the already-built slot (applyPrepared), so an azimuth /
         // elevation / sample-rate change can never allocate in process().
-        hrtf_.setDataset(updated->hrtf.dataset);
+        hrtf_.applySnapshotSources(updated->hrtf.dataset, updated->hrtf.customIr);
         hrtf_.prepare(updated->hrtf.azimuthDeg, updated->hrtf.elevationDeg,
                       updated->sampleRate);
         updated->generation = ++snapshotGeneration_;
@@ -1084,7 +1072,7 @@ void AudioDspEngine::publishParams(std::shared_ptr<const DspParamSnapshot> snaps
     ensureArbitraryEqPrepared(*mutableSnap);
     // §8.9: same control-thread HRIR preparation for snapshots arriving through
     // publishParams/broadcast (restore, registry fan-out, tests).
-    hrtf_.setDataset(mutableSnap->hrtf.dataset);
+    hrtf_.applySnapshotSources(mutableSnap->hrtf.dataset, mutableSnap->hrtf.customIr);
     hrtf_.prepare(mutableSnap->hrtf.azimuthDeg, mutableSnap->hrtf.elevationDeg,
                   mutableSnap->sampleRate);
     if (mutableSnap->reverb.preparedIr && mutableSnap->reverb.preparedIr->numPartitions > 0) {
@@ -1114,6 +1102,7 @@ void AudioDspEngine::resetInternal() {
     eq_.reset();
     crossfeed_.reset();
     limiter_.reset();
+    hasLastAppliedLimiter_ = false;
     reverb_.reset();
     resampler_.reset();
     // Tap SRC is reset by prepareTapResampler on the serialized configure/
@@ -1212,12 +1201,16 @@ void AudioDspEngine::prepareTapResampler(double srcRate, double dstRate, int cha
 
     // Remaster: If oversampling is requested or active, and dstRate / srcRate is
     // an integer power of 2 (2x, 4x, 8x), use Oversampler with the selected kernel.
+    const auto snap = getParams();
+    const int osMult = snap ? (snap->oversample.enabled ? snap->oversample.multiplier : 1) : oversampleMultiplier_;
+    const int osKern = snap ? snap->oversample.kernel : oversampleKernel_;
+    const int srcQuality = snap ? snap->resampler.tapSrcQuality : tapSrcQuality_;
     const int factor = static_cast<int>(std::round(expansion));
     if ((factor == 2 || factor == 4 || factor == 8) &&
         std::abs(dstRate - srcRate * factor) < 0.5 &&
-        (oversampleMultiplier_ > 1 || oversampleKernel_ != 0)) {
+        osMult > 1) {
         pulsr::OversampleKernel kernel = pulsr::OversampleKernel::Sharp;
-        switch (oversampleKernel_) {
+        switch (osKern) {
             case 1: kernel = pulsr::OversampleKernel::Slow; break;
             case 2: kernel = pulsr::OversampleKernel::MinimumPhase; break;
             case 3: kernel = pulsr::OversampleKernel::Apodizing; break;
@@ -1249,8 +1242,8 @@ void AudioDspEngine::prepareTapResampler(double srcRate, double dstRate, int cha
         return;
     }
 
-    if (!tapResampler_.configure(channels, TapTapsForQuality(tapSrcQuality_),
-                                 TapPhasesForQuality(tapSrcQuality_),
+    if (!tapResampler_.configure(channels, TapTapsForQuality(srcQuality),
+                                 TapPhasesForQuality(srcQuality),
                                  srcRate, dstRate)) {
         tapResampler_.release();
         return;
@@ -1266,8 +1259,12 @@ void AudioDspEngine::prepareTapResampler(double srcRate, double dstRate, int cha
 
 void AudioDspEngine::setTapSrcQuality(int quality) {
     const int clamped = quality < 0 ? 0 : (quality > 3 ? 3 : quality);
-    if (clamped == tapSrcQuality_) return;
-    tapSrcQuality_ = clamped;
+    if (clamped != tapSrcQuality_) {
+        tapSrcQuality_ = clamped;
+    }
+    updateParams([clamped](DspParamSnapshot& snap) {
+        snap.resampler.tapSrcQuality = clamped;
+    });
     // Rebuild on the control thread; the next configure/flush picks the
     // kernel up. Never reconfigure from the audio callback.
     if (tapChannels_ > 0 && std::abs(tapSrcRate_ - tapDstRate_) >= 0.5) {
@@ -1469,10 +1466,21 @@ int AudioDspEngine::convertPcmToDsdNative(const float* inInterleaved, int inFram
             return totalOutBytes > 0 ? totalOutBytes : -1;
         }
 
-        for (int i = 0; i < dsdBytesWritten; ++i) {
-            if (totalOutBytes + 2 > maxOutBytes) break;
-            outDsd[totalOutBytes++] = sdmDsdBufL_[size_t(i)];
-            outDsd[totalOutBytes++] = sdmDsdBufR_[size_t(i)];
+        for (int offset = 0; offset + bytesPerSample <= dsdBytesWritten; offset += bytesPerSample) {
+            if (totalOutBytes + bytesPerSample * 2 > maxOutBytes) break;
+            const int writtenL = pulsr::PackDsdBitsToWords(
+                sdmDsdBufL_.data() + offset, bytesPerSample,
+                outDsd + totalOutBytes, maxOutBytes - totalOutBytes, bytesPerSample);
+            if (writtenL <= 0) break;
+            totalOutBytes += writtenL;
+            const int writtenR = pulsr::PackDsdBitsToWords(
+                sdmDsdBufR_.data() + offset, bytesPerSample,
+                outDsd + totalOutBytes, maxOutBytes - totalOutBytes, bytesPerSample);
+            if (writtenR <= 0) {
+                totalOutBytes -= writtenL;
+                break;
+            }
+            totalOutBytes += writtenR;
         }
         consumedFrames += chunk;
     }
@@ -1871,10 +1879,15 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
     }
 
     const uint32_t initialDegraded = getAutoDegradedStages();
-    const bool crossfeedEnabled = !snapshot->bitPerfect.enabled &&
-        (snapshot->activeStages & ~initialDegraded & STAGE_CROSSFEED) &&
+    const uint32_t initialStages = snapshot->activeStages & ~initialDegraded;
+    const bool hrtfEarlyEnabled = !snapshot->bitPerfect.enabled &&
+        ((initialStages & STAGE_HRTF) != 0) &&
+        snapshot->hrtf.enabled;
+    const bool crossfeedEnabled = !snapshot->bitPerfect.enabled && !hrtfEarlyEnabled &&
+        ((initialStages & STAGE_CROSSFEED) != 0) &&
         snapshot->crossfeed.enabled;
     crossfeed_.setEnabled(crossfeedEnabled);
+    hrtf_.setEnabled(hrtfEarlyEnabled);
     const uint64_t resetGeneration = resetRequestGeneration_.load(std::memory_order_acquire);
     if (resetGeneration != lastResetGeneration_) {
         resetInternal();
@@ -1950,35 +1963,77 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
             liveProg_.setSampleRate(sr);
         }
 
-        eq_.applyParams(snapshot->eq);
-        reverb_.applyParams(snapshot->reverb);
+        {
+            auto eqParams = snapshot->eq;
+            eqParams.enabled = eqParams.enabled && ((initialStages & STAGE_EQ) != 0);
+            eq_.applyParams(eqParams);
+        }
+        {
+            auto reverbParams = snapshot->reverb;
+            reverbParams.enabled = reverbParams.enabled && ((initialStages & STAGE_REVERB) != 0);
+            reverb_.applyParams(reverbParams);
+        }
         panner_.applyParams(snapshot->panner);
-        auto crossfeedParams = snapshot->crossfeed;
-        crossfeedParams.enabled = crossfeedEnabled;
-        crossfeed_.applyParams(crossfeedParams);
-        limiter_.applyParams(snapshot->limiter);
+        {
+            auto crossfeedParams = snapshot->crossfeed;
+            crossfeedParams.enabled = crossfeedEnabled;
+            crossfeed_.applyParams(crossfeedParams);
+        }
         resampler_.applyParams(snapshot->resampler);
-        saturation_.applyParams(snapshot->saturation);
-        stereoWidth_.applyParams(snapshot->stereoWidth);
+        {
+            auto satParams = snapshot->saturation;
+            satParams.enabled = satParams.enabled && ((initialStages & STAGE_SATURATION) != 0);
+            saturation_.applyParams(satParams);
+        }
+        {
+            auto widthParams = snapshot->stereoWidth;
+            widthParams.enabled = widthParams.enabled && ((initialStages & STAGE_WIDTH) != 0);
+            stereoWidth_.applyParams(widthParams);
+        }
         {
             // With DVC the platform stream is pinned to max, so the real listening
             // level is the DVC gain, not the pushed slider value. Drive the
             // equal-loudness lift from it so the curve tracks what is heard.
             auto loudnessParams = snapshot->loudness;
+            loudnessParams.enabled = loudnessParams.enabled && ((initialStages & STAGE_LOUDNESS) != 0);
             if (snapshot->directVolume.enabled) {
                 loudnessParams.volumeLinear =
                     std::clamp(snapshot->directVolume.gainLinear, 0.0, 1.0);
             }
             loudnessContour_.applyParams(loudnessParams);
         }
-        subCrossover_.applyParams(snapshot->subCrossover);
-        lfeCrossover_.applyParams(snapshot->lfeCrossover);
-        channelManager_.applyParams(snapshot->channelManager);
-        dacVoicing_.applyParams(snapshot->dacVoicing);
-        dynamicEq_.applyParams(snapshot->dynamicEq);
-        multibandCompressor_.applyParams(snapshot->multibandCompressor);
+        {
+            auto subParams = snapshot->subCrossover;
+            subParams.enabled = subParams.enabled && ((initialStages & STAGE_CROSSOVER) != 0);
+            subCrossover_.applyParams(subParams);
+        }
+        {
+            auto lfeParams = snapshot->lfeCrossover;
+            lfeParams.enabled = lfeParams.enabled && ((initialStages & STAGE_LFE_CROSSOVER) != 0);
+            lfeCrossover_.applyParams(lfeParams);
+        }
+        {
+            auto chParams = snapshot->channelManager;
+            chParams.enabled = chParams.enabled && ((initialStages & STAGE_CHANNEL_MANAGER) != 0);
+            channelManager_.applyParams(chParams);
+        }
+        {
+            auto dacParams = snapshot->dacVoicing;
+            dacParams.enabled = dacParams.enabled && ((initialStages & STAGE_DAC_VOICING) != 0);
+            dacVoicing_.applyParams(dacParams);
+        }
+        {
+            auto dynEqParams = snapshot->dynamicEq;
+            dynEqParams.enabled = dynEqParams.enabled && ((initialStages & STAGE_DYNEQ) != 0);
+            dynamicEq_.applyParams(dynEqParams);
+        }
+        {
+            auto mbParams = snapshot->multibandCompressor;
+            mbParams.enabled = mbParams.enabled && ((initialStages & STAGE_MULTIBAND_COMPRESSOR) != 0);
+            multibandCompressor_.applyParams(mbParams);
+        }
         dynamicBass_.setParams(
-            snapshot->dynamicBass.enabled,
+            snapshot->dynamicBass.enabled && ((initialStages & STAGE_DYNAMIC_BASS) != 0),
             snapshot->dynamicBass.strength,
             snapshot->dynamicBass.xLow,
             snapshot->dynamicBass.xHigh,
@@ -1989,8 +2044,11 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
             snapshot->dynamicBass.devicePreset
         );
         viperDdc_.applyParams(snapshot->viperDdc);
+        viperDdc_.setEnabled(snapshot->viperDdc.enabled && ((initialStages & STAGE_VIPER_DDC) != 0));
         arbitraryEq_.applyParams(snapshot->arbitraryEq);
+        arbitraryEq_.setEnabled(snapshot->arbitraryEq.enabled && ((initialStages & STAGE_ARBITRARY_EQ) != 0));
         liveProg_.applyParams(snapshot->liveProg);
+        liveProg_.setEnabled(snapshot->liveProg.enabled && ((initialStages & STAGE_LIVE_PROG) != 0));
         // configure() rebuilds the lookahead window; only do it when the ceiling
         // actually changes, not on every unrelated snapshot generation.
         if (!safetyConfigured_ ||
@@ -2005,28 +2063,6 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
         if (snapshot->headphoneSafety.enabled != lastSafetyEnabled_) {
             safetyLimiter_.setEnabled(snapshot->headphoneSafety.enabled);
             lastSafetyEnabled_ = snapshot->headphoneSafety.enabled;
-        }
-
-        if (snapshot->oversample.multiplier != oversampleMultiplier_ ||
-            snapshot->oversample.kernel != oversampleKernel_) {
-            oversampleMultiplier_ = snapshot->oversample.multiplier;
-            oversampleKernel_ = snapshot->oversample.kernel;
-            // Never rebuild the oversampler here: configure() allocates, and
-            // this branch runs on the render thread. The control-thread sink
-            // rebuild (prepareTapResampler) applies the new multiplier/kernel.
-        }
-
-        if (snapshot->pcmToDsd.enabled != pcmToDsdEnabled_ ||
-            snapshot->pcmToDsd.rate != pcmToDsdRate_ ||
-            snapshot->pcmToDsd.order != pcmToDsdOrder_) {
-            pcmToDsdEnabled_ = snapshot->pcmToDsd.enabled;
-            pcmToDsdRate_ = snapshot->pcmToDsd.rate;
-            pcmToDsdOrder_ = snapshot->pcmToDsd.order;
-            if (!pcmToDsdEnabled_) {
-                releasePcmToDsd();
-            } else if (pcmToDsdInputRate_ > 0.0) {
-                preparePcmToDsd(pcmToDsdInputRate_, pcmToDsdRate_, pcmToDsdOrder_, pcmToDsdContainerBits_);
-            }
         }
 
         lastAppliedGeneration_.store(snapshot->generation);
@@ -2055,6 +2091,7 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
         limiterGrDb_.store(0.0f, std::memory_order_relaxed);
         safetyAttenuationActive_.store(false, std::memory_order_relaxed);
         limiter_.setProcessingActive(false);
+        safetyLimiter_.setProcessingActive(false);
         // The safety limiter is suppressed on this path by design (it would
         // alter the samples). Publish that so callers can distinguish "safety
         // inactive" from "safety bypassed by bit-perfect"; dose stays metered.
@@ -2103,13 +2140,33 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
     }
 
     // Low-Power Interlocked Bypass: skips DSP cleanly ONLY when activeDspStages == 0,
-    // EQ and preamp are off, remaster is off, and HRTF is off.
+    // EQ and preamp are off, remaster is off, HRTF is off, gain/safety stages are off,
+    // and every stage/smoother has finished ramping or draining.
+    const bool stagesSettledForLowPower =
+        !eq_.isRamping() && !crossfeed_.isRamping() && !hrtf_.isRamping() &&
+        !loudnessContour_.isRamping() && !subCrossover_.isRamping() &&
+        !lfeCrossover_.isRamping() && !dynamicBass_.isRamping() &&
+        !saturation_.isRamping() && !stereoWidth_.isRamping() &&
+        !panner_.isRamping() && !reverb_.isRamping() &&
+        !arbitraryEq_.isRamping() && !viperDdc_.isRamping() &&
+        !dynamicEq_.isRamping() && !multibandCompressor_.isRamping() &&
+        !liveProg_.isRamping() && !channelManager_.isRamping() &&
+        !dacVoicing_.isRamping() && !limiter_.isDraining() &&
+        std::abs(smoothedReplayGain_ - 1.0) <= 1e-4 &&
+        std::abs(smoothedDirectVolume_ - 1.0) <= 1e-4 &&
+        smoothedSafetyGain_ >= 0.9999;
     const bool lowPowerInterlockOk = (snapshot->activeStages == 0) &&
                                      !snapshot->eq.enabled &&
                                      (std::abs(snapshot->eq.preampDb) < 0.001) &&
                                      !snapshot->oversample.enabled &&
                                      !snapshot->pcmToDsd.enabled &&
-                                     !snapshot->hrtf.enabled;
+                                     !snapshot->hrtf.enabled &&
+                                     !snapshot->directVolume.enabled &&
+                                     !snapshot->replayGain.enabled &&
+                                     (!snapshot->bitPerfect.directUsbActive ||
+                                      snapshot->bitPerfect.directUsbGain >= 0.9999) &&
+                                     !snapshot->headphoneSafety.enabled &&
+                                     stagesSettledForLowPower;
     const bool lowPowerBypassed = snapshot->lowPower.enabled && lowPowerInterlockOk;
     lowPowerBypassed_.store(lowPowerBypassed, std::memory_order_relaxed);
     if (lowPowerBypassed) {
@@ -2117,6 +2174,7 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
         limiterGrDb_.store(0.0f, std::memory_order_relaxed);
         safetyAttenuationActive_.store(false, std::memory_order_relaxed);
         limiter_.setProcessingActive(false);
+        safetyLimiter_.setProcessingActive(false);
         safetySuppressed_.store(snapshot->headphoneSafety.enabled, std::memory_order_relaxed);
         smoothedReplayGain_ = 1.0;
         smoothedDirectVolume_ = 1.0;
@@ -2130,6 +2188,7 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
         effectiveLatencyFrames_.store(0, std::memory_order_release);
         limiterGrDb_.store(0.0f, std::memory_order_relaxed);
         limiter_.setProcessingActive(false);
+        safetyLimiter_.setProcessingActive(snapshot->headphoneSafety.enabled);
         smoothedReplayGain_ = 1.0;
         smoothedDirectVolume_ = 1.0;
         // Item 9: match the bit-perfect path. The Direct USB software gain stage
@@ -2143,19 +2202,32 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
         double bypassGainDb = std::log10(
             std::max(0.001, snapshot->bypassCompare.gainCompensationLinear)) * 20.0;
         if (snapshot->bypassCompare.autoGainMatch) {
+            // Auto-Level already measures the full input-to-output level delta
+            // including DVC and Direct USB attenuation; folding them in again
+            // would double-apply those gains on the dry comparison path.
             const double measuredDb = static_cast<double>(
                 shortTermLoudnessDeltaDb_.load(std::memory_order_relaxed));
             // Compensation applied to the dry path is the inverse of the
             // chain's measured change, bounded to [-18, +12] dB.
             bypassGainDb = std::clamp(-measuredDb, -18.0, 12.0);
-        }
-        // The DVC and Direct USB gain stages never run on this path either, so
-        // fold the Direct USB attenuation (when that endpoint is live) into the
-        // compare gain. Without it A/B would be louder than the bit-perfect
-        // output it is being compared against.
-        const double usbCompareGain = effectiveDirectUsbGain(*snapshot);
-        if (usbCompareGain < 0.9999) {
-            bypassGainDb += std::log10(std::max(0.001, usbCompareGain)) * 20.0;
+        } else {
+            // In manual A/B compare, preserve active listening attenuation
+            // (Direct USB / DVC) before applying safety metering & limiting so
+            // toggling A/B never jumps to full-scale output.
+            const double usbCompareGain = effectiveDirectUsbGain(*snapshot);
+            if (usbCompareGain < 0.9999) {
+                bypassGainDb += std::log10(std::max(0.001, usbCompareGain)) * 20.0;
+            }
+            if (snapshot->directVolume.enabled) {
+                const double dvcCompareGain =
+                    std::clamp(snapshot->directVolume.gainLinear, 0.0, 8.0);
+                if (dvcCompareGain <= 0.0) {
+                    std::fill(buffer, buffer + frames * channels, 0.0f);
+                    bypassGainDb = 0.0;
+                } else {
+                    bypassGainDb += std::log10(dvcCompareGain) * 20.0;
+                }
+            }
         }
         if (std::abs(bypassGainDb) > 1e-3) {
             const int totalSamples = frames * channels;
@@ -2232,9 +2304,12 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
     const uint32_t degraded = getAutoDegradedStages();
     const uint32_t stages = rawStages & ~degraded;
 
+    const bool hrtfRequested = ((stages & STAGE_HRTF) != 0) && snapshot->hrtf.enabled;
+    const bool crossfeedRequested = !hrtfRequested && ((stages & STAGE_CROSSFEED) != 0) && snapshot->crossfeed.enabled;
+
     eq_.setEnabled((stages & STAGE_EQ) && snapshot->eq.enabled);
     dynamicEq_.setEnabled((stages & STAGE_DYNEQ) && snapshot->dynamicEq.enabled);
-    crossfeed_.setEnabled((stages & STAGE_CROSSFEED) && snapshot->crossfeed.enabled);
+    crossfeed_.setEnabled(crossfeedRequested);
     stereoWidth_.setEnabled((stages & STAGE_WIDTH) && snapshot->stereoWidth.enabled);
     subCrossover_.setEnabled((stages & STAGE_CROSSOVER) && snapshot->subCrossover.enabled);
     lfeCrossover_.setEnabled((stages & STAGE_LFE_CROSSOVER) && snapshot->lfeCrossover.enabled);
@@ -2248,7 +2323,7 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
     liveProg_.setEnabled((stages & STAGE_LIVE_PROG) && snapshot->liveProg.enabled);
     channelManager_.setEnabled((stages & STAGE_CHANNEL_MANAGER) && snapshot->channelManager.enabled);
     dacVoicing_.setEnabled((stages & STAGE_DAC_VOICING) && snapshot->dacVoicing.enabled);
-    hrtf_.setEnabled((stages & STAGE_HRTF) && snapshot->hrtf.enabled);
+    hrtf_.setEnabled(hrtfRequested);
     // §8.9: the quad itself was already prepared on the control thread when the
     // snapshot was published; this only claims the newest preallocated slot and
     // is allocation-, lock- and log-free.
@@ -2261,49 +2336,57 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
         else if (gMax < 1.0002) gainBoostLatched_ = false;
     }
     bool hasNetPositiveGain = gainBoostLatched_ ||
-                              channelManager_.canBoost(channels);
+                              channelManager_.canBoost(channels) ||
+                              channelManager_.isRamping();
     if (snapshot->directVolume.enabled && snapshot->directVolume.gainLinear > 1.001) {
         hasNetPositiveGain = true;
     }
-    if ((stages & STAGE_EQ) && snapshot->eq.enabled) {
-        if (snapshot->eq.preampDb > 0.01) hasNetPositiveGain = true;
+    if (((stages & STAGE_EQ) && snapshot->eq.enabled) || (!(degraded & STAGE_EQ) && eq_.isRamping())) {
+        if (snapshot->eq.preampDb > 0.01 || eq_.isRamping()) hasNetPositiveGain = true;
         for (int b = 0; b < snapshot->eq.bandCount; ++b) {
-            if (snapshot->eq.bands[b].enabled && snapshot->eq.bands[b].gainDb > 0.01) {
+            const auto& band = snapshot->eq.bands[b];
+            const bool resonantCutoff =
+                (band.type == FilterType::LowPass || band.type == FilterType::HighPass) &&
+                band.q > 0.75;
+            if (band.enabled && !band.mute && (band.gainDb > 0.01 || resonantCutoff)) {
                 hasNetPositiveGain = true;
                 break;
             }
         }
     }
-    if ((stages & STAGE_LOUDNESS) && snapshot->loudness.enabled && snapshot->loudness.intensity > 0.01 && snapshot->loudness.volumeLinear < 0.99) {
+    if (((stages & STAGE_LOUDNESS) && snapshot->loudness.enabled &&
+         snapshot->loudness.intensity > 0.01 && snapshot->loudness.volumeLinear < 0.99) ||
+        (!(degraded & STAGE_LOUDNESS) && loudnessContour_.isRamping())) {
         hasNetPositiveGain = true;
     }
-    if ((stages & STAGE_WIDTH) && snapshot->stereoWidth.enabled &&
-        (snapshot->stereoWidth.width > 1.01 || (snapshot->stereoWidth.multiband &&
-         (snapshot->stereoWidth.lowWidth > 1.01 || snapshot->stereoWidth.midWidth > 1.01 || snapshot->stereoWidth.highWidth > 1.01)))) {
+    if (((stages & STAGE_WIDTH) && snapshot->stereoWidth.enabled &&
+         (snapshot->stereoWidth.width > 1.01 || (snapshot->stereoWidth.multiband &&
+          (snapshot->stereoWidth.lowWidth > 1.01 || snapshot->stereoWidth.midWidth > 1.01 || snapshot->stereoWidth.highWidth > 1.01)))) ||
+        (!(degraded & STAGE_WIDTH) && stereoWidth_.isRamping())) {
         hasNetPositiveGain = true;
     }
-    if ((stages & STAGE_DYNAMIC_BASS) && snapshot->dynamicBass.enabled && snapshot->dynamicBass.strength > 1.01) {
+    if (((stages & STAGE_DYNAMIC_BASS) && snapshot->dynamicBass.enabled && snapshot->dynamicBass.strength > 1.01) ||
+        (!(degraded & STAGE_DYNAMIC_BASS) && dynamicBass_.isRamping())) {
         hasNetPositiveGain = true;
     }
 
-    // Nonlinear/custom stages may boost even without a positive EQ knob.
+    // Nonlinear/custom stages (and active release ramps) may boost even without a positive EQ knob.
     hasNetPositiveGain |=
         (((stages & STAGE_ARBITRARY_EQ) || arbitraryEq_.isRamping()) && (snapshot->arbitraryEq.enabled || arbitraryEq_.isRamping())) ||
         (((stages & STAGE_VIPER_DDC) || viperDdc_.isRamping()) && (snapshot->viperDdc.enabled || viperDdc_.isRamping())) ||
         (((stages & STAGE_LIVE_PROG) || liveProg_.isRamping()) && (snapshot->liveProg.enabled || liveProg_.isRamping())) ||
-        ((stages & STAGE_REVERB) && snapshot->reverb.enabled) ||
-        ((stages & STAGE_MULTIBAND_COMPRESSOR) && snapshot->multibandCompressor.enabled) ||
-        ((stages & STAGE_DYNEQ) && snapshot->dynamicEq.enabled) ||
+        ((stages & STAGE_REVERB) && snapshot->reverb.enabled) || reverb_.isRamping() ||
+        ((stages & STAGE_MULTIBAND_COMPRESSOR) && snapshot->multibandCompressor.enabled) || multibandCompressor_.isRamping() ||
+        ((stages & STAGE_DYNEQ) && snapshot->dynamicEq.enabled) || (!(degraded & STAGE_DYNEQ) && dynamicEq_.isRamping()) ||
         (((stages & STAGE_SATURATION) || saturation_.isRamping()) && (snapshot->saturation.enabled || saturation_.isRamping())) ||
         (((stages & STAGE_DAC_VOICING) || dacVoicing_.isRamping()) && (snapshot->dacVoicing.enabled || dacVoicing_.isRamping())) ||
-        (((stages & STAGE_HRTF) != 0) && snapshot->hrtf.enabled) || hrtf_.isRamping() ||
-        ((stages & STAGE_PANNER) && std::abs(snapshot->panner.balance) > 0.001) ||
+        hrtfRequested || hrtf_.isRamping() ||
+        ((stages & STAGE_PANNER) && std::abs(snapshot->panner.balance) > 0.001) || panner_.isRamping() ||
         // Crossfeed and SubCrossover can sum channels above unity at low
-        // frequencies; guard them too. The old heuristic omitted these, so their
-        // boosts could reach the final hard clamp and click when toggling.
-        ((stages & STAGE_CROSSFEED) && snapshot->crossfeed.enabled) ||
-        ((stages & STAGE_CROSSOVER) && snapshot->subCrossover.enabled) ||
-        (((stages & STAGE_LFE_CROSSOVER) || lfeCrossover_.isRamping()) &&
+        // frequencies; guard them (and their ramp-downs) too.
+        crossfeedRequested || (!(degraded & STAGE_CROSSFEED) && crossfeed_.isRamping()) ||
+        ((stages & STAGE_CROSSOVER) && snapshot->subCrossover.enabled) || (!(degraded & STAGE_CROSSOVER) && subCrossover_.isRamping()) ||
+        (((stages & STAGE_LFE_CROSSOVER) || (!(degraded & STAGE_LFE_CROSSOVER) && lfeCrossover_.isRamping())) &&
          channels >= LfeCrossover::MIN_MULTICHANNEL &&
          (snapshot->lfeCrossover.enabled || lfeCrossover_.isRamping())) ||
         // DVC boost (> 1.0 / > 0 dB) must be guarded by lookahead limiter to prevent DAC clipping
@@ -2339,7 +2422,7 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
     const bool anyStageEnabled =
         (((stages & STAGE_EQ) != 0) && snapshot->eq.enabled) || eq_.isRamping() ||
         (((stages & STAGE_DYNEQ) != 0) && snapshot->dynamicEq.enabled) || dynamicEq_.isRamping() ||
-        (((stages & STAGE_CROSSFEED) != 0) && snapshot->crossfeed.enabled) || crossfeed_.isRamping() ||
+        crossfeedRequested || crossfeed_.isRamping() ||
         // A raw STAGE_PANNER bit is not evidence of work either: a centered
         // balance with monoMix off is an exact pass-through, and treating it as
         // active would defeat the bit-exact fast path for the common
@@ -2359,7 +2442,7 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
         (((stages & STAGE_LIVE_PROG) != 0) && snapshot->liveProg.enabled) || liveProg_.isRamping() ||
         (((stages & STAGE_CHANNEL_MANAGER) != 0) && snapshot->channelManager.enabled) || channelManager_.isRamping() ||
         (((stages & STAGE_DAC_VOICING) != 0) && snapshot->dacVoicing.enabled) || dacVoicing_.isRamping() ||
-        (((stages & STAGE_HRTF) != 0) && snapshot->hrtf.enabled) || hrtf_.isRamping();
+        hrtfRequested || hrtf_.isRamping();
     const bool nonUnityGain = anyStageEnabled ||
                               (std::abs(smoothedReplayGain_ - 1.0) > 1e-4) ||
                               (std::abs(startReplayGain - 1.0) > 1e-4) ||
@@ -2551,7 +2634,16 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
         if (runLimiter) {
             auto effectiveLimiter = snapshot->limiter;
             effectiveLimiter.enabled = true;
-            limiter_.applyParams(effectiveLimiter);
+            if (!hasLastAppliedLimiter_ ||
+                effectiveLimiter.lookaheadMs != lastAppliedLimiter_.lookaheadMs ||
+                effectiveLimiter.thresholdDb != lastAppliedLimiter_.thresholdDb ||
+                effectiveLimiter.releaseMs != lastAppliedLimiter_.releaseMs ||
+                effectiveLimiter.truePeakMode != lastAppliedLimiter_.truePeakMode ||
+                effectiveLimiter.enabled != lastAppliedLimiter_.enabled) {
+                limiter_.applyParams(effectiveLimiter);
+                lastAppliedLimiter_ = effectiveLimiter;
+                hasLastAppliedLimiter_ = true;
+            }
             limiter_.processInterleaved(buffer, frames, channels);
             limiterActive_.store(true, std::memory_order_relaxed);
             blockLatency += limiter_.getLatencyFrames();
@@ -2601,6 +2693,7 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
     // 11. Headphone Safety & Sound Dose Tracking (EN 62368-1 / WHO-ITU H.870)
     // Mask-immune: safety enforcement cannot be bypassed by activeStages bitmask dropping.
     // Placed after DVC and main limiter, before dither.
+    safetyLimiter_.setProcessingActive(snapshot->headphoneSafety.enabled);
     processSafetyStage(buffer, frames, channels, currentSr, *snapshot, blockLatency);
 
     // 11b. Transport gain (crossfade/sleep curve x profile transition fade),
@@ -2750,7 +2843,7 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
             if (avgRtf > degradeThreshold &&
                 overBudgetBlocks >= kRtfWindowSize / 2) {
                 recoveryConsecutiveBlocks_ = 0;
-                // Cost order: REVERB -> LIVE_PROG -> ARBITRARY_EQ -> MULTIBAND_COMPRESSOR -> DYNAMIC_BASS -> SATURATION -> DAC_VOICING -> VIPER_DDC -> DYNEQ -> CROSSOVER -> WIDTH -> CROSSFEED -> PANNER -> EQ
+                // Cost order: REVERB -> LIVE_PROG -> ARBITRARY_EQ -> HRTF -> MULTIBAND_COMPRESSOR -> DYNAMIC_BASS -> SATURATION -> DAC_VOICING -> VIPER_DDC -> DYNEQ -> CROSSOVER -> WIDTH -> CROSSFEED -> PANNER -> EQ
                 if ((rawStages & STAGE_REVERB) && snapshot->reverb.enabled && !(currentDegraded & STAGE_REVERB)) {
                     triggerStageAutoDegrade(STAGE_REVERB);
                     rtfCount_ = 0;
@@ -2761,6 +2854,10 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
                     rtfRingHead_ = 0;
                 } else if ((rawStages & STAGE_ARBITRARY_EQ) && snapshot->arbitraryEq.enabled && !(currentDegraded & STAGE_ARBITRARY_EQ)) {
                     triggerStageAutoDegrade(STAGE_ARBITRARY_EQ);
+                    rtfCount_ = 0;
+                    rtfRingHead_ = 0;
+                } else if ((rawStages & STAGE_HRTF) && snapshot->hrtf.enabled && !(currentDegraded & STAGE_HRTF)) {
+                    triggerStageAutoDegrade(STAGE_HRTF);
                     rtfCount_ = 0;
                     rtfRingHead_ = 0;
                 } else if ((rawStages & STAGE_MULTIBAND_COMPRESSOR) && snapshot->multibandCompressor.enabled && !(currentDegraded & STAGE_MULTIBAND_COMPRESSOR)) {
@@ -2815,7 +2912,7 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
                 recoveryConsecutiveBlocks_++;
                 if (recoveryConsecutiveBlocks_ >= kRtfRecoveryWindowSize) {
                     recoveryConsecutiveBlocks_ = 0;
-                    // Reverse cost order: EQ -> PANNER -> CROSSFEED -> WIDTH -> CROSSOVER -> DYNEQ -> VIPER_DDC -> SATURATION -> DYNAMIC_BASS -> MULTIBAND_COMPRESSOR -> ARBITRARY_EQ -> LIVE_PROG -> REVERB
+                    // Reverse cost order: EQ -> PANNER -> CROSSFEED -> WIDTH -> CROSSOVER -> DYNEQ -> VIPER_DDC -> DAC_VOICING -> SATURATION -> DYNAMIC_BASS -> MULTIBAND_COMPRESSOR -> HRTF -> ARBITRARY_EQ -> LIVE_PROG -> REVERB
                     if (nativeDegraded & STAGE_EQ) {
                         recoverStageAutoDegrade(STAGE_EQ);
                     } else if (nativeDegraded & STAGE_PANNER) {
@@ -2838,6 +2935,8 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
                         recoverStageAutoDegrade(STAGE_DYNAMIC_BASS);
                     } else if (nativeDegraded & STAGE_MULTIBAND_COMPRESSOR) {
                         recoverStageAutoDegrade(STAGE_MULTIBAND_COMPRESSOR);
+                    } else if (nativeDegraded & STAGE_HRTF) {
+                        recoverStageAutoDegrade(STAGE_HRTF);
                     } else if (nativeDegraded & STAGE_ARBITRARY_EQ) {
                         recoverStageAutoDegrade(STAGE_ARBITRARY_EQ);
                     } else if (nativeDegraded & STAGE_LIVE_PROG) {

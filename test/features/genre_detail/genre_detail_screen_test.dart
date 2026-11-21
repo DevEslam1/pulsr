@@ -187,4 +187,31 @@ void main() {
     expect(find.widgetWithText(OutlinedButton, 'Shuffle'), findsOneWidget);
     expect(find.byType(SongTile), findsNWidgets(2));
   });
+
+  testWidgets('didUpdateWidget refreshes song stream when genreItem changes',
+      (tester) async {
+    const genre2 = GenreItem(name: 'Jazz', songCount: 1);
+
+    when(() => useCase.watchGenreSongs('Rock'))
+        .thenAnswer((_) => Stream.value(Right([_song(1, 'Alpha')])));
+    when(() => useCase.watchGenreSongs('Jazz'))
+        .thenAnswer((_) => Stream.value(Right([_song(2, 'Beta')])));
+
+    await tester.pumpWidget(
+      detailHarness(
+        child: GenreDetailScreen(genreItem: _genre, getGenresUseCase: useCase),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Alpha'), findsOneWidget);
+
+    await tester.pumpWidget(
+      detailHarness(
+        child: GenreDetailScreen(genreItem: genre2, getGenresUseCase: useCase),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Beta'), findsOneWidget);
+    verify(() => useCase.watchGenreSongs('Jazz')).called(1);
+  });
 }

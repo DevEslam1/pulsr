@@ -24,6 +24,7 @@ class VisualizerPlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamHa
     @Volatile
     private var fftExecutor: java.util.concurrent.ExecutorService = newExecutor()
     private val executorLock = Any()
+    private val fftInFlight = java.util.concurrent.atomic.AtomicBoolean(false)
 
     companion object {
         const val METHOD_CHANNEL = "com.pulsr.music/visualizer"
@@ -74,6 +75,8 @@ class VisualizerPlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamHa
 
     fun cleanup() {
         stopVisualizer()
+        eventSink = null
+        appContext = null
         if (::methodChannel.isInitialized) {
             methodChannel.setMethodCallHandler(null)
         }
@@ -89,6 +92,7 @@ class VisualizerPlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamHa
         } catch (_: InterruptedException) {
             currentExecutor.shutdownNow()
         }
+        fftInFlight.set(false)
     }
 
     override fun onMethodCall(call: MethodCall, result: Result) {
@@ -99,7 +103,7 @@ class VisualizerPlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamHa
                 result.success(success)
             }
             "stop", "releaseVisualizer" -> {
-                stopVisualizer()
+                stopVisualizer(clearSession = true)
                 result.success(true)
             }
             else -> result.notImplemented()
@@ -111,7 +115,10 @@ class VisualizerPlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamHa
     private fun startVisualizer(audioSessionId: Int): Boolean {
         // Session 0 is the global mixer pseudo-session: attaching a Visualizer
         // to it either throws or captures unrelated audio.
-        if (audioSessionId <= 0) return false
+        if (audioSessionId <= 0) {
+            stopVisualizer(clearSession = true)
+            return false
+        }
         val ctx = appContext
         if (ctx != null && ctx.checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) !=
             PackageManager.PERMISSION_GRANTED
@@ -119,7 +126,6 @@ class VisualizerPlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamHa
             return false
         }
         stopVisualizer()
-        currentSessionId = audioSessionId
         return try {
             val vis = Visualizer(audioSessionId)
             val captureSizeRange = Visualizer.getCaptureSizeRange()
@@ -145,33 +151,48 @@ class VisualizerPlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamHa
                     samplingRate: Int
                 ) {
                     if (fft == null || fft.size < 4 || eventSink == null) return
-                    val fftCopy = fft.copyOf()
-                    try {
-                        ensureFftExecutor().execute {
-                            try {
-                                val bandValues = processFftData(fftCopy)
-                                val normalizedList = bandValues.toList()
-                                mainHandler.post {
-                                    try {
-                                        eventSink?.success(normalizedList)
-                                    } catch (_: Throwable) {}
-                                }
-                            } catch (e: Exception) {
-                                android.util.Log.w("VisualizerPlugin", "FFT processing failed: ${e.message}")
-                            }
-                        }
-                    } catch (_: java.util.concurrent.RejectedExecutionException) {
-                        // Plugin is shutting down; drop this frame.
-                    }
+                    dispatchFftFrame(fft)
                 }
             }, Visualizer.getMaxCaptureRate() / 2, false, true)
 
             vis.enabled = true
             visualizer = vis
+            currentSessionId = audioSessionId
             true
         } catch (e: Throwable) {
             android.util.Log.w("VisualizerPlugin", "Hardware visualizer unavailable for session $audioSessionId: ${e.message}")
             false
+        }
+    }
+
+    internal fun dispatchFftFrame(fft: ByteArray): Boolean {
+        if (fft.size < 4 || eventSink == null) return false
+        if (!fftInFlight.compareAndSet(false, true)) return false
+        val fftCopy = fft.copyOf()
+        try {
+            ensureFftExecutor().execute {
+                try {
+                    val bandValues = processFftData(fftCopy)
+                    val normalizedList = bandValues.toList()
+                    mainHandler.post {
+                        try {
+                            eventSink?.success(normalizedList)
+                        } catch (_: Throwable) {}
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.w("VisualizerPlugin", "FFT processing failed: ${e.message}")
+                } finally {
+                    fftInFlight.set(false)
+                }
+            }
+            return true
+        } catch (_: java.util.concurrent.RejectedExecutionException) {
+            // Plugin is shutting down; drop this frame and release the gate.
+            fftInFlight.set(false)
+            return false
+        } catch (_: Throwable) {
+            fftInFlight.set(false)
+            return false
         }
     }
 
@@ -220,13 +241,16 @@ class VisualizerPlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamHa
         return bandValues
     }
 
-    private fun stopVisualizer() {
+    private fun stopVisualizer(clearSession: Boolean = false) {
         try {
             visualizer?.enabled = false
             visualizer?.release()
         } catch (_: Exception) {
         } finally {
             visualizer = null
+            if (clearSession) {
+                currentSessionId = 0
+            }
         }
     }
 

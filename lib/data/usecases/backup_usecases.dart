@@ -1,7 +1,6 @@
 // lib/data/usecases/backup_usecases.dart
 import 'dart:convert';
 import 'dart:io';
-import 'dart:math' as math;
 import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
 import 'package:injectable/injectable.dart';
@@ -46,7 +45,7 @@ class ImportResult {
 const String _cueRefMarker = '#pulsr_cue=';
 
 String _composeSongRef(String path, int? cueStartMs) {
-  if (cueStartMs == null || cueStartMs <= 0) return path;
+  if (cueStartMs == null || cueStartMs < 0) return path;
   return '$path$_cueRefMarker$cueStartMs';
 }
 
@@ -170,22 +169,6 @@ class ExportBackupUseCase {
       'autoThemeByTime': prefs.getBool('setting_auto_theme_by_time') ?? false,
       'themeScheduleStart': prefs.getInt('setting_theme_schedule_start'),
       'themeScheduleEnd': prefs.getInt('setting_theme_schedule_end'),
-      // Backup v5 keys
-      if (prefs.getString('usb_quirks_v1') != null)
-        'usb_quirks_v1': prefs.getString('usb_quirks_v1'),
-      if (prefs.getString('audio_profile_default_id') != null)
-        'audio_profile_default_id': prefs.getString('audio_profile_default_id'),
-      if (prefs.getString('remote_sources_v1') != null)
-        'remote_sources_v1': prefs.getString('remote_sources_v1'),
-      if (prefs.getBool('assistant_suggestions_enabled') != null)
-        'assistant_suggestions_enabled':
-            prefs.getBool('assistant_suggestions_enabled'),
-      if (prefs.getString('setting_bt_latency_by_device') != null)
-        'setting_bt_latency_by_device':
-            prefs.getString('setting_bt_latency_by_device'),
-      if (prefs.getBool('setting_auto_device_profiles_enabled') != null)
-        'setting_auto_device_profiles_enabled':
-            prefs.getBool('setting_auto_device_profiles_enabled'),
       for (final k in prefs.getKeys())
         if (k.startsWith('announce_') || k.startsWith('sysbeh_'))
           if (prefs.get(k) != null) k: prefs.get(k),
@@ -521,8 +504,122 @@ class ImportBackupUseCase {
       if (data['downloads'] is List)
         ...(data['downloads'] as List).whereType<Map<String, dynamic>>(),
     ];
-    if (onlineSeedList.isNotEmpty) {
-      await _db.transaction(() async {
+
+    Map<String, List<SongsTableData>>? lazyParentFilenameMap;
+    Map<String, List<SongsTableData>>? lazyUniqueFilenameMap;
+    List<({SongsTableData song, List<String> segments})>? lazySongSegments;
+
+    List<({SongsTableData song, List<String> segments})> getSongSegments() {
+      return lazySongSegments ??= allSongs.map((s) {
+        return (song: s, segments: s.path.replaceAll(r'\\', '/').split('/'));
+      }).toList();
+    }
+
+    SongsTableData? matchPath(String rawRef) {
+      final parsedRef = _parseSongRef(rawRef);
+      final ref = parsedRef.cueStartMs == null
+          ? rawRef
+          : _composeSongRef(parsedRef.path, parsedRef.cueStartMs);
+      // 1. Exact or normalized path/chapter-ref match
+      final direct = pathMap[ref] ?? pathMap[ref.toLowerCase()];
+      if (direct != null) return direct;
+      final path = parsedRef.path;
+
+      // 2. Fallback for ytmusic:// paths matching by remoteId
+      if (path.startsWith('ytmusic://')) {
+        final videoId = path.replaceFirst('ytmusic://', '').split('?').first;
+        final remoteMatch = remoteIdMap[videoId];
+        if (remoteMatch != null) return remoteMatch;
+      }
+
+      final normPath = path.replaceAll(r'\\', '/').toLowerCase();
+      final segments = normPath.split('/');
+
+      // 3. Parent + Filename fallback (lazy init, keyed by (parent/filename, cueStartMs))
+      if (segments.length >= 2) {
+        if (lazyParentFilenameMap == null) {
+          final map = <String, List<SongsTableData>>{};
+          for (final item in getSongSegments()) {
+            final segs = item.segments;
+            if (segs.length >= 2) {
+              final key =
+                  '${segs[segs.length - 2].toLowerCase()}/${segs.last.toLowerCase()}';
+              (map[key] ??= []).add(item.song);
+            }
+          }
+          lazyParentFilenameMap = map;
+        }
+        final parentAndFilename =
+            '${segments[segments.length - 2]}/${segments.last}';
+        final candidates = lazyParentFilenameMap![parentAndFilename];
+        if (candidates != null && candidates.isNotEmpty) {
+          if (parsedRef.cueStartMs != null) {
+            final targetCue = parsedRef.cueStartMs!;
+            for (final song in candidates) {
+              if (song.cueStartMs != null &&
+                  (song.cueStartMs! - targetCue).abs() <= 500) {
+                return song;
+              }
+            }
+          } else {
+            for (final song in candidates) {
+              if (song.cueStartMs == null) {
+                return song;
+              }
+            }
+          }
+        }
+      }
+
+      // 4. Unique filename fallback (lazy init, keyed by (filename, cueStartMs))
+      final filename = segments.isNotEmpty ? segments.last : '';
+      if (filename.isNotEmpty) {
+        if (lazyUniqueFilenameMap == null) {
+          final map = <String, List<SongsTableData>>{};
+          for (final item in getSongSegments()) {
+            final segs = item.segments;
+            final fName = segs.isNotEmpty ? segs.last.toLowerCase() : '';
+            if (fName.isNotEmpty) {
+              (map[fName] ??= []).add(item.song);
+            }
+          }
+          lazyUniqueFilenameMap = map;
+        }
+        final candidates = lazyUniqueFilenameMap![filename];
+        if (candidates != null && candidates.isNotEmpty) {
+          if (parsedRef.cueStartMs != null) {
+            final targetCue = parsedRef.cueStartMs!;
+            final matching = candidates
+                .where((s) =>
+                    s.cueStartMs != null &&
+                    (s.cueStartMs! - targetCue).abs() <= 500)
+                .toList();
+            if (matching.length == 1) {
+              return matching.first;
+            }
+          } else {
+            final matching =
+                candidates.where((s) => s.cueStartMs == null).toList();
+            if (matching.length == 1) {
+              return matching.first;
+            }
+          }
+        }
+      }
+      return null;
+    }
+
+    final unmatchedPaths = <String>{};
+    int restoredFavoritesCount = 0;
+    int restoredPlaylistsCount = 0;
+    int restoredHistoryCount = 0;
+    int restoredExcludedCount = 0;
+    int restoredDownloadsCount = 0;
+
+    // Wrap ALL DB restore phases in one single database transaction
+    await _db.transaction(() async {
+      // 0. Seed online / YTM tracks
+      if (onlineSeedList.isNotEmpty) {
         for (final meta in onlineSeedList) {
           final rawRemoteId = meta['remoteId'];
           final remoteId = rawRemoteId is String ? rawRemoteId.trim() : null;
@@ -575,97 +672,20 @@ class ImportBackupUseCase {
               pathMap[row.path] = row;
               pathMap[row.path.toLowerCase()] = row;
               remoteIdMap[videoId] = row;
+              lazySongSegments = null;
+              lazyParentFilenameMap = null;
+              lazyUniqueFilenameMap = null;
             }
           }
         }
-      });
-    }
-
-    Map<String, SongsTableData>? lazyParentFilenameMap;
-    Map<String, SongsTableData>? lazyUniqueFilenameMap;
-    List<({SongsTableData song, List<String> segments})>? lazySongSegments;
-
-    List<({SongsTableData song, List<String> segments})> getSongSegments() {
-      return lazySongSegments ??= allSongs.map((s) {
-        return (song: s, segments: s.path.replaceAll('\\', '/').split('/'));
-      }).toList();
-    }
-
-    SongsTableData? matchPath(String rawRef) {
-      final parsedRef = _parseSongRef(rawRef);
-      final ref = parsedRef.cueStartMs == null
-          ? rawRef
-          : _composeSongRef(parsedRef.path, parsedRef.cueStartMs);
-      // 1. Exact or normalized path/chapter-ref match
-      final direct = pathMap[ref] ?? pathMap[ref.toLowerCase()];
-      if (direct != null) return direct;
-      final path = parsedRef.path;
-
-      // 2. Fallback for ytmusic:// paths matching by remoteId
-      if (path.startsWith('ytmusic://')) {
-        final videoId = path.replaceFirst('ytmusic://', '').split('?').first;
-        final remoteMatch = remoteIdMap[videoId];
-        if (remoteMatch != null) return remoteMatch;
       }
 
-      final normPath = path.replaceAll('\\', '/').toLowerCase();
-      final segments = normPath.split('/');
-
-      // 3. Parent + Filename fallback (lazy init)
-      if (segments.length >= 2) {
-        if (lazyParentFilenameMap == null) {
-          final map = <String, SongsTableData>{};
-          for (final item in getSongSegments()) {
-            final segs = item.segments;
-            if (segs.length >= 2) {
-              final key =
-                  '${segs[segs.length - 2].toLowerCase()}/${segs.last.toLowerCase()}';
-              map[key] = item.song;
-            }
-          }
-          lazyParentFilenameMap = map;
-        }
-        final parentAndFilename =
-            '${segments[segments.length - 2]}/${segments.last}';
-        final match = lazyParentFilenameMap![parentAndFilename];
-        if (match != null) return match;
-      }
-
-      // 4. Unique filename fallback (lazy init)
-      final filename = segments.isNotEmpty ? segments.last : '';
-      if (filename.isNotEmpty) {
-        if (lazyUniqueFilenameMap == null) {
-          final countMap = <String, int>{};
-          final nameMap = <String, SongsTableData>{};
-          for (final item in getSongSegments()) {
-            final segs = item.segments;
-            final fName = segs.isNotEmpty ? segs.last.toLowerCase() : '';
-            if (fName.isNotEmpty) {
-              countMap[fName] = (countMap[fName] ?? 0) + 1;
-              nameMap[fName] = item.song;
-            }
-          }
-          lazyUniqueFilenameMap = {
-            for (final entry in nameMap.entries)
-              if (countMap[entry.key] == 1) entry.key: entry.value
-          };
-        }
-        final match = lazyUniqueFilenameMap![filename];
-        if (match != null) return match;
-      }
-      return null;
-    }
-
-    final unmatchedPaths = <String>{};
-
-    // 1. Restore Favorites (Transaction 1)
-    int restoredFavoritesCount = 0;
-    if (data['favorites'] != null && data['favorites'] is List) {
-      final favList = (data['favorites'] as List)
-          .whereType<String>()
-          .where((p) => p.trim().isNotEmpty)
-          .toList();
-      await _db.transaction(() async {
+      // 1. Restore Favorites
+      if (data['favorites'] != null && data['favorites'] is List) {
+        final favList = (data['favorites'] as List)
+            .whereType<String>()
+            .where((p) => p.trim().isNotEmpty)
+            .toList();
         for (final path in favList) {
           final matchedSong = matchPath(path);
           if (matchedSong != null) {
@@ -677,20 +697,17 @@ class ImportBackupUseCase {
             unmatchedPaths.add(path);
           }
         }
-      });
-    }
+      }
 
-    // 2. Restore Playlists (Transaction per playlist)
-    int restoredPlaylistsCount = 0;
-    if (data['playlists'] != null && data['playlists'] is List) {
-      final playlistsList = data['playlists'] as List;
-      final existingPlaylistsRes = await _repository.getPlaylists();
-      final existingList = existingPlaylistsRes.fold(
-          (l) => <PlaylistsTableData>[], (r) => r.toList());
+      // 2. Restore Playlists
+      if (data['playlists'] != null && data['playlists'] is List) {
+        final playlistsList = data['playlists'] as List;
+        final existingPlaylistsRes = await _repository.getPlaylists();
+        final existingList = existingPlaylistsRes.fold(
+            (l) => <PlaylistsTableData>[], (r) => r.toList());
 
-      for (final item in playlistsList) {
-        if (item is Map<String, dynamic> && item.containsKey('name')) {
-          await _db.transaction(() async {
+        for (final item in playlistsList) {
+          if (item is Map<String, dynamic> && item.containsKey('name')) {
             final rawName = item['name'];
             final name = rawName is String && rawName.trim().isNotEmpty
                 ? rawName
@@ -759,12 +776,151 @@ class ImportBackupUseCase {
               }
               restoredPlaylistsCount++;
             }
-          });
+          }
         }
       }
-    }
 
-    // 3. Restore Settings (No DB transaction required)
+      // 3. Restore Play History
+      if (data['playHistory'] != null && data['playHistory'] is List) {
+        final historyList = data['playHistory'] as List;
+        for (final item in historyList) {
+          if (item is Map<String, dynamic>) {
+            final rawPath = item['path'];
+            final path = rawPath is String ? rawPath : null;
+            final rawPlayCount = item['playCount'];
+            final playCount = rawPlayCount is num ? rawPlayCount.toInt() : 0;
+            final rawLastPlayed = item['lastPlayed'];
+            final lastPlayed =
+                rawLastPlayed is num ? rawLastPlayed.toInt() : null;
+
+            if (path != null && path.isNotEmpty) {
+              final matched = matchPath(path);
+              if (matched != null) {
+                final mergedCount = playCount > matched.playCount
+                    ? playCount
+                    : matched.playCount;
+                final mergedLastPlayed =
+                    (lastPlayed != null && matched.lastPlayed != null)
+                        ? (lastPlayed > matched.lastPlayed!
+                            ? lastPlayed
+                            : matched.lastPlayed!)
+                        : (lastPlayed ?? matched.lastPlayed);
+                await (_db.update(_db.songsTable)
+                      ..where((t) => t.id.equals(matched.id)))
+                    .write(
+                  SongsTableCompanion(
+                    playCount: Value(mergedCount),
+                    lastPlayed: Value(mergedLastPlayed),
+                  ),
+                );
+                if (mergedLastPlayed != null && mergedLastPlayed > 0) {
+                  final existingHist = await (_db.select(_db.playHistoryTable)
+                        ..where((h) => h.songId.equals(matched.id))
+                        ..limit(1))
+                      .getSingleOrNull();
+                  if (existingHist == null) {
+                    await _db.into(_db.playHistoryTable).insert(
+                          PlayHistoryTableCompanion.insert(
+                            songId: matched.id,
+                            playedAt: Value(
+                              DateTime.fromMillisecondsSinceEpoch(
+                                mergedLastPlayed < 10000000000
+                                    ? mergedLastPlayed * 1000
+                                    : mergedLastPlayed,
+                              ),
+                            ),
+                          ),
+                        );
+                  }
+                }
+                restoredHistoryCount++;
+              } else {
+                unmatchedPaths.add(path);
+              }
+            }
+          }
+        }
+      }
+
+      // 4. Restore Excluded Folders
+      if (data['excludedFolders'] != null && data['excludedFolders'] is List) {
+        final folderList =
+            (data['excludedFolders'] as List).whereType<String>().toList();
+        final existingExcluded = await _repository.getExcludedFolderPaths();
+        final existingPaths =
+            existingExcluded.fold((l) => <String>[], (r) => r).toSet();
+
+        for (final path in folderList) {
+          if (path.isNotEmpty && !existingPaths.contains(path)) {
+            await _repository.toggleFolderExclusion(path);
+            restoredExcludedCount++;
+          }
+        }
+      }
+
+      // 5. Restore Downloads Metadata
+      if (data['downloads'] != null && data['downloads'] is List) {
+        final dlList = data['downloads'] as List;
+        for (final item in dlList) {
+          if (item is Map<String, dynamic>) {
+            final rawPath = item['path'];
+            final path = rawPath is String ? rawPath : null;
+            final rawRemoteId = item['remoteId'];
+            final remoteId = rawRemoteId is String ? rawRemoteId : null;
+            final matched = matchPath(path ?? '') ??
+                (remoteId != null ? remoteIdMap[remoteId] : null);
+            if (matched != null && !matched.isDownloaded) {
+              await (_db.update(_db.songsTable)
+                    ..where((t) => t.id.equals(matched.id)))
+                  .write(const SongsTableCompanion(isDownloaded: Value(true)));
+              restoredDownloadsCount++;
+            }
+          }
+        }
+      }
+
+      // 6. Restore saved queue (paths resolved against the fresh library).
+      if (data['queue'] is Map<String, dynamic>) {
+        final q = data['queue'] as Map<String, dynamic>;
+        final paths = (q['paths'] is List)
+            ? (q['paths'] as List).whereType<String>().toList()
+            : <String>[];
+        final rawIdx = q['currentIndex'];
+        final idx = rawIdx is num ? rawIdx.toInt() : 0;
+        final rawPosMs = q['positionMs'];
+        final posMs = rawPosMs is num ? rawPosMs.toInt() : 0;
+        if (paths.isNotEmpty) {
+          final resolved = <({SongsTableData song, int originalIndex})>[];
+          for (var i = 0; i < paths.length; i++) {
+            final matched = matchPath(paths[i]);
+            if (matched == null) {
+              unmatchedPaths.add(paths[i]);
+            } else {
+              resolved.add((song: matched, originalIndex: i));
+            }
+          }
+          if (resolved.isNotEmpty) {
+            final currentOriginal = idx.clamp(0, paths.length - 1);
+            var currentOrdinal =
+                resolved.indexWhere((e) => e.originalIndex == currentOriginal);
+            if (currentOrdinal == -1) currentOrdinal = 0;
+            await _db.delete(_db.queueItemsTable).go();
+            for (var order = 0; order < resolved.length; order++) {
+              await _db.into(_db.queueItemsTable).insert(
+                    QueueItemsTableCompanion.insert(
+                      songId: resolved[order].song.id,
+                      orderIndex: order,
+                      isCurrent: Value(order == currentOrdinal),
+                      positionMs: Value(order == currentOrdinal ? posMs : 0),
+                    ),
+                  );
+            }
+          }
+        }
+      }
+    });
+
+    // APPLY SharedPreferences writes ONLY after commit:
     int restoredSettingsCount = 0;
     if (data['settings'] is Map<String, dynamic>) {
       final settings = data['settings'] as Map<String, dynamic>;
@@ -900,34 +1056,44 @@ class ImportBackupUseCase {
         'customThemeRadius': 'setting_custom_theme_radius',
       }.entries) {
         final value = settings[entry.key];
-        if (value is num) {
-          await prefs.setDouble(entry.value, value.toDouble());
-          restoredSettingsCount++;
-        }
-      }
-      for (final entry in <String, String>{
-        'visualDensityMode': PrefsKeys.visualDensityMode,
-        'miniPlayerSwipeLeft': 'setting_mini_player_swipe_left',
-        'miniPlayerSwipeRight': 'setting_mini_player_swipe_right',
-        'nowPlayingDoubleTap': 'setting_now_playing_double_tap',
-        'nowPlayingArtworkSwipe': 'setting_now_playing_artwork_swipe',
-        'dockStackMode': PrefsKeys.dockStackMode,
-      }.entries) {
-        final value = settings[entry.key];
-        if (value is String) {
-          await prefs.setString(entry.value, value);
-          restoredSettingsCount++;
-        }
-      }
-      for (final entry in <String, String>{
-        'themeScheduleStart': 'setting_theme_schedule_start',
-        'themeScheduleEnd': 'setting_theme_schedule_end',
-      }.entries) {
-        final value = settings[entry.key];
         if (value is int) {
           await prefs.setInt(entry.value, value);
           restoredSettingsCount++;
         }
+      }
+      for (final entry in <String, String>{
+        'headphoneSafety': PrefsKeys.headphoneSafetyEnabled,
+        'soundFeedback': PrefsKeys.soundFeedbackEnabled,
+      }.entries) {
+        final value = settings[entry.key];
+        if (value is bool) {
+          await prefs.setBool(entry.value, value);
+          restoredSettingsCount++;
+        }
+      }
+      if (settings.containsKey('themeScheduleStart')) {
+        final v = settings['themeScheduleStart'];
+        if (v is int) {
+          await prefs.setInt('setting_theme_schedule_start', v);
+          restoredSettingsCount++;
+        }
+      }
+      if (settings.containsKey('themeScheduleEnd')) {
+        final v = settings['themeScheduleEnd'];
+        if (v is int) {
+          await prefs.setInt('setting_theme_schedule_end', v);
+          restoredSettingsCount++;
+        }
+      }
+      if (settings['audioDoseBudget'] is num) {
+        await prefs.setDouble('audio_dose_budget',
+            (settings['audioDoseBudget'] as num).toDouble());
+        restoredSettingsCount++;
+      }
+      if (settings['dockStackMode'] is String) {
+        await prefs.setString(
+            PrefsKeys.dockStackMode, settings['dockStackMode']);
+        restoredSettingsCount++;
       }
       if (settings['dspPreference'] is String) {
         await prefs.setString(
@@ -944,12 +1110,16 @@ class ImportBackupUseCase {
             'setting_download_quality', settings['downloadQuality']);
         restoredSettingsCount++;
       }
-      if (settings['isLosslessMode'] is bool) {
-        await prefs.setBool('setting_lossless', settings['isLosslessMode']);
+      if (settings.containsKey('isLosslessMode')) {
+        await prefs.setBool(
+            'setting_lossless', settings['isLosslessMode'] == true);
         restoredSettingsCount++;
       }
-      if (settings['eqEnabled'] is bool) {
-        await prefs.setBool(PrefsKeys.eqEnabled, settings['eqEnabled']);
+      // EQ keys: restored through the live EqualizerManager keys so audio
+      // applies the backup's EQ immediately without an app restart.
+      if (settings.containsKey('eqEnabled')) {
+        await prefs.setBool(
+            PrefsKeys.eqEnabled, settings['eqEnabled'] == true);
         restoredSettingsCount++;
       }
       if (settings['eqGains'] is String) {
@@ -975,18 +1145,18 @@ class ImportBackupUseCase {
         restoredSettingsCount++;
       }
       if (settings['eqCustom32Frequencies'] is String) {
-        await prefs.setString(
-            PrefsKeys.eqCustom32Frequencies, settings['eqCustom32Frequencies']);
+        await prefs.setString(PrefsKeys.eqCustom32Frequencies,
+            settings['eqCustom32Frequencies']);
         restoredSettingsCount++;
       }
       if (settings['eqCustom64Frequencies'] is String) {
-        await prefs.setString(
-            PrefsKeys.eqCustom64Frequencies, settings['eqCustom64Frequencies']);
+        await prefs.setString(PrefsKeys.eqCustom64Frequencies,
+            settings['eqCustom64Frequencies']);
         restoredSettingsCount++;
       }
       if (settings['playbackSpeed'] is num) {
-        await prefs.setDouble('setting_playback_speed',
-            (settings['playbackSpeed'] as num).toDouble());
+        await prefs.setDouble(
+            'setting_playback_speed', (settings['playbackSpeed'] as num).toDouble());
         restoredSettingsCount++;
       }
 
@@ -1109,93 +1279,6 @@ class ImportBackupUseCase {
           error: e, stackTrace: st, category: 'Backup');
     }
 
-    // 4. Restore Play History (Batched Transactions of 100)
-    int restoredHistoryCount = 0;
-    if (data['playHistory'] != null && data['playHistory'] is List) {
-      final historyList = data['playHistory'] as List;
-      for (var i = 0; i < historyList.length; i += 100) {
-        final batch =
-            historyList.sublist(i, math.min(i + 100, historyList.length));
-        await _db.transaction(() async {
-          for (final item in batch) {
-            if (item is Map<String, dynamic>) {
-              final rawPath = item['path'];
-              final path = rawPath is String ? rawPath : null;
-              final rawPlayCount = item['playCount'];
-              final playCount = rawPlayCount is num ? rawPlayCount.toInt() : 0;
-              final rawLastPlayed = item['lastPlayed'];
-              final lastPlayed =
-                  rawLastPlayed is num ? rawLastPlayed.toInt() : null;
-
-              if (path != null && path.isNotEmpty) {
-                final matched = matchPath(path);
-                if (matched != null) {
-                  // Merge with max to avoid restore reducing play counts incremented since backup
-                  final mergedCount = playCount > matched.playCount
-                      ? playCount
-                      : matched.playCount;
-                  final mergedLastPlayed =
-                      (lastPlayed != null && matched.lastPlayed != null)
-                          ? (lastPlayed > matched.lastPlayed!
-                              ? lastPlayed
-                              : matched.lastPlayed!)
-                          : (lastPlayed ?? matched.lastPlayed);
-                  await (_db.update(_db.songsTable)
-                        ..where((t) => t.id.equals(matched.id)))
-                      .write(
-                    SongsTableCompanion(
-                      playCount: Value(mergedCount),
-                      lastPlayed: Value(mergedLastPlayed),
-                    ),
-                  );
-                  if (mergedLastPlayed != null && mergedLastPlayed > 0) {
-                    final existingHist = await (_db.select(_db.playHistoryTable)
-                          ..where((h) => h.songId.equals(matched.id))
-                          ..limit(1))
-                        .getSingleOrNull();
-                    if (existingHist == null) {
-                      await _db.into(_db.playHistoryTable).insert(
-                            PlayHistoryTableCompanion.insert(
-                              songId: matched.id,
-                              playedAt: Value(
-                                DateTime.fromMillisecondsSinceEpoch(
-                                  mergedLastPlayed < 10000000000
-                                      ? mergedLastPlayed * 1000
-                                      : mergedLastPlayed,
-                                ),
-                              ),
-                            ),
-                          );
-                    }
-                  }
-                  restoredHistoryCount++;
-                } else {
-                  unmatchedPaths.add(path);
-                }
-              }
-            }
-          }
-        });
-      }
-    }
-
-    // 5. Restore Excluded Folders
-    int restoredExcludedCount = 0;
-    if (data['excludedFolders'] != null && data['excludedFolders'] is List) {
-      final folderList =
-          (data['excludedFolders'] as List).whereType<String>().toList();
-      final existingExcluded = await _repository.getExcludedFolderPaths();
-      final existingPaths =
-          existingExcluded.fold((l) => <String>[], (r) => r).toSet();
-
-      for (final path in folderList) {
-        if (path.isNotEmpty && !existingPaths.contains(path)) {
-          await _repository.toggleFolderExclusion(path);
-          restoredExcludedCount++;
-        }
-      }
-    }
-
     // 6. Restore Custom EQ Profiles
     int restoredEqProfilesCount = 0;
     final prefs = await SharedPreferences.getInstance();
@@ -1224,30 +1307,6 @@ class ImportBackupUseCase {
         ErrorLogger.log('Failed restoring automation rules',
             error: e, stackTrace: st, category: 'Backup');
       }
-    }
-
-    // 8. Restore Downloads Metadata
-    int restoredDownloadsCount = 0;
-    if (data['downloads'] != null && data['downloads'] is List) {
-      final dlList = data['downloads'] as List;
-      await _db.transaction(() async {
-        for (final item in dlList) {
-          if (item is Map<String, dynamic>) {
-            final rawPath = item['path'];
-            final path = rawPath is String ? rawPath : null;
-            final rawRemoteId = item['remoteId'];
-            final remoteId = rawRemoteId is String ? rawRemoteId : null;
-            final matched = matchPath(path ?? '') ??
-                (remoteId != null ? remoteIdMap[remoteId] : null);
-            if (matched != null && !matched.isDownloaded) {
-              await (_db.update(_db.songsTable)
-                    ..where((t) => t.id.equals(matched.id)))
-                  .write(const SongsTableCompanion(isDownloaded: Value(true)));
-              restoredDownloadsCount++;
-            }
-          }
-        }
-      });
     }
 
     // 9. Restore per-song data (v3 keys; merged, never clobbered). Backup keys
@@ -1325,56 +1384,6 @@ class ImportBackupUseCase {
     } catch (e, st) {
       ErrorLogger.log('Failed restoring v2 profile blobs',
           error: e, stackTrace: st, category: 'Backup');
-    }
-
-    // 10. Restore saved queue (paths resolved against the fresh library).
-    if (data['queue'] is Map<String, dynamic>) {
-      final q = data['queue'] as Map<String, dynamic>;
-      final paths = (q['paths'] is List)
-          ? (q['paths'] as List).whereType<String>().toList()
-          : <String>[];
-      final rawIdx = q['currentIndex'];
-      final idx = rawIdx is num ? rawIdx.toInt() : 0;
-      final rawPosMs = q['positionMs'];
-      final posMs = rawPosMs is num ? rawPosMs.toInt() : 0;
-      if (paths.isNotEmpty) {
-        try {
-          // Resolve every path BEFORE replacing the existing queue: clearing
-          // first and then failing to match a single path left the user with
-          // no queue at all after a restore.
-          final resolved = <({SongsTableData song, int originalIndex})>[];
-          for (var i = 0; i < paths.length; i++) {
-            final matched = matchPath(paths[i]);
-            if (matched == null) {
-              unmatchedPaths.add(paths[i]);
-            } else {
-              resolved.add((song: matched, originalIndex: i));
-            }
-          }
-          if (resolved.isNotEmpty) {
-            final currentOriginal = idx.clamp(0, paths.length - 1);
-            var currentOrdinal =
-                resolved.indexWhere((e) => e.originalIndex == currentOriginal);
-            if (currentOrdinal == -1) currentOrdinal = 0;
-            await _db.transaction(() async {
-              await _db.delete(_db.queueItemsTable).go();
-              for (var order = 0; order < resolved.length; order++) {
-                await _db.into(_db.queueItemsTable).insert(
-                      QueueItemsTableCompanion.insert(
-                        songId: resolved[order].song.id,
-                        orderIndex: order,
-                        isCurrent: Value(order == currentOrdinal),
-                        positionMs: Value(order == currentOrdinal ? posMs : 0),
-                      ),
-                    );
-              }
-            });
-          }
-        } catch (e, st) {
-          ErrorLogger.log('Failed restoring queue',
-              error: e, stackTrace: st, category: 'Backup');
-        }
-      }
     }
 
     // 11. Live store refresh: ratings/BPM/EQ/volume/bookmarks/DSP snapshots

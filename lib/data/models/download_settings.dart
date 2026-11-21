@@ -8,12 +8,18 @@ class DownloadSettings {
   final int maxConcurrent; // 1..5
   final String? downloadLocation; // SAF uri or null for default Music/
 
-  const DownloadSettings({
+  DownloadSettings({
     this.wifiOnly = false,
     this.quality = 'high',
-    this.maxConcurrent = 3,
+    int maxConcurrent = 3,
     this.downloadLocation,
-  });
+  }) : maxConcurrent = maxConcurrent.clamp(1, 5);
+
+  const DownloadSettings.defaults()
+      : wifiOnly = false,
+        quality = 'high',
+        maxConcurrent = 3,
+        downloadLocation = null;
 
   static const _kWifi = 'setting_wifi_only_mode';
   static const _kQuality = 'setting_download_quality';
@@ -40,19 +46,24 @@ class DownloadSettings {
       // FIX-A10: Log via ErrorLogger and return default settings
       ErrorLogger.log('DownloadSettings.load failed',
           error: e, stackTrace: st, category: 'DownloadSettings');
-      return const DownloadSettings();
+      return const DownloadSettings.defaults();
     }
   }
 
   Future<void> save() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_kWifi, wifiOnly);
-    await prefs.setString(_kQuality, quality);
-    await prefs.setInt(_kConcurrency, maxConcurrent.clamp(1, 5));
-    if (downloadLocation != null) {
-      await prefs.setString(_kLocation, downloadLocation!);
-    } else {
-      await prefs.remove(_kLocation);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_kWifi, wifiOnly);
+      await prefs.setString(_kQuality, quality);
+      await prefs.setInt(_kConcurrency, maxConcurrent.clamp(1, 5));
+      if (downloadLocation != null) {
+        await prefs.setString(_kLocation, downloadLocation!);
+      } else {
+        await prefs.remove(_kLocation);
+      }
+    } catch (e, st) {
+      ErrorLogger.log('DownloadSettings.save failed',
+          error: e, stackTrace: st, category: 'DownloadSettings');
     }
   }
 

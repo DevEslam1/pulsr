@@ -119,14 +119,18 @@ struct UsbAudioSinkTestAccess {
         for (size_t i = 0; i < count; ++i) out[i] = sink.ring_[(startByte + i) % capBytes];
         return out;
     }
-    static void preparePull(UsbAudioSink& sink, int mode, int bufferMs) {
+    static void preparePull(UsbAudioSink& sink, int mode, int bufferMs,
+                            int sampleRate = 48000, int maxFramesPerPacket = 480) {
         sink.renderMode_ = mode;
-        sink.sampleRate_ = 48000;
+        sink.sampleRate_ = sampleRate;
         sink.channels_ = 2;
         sink.bytesPerSample_ = 2;
         sink.validBitDepth_ = 16;
-        sink.maxFramesPerPacket_ = 480;
+        sink.maxFramesPerPacket_ = maxFramesPerPacket;
         sink.frameAccumulator_ = 0;
+        sink.feedbackEndpoint_ = 0;
+        sink.feedbackPacketSize_ = 0;
+        sink.feedbackRatePerSec_.store(sampleRate);
         sink.underrunCount_.store(0);
         sink.overrunCount_.store(0);
         sink.channelMismatchFrames_.store(0);
@@ -138,18 +142,47 @@ struct UsbAudioSinkTestAccess {
         sink.producerOwner_.store(0);
         sink.producerRawDepth_.store(mode == 1 ? 16 : 0);
         const int storageBytes = mode == 2 ? 4 : 2;
-        sink.pullRenderer_.Configure(48000, 2, storageBytes, bufferMs);
+        sink.pullRenderer_.Configure(sampleRate, 2, storageBytes, bufferMs);
         sink.asrcOutAvail_ = 0;
         if (mode == 2) {
             sink.asrc_.configure(2, 32, 256);
-            const size_t packetFloor = 2048;
-            sink.asrcOut_.assign((packetFloor + 64) * 2, 0.0f);
-            sink.asrcPack_.assign(packetFloor * 2, 0.0f);
-            sink.asrcInputCapacityFrames_ = 1024;
-            sink.asrcIn_.assign(1024 * 2, 0.0f);
-            sink.asrcRawScratchFrames_ = 8192;
-            sink.asrcRawScratch_.assign(8192 * 2, 0.0f);
+            sink.allocateAsrcBuffers();
         }
+    }
+    static void setFeedbackState(UsbAudioSink& sink, int endpoint, int ratePerSec) {
+        sink.feedbackEndpoint_ = endpoint;
+        sink.feedbackRatePerSec_.store(ratePerSec, std::memory_order_relaxed);
+    }
+    static double computeAsrcRatio(const UsbAudioSink& sink) {
+        return sink.computeAsrcRatio();
+    }
+    static double asrcRatio(const UsbAudioSink& sink) {
+        return sink.asrc_.ratio();
+    }
+    static bool asrcBypassed(const UsbAudioSink& sink) {
+        return sink.asrc_.bypassed();
+    }
+    static int pullFillMs(const UsbAudioSink& sink) {
+        return sink.pullRenderer_.fillMs();
+    }
+    static size_t asrcPackSize(const UsbAudioSink& sink) {
+        return sink.asrcPack_.size();
+    }
+    static size_t asrcOutSize(const UsbAudioSink& sink) {
+        return sink.asrcOut_.size();
+    }
+    static bool configureFeedback(UsbAudioSink& sink, const uint8_t* cfg, size_t len,
+                                  int iface, int alt, bool disableExplicit,
+                                  int* outEp, int* outPktSize) {
+        sink.interfaceNumber_ = iface;
+        sink.altSetting_ = alt;
+        sink.disableExplicitFeedback_ = disableExplicit;
+        sink.feedbackEndpoint_ = 0x7F;   // sentinel to prove overwrite/zeroing
+        sink.feedbackPacketSize_ = 0x7F; // sentinel to prove overwrite/zeroing
+        const bool ok = sink.configureFeedbackFromDescriptor(cfg, len);
+        if (outEp) *outEp = sink.feedbackEndpoint_;
+        if (outPktSize) *outPktSize = sink.feedbackPacketSize_;
+        return ok;
     }
     static bool writePull(UsbAudioSink& sink, const void* src, int frames) {
         return sink.pullRenderer_.write(src, frames);
@@ -1264,6 +1297,187 @@ int main() {
         Access::stopPull(sink);
 
         pullChecks = 13;
+    }
+
+    // ---- Phase 1: ASRC live clock-drift ratio, feedback tuning & sizing ---
+    {
+        using Access = pulsr::UsbAudioSinkTestAccess;
+        using pulsr::UsbAsrcClockSync;
+        auto& sink = UsbAudioSink::instance();
+
+        // 1) Explicit feedback endpoint ratio tracking & clamping.
+        Access::preparePull(sink, /*mode=*/2, /*bufferMs=*/100, /*sampleRate=*/48000,
+                            /*maxFramesPerPacket=*/480);
+        std::vector<float> tone(4800 * 2);
+        for (size_t f = 0; f < 4800; ++f) {
+            const float v = 0.25f * std::sin(2.0f * 3.14159265f * 1000.0f *
+                                             static_cast<float>(f) / 48000.0f);
+            tone[f * 2] = v;
+            tone[f * 2 + 1] = v;
+        }
+        check(Access::writePull(sink, tone.data(), 4800),
+              "ASRC ratio test prefill write must succeed");
+
+        // Nominal feedback rate => exact 1.0 ratio.
+        Access::setFeedbackState(sink, 0x83, 48000);
+        check(std::fabs(Access::computeAsrcRatio(sink) - 1.0) < 1e-12,
+              "nominal feedback rate must produce unity ASRC ratio");
+
+        // +500 ppm fast DAC => ratio 1.0005, applied live by fillAsrcPacket().
+        Access::setFeedbackState(sink, 0x83, 48024);
+        check(std::fabs(Access::computeAsrcRatio(sink) - (48024.0 / 48000.0)) < 1e-12,
+              "positive feedback drift must compute ratio > 1.0");
+        std::vector<uint8_t> pkt(480 * 2 * 2, 0);
+        int depth = 99;
+        const uint64_t allocsBefore = gAllocations.load();
+        const size_t nBytes = Access::fillAsrc(sink, pkt.data(), 480, depth);
+        const uint64_t allocsAfter = gAllocations.load();
+        check(nBytes == pkt.size() && depth == 0,
+              "live-ratio ASRC packet fill must emit exact byte count and depth 0");
+        check(allocsBefore == allocsAfter,
+              "live-ratio ASRC packet fill must perform zero heap allocations");
+        check(!Access::asrcBypassed(sink) &&
+                  std::fabs(Access::asrcRatio(sink) - (48024.0 / 48000.0)) < 1e-12,
+              "fillAsrcPacket must apply live feedback ratio instead of staying in 1:1 bypass");
+
+        // -500 ppm slow DAC => ratio 0.9995.
+        Access::setFeedbackState(sink, 0x83, 47976);
+        (void)Access::fillAsrc(sink, pkt.data(), 480, depth);
+        check(std::fabs(Access::asrcRatio(sink) - (47976.0 / 48000.0)) < 1e-12,
+              "negative feedback drift must apply ratio < 1.0");
+
+        // Extreme feedback rates must clamp cleanly to [kMinRatio, kMaxRatio].
+        Access::setFeedbackState(sink, 0x83, 60000);
+        check(Access::computeAsrcRatio(sink) == UsbAsrcClockSync::kMaxRatio,
+              "excessive positive feedback rate must clamp to kMaxRatio");
+        Access::setFeedbackState(sink, 0x83, 30000);
+        check(Access::computeAsrcRatio(sink) == UsbAsrcClockSync::kMinRatio,
+              "excessive negative feedback rate must clamp to kMinRatio");
+        Access::setFeedbackState(sink, 0x83, 0);
+        check(Access::computeAsrcRatio(sink) == 1.0,
+              "zero feedback rate must fall back to unity ratio");
+
+        // 2) No feedback endpoint => reservoir fillMs() vs midpoint fallback.
+        Access::preparePull(sink, /*mode=*/2, /*bufferMs=*/100, /*sampleRate=*/48000,
+                            /*maxFramesPerPacket=*/480);
+        Access::setFeedbackState(sink, 0, 48000);
+        // Empty reservoir (0 ms vs 50 ms midpoint) => clamped to kMaxRatio.
+        check(Access::pullFillMs(sink) == 0 &&
+                  Access::computeAsrcRatio(sink) == UsbAsrcClockSync::kMaxRatio,
+              "empty reservoir without feedback must steer ratio to kMaxRatio");
+
+        // Fill to 100 ms (2x midpoint) => clamped to kMinRatio.
+        check(Access::writePull(sink, tone.data(), 4800),
+              "100 ms reservoir fill write must succeed");
+        check(Access::pullFillMs(sink) == 100 &&
+                  Access::computeAsrcRatio(sink) == UsbAsrcClockSync::kMinRatio,
+              "full reservoir without feedback must steer ratio to kMinRatio");
+        // Above-midpoint (80 ms vs 50 ms): pull 20 ms -> fillMs ~78 -> ratio < 1.0.
+        std::vector<uint8_t> drainPkt(480 * 2 * 2, 0);
+        (void)Access::fillAsrc(sink, drainPkt.data(), 480, depth);
+        check(Access::asrcRatio(sink) == UsbAsrcClockSync::kMinRatio,
+              "fillAsrcPacket must apply reservoir-derived ratio before processing");
+        const double highFillRatio = Access::computeAsrcRatio(sink);
+        check(highFillRatio < 1.0 && highFillRatio >= UsbAsrcClockSync::kMinRatio,
+              "above-midpoint reservoir fill must compute ratio < 1.0 within clamp");
+
+        // Drain below midpoint (<= 30 ms).
+        while (Access::pullFillMs(sink) > 30) {
+            (void)Access::fillAsrc(sink, drainPkt.data(), 480, depth);
+        }
+        const double lowFillRatio = Access::computeAsrcRatio(sink);
+        check(lowFillRatio > 1.0 && lowFillRatio <= UsbAsrcClockSync::kMaxRatio,
+              "below-midpoint reservoir fill must compute ratio > 1.0 within clamp");
+        (void)Access::fillAsrc(sink, drainPkt.data(), 480, depth);
+        check(Access::asrcRatio(sink) > 1.0 &&
+                  Access::asrcRatio(sink) <= UsbAsrcClockSync::kMaxRatio,
+              "fillAsrcPacket must track low reservoir fill with ratio > 1.0");
+
+        // Exact midpoint check (50 ms of 100 ms buffer -> ratio == 1.0).
+        Access::preparePull(sink, /*mode=*/2, /*bufferMs=*/100, /*sampleRate=*/48000,
+                            /*maxFramesPerPacket=*/480);
+        Access::setFeedbackState(sink, 0, 48000);
+        check(Access::writePull(sink, tone.data(), 2400),
+              "50 ms midpoint fill write must succeed");
+        check(Access::pullFillMs(sink) == 50 &&
+                  std::fabs(Access::computeAsrcRatio(sink) - 1.0) < 1e-12,
+              "exact reservoir midpoint must compute unity ASRC ratio");
+
+        // 3) disableExplicitFeedback_ vs malformed & valid feedback descriptors.
+        std::vector<uint8_t> validFb = {9, 0x02, 0, 0, 1, 1, 0, 0x80, 50};
+        pushInterface(validFb, 1, 1, 0x01, 0x02, 2);
+        validFb.insert(validFb.end(), {7, 0x05, 0x01, 0x05, 192, 0, 1});
+        validFb.insert(validFb.end(), {7, 0x05, 0x83, 0x11, 4, 0, 1});
+        setConfigLength(validFb);
+
+        int ep = -1, pktSz = -1;
+        check(Access::configureFeedback(sink, validFb.data(), validFb.size(), 1, 1,
+                                        /*disableExplicit=*/false, &ep, &pktSz) &&
+                  ep == 0x83 && pktSz == 4,
+              "valid feedback descriptor with tuning off must keep endpoint and packet size");
+        check(Access::configureFeedback(sink, validFb.data(), validFb.size(), 1, 1,
+                                        /*disableExplicit=*/true, &ep, &pktSz) &&
+                  ep == 0 && pktSz == 0,
+              "disableExplicitFeedback_ on valid descriptor must zero both endpoint and packet size");
+
+        // Malformed descriptors MUST still fail even when disableExplicitFeedback_ is true.
+        std::vector<uint8_t> truncatedFb(validFb.begin(), validFb.end() - 3);
+        check(!Access::configureFeedback(sink, truncatedFb.data(), truncatedFb.size(), 1, 1,
+                                         /*disableExplicit=*/true, &ep, &pktSz) &&
+                  ep == 0 && pktSz == 0,
+              "disableExplicitFeedback_ must NOT mask a truncated configuration descriptor");
+        auto badCountFb = validFb;
+        badCountFb[13] = 3; // bNumEndpoints mismatch
+        check(!Access::configureFeedback(sink, badCountFb.data(), badCountFb.size(), 1, 1,
+                                         /*disableExplicit=*/true, &ep, &pktSz) &&
+                  ep == 0 && pktSz == 0,
+              "disableExplicitFeedback_ must NOT mask a malformed bNumEndpoints descriptor");
+        check(!Access::configureFeedback(sink, nullptr, 0, 1, 1,
+                                         /*disableExplicit=*/true, &ep, &pktSz) &&
+                  ep == 0 && pktSz == 0,
+              "disableExplicitFeedback_ must NOT mask a null configuration descriptor");
+
+        // 4) High-rate ASRC buffer sizing: packetFloor = std::max(maxFramesPerPacket_, 2048).
+        Access::preparePull(sink, /*mode=*/2, /*bufferMs=*/50, /*sampleRate=*/48000,
+                            /*maxFramesPerPacket=*/480);
+        check(Access::asrcPackSize(sink) == 2048u * 2u &&
+                  Access::asrcOutSize(sink) == (2048u + 64u) * 2u,
+              "standard-rate ASRC buffers must use the 2048-frame floor");
+
+        // 768 kHz with 10 ms service interval => nominal 7680, maxFramesPerPacket = 7681.
+        constexpr int kHighRate = 768000;
+        constexpr int kHighRateMaxFrames = 7681;
+        Access::preparePull(sink, /*mode=*/2, /*bufferMs=*/30, /*sampleRate=*/kHighRate,
+                            /*maxFramesPerPacket=*/kHighRateMaxFrames);
+        check(Access::asrcPackSize(sink) == static_cast<size_t>(kHighRateMaxFrames) * 2u &&
+                  Access::asrcOutSize(sink) ==
+                      static_cast<size_t>(kHighRateMaxFrames + 64) * 2u,
+              "high-rate 10 ms ASRC buffers must grow to maxFramesPerPacket_ without truncation");
+        // Stream a full 7681-frame packet at 768 kHz with live +500 ppm ratio.
+        const int hiFillFrames = 20000; // ~26 ms (> 80% of 30 ms prefill)
+        std::vector<float> hiTone(static_cast<size_t>(hiFillFrames) * 2u);
+        for (int f = 0; f < hiFillFrames; ++f) {
+            const float v = 0.25f * std::sin(2.0f * 3.14159265f * 1000.0f *
+                                             static_cast<float>(f) /
+                                             static_cast<float>(kHighRate));
+            hiTone[static_cast<size_t>(f) * 2u] = v;
+            hiTone[static_cast<size_t>(f) * 2u + 1u] = v;
+        }
+        check(Access::writePull(sink, hiTone.data(), hiFillFrames),
+              "768 kHz ASRC reservoir prefill write must succeed");
+        Access::setFeedbackState(sink, 0x83, kHighRate + 384); // +500 ppm
+        std::vector<uint8_t> hiOut(static_cast<size_t>(kHighRateMaxFrames) * 2u * 2u, 0);
+        depth = 99;
+        const uint64_t hiAllocsBefore = gAllocations.load();
+        const size_t hiBytes = Access::fillAsrc(sink, hiOut.data(), kHighRateMaxFrames, depth);
+        const uint64_t hiAllocsAfter = gAllocations.load();
+        bool hiNonZero = false;
+        for (uint8_t b : hiOut) hiNonZero = hiNonZero || b != 0;
+        check(hiBytes == hiOut.size() && depth == 0 && hiNonZero &&
+                  Access::underruns(sink) == 0 && hiAllocsBefore == hiAllocsAfter,
+              "high-rate 7681-frame ASRC packet must fill cleanly with zero underruns and zero allocations");
+
+        Access::stopPull(sink);
     }
 
     if (gFailures != 0) {

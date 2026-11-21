@@ -1,10 +1,7 @@
 // lib/domain/models/audio_quality_info.dart
-import 'package:material_ui/material_ui.dart';
 import '../../core/constants/audio_formats.dart';
-import '../../data/audio/mqa_decoder_helper.dart';
-import '../../data/db/app_database.dart';
+import 'song_source.dart';
 import 'ytm_audio_quality.dart';
-import 'package:pulsr/core/constants/app_colors.dart';
 
 enum AudioQualityTier {
   hiResLossless,
@@ -15,15 +12,8 @@ enum AudioQualityTier {
 }
 
 class AudioQualityInfo {
-  /// Whether the most recent DSD (DSF/DFF) track was routed through the DoP
-  /// (DSD over PCM) encoder rather than decoded to PCM. Written by
-  /// [DsdDecoderHelper] only after it has confirmed a compatible USB DAC, so
-  /// the quality sheet reports the transport that is actually in use.
-  static bool dsdDopActive = false;
-
-  /// Whether the most recent DSD (DSF/DFF) track was routed via Direct Native DSD
-  /// (raw bitstream without DoP encapsulation). Written by [DsdDecoderHelper].
-  static bool dsdNativeActive = false;
+  final bool dsdDopActive;
+  final bool dsdNativeActive;
 
   final String format;
   final String codecName;
@@ -36,8 +26,6 @@ class AudioQualityInfo {
   final String tierLabel;
   final String shortBadgeLabel;
   final String description;
-  final Color badgeColor;
-  final IconData icon;
 
   const AudioQualityInfo({
     required this.format,
@@ -51,8 +39,8 @@ class AudioQualityInfo {
     required this.tierLabel,
     required this.shortBadgeLabel,
     required this.description,
-    required this.badgeColor,
-    required this.icon,
+    this.dsdDopActive = false,
+    this.dsdNativeActive = false,
   });
 
   /// The audio rendering pipeline configuration based on source format and bit-depth.
@@ -70,15 +58,18 @@ class AudioQualityInfo {
   }
 
   factory AudioQualityInfo.fromSong(
-    SongsTableData? song, {
+    dynamic song, {
     int? explicitSampleRate,
     int? explicitBitDepth,
     int? explicitBitrateKbps,
     String? explicitFormat,
     YtmAudioQuality? streamingQuality,
+    bool isConfirmedMqa = false,
+    bool dsdDopActive = false,
+    bool dsdNativeActive = false,
   }) {
     if (song == null) {
-      return const AudioQualityInfo(
+      return AudioQualityInfo(
         format: 'AUDIO',
         codecName: 'Standard Audio',
         bitrateKbps: null,
@@ -89,25 +80,33 @@ class AudioQualityInfo {
         tierLabel: 'Standard Audio',
         shortBadgeLabel: 'STANDARD',
         description: 'Standard stereo audio playback',
-        badgeColor: AppColors.slate,
-        icon: Icons.graphic_eq_rounded,
+        dsdDopActive: dsdDopActive,
+        dsdNativeActive: dsdNativeActive,
       );
     }
 
-    final path = song.path.toLowerCase();
+    final String path = (song.path as String?)?.toLowerCase() ?? '';
+    final String? songSource = song.source as String?;
+    final bool? isDownloaded = song.isDownloaded as bool?;
+    final int? songBitrate = song.bitrateKbps as int?;
+    final String? songCodec = song.codec as String?;
+    final int? songSampleRate = song.sampleRate as int?;
+    final int? songBitDepth = song.bitDepth as int?;
+    final int? songFileSize = song.fileSize as int?;
+    final int songDurationMs = (song.durationMs as int?) ?? 0;
 
     // Internet Radio live stream
     // A net-library file is finite and seekable: its loopback URL must not be
     // misread as a live radio stream because a folder happens to be called
     // "radio".
-    final bool isNetLibraryFile = song.source == SongSource.remote;
+    final bool isNetLibraryFile = songSource == SongSource.remote;
     final bool isRadio = !isNetLibraryFile &&
-        (song.source == SongSource.radio ||
-        path.startsWith('radio://') ||
-        ((path.startsWith('http://') || path.startsWith('https://')) &&
-            (path.contains('/radio') || path.contains('radio.'))));
+        (songSource == SongSource.radio ||
+            path.startsWith('radio://') ||
+            ((path.startsWith('http://') || path.startsWith('https://')) &&
+                (path.contains('/radio') || path.contains('radio.'))));
     if (isRadio) {
-      final kbps = explicitBitrateKbps ?? song.bitrateKbps;
+      final kbps = explicitBitrateKbps ?? songBitrate;
       return AudioQualityInfo(
         format: 'RADIO',
         codecName: 'Internet Radio Stream',
@@ -119,20 +118,18 @@ class AudioQualityInfo {
         tierLabel: 'Live Radio',
         shortBadgeLabel: 'Radio',
         description: 'Live internet radio stream',
-        badgeColor: AppColors.qualityBadgeSky,
-        icon: Icons.radio_rounded,
+        dsdDopActive: dsdDopActive,
+        dsdNativeActive: dsdNativeActive,
       );
     }
 
     // YouTube Music online streaming track (not yet downloaded)
-    if ((song.source == SongSource.youtube || path.startsWith('ytmusic://')) &&
-        song.isDownloaded != true) {
+    if ((songSource == SongSource.youtube || path.startsWith('ytmusic://')) &&
+        isDownloaded != true) {
       const defaultKbps = 0;
       final kbps = explicitBitrateKbps ??
-          (song.bitrateKbps != null && song.bitrateKbps! > 0
-              ? song.bitrateKbps!
-              : defaultKbps);
-      final rawCodec = (explicitFormat ?? song.codec)?.trim();
+          (songBitrate != null && songBitrate > 0 ? songBitrate : defaultKbps);
+      final rawCodec = (explicitFormat ?? songCodec)?.trim();
       final normalizedCodec =
           rawCodec == null || rawCodec.isEmpty ? null : rawCodec.toUpperCase();
       final format = normalizedCodec == null
@@ -175,11 +172,11 @@ class AudioQualityInfo {
             ? 'YouTube Music Stream'
             : 'YouTube Music Stream ($format)',
         bitrateKbps: kbps > 0 ? kbps : null,
-        sampleRate: song.sampleRate != null && song.sampleRate! > 0
-            ? '${(song.sampleRate! / 1000).toStringAsFixed(1)} kHz'
+        sampleRate: songSampleRate != null && songSampleRate > 0
+            ? '${(songSampleRate / 1000).toStringAsFixed(1)} kHz'
             : 'Unknown',
-        bitDepth: song.bitDepth != null && song.bitDepth! > 0
-            ? '${song.bitDepth}-bit'
+        bitDepth: songBitDepth != null && songBitDepth > 0
+            ? '$songBitDepth-bit'
             : 'Unknown',
         channels: 'Not verified',
         tier: tier,
@@ -196,8 +193,8 @@ class AudioQualityInfo {
                     '${selectedQuality.toLowerCase()} quality; the exact '
                     'codec and bitrate are not verified.'
                 : 'Online stream • actual bitrate is unverified',
-        badgeColor: AppColors.qualityBadgeRose,
-        icon: Icons.wifi_tethering_rounded,
+        dsdDopActive: dsdDopActive,
+        dsdNativeActive: dsdNativeActive,
       );
     }
 
@@ -210,18 +207,18 @@ class AudioQualityInfo {
     // Prefer real, cached header values (read from the file via the tag
     // channel) over anything inferred from the filename. Explicit args (a live
     // read) win over both.
-    final int? realSampleRate = explicitSampleRate ?? song.sampleRate;
-    final int? realBitDepth = explicitBitDepth ?? song.bitDepth;
-    final String? realCodec = (explicitFormat ?? song.codec)?.toLowerCase();
+    final int? realSampleRate = explicitSampleRate ?? songSampleRate;
+    final int? realBitDepth = explicitBitDepth ?? songBitDepth;
+    final String? realCodec = (explicitFormat ?? songCodec)?.toLowerCase();
 
     // Calculate bitrate if fileSize and durationMs are available
-    int? calculatedBitrate = explicitBitrateKbps ?? song.bitrateKbps;
+    int? calculatedBitrate = explicitBitrateKbps ?? songBitrate;
     if (calculatedBitrate == null &&
-        song.fileSize != null &&
-        song.fileSize! > 0 &&
-        song.durationMs > 0) {
-      final seconds = song.durationMs / 1000.0;
-      final bits = song.fileSize! * 8.0;
+        songFileSize != null &&
+        songFileSize > 0 &&
+        songDurationMs > 0) {
+      final seconds = songDurationMs / 1000.0;
+      final bits = songFileSize * 8.0;
       calculatedBitrate = (bits / seconds / 1000.0).round();
     }
 
@@ -254,8 +251,8 @@ class AudioQualityInfo {
     // MQA is carried inside a lossless container (usually FLAC). A confirmed
     // signature scan wins; otherwise fall back to a filename/tag heuristic so
     // the badge never silently presents MQA material as plain lossless.
-    final bool isMqa = (realCodec != null && realCodec.contains('mqa')) ||
-        MqaDecoderHelper.isConfirmedMqaPath(song.path) ||
+    final bool isMqa = isConfirmedMqa ||
+        (realCodec != null && realCodec.contains('mqa')) ||
         RegExp(r'(?:^|[\s_\-\.\/])mqa(?:$|[\s_\-\.\/])', caseSensitive: false)
             .hasMatch(path);
 
@@ -268,8 +265,6 @@ class AudioQualityInfo {
     final String tierLabel;
     final String shortBadgeLabel;
     final String description;
-    final Color badgeColor;
-    final IconData icon;
     final String formatLabel;
     final String codecName;
     final String sampleRate;
@@ -304,8 +299,6 @@ class AudioQualityInfo {
             'DSD → PCM: 1-bit High Density Studio Master decoded to PCM. '
             'DoP output is off, or no compatible USB DAC is connected.';
       }
-      badgeColor = AppColors.amberDeep;
-      icon = Icons.stars_rounded;
       sampleRate =
           explicitSampleRate != null ? resolvedSampleRate : '2.8 MHz / 5.6 MHz';
       bitDepth = '1-bit DSD';
@@ -322,8 +315,6 @@ class AudioQualityInfo {
           : '$formatLabel • HI-RES';
       description =
           'Lossless source • output fidelity depends on the active playback path';
-      badgeColor = AppColors.amberDeep; // Gold Shimmer
-      icon = Icons.workspace_premium_rounded;
       sampleRate = resolvedSampleRate;
       bitDepth = resolvedBitDepth;
     } else if (isLosslessFormat) {
@@ -341,8 +332,6 @@ class AudioQualityInfo {
           : '$formatLabel • LOSSLESS';
       description =
           'Lossless source • output fidelity depends on the active playback path';
-      badgeColor = AppColors.qualityBadgeCyan; // Electric Cyan
-      icon = Icons.diamond_rounded;
       sampleRate = resolvedSampleRate;
       bitDepth = resolvedBitDepth;
     } else if (realCodec != null
@@ -360,8 +349,6 @@ class AudioQualityInfo {
       shortBadgeLabel =
           calculatedBitrate != null ? 'AAC • ${calculatedBitrate}k' : 'AAC HQ';
       description = 'High Efficiency perceptual audio compression';
-      badgeColor = AppColors.qualityBadgeSky;
-      icon = Icons.high_quality_rounded;
       sampleRate =
           resolvedSampleRate.isNotEmpty && resolvedSampleRate != '44.1 kHz'
               ? resolvedSampleRate
@@ -392,8 +379,6 @@ class AudioQualityInfo {
       description = isOpus
           ? 'Modern high-performance Opus audio stream ($kbps kbps)'
           : 'Ogg Vorbis variable bitrate audio';
-      badgeColor = AppColors.qualityBadgeIndigo;
-      icon = Icons.graphic_eq_rounded;
       sampleRate =
           resolvedSampleRate.isNotEmpty && resolvedSampleRate != '44.1 kHz'
               ? resolvedSampleRate
@@ -408,8 +393,6 @@ class AudioQualityInfo {
       description =
           'Recognized $formatLabel file. Playback requires a native decoder '
           'that is not bundled in this build, so it is not playable.';
-      badgeColor = AppColors.slate;
-      icon = Icons.extension_off_rounded;
       sampleRate = 'Unavailable';
       bitDepth = 'Unavailable';
     } else {
@@ -428,22 +411,16 @@ class AudioQualityInfo {
         tierLabel = 'High Quality $formatLabel';
         shortBadgeLabel = '$formatLabel • ${kbps}k';
         description = 'Full-frequency $kbps kbps $formatLabel playback';
-        badgeColor = AppColors.qualityBadgeBlue;
-        icon = Icons.high_quality_rounded;
       } else if (kbps >= 160) {
         tier = AudioQualityTier.standardQuality;
         tierLabel = 'Standard Quality $formatLabel';
         shortBadgeLabel = '$formatLabel • ${kbps}k';
         description = 'Standard compression audio stream';
-        badgeColor = AppColors.qualityBadgeSlate;
-        icon = Icons.graphic_eq_rounded;
       } else {
         tier = AudioQualityTier.compact;
         tierLabel = 'Compact $formatLabel';
         shortBadgeLabel = '$formatLabel • ${kbps}k';
         description = 'Compact size encoded audio';
-        badgeColor = AppColors.slate;
-        icon = Icons.audiotrack_rounded;
       }
       sampleRate = resolvedSampleRate;
       bitDepth = resolvedBitDepth;
@@ -454,7 +431,7 @@ class AudioQualityInfo {
       codecName: isMqa ? 'Master Quality Authenticated (MQA)' : codecName,
       bitrateKbps: calculatedBitrate,
       bitrateEstimated: explicitBitrateKbps == null &&
-          song.bitrateKbps == null &&
+          songBitrate == null &&
           calculatedBitrate != null,
       sampleRate: realSampleRate != null && realSampleRate > 0
           ? sampleRate
@@ -490,8 +467,8 @@ class AudioQualityInfo {
               'authenticated/native MQA rendering is not available in this '
               'build, so no authenticated MQA output is claimed.'
           : description,
-      badgeColor: isMqa ? AppColors.qualityBadgeAmber : badgeColor,
-      icon: isMqa ? Icons.verified_rounded : icon,
+      dsdDopActive: dsdDopActive,
+      dsdNativeActive: dsdNativeActive,
     );
   }
 }

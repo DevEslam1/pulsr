@@ -28,6 +28,7 @@ import java.util.logging.Logger
 class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
     private lateinit var channel: MethodChannel
     internal var context: Context? = null
+    internal var writeAudioFile: (org.jaudiotagger.audio.AudioFile) -> Unit = { AudioFileIO.write(it) }
     @Volatile
     private var backgroundExecutor: java.util.concurrent.ExecutorService = newExecutor()
     private val executorLock = Any()
@@ -357,7 +358,6 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
                     var tempFile: java.io.File? = null
                     var backupFile: java.io.File? = null
                     var verified = false
-                    var contentRestored = false
                     try {
                         val file = if (isContentUri) {
                             val uri = android.net.Uri.parse(path)
@@ -533,17 +533,7 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
                             }
                         }
 
-                        try {
-                            AudioFileIO.write(audioFile)
-                        } catch (writeEx: Exception) {
-                            // Restore backup on failed write when possible.
-                            try {
-                                if (!isContentUri && backupFile != null && backupFile.exists()) {
-                                    backupFile.copyTo(File(path), overwrite = true)
-                                }
-                            } catch (_: Exception) {}
-                            throw writeEx
-                        }
+                        writeAudioFile(audioFile)
 
                         if (isContentUri) {
                             if (file.length() <= 0L) {
@@ -611,44 +601,33 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
                             }
                         }
 
+                        val backupCreated = backupFile?.exists() == true
                         android.os.Handler(android.os.Looper.getMainLooper()).post {
                             result.success(
                                 mapOf(
                                     "ok" to true,
                                     "verified" to verified,
                                     "verifiedFields" to verifiedFields,
-                                    "backupCreated" to (backupFile?.exists() == true),
+                                    "backupCreated" to backupCreated,
                                 )
                             )
                         }
                     } catch (e: Exception) {
-                        if (isContentUri) {
-                            restoreContentUri(android.net.Uri.parse(path), backupFile)
-                            contentRestored = true
+                        backupFile?.let { backup ->
+                            if (backup.exists()) {
+                                if (isContentUri) {
+                                    restoreContentUri(android.net.Uri.parse(path), backup)
+                                } else {
+                                    runCatching { backup.copyTo(File(path), overwrite = true) }
+                                }
+                            }
                         }
                         android.os.Handler(android.os.Looper.getMainLooper()).post {
                             result.error("WRITE_TAGS_ERROR", e.message, e.stackTraceToString())
                         }
                     } finally {
                         tempFile?.let { runCatching { it.delete() } }
-                        backupFile?.let { backup ->
-                            if (verified) {
-                                runCatching { backup.delete() }
-                            } else {
-                                try {
-                                    if (backup.exists()) {
-                                        if (isContentUri) {
-                                            if (!contentRestored) {
-                                                restoreContentUri(android.net.Uri.parse(path), backup)
-                                            }
-                                        } else {
-                                            backup.copyTo(File(path), overwrite = true)
-                                        }
-                                    }
-                                    backup.delete()
-                                } catch (_: Exception) {}
-                            }
-                        }
+                        backupFile?.let { runCatching { it.delete() } }
                     }
                     }
                 }

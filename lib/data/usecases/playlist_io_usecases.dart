@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:injectable/injectable.dart';
 import 'package:path/path.dart' as p;
@@ -66,7 +67,7 @@ class PlaylistExportUseCase {
       final title =
           song.title.trim().isNotEmpty ? song.title.trim() : 'Unknown Track';
       buffer.writeln('#EXTINF:$durationSec,$artist - $title');
-      if (song.cueStartMs != null && song.cueStartMs! > 0) {
+      if (song.cueStartMs != null) {
         buffer.writeln(
             '#EXTVLCOPT:start-time=${(song.cueStartMs! / 1000.0).toStringAsFixed(3)}');
       }
@@ -125,6 +126,10 @@ class PlaylistExportUseCase {
     return buffer.toString();
   }
 
+  @visibleForTesting
+  static Future<Directory> Function() tempDirectoryProvider =
+      getTemporaryDirectory;
+
   /// Writes playlist content to a temp file and returns the file object.
   Future<File> exportToFile(
     String playlistName,
@@ -136,9 +141,21 @@ class PlaylistExportUseCase {
       PlaylistFormat.pls => generatePlsContent(songs),
       PlaylistFormat.wpl => generateWplContent(songs),
     };
-    final tempDir = await getTemporaryDirectory();
-    final sanitizedName = playlistName.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
-    final file = File('${tempDir.path}/$sanitizedName.${format.extension}');
+    Directory tempDir;
+    try {
+      tempDir = await tempDirectoryProvider();
+    } catch (_) {
+      tempDir = Directory.systemTemp;
+    }
+    var sanitizedName = playlistName.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_').trim();
+    if (sanitizedName.isEmpty || sanitizedName == '.' || sanitizedName == '..') {
+      sanitizedName = 'playlist';
+    }
+    final targetPath = p.normalize(p.join(tempDir.path, '$sanitizedName.${format.extension}'));
+    if (!p.isWithin(tempDir.path, targetPath)) {
+      throw ArgumentError('Invalid playlist file destination: $targetPath');
+    }
+    final file = File(targetPath);
     await file.writeAsString(content);
     return file;
   }
@@ -379,8 +396,18 @@ class PlaylistImportUseCase {
       final normalizedMap = <String, SongsTableData>{};
       final filenameMap = <String, SongsTableData>{};
       final filenameCounts = <String, int>{};
+      final cueTracksByNormPath = <String, List<SongsTableData>>{};
+      final cueTracksByFilename = <String, List<SongsTableData>>{};
 
       for (final song in allSongs) {
+        if (song.cueStartMs != null) {
+          final norm = song.path.replaceAll('\\', '/').toLowerCase();
+          final fname = norm.split('/').last;
+          cueTracksByNormPath.putIfAbsent(norm, () => []).add(song);
+          if (fname.isNotEmpty) {
+            cueTracksByFilename.putIfAbsent(fname, () => []).add(song);
+          }
+        }
         if (song.cueFile != null && song.cueStartMs == null) continue;
         exactMap[song.path] = song;
         final normPath = song.path.replaceAll('\\', '/').toLowerCase();
@@ -437,22 +464,19 @@ class PlaylistImportUseCase {
 
         SongsTableData? matchedSong;
         if (targetCueStartMs != null) {
-          for (final song in allSongs) {
-            if (song.cueStartMs != null &&
-                (song.cueStartMs! - targetCueStartMs).abs() <= 500) {
-              final songNorm = song.path.replaceAll('\\', '/').toLowerCase();
-              if (song.path == path ||
-                  songNorm == normPath ||
-                  songNorm.split('/').last == filename) {
-                matchedSong = song;
-                break;
-              }
+          final candidates = cueTracksByNormPath[normPath] ??
+              cueTracksByFilename[filename] ??
+              const <SongsTableData>[];
+          for (final candidate in candidates) {
+            if ((candidate.cueStartMs! - targetCueStartMs).abs() <= 500) {
+              matchedSong = candidate;
+              break;
             }
           }
+          // Never fall back to exactMap/normalizedMap/filenameMap when targetCueStartMs != null
+        } else {
+          matchedSong = exactMap[path] ?? normalizedMap[normPath] ?? filenameMap[filename];
         }
-
-        matchedSong ??=
-            exactMap[path] ?? normalizedMap[normPath] ?? filenameMap[filename];
 
         if (matchedSong != null) {
           matchedSongIds.add(matchedSong.id);
@@ -467,7 +491,12 @@ class PlaylistImportUseCase {
         (failure) async => Left(failure),
         (playlistId) async {
           if (matchedSongIds.isNotEmpty) {
-            await _repository.addSongsToPlaylist(playlistId, matchedSongIds);
+            final addRes =
+                await _repository.addSongsToPlaylist(playlistId, matchedSongIds);
+            final failure = addRes.fold((f) => f, (_) => null);
+            if (failure != null) {
+              return Left(failure);
+            }
           }
 
           return Right(

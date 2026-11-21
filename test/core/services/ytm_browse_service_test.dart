@@ -346,6 +346,46 @@ void main() {
       );
     });
 
+    test('refreshSection keeps existing cached items when refresh returns empty',
+        () async {
+      var now = DateTime(2026, 1, 1);
+      final clocked = YtmBrowseService(ytm, clock: () => now);
+      stubAll(charts: 3, releases: 2, moods: 2);
+      final first = await clocked.getHomeFeed();
+      final charts = first.first;
+      final initialFetchTime = clocked.lastFetchTime;
+
+      now = now.add(const Duration(hours: 2));
+      when(() => ytm.getCharts(limit: 15)).thenAnswer((_) async => const []);
+      when(() => ytm.trending(limit: 15)).thenAnswer((_) async => const []);
+      when(() => ytm.searchWithFallback('Top Global Hits', limit: 15))
+          .thenAnswer((_) async => const []);
+
+      final refreshed = await clocked.refreshSection(charts);
+      expect(refreshed.items, isEmpty);
+
+      final cached = await clocked.getHomeFeed();
+      expect(cached.first.items, hasLength(3));
+      expect(clocked.lastFetchTime, initialFetchTime);
+    });
+
+    test('refreshSection updates lastFetchTime when items are non-empty',
+        () async {
+      var now = DateTime(2026, 1, 1);
+      final clocked = YtmBrowseService(ytm, clock: () => now);
+      stubAll(charts: 2, releases: 1, moods: 1);
+      final first = await clocked.getHomeFeed();
+      expect(clocked.lastFetchTime, now);
+
+      now = now.add(const Duration(hours: 3));
+      when(() => ytm.getCharts(limit: 15))
+          .thenAnswer((_) async => [_track(99)]);
+
+      final refreshed = await clocked.refreshSection(first.first);
+      expect(refreshed.items.single.id, 'video99');
+      expect(clocked.lastFetchTime, now);
+    });
+
     test('concurrent callers share one in-flight fetch', () async {
       final charts = Completer<List<YtmTrack>>();
       final releases = Completer<List<YtmTrack>>();

@@ -91,6 +91,7 @@ class _MultichannelBassCardState extends State<MultichannelBassCard> {
         _lfeRedirectBass = eq.lfeRedirectBass;
       } else {
         final prefs = await SharedPreferences.getInstance();
+        if (!mounted) return;
         _channelManagerEnabled =
             prefs.getBool(PrefsKeys.channelManagerEnabled) ?? false;
         _channelCount =
@@ -169,9 +170,12 @@ class _MultichannelBassCardState extends State<MultichannelBassCard> {
         await AudioEffectsChannel()
             .setChannelManagerEnabled(enabled, channelCount: _channelCount);
         final prefs = await SharedPreferences.getInstance();
+        if (!mounted) return;
         await prefs.setBool(PrefsKeys.channelManagerEnabled, enabled);
       }
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('Failed to toggle channel manager',
+          error: e, stackTrace: st, category: 'ChannelManager');
       if (mounted) setState(() => _channelManagerEnabled = !enabled);
     }
   }
@@ -224,6 +228,7 @@ class _MultichannelBassCardState extends State<MultichannelBassCard> {
         );
         await channel.setLfeCrossoverEnabled(targetLfeEnabled);
         final prefs = await SharedPreferences.getInstance();
+        if (!mounted) return;
         await prefs.setInt(
             PrefsKeys.channelManagerChannelCount, layout.channelCount);
         await prefs.setInt(PrefsKeys.lfeChannelIndex, targetLfeIndex);
@@ -264,12 +269,16 @@ class _MultichannelBassCardState extends State<MultichannelBassCard> {
           delayMs: delayMs ?? _channelDelays[channel],
         );
         final prefs = await SharedPreferences.getInstance();
+        if (!mounted) return;
         await prefs.setString(
             PrefsKeys.channelManagerTrims, json.encode(_channelTrims));
         await prefs.setString(
             PrefsKeys.channelManagerDelays, json.encode(_channelDelays));
       }
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Failed to set channel param',
+          error: e, stackTrace: st, category: 'ChannelManager');
+    }
   }
 
   Future<void> _setLfeCrossover({
@@ -322,6 +331,7 @@ class _MultichannelBassCardState extends State<MultichannelBassCard> {
         await AudioEffectsChannel()
             .setLfeCrossoverEnabled(targetEnabled);
         final prefs = await SharedPreferences.getInstance();
+        if (!mounted) return;
         await prefs.setBool(PrefsKeys.lfeCrossoverEnabled, targetEnabled);
         await prefs.setDouble(PrefsKeys.lfeCrossoverHz, targetCrossover);
         await prefs.setDouble(PrefsKeys.lfeLowPassHz, targetLowPass);
@@ -330,7 +340,10 @@ class _MultichannelBassCardState extends State<MultichannelBassCard> {
         await prefs.setInt(PrefsKeys.lfeChannelIndex, targetLfeIndex);
         await prefs.setBool(PrefsKeys.lfeRedirectBass, targetRedirect);
       }
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Failed to set LFE crossover',
+          error: e, stackTrace: st, category: 'ChannelManager');
+    }
   }
 
   void _showInfo(AudioFeatureInfo info) {
@@ -367,6 +380,7 @@ class _MultichannelBassCardState extends State<MultichannelBassCard> {
         (c) => c?.state.currentOutputDevice);
     final isMultichannel =
         widget.forceVisible || (output?.hasMultichannelOutput ?? false);
+    final hasLfe = _layout?.hasLfe ?? false;
 
     if (!isMultichannel) {
       return const SizedBox.shrink();
@@ -691,17 +705,17 @@ class _MultichannelBassCardState extends State<MultichannelBassCard> {
               ),
               const SizedBox(width: AppSpacing.xxs),
               Switch.adaptive(
-                value: !isBlocked && _lfeCrossoverEnabled,
+                value: !isBlocked && hasLfe && _lfeCrossoverEnabled,
                 activeTrackColor: p.accent,
                 activeThumbColor: p.onAccent,
-                onChanged: isBlocked
+                onChanged: (isBlocked || !hasLfe)
                     ? null
                     : (val) => _setLfeCrossover(enabled: val),
               ),
             ],
           ),
 
-          if (!isBlocked && _lfeCrossoverEnabled) ...[
+          if (!isBlocked && hasLfe && _lfeCrossoverEnabled) ...[
             const SizedBox(height: AppSpacing.sm),
             Text(
               'Linkwitz-Riley crossover applies high-pass filter to satellite channels and routes redirected low frequencies to the dedicated LFE channel.',

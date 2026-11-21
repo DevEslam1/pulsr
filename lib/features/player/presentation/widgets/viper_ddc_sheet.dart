@@ -7,8 +7,10 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart' show listEquals;
 import 'package:material_ui/material_ui.dart';
 import 'package:just_audio/just_audio.dart' hide PlayerState;
+import '../../../../core/di/injection.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/utils/safe_file_path.dart';
+import '../../../../data/audio/equalizer_manager.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/audio_feature_info.dart';
 import '../../../../core/theme/aura_theme.dart';
@@ -20,6 +22,11 @@ import 'package:pulsr/core/constants/app_typography.dart';
 
 class ViperDdcSheet extends StatefulWidget {
   const ViperDdcSheet({super.key});
+
+  @visibleForTesting
+  static void registerCustomProfile(String name, List<double> coeffs) {
+    _ViperDdcSheetState._customProfiles[name] = coeffs;
+  }
 
   @override
   State<ViperDdcSheet> createState() => _ViperDdcSheetState();
@@ -37,6 +44,36 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
   List<List<double>> _cachedBiquads = const [];
   double _cachedAvgGain = 0.0;
   PlayerCubit? _playerCubit;
+  static final Map<String, List<double>> _customProfiles = {};
+
+  List<double>? _resolveCoeffs(String profileName) {
+    if (profileName.isEmpty) return null;
+    if (_builtInProfiles.containsKey(profileName)) {
+      return _builtInProfiles[profileName];
+    }
+    if (_customProfiles.containsKey(profileName)) {
+      return _customProfiles[profileName];
+    }
+    if (getIt.isRegistered<EqualizerManager>()) {
+      final eq = getIt<EqualizerManager>();
+      if (eq.viperDdcProfileName == profileName &&
+          eq.viperDdcContent.isNotEmpty) {
+        try {
+          final parsed = eq.viperDdcContent
+              .split(RegExp(r'\s+'))
+              .where((s) => s.isNotEmpty)
+              .map(double.tryParse)
+              .whereType<double>()
+              .toList();
+          if (parsed.isNotEmpty) {
+            _customProfiles[profileName] = parsed;
+            return parsed;
+          }
+        } catch (_) {}
+      }
+    }
+    return null;
+  }
 
   @override
   void didChangeDependencies() {
@@ -233,6 +270,7 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
     }
     if (mounted) setState(() => _isPlayingTone = true);
     try {
+      final player = _tonePlayer ??= AudioPlayer();
       if (_playerCubit?.state.isPlaying == true) {
         _isPausingForSweep = true;
         _pausedMainPlaybackForSweep = true;
@@ -241,21 +279,29 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
         } finally {
           _isPausingForSweep = false;
         }
+        if (!mounted || _tonePlayer == null) return;
       }
-      _tonePlayer ??= AudioPlayer();
       final bytes = generateTestSweepWav();
       final tempDir = await getTemporaryDirectory();
+      if (!mounted || _tonePlayer == null) return;
       final file = File('${tempDir.path}/ddc_test_sweep.wav');
       await file.writeAsBytes(bytes);
-      await _tonePlayer!.setFilePath(file.path);
-      await _tonePlayer!.play();
+      if (!mounted || _tonePlayer == null) return;
+      await player.setFilePath(file.path);
+      if (!mounted || _tonePlayer == null) return;
+      await player.play();
+      if (!mounted || _tonePlayer == null) return;
       _toneSubscription?.cancel();
-      _toneSubscription = _tonePlayer!.playerStateStream.listen((ps) {
+      _toneSubscription = player.playerStateStream.listen((ps) {
         if (ps.processingState == ProcessingState.completed) {
           _stopTone();
         }
       });
     } catch (_) {
+      if (_pausedMainPlaybackForSweep) {
+        _pausedMainPlaybackForSweep = false;
+        unawaited(_playerCubit?.play());
+      }
       if (mounted) setState(() => _isPlayingTone = false);
     }
   }
@@ -268,6 +314,7 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
     } catch (_) {
       // Best-effort tone stop.
     }
+    if (!mounted) return;
     if (mounted) setState(() => _isPlayingTone = false);
     if (_pausedMainPlaybackForSweep) {
       _pausedMainPlaybackForSweep = false;
@@ -281,6 +328,7 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
         type: FileType.custom,
         allowedExtensions: ['vdc', 'txt'],
       );
+      if (!mounted) return;
       if (result != null) {
         final file = SafeFilePath.validate(result.path,
             allowedExtensions: ['vdc', 'txt']);
@@ -288,20 +336,24 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
           throw 'Invalid or inaccessible file';
         }
         final length = await file.length();
+        if (!mounted) return;
         if (length == 0 || length > 2 * 1024 * 1024) {
           throw 'Invalid file size (must be > 0 and < 2MB)';
         }
         final bytes = await file.readAsBytes();
+        if (!mounted) return;
         final coeffs = ViperDdcParser.parseBytes(bytes);
 
         if (coeffs.isNotEmpty && context.mounted) {
           final fileName = result.name
               .replaceAll(RegExp(r'\.vdc$', caseSensitive: false), '');
+          _customProfiles[fileName] = coeffs;
           await context.read<PlayerCubit>().setViperDdcEnabled(
                 true,
                 profileName: fileName,
                 coeffs: coeffs,
               );
+          if (!mounted) return;
           if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text(context.l10n.vdcLoaded(fileName))),
@@ -498,9 +550,10 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
                   // Interactive Frequency Response Curve & Tools
                   Builder(builder: (context) {
                     final activeCoeffs =
-                        _builtInProfiles[state.viperDdcProfileName] ??
+                        _resolveCoeffs(state.viperDdcProfileName) ??
                             _builtInProfiles.values.first;
-                    if (!identical(_cachedBiquadSource, activeCoeffs)) {
+                    if (!identical(_cachedBiquadSource, activeCoeffs) &&
+                        !listEquals(_cachedBiquadSource, activeCoeffs)) {
                       _cachedBiquadSource = activeCoeffs;
                       _cachedBiquads = extractBiquadSections(activeCoeffs);
                       _cachedAvgGain = averageGainDb(_cachedBiquads);

@@ -192,7 +192,7 @@ extension EqualizerEffectOps on EqualizerManager {
         mode != null ? DspParamRanges.crossfeedMode.clamp(mode) : prevMode;
 
     try {
-      if (enabled && isHrtfEnabled) {
+      if ((enabled || preferenceEnabled == true) && isHrtfEnabled) {
         // §8.9 & §9: HRTF and Crossfeed are mutually exclusive.
         await setHrtfBinaural(false);
       }
@@ -256,10 +256,16 @@ extension EqualizerEffectOps on EqualizerManager {
     final prevElevation = hrtfElevation;
     final prevSofaPath = hrtfSofaPath;
 
-    final targetAzimuth =
-        azimuth != null ? azimuth.clamp(-90.0, 90.0) : prevAzimuth;
-    final targetElevation =
-        elevation != null ? elevation.clamp(-45.0, 45.0) : prevElevation;
+    final targetAzimuth = azimuth != null
+        ? (azimuth.isFinite
+            ? azimuth.clamp(-90.0, 90.0).toDouble()
+            : prevAzimuth)
+        : prevAzimuth;
+    final targetElevation = elevation != null
+        ? (elevation.isFinite
+            ? elevation.clamp(-45.0, 45.0).toDouble()
+            : prevElevation)
+        : prevElevation;
 
     try {
       if (enabled && isCrossfeedEnabled) {
@@ -475,10 +481,30 @@ extension EqualizerEffectOps on EqualizerManager {
 
   Future<int> getPipelineLatencyFrames() =>
       _effectsChannel.getPipelineLatencyFrames();
-  Future<void> setBandSolo(int index, bool solo) =>
-      _effectsChannel.setBandSolo(index, solo);
-  Future<void> setBandMute(int index, bool mute) =>
-      _effectsChannel.setBandMute(index, mute);
+
+  Future<void> setBandSolo(int index, bool solo) async {
+    if (index < 0 || index >= activeFrequencies.length) return;
+    if (solo) {
+      soloedBands.add(index);
+    } else {
+      soloedBands.remove(index);
+    }
+    if (PlatformCapabilities.isAndroid) {
+      await _effectsChannel.setBandSolo(index, solo);
+    }
+  }
+
+  Future<void> setBandMute(int index, bool mute) async {
+    if (index < 0 || index >= activeFrequencies.length) return;
+    if (mute) {
+      mutedBands.add(index);
+    } else {
+      mutedBands.remove(index);
+    }
+    if (PlatformCapabilities.isAndroid) {
+      await _effectsChannel.setBandMute(index, mute);
+    }
+  }
 
   Future<void> setStereoBalance(double balance) async {
     stereoBalance = DspParamRanges.stereoBalance.clamp(balance);

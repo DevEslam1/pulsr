@@ -37,6 +37,7 @@ class AudioProfileBootstrap {
   bool _disposed = false;
   bool _applying = false;
   bool _lastAttached = false;
+  UsbExclusiveStatus? _pendingUsbStatus;
 
   /// Whether the startup pass ran and the status listener is installed.
   bool get isStarted => _started && !_disposed;
@@ -63,12 +64,7 @@ class AudioProfileBootstrap {
       );
     }
 
-    final report = await _apply(
-      startup: true,
-      vid: status != null && status.attached ? status.vendorId : null,
-      pid: status != null && status.attached ? status.productId : null,
-      deviceKey: _deviceKey(status),
-    );
+    _lastAttached = status?.attached ?? false;
 
     try {
       _statusSub = _usb.statusStream.listen(
@@ -91,7 +87,13 @@ class AudioProfileBootstrap {
       );
     }
 
-    _lastAttached = status?.attached ?? false;
+    final report = await _apply(
+      startup: true,
+      vid: status != null && status.attached ? status.vendorId : null,
+      pid: status != null && status.attached ? status.productId : null,
+      deviceKey: _deviceKey(status),
+    );
+
     return report;
   }
 
@@ -104,6 +106,15 @@ class AudioProfileBootstrap {
   }
 
   Future<void> _onUsbStatus(UsbExclusiveStatus status) async {
+    if (_disposed) return;
+    if (_applying) {
+      _pendingUsbStatus = status;
+      return;
+    }
+    await _handleUsbStatus(status);
+  }
+
+  Future<void> _handleUsbStatus(UsbExclusiveStatus status) async {
     if (_disposed) return;
     final bool attached = status.attached;
     if (attached == _lastAttached) return;
@@ -158,6 +169,11 @@ class AudioProfileBootstrap {
       return null;
     } finally {
       _applying = false;
+      if (_pendingUsbStatus != null && !_disposed) {
+        final pending = _pendingUsbStatus!;
+        _pendingUsbStatus = null;
+        unawaited(_handleUsbStatus(pending));
+      }
     }
   }
 

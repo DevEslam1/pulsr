@@ -178,6 +178,28 @@ class _ChainAudioHandler extends RecordingAudioHandler {
       chain.add('applyHeadphoneProfile');
 }
 
+class _HrtfSpyAudioHandler extends RecordingAudioHandler {
+  final List<bool> hrtfEnabledCalls = <bool>[];
+
+  @override
+  Future<void> setHrtfBinaural(
+    bool enabled, {
+    double? azimuth,
+    double? elevation,
+    String? sofaPath,
+    bool? preferenceEnabled,
+  }) async {
+    hrtfEnabledCalls.add(enabled);
+    await super.setHrtfBinaural(
+      enabled,
+      azimuth: azimuth,
+      elevation: elevation,
+      sofaPath: sofaPath,
+      preferenceEnabled: preferenceEnabled,
+    );
+  }
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -337,5 +359,44 @@ void main() {
         reason: 'isolation preserves the table order');
     expect(rollback.indexOf('setDynamicBass'),
         lessThan(rollback.indexOf('applyHeadphoneProfile')));
+  });
+
+  test('applyProfile disables HRTF when applying a profile', () async {
+    final handler = _HrtfSpyAudioHandler();
+    final settings = MockSettingsCubit();
+    when(() => settings.state).thenReturn(const SettingsState());
+    when(() => settings.setCrossfade(any())).thenAnswer((_) async {});
+    when(() => settings.setBitPerfectOutput(any())).thenAnswer((_) async {});
+
+    var state = PlayerState(
+      dsp: const DspSlice(
+        isHrtfEnabled: true,
+        hrtfAzimuth: 45.0,
+        hrtfElevation: 10.0,
+        hrtfSofaPath: '/custom/room.sofa',
+      ),
+    );
+
+    final controller = PlayerDspController(
+      audioHandler: handler,
+      settingsCubit: settings,
+      getState: () => state,
+      emit: (s) => state = s,
+      syncAudioEffects: ({bool force = false}) {},
+      isClosed: () => false,
+    );
+    addTearDown(controller.dispose);
+
+    final applied = await controller.applyProfile(
+      const SettingsProfile(
+        id: 'p_hrtf_reset',
+        name: 'Clean',
+        type: ProfileType.custom,
+      ),
+    );
+
+    expect(applied, isTrue);
+    expect(state.dsp.isHrtfEnabled, isFalse);
+    expect(handler.hrtfEnabledCalls, <bool>[false]);
   });
 }

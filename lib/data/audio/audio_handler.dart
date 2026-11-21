@@ -10,12 +10,13 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:injectable/injectable.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:fpdart/fpdart.dart';
 import 'package:rxdart/rxdart.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/config/app_config.dart';
-import '../../core/constants/channels.dart';
 import '../../core/constants/prefs_keys.dart';
 import '../../core/di/injection.dart';
+import '../../core/errors/failures.dart';
 import '../../core/errors/ytm_error_classifier.dart';
 import '../../core/services/battery_optimization_service.dart';
 import '../services/hires_audio_service.dart';
@@ -58,7 +59,6 @@ import 'optimized_dsp_pipeline.dart';
 import 'playback_analytics.dart';
 import 'replay_gain_math.dart';
 import 'usb_hardware_volume_curve.dart';
-import '../../domain/models/audio_quality_info.dart';
 import 'smart_preload_scheduler.dart';
 import 'stream_pre_resolver.dart';
 import 'triple_buffer_pipeline.dart';
@@ -262,6 +262,9 @@ class PulsrAudioHandler extends BaseAudioHandler
   @override
   AudioPlayer get _inactivePlayer => _isPlayerAActive ? _playerB : _playerA;
   AudioPlayer get prefetchPlayer => _prefetchPlayer;
+  @override
+  bool get _isEffectivelyPlaying =>
+      _activePlayer.playing || (nativeDsdActive && _nativeDsdPlaying);
 
   /// Returns playback position compensated for native and DSP pipeline latency.
   @override
@@ -339,6 +342,7 @@ class PulsrAudioHandler extends BaseAudioHandler
   // [_reapplyActiveVolume] / [setVolume]. The native sample-accurate gain-curve
   // fade path leaves this at 1.0 (that curve multiplies the player's base
   // volume inside the sink, so it already composes).
+  @override
   double _sleepFadeFactor = 1.0;
   // Transient system-sound duck restore timer; tracked so dispose() can cancel
   // it (previously it was an untracked Timer that could fire after dispose).
@@ -618,10 +622,10 @@ class PulsrAudioHandler extends BaseAudioHandler
   }
 
   bool _isSongDopActive(SongsTableData? song) {
-    if (song == null) return AudioQualityInfo.dsdDopActive;
+    if (song == null) return DsdDecoderHelper.dsdDopActive;
     final resolved = _resolvedDopBySongId[song.id];
     if (resolved != null) return resolved;
-    return song.id == currentSong?.id && AudioQualityInfo.dsdDopActive;
+    return song.id == currentSong?.id && DsdDecoderHelper.dsdDopActive;
   }
 
   @override
@@ -658,11 +662,11 @@ class PulsrAudioHandler extends BaseAudioHandler
     _cueStartSeeked = false;
     _cueAdvanceTriggered = false;
     _playbackStateCoordinator.resetSavedPosition();
-    final previousDop = AudioQualityInfo.dsdDopActive;
+    final previousDop = DsdDecoderHelper.dsdDopActive;
     final isDop = _resolvedDopBySongId[song.id] ?? false;
     final isNativeDsd = _resolvedNativeDsdBySongId[song.id] ?? false;
-    AudioQualityInfo.dsdDopActive = isDop;
-    AudioQualityInfo.dsdNativeActive = isNativeDsd;
+    DsdDecoderHelper.dsdDopActive = isDop;
+    DsdDecoderHelper.dsdNativeActive = isNativeDsd;
     if (isDop != _lastSyncedNativeDop) {
       unawaited(_syncDopToEffectsEngine(isDop));
     }
@@ -1761,13 +1765,17 @@ class PulsrAudioHandler extends BaseAudioHandler
     final controller = _volumeController;
     if (controller != null) {
       final perSongDb = song != null ? _perSongVolumeDbFor(song) : 0.0;
+      final boostFoldedIntoDvc = _dvcEnabled && perSongDb > 0.0;
       final target = controller.calculateTargetVolume(
         song,
         albumContext: _isConsecutiveAlbumPlayback(),
-        perSongOffsetDb: perSongDb,
+        perSongOffsetDb: boostFoldedIntoDvc ? 0.0 : perSongDb,
       );
       if (_dvcEnabled && (song == null || song.id == currentSong?.id)) {
-        unawaited(_pushDvcGain(_volume));
+        final dvcGain = boostFoldedIntoDvc
+            ? (_volume * math.pow(10.0, perSongDb / 20.0)).clamp(0.0, 4.0)
+            : _volume;
+        unawaited(_pushDvcGain(dvcGain));
       }
       return target;
     }
@@ -1907,6 +1915,17 @@ class PulsrAudioHandler extends BaseAudioHandler
     }
     try {
       final albumContext = _isConsecutiveAlbumPlayback();
+      var effectiveTrackGainDb = song.replayGainTrack;
+      if (effectiveTrackGainDb == null &&
+          song.source == SongSource.youtube &&
+          song.remoteId != null) {
+        final ytmService =
+            getIt.isRegistered<YtmService>() ? getIt<YtmService>() : null;
+        final loudnessDb = ytmService?.getLoudnessDb(song.remoteId!);
+        if (loudnessDb != null && loudnessDb.isFinite) {
+          effectiveTrackGainDb = -loudnessDb;
+        }
+      }
       final applied = await AudioEffectsChannel().setReplayGainParams(
         mode: ReplayGainMath.nativeModeFor(mode, albumContext: albumContext),
         // ReplayGain tags come from arbitrary file metadata / the scanner and
@@ -1914,13 +1933,13 @@ class PulsrAudioHandler extends BaseAudioHandler
         // sanitizes them, but the native pre-gain stage consumes the raw
         // doubles: one NaN poisons its smoothed gain for the rest of the
         // session, turning every following track into noise. Sanitize here.
-        trackGainDb: ReplayGainMath.sanitizeGainDb(song.replayGainTrack),
+        trackGainDb: ReplayGainMath.sanitizeGainDb(effectiveTrackGainDb),
         albumGainDb: ReplayGainMath.sanitizeGainDb(song.replayGainAlbum),
         trackPeak: ReplayGainMath.sanitizePeak(song.replayGainTrackPeak),
         albumPeak: ReplayGainMath.sanitizePeak(song.replayGainAlbumPeak),
         preAmpDb: ReplayGainMath.sanitizeGainDb(ReplayGainMath.nativePreAmpFor(
           mode: mode,
-          trackGainDb: song.replayGainTrack,
+          trackGainDb: effectiveTrackGainDb,
           albumGainDb: song.replayGainAlbum,
           albumContext: albumContext,
           preampWithRg:
@@ -2020,10 +2039,8 @@ class PulsrAudioHandler extends BaseAudioHandler
   }
 
   /// Sets the true low-power route on both players and persists the preference.
-  @override
   Future<void> setLowPowerRoute(bool enabled) async {
     await _equalizerManager.setLowPowerRoute(enabled);
-    await AudioEffectsChannel().setLowPowerRoute(enabled);
     await Future.wait([
       _playerA.dspSetLowPowerRoute(enabled),
       _playerB.dspSetLowPowerRoute(enabled),
@@ -2119,7 +2136,8 @@ class PulsrAudioHandler extends BaseAudioHandler
     }
     final song = currentSong;
     final now = DateTime.now();
-    if (_lastNativeRgPush == null ||
+    if (smooth ||
+        _lastNativeRgPush == null ||
         _lastNativeRgSongId != song?.id ||
         now.difference(_lastNativeRgPush!) > const Duration(seconds: 2)) {
       _lastNativeRgPush = now;
@@ -2443,6 +2461,8 @@ class PulsrAudioHandler extends BaseAudioHandler
         debugPrint(
             '[AudioHandler] Preload rejected for $key ($sizeBytes bytes)');
       },
+      onBackgroundReleaseRequested: () =>
+          _tripleBufferPipeline.clearPreload(),
     );
 
     _preloadScheduler = SmartPreloadScheduler(
@@ -3529,13 +3549,6 @@ class PulsrAudioHandler extends BaseAudioHandler
   }
 
   /// Queries the actual platform audio focus state via platform channel.
-  Future<bool> getPlatformFocusState() async {
-    try {
-      final res = await MethodChannel(PulsrChannels.audioEffects)
-          .invokeMethod<bool>('getFocusState');
-      return res ?? true;
-    } catch (_) {
-      return true;
-    }
-  }
+  Future<bool> getPlatformFocusState() =>
+      AudioEffectsChannel().getFocusState();
 }

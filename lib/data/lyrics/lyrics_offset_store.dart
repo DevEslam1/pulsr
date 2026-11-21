@@ -5,6 +5,7 @@
 // entry count; failures are swallowed as best-effort (offset is cosmetic).
 import 'dart:async';
 
+import 'package:mutex/mutex.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/utils/error_logger.dart';
 
@@ -15,29 +16,9 @@ class LyricsOffsetStore {
   static const int maxEntries = 500;
 
   /// Serializes all read-modify-write operations on [_indexKey] and writes to
-  /// SharedPreferences. Without this, two concurrent `setOffsetMs` or migration
-  /// calls can each read the same index snapshot and drop keys. Shared by every
-  /// instance because SharedPreferences itself is process-global.
-  static Future<void> _indexChain = Future<void>.value();
-  static Zone? _chainZone;
-
-  static Future<T> _synchronized<T>(Future<T> Function() action) {
-    // Detach any chain left pending by a different torn-down Zone (e.g. a
-    // sibling FakeAsync widget-test zone that exited without awaiting writes).
-    if (_chainZone != null && !identical(_chainZone, Zone.current)) {
-      _indexChain = Future<void>.value();
-    }
-    _chainZone = Zone.current;
-    final completer = Completer<T>();
-    _indexChain = _indexChain.then((_) async {
-      try {
-        completer.complete(await action());
-      } catch (e, st) {
-        completer.completeError(e, st);
-      }
-    });
-    return completer.future;
-  }
+  /// SharedPreferences. Shared by every instance because SharedPreferences itself
+  /// is process-global.
+  static final Mutex _mutex = Mutex();
 
   String _hash(String path) {
     var h1 = 0x811c9dc5;
@@ -74,26 +55,32 @@ class LyricsOffsetStore {
       final legKey = _legacyKey(path);
       final legOwner = prefs.getString('$legKey$_pathSuffix');
       if (legOwner == path) {
-        return await _synchronized(() async {
-          final currentOwner = prefs.getString('$key$_pathSuffix');
+        return await _mutex.protect(() async {
+          final p = await SharedPreferences.getInstance();
+          final currentOwner = p.getString('$key$_pathSuffix');
           if (currentOwner == path) {
-            return prefs.getInt(key) ?? 0;
+            return p.getInt(key) ?? 0;
           }
-          final val = prefs.getInt(legKey) ?? 0;
-          await prefs.setInt(key, val);
-          await prefs.setString('$key$_pathSuffix', path);
-          await prefs.remove(legKey);
-          await prefs.remove('$legKey$_pathSuffix');
-          await _appendAndEvictIndex(prefs, key);
+          final val = p.getInt(legKey) ?? 0;
+          await p.setInt(key, val);
+          await p.setString('$key$_pathSuffix', path);
+          await p.remove(legKey);
+          await p.remove('$legKey$_pathSuffix');
+          await _appendAndEvictIndex(p, key);
           return val;
         });
       }
       if (owner == null) {
         // Missing owner marker: the value cannot be attributed to this path
         // (the hash may belong to a colliding path). Treat as a miss and drop
-        // the orphan so it cannot be served to a future collision either.
+        // the orphan inside the lock so it cannot be served to a future collision either.
         if (prefs.containsKey(key)) {
-          await prefs.remove(key);
+          await _mutex.protect(() async {
+            final p = await SharedPreferences.getInstance();
+            if (p.containsKey(key) && p.getString('$key$_pathSuffix') == null) {
+              await p.remove(key);
+            }
+          });
         }
         return 0;
       }
@@ -109,7 +96,7 @@ class LyricsOffsetStore {
   Future<void> setOffsetMs(String path, int offsetMs) async {
     if (path.isEmpty) return;
     final clamped = offsetMs.clamp(-5000, 5000);
-    await _synchronized(() async {
+    await _mutex.protect(() async {
       try {
         final prefs = await SharedPreferences.getInstance();
         final key = _key(path);
@@ -144,7 +131,7 @@ class LyricsOffsetStore {
 
   Future<void> clearOffset(String path) async {
     if (path.isEmpty) return;
-    await _synchronized(() async {
+    await _mutex.protect(() async {
       try {
         final prefs = await SharedPreferences.getInstance();
         final key = _key(path);

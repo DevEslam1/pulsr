@@ -3,7 +3,6 @@ import 'package:audio_service/audio_service.dart';
 import 'package:just_audio/just_audio.dart';
 import '../../core/constants/audio_formats.dart';
 import '../../core/utils/error_logger.dart';
-import '../../domain/models/audio_quality_info.dart';
 import '../db/app_database.dart';
 import 'dsd_decoder_helper.dart';
 import 'decoder_runtime_probe.dart';
@@ -45,8 +44,8 @@ class FormatAwareDecoder {
     // and report via [onTransportResolved] so they don't clobber the currently
     // playing track's transport state.
     if (updateGlobalState) {
-      AudioQualityInfo.dsdDopActive = false;
-      AudioQualityInfo.dsdNativeActive = false;
+      DsdDecoderHelper.dsdDopActive = false;
+      DsdDecoderHelper.dsdNativeActive = false;
     }
 
     if (song.source == SongSource.youtube) {

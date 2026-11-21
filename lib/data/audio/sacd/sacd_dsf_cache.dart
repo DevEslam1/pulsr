@@ -217,18 +217,23 @@ class SacdDsfCache {
     }
     final keepPrefix = sourceStem(normalizeSourcePath(keepSourcePath));
     final entries = <_CacheEntry>[];
+    var total = 0;
     await for (final entity in dir.list(followLinks: false)) {
       if (entity is! File || !_isCacheFile(entity.path)) continue;
-      if (_baseName(entity.path).startsWith(keepPrefix)) continue;
       try {
         final stat = await entity.stat();
-        entries.add(_CacheEntry(entity, stat.modified, stat.size));
-      } catch (_) {
+        if (stat.type == FileSystemEntityType.notFound) continue;
+        total += stat.size;
+        if (!_baseName(entity.path).startsWith(keepPrefix)) {
+          entries.add(_CacheEntry(entity, stat.modified, stat.size));
+        }
+      } catch (e, st) {
         // A file that vanished between list and stat needs no eviction.
+        ErrorLogger.log('Could not stat cached SACD file during ensureRoom',
+            error: e, stackTrace: st, category: 'SacdCache');
       }
     }
     entries.sort((a, b) => a.modified.compareTo(b.modified));
-    var total = entries.fold<int>(0, (sum, entry) => sum + entry.size);
     var evicted = 0;
     for (final entry in entries) {
       if (total + requiredBytes <= byteBudget) break;
@@ -257,7 +262,9 @@ class SacdDsfCache {
       if (stat.size == expectedBytes) return true;
       await _deleteQuietly(file);
       return false;
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('isReusable check failed',
+          error: e, stackTrace: st, category: 'SacdCache');
       return false;
     }
   }

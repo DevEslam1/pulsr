@@ -8,6 +8,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:mutex/mutex.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/constants/prefs_keys.dart';
@@ -111,6 +112,7 @@ class SafeModeController {
   final SharedPreferences _prefs;
   final DateTime Function() _clock;
   final SafeModeSettingsReloader? _reloadSettings;
+  final Mutex _mutex = Mutex();
   final StreamController<SafeModeEvent> _events =
       StreamController<SafeModeEvent>.broadcast();
 
@@ -171,7 +173,10 @@ class SafeModeController {
   }
 
   /// Records one sink failure for [deviceKey] and emits the transition.
-  Future<void> recordFailure(String deviceKey, String reason) async {
+  Future<void> recordFailure(String deviceKey, String reason) =>
+      _mutex.protect(() => _recordFailureLocked(deviceKey, reason));
+
+  Future<void> _recordFailureLocked(String deviceKey, String reason) async {
     final key = normalizeDeviceKey(deviceKey);
     final next = consecutiveFailures(key) + 1;
     final saved = await _writeState(
@@ -203,7 +208,10 @@ class SafeModeController {
   /// must not keep advertising the failure it recovered from. The counter is
   /// removed last so a rejected reason removal cannot hide a live failure
   /// streak from [shouldFallback].
-  Future<void> recordSuccess(String deviceKey) async {
+  Future<void> recordSuccess(String deviceKey) =>
+      _mutex.protect(() => _recordSuccessLocked(deviceKey));
+
+  Future<void> _recordSuccessLocked(String deviceKey) async {
     final key = normalizeDeviceKey(deviceKey);
     final previous = consecutiveFailures(key);
     final hadReason = _prefs.containsKey(reasonKey(key));
@@ -235,7 +243,10 @@ class SafeModeController {
   /// before the first fallback are snapshotted so [reset] can restore them.
   /// Idempotent: running it twice leaves the same settings and never replaces
   /// the original snapshot.
-  Future<String> applyFallback(String deviceKey) async {
+  Future<String> applyFallback(String deviceKey) =>
+      _mutex.protect(() => _applyFallbackLocked(deviceKey));
+
+  Future<String> _applyFallbackLocked(String deviceKey) async {
     final key = normalizeDeviceKey(deviceKey);
     final label = deviceKey.trim().isEmpty ? key : deviceKey.trim();
     final failures = consecutiveFailures(key);
@@ -298,7 +309,10 @@ class SafeModeController {
 
   /// Clears every safe-mode record for [deviceKey] and restores the pre-fallback
   /// values captured by [applyFallback].
-  Future<void> reset(String deviceKey) async {
+  Future<void> reset(String deviceKey) =>
+      _mutex.protect(() => _resetLocked(deviceKey));
+
+  Future<void> _resetLocked(String deviceKey) async {
     final key = normalizeDeviceKey(deviceKey);
     var removed = await _restoreSnapshot(key);
     removed = await _removeKeys(<String>[

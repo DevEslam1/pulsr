@@ -63,6 +63,7 @@ extension EqualizerPresetOps on EqualizerManager {
   Future<void> resetToFlat() async {
     await _clearFirForManualEdit();
     selectedHeadphoneProfile = null;
+    await _clearBandMuteSolo();
     await setPreamp(0.0);
     await setPreset(
       const EqPreset(
@@ -76,7 +77,11 @@ extension EqualizerPresetOps on EqualizerManager {
   Future<void> startAbComparison() async {
     // Re-entry would snapshot the already-flattened state as "the original".
     if (isAbComparisonActive) return;
-    await _clearFirForManualEdit();
+    // Bypass active AutoEQ FIR temporarily without overwriting
+    // autoEqCorrectionMode or disturbing user-authored manual Arbitrary EQ.
+    if (isFirCorrectionActive) {
+      await _disableFirCorrection(persist: false);
+    }
     isAbComparisonActive = true;
     _abComparisonGains = List.from(currentPreset.gains);
     final targetFreqs = activeFrequencies;

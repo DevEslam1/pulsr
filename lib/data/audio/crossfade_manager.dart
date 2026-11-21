@@ -375,7 +375,9 @@ class CrossfadeManager {
       final applied = await pending;
       if (applied) _playersWithArmedCurves.add(player);
       return applied;
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('dspSetGainCurve failed',
+          error: e, stackTrace: st, category: 'CrossfadeManager');
       return false;
     } finally {
       if (pending != null) _pendingCurveArms.remove(pending);
@@ -387,7 +389,9 @@ class CrossfadeManager {
       final cleared = await player.dspClearGainCurve();
       if (cleared) _playersWithArmedCurves.remove(player);
       return cleared;
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('dspClearGainCurve failed',
+          error: e, stackTrace: st, category: 'CrossfadeManager');
       return false;
     }
   }
@@ -446,14 +450,26 @@ class CrossfadeManager {
       final gains = List<double>.generate(
           points, (i) => evaluateGainPair(i / (points - 1)).$1);
       nativeArmed = await _armNativeCurve(player, gains, segmentMs);
+      if (_fadeId != fadeId) {
+        _clearNativeCurve(player);
+        if (!completer.isCompleted) completer.complete();
+        return;
+      }
     } else if (_isPureFadeIn(from)) {
       final gains = List<double>.generate(
           points, (i) => evaluateGainPair(i / (points - 1)).$2);
       nativeArmed = await _armNativeCurve(player, gains, segmentMs);
+      if (_fadeId != fadeId) {
+        _clearNativeCurve(player);
+        if (!completer.isCompleted) completer.complete();
+        return;
+      }
       if (nativeArmed) {
         try {
           await player.setVolume(to.clamp(0.0, 1.0));
-        } catch (_) {
+        } catch (e, st) {
+          ErrorLogger.log('Failed to set player volume during fade-in',
+              error: e, stackTrace: st, category: 'CrossfadeManager');
           nativeArmed = false;
           _clearNativeCurve(
               player); // else the stepped fallback double-attenuates
@@ -481,7 +497,10 @@ class CrossfadeManager {
         }
         try {
           player.setVolume(to.clamp(0.0, 1.0));
-        } catch (_) {}
+        } catch (e, st) {
+          ErrorLogger.log('Failed to set final volume in fadeVolume',
+              error: e, stackTrace: st, category: 'CrossfadeManager');
+        }
         if (to > 0.0) {
           _clearNativeCurve(player);
         }
@@ -526,7 +545,10 @@ class CrossfadeManager {
         // fade-out whose player volume still reads the pre-fade value).
         try {
           player.setVolume(to.clamp(0.0, 1.0));
-        } catch (_) {}
+        } catch (e, st) {
+          ErrorLogger.log('Failed to set final volume in fadeVolume',
+              error: e, stackTrace: st, category: 'CrossfadeManager');
+        }
         if (to > 0.0) {
           _clearNativeCurve(player);
         }
@@ -684,7 +706,10 @@ class CrossfadeManager {
         try {
           active.setVolume(0.0);
           inactive.setVolume(toInactiveVol.clamp(0.0, 1.0));
-        } catch (_) {}
+        } catch (e, st) {
+          ErrorLogger.log('Failed to set exact endpoints in crossfadeVolumes',
+              error: e, stackTrace: st, category: 'CrossfadeManager');
+        }
         if (oldArmed) {
           _clearNativeCurve(active);
           _outgoingWithArmedCurve = null;

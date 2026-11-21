@@ -7,8 +7,10 @@ import 'package:flutter/services.dart';
 import 'package:injectable/injectable.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/constants/audio_formats.dart';
 import '../../core/constants/channels.dart';
+import '../../core/constants/prefs_keys.dart';
 import '../../core/di/injection.dart';
 import '../../core/services/playlist_suggestions_service.dart';
 import '../../core/utils/error_logger.dart';
@@ -85,8 +87,12 @@ class MediaScannerService {
 
   DateTime? _lastScanAt;
   int? _lastScanEpochSec;
+  DateTime? _lastOrphanPruneAt;
+  static const Duration defaultOrphanPruningInterval = Duration(days: 1);
+
   DateTime? get lastScanAt => _lastScanAt;
   int? get lastScanEpochSec => _lastScanEpochSec;
+  DateTime? get lastOrphanPruneAt => _lastOrphanPruneAt;
   bool _isEnrichingQuality = false;
   bool _isScanning = false;
   bool _cancelScanRequested = false;
@@ -108,10 +114,19 @@ class MediaScannerService {
     return DateTime.now().difference(last) >= threshold;
   }
 
-  void markScanComplete({int? epochSec}) {
+  Future<void> markScanComplete({int? epochSec}) async {
     _lastScanAt = DateTime.now();
-    _lastScanEpochSec =
+    final epoch =
         epochSec ?? DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    _lastScanEpochSec = epoch;
+    _lastOrphanPruneAt ??= _lastScanAt;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt(PrefsKeys.lastScanEpochSec, epoch);
+    } catch (e, st) {
+      ErrorLogger.log('Failed to persist last scan epoch',
+          error: e, stackTrace: st, category: 'scanner');
+    }
   }
 
   MediaScannerService(this._repository);
@@ -305,6 +320,7 @@ class MediaScannerService {
     bool autoHideSystemMedia = true,
     bool incremental = false,
     Duration wallClockBudget = const Duration(minutes: 5),
+    Duration orphanPruningInterval = defaultOrphanPruningInterval,
   }) async {
     if (_isScanning) {
       ErrorLogger.log('scanDeviceLibrary ignored: a scan is already running',
@@ -354,6 +370,19 @@ class MediaScannerService {
 
       // Filter songs for incremental scan if enabled
       List<SongModel> songsToProcess = songs;
+      if (_lastScanEpochSec == null) {
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          _lastScanEpochSec = prefs.getInt(PrefsKeys.lastScanEpochSec);
+          if (_lastScanEpochSec != null && _lastScanAt == null) {
+            _lastScanAt = DateTime.fromMillisecondsSinceEpoch(
+                _lastScanEpochSec! * 1000);
+          }
+        } catch (e, st) {
+          ErrorLogger.log('Failed to read last scan epoch',
+              error: e, stackTrace: st, category: 'scanner');
+        }
+      }
       final lastEpoch = _lastScanEpochSec;
       if (incremental && lastEpoch != null && lastEpoch > 0) {
         songsToProcess = songs.where((s) {
@@ -369,7 +398,7 @@ class MediaScannerService {
               scannedCount: 0,
               totalCount: songs.length,
               isIncremental: true);
-          markScanComplete(epochSec: scanStartEpochSec);
+          await markScanComplete(epochSec: scanStartEpochSec);
           return 0;
         }
       }
@@ -402,6 +431,10 @@ class MediaScannerService {
         try {
           final genres = await _audioQuery.queryGenres();
           for (final g in genres) {
+            if (_cancelScanRequested || stopwatch.elapsed >= wallClockBudget) {
+              truncated = true;
+              break;
+            }
             final genreName = g.genre.trim();
             if (genreName.isEmpty || genreName.toLowerCase() == '<unknown>') {
               continue;
@@ -524,9 +557,21 @@ class MediaScannerService {
       // A truncated pass has not seen the whole library, so pruning against
       // its partial valid-id set would mark/delete valid tracks. Skip both
       // destructive post-passes and leave the next scan to complete them.
-      if (!truncated && !incremental) {
+      bool shouldPruneOrphans = !incremental;
+      if (incremental) {
+        final lastPrune = _lastOrphanPruneAt;
+        if (lastPrune == null ||
+            DateTime.now().difference(lastPrune) >= orphanPruningInterval) {
+          shouldPruneOrphans = true;
+        }
+      }
+
+      if (!truncated && shouldPruneOrphans) {
+        final validIdsForCleanup = incremental
+            ? songs.map((s) => s.id).toSet()
+            : parseResult.validSongIds;
         final cleanupResult = await _repository.cleanupOrphanedSongs(
-          parseResult.validSongIds,
+          validIdsForCleanup,
           excludedFolderPrefixes: excludedFolders,
         );
         cleanupResult.fold(
@@ -534,6 +579,7 @@ class MediaScannerService {
               category: 'scanner'),
           (_) {},
         );
+        _lastOrphanPruneAt = DateTime.now();
       }
 
       // Expand sibling CUE sheets into virtual per-track rows.
@@ -567,7 +613,7 @@ class MediaScannerService {
           category: 'scanner');
 
       if (!truncated) {
-        markScanComplete(epochSec: scanStartEpochSec);
+        await markScanComplete(epochSec: scanStartEpochSec);
         scheduleAudioQualityEnrichment();
       } else {
         ErrorLogger.log(
@@ -653,7 +699,11 @@ class MediaScannerService {
         'path': path,
         'includeArtwork': false,
       });
-      if (tags == null) return;
+      if (tags == null) {
+        ErrorLogger.log('No audio tags returned for $path',
+            category: 'MediaScanner');
+        return;
+      }
 
       int? sampleRate = _asInt(tags['sampleRate']);
       int? bitDepth = _asInt(tags['bitsPerSample']);
@@ -679,21 +729,35 @@ class MediaScannerService {
           pathLower.endsWith('.m4p') ||
           pathLower.endsWith('.alac');
       if (isMp4) {
-        final mp4Probe = await Mp4BoxParser.probePath(path);
-        if (mp4Probe.hasAudioTrack) {
-          codec = mp4Probe.codec;
-          if (mp4Probe.sampleRate != null && mp4Probe.sampleRate! > 0) {
-            sampleRate = mp4Probe.sampleRate;
+        try {
+          final mp4Probe = await Mp4BoxParser.probePath(path);
+          if (mp4Probe.hasAudioTrack) {
+            codec = mp4Probe.codec;
+            if (mp4Probe.sampleRate != null && mp4Probe.sampleRate! > 0) {
+              sampleRate = mp4Probe.sampleRate;
+            }
+            if (mp4Probe.bitDepth != null && mp4Probe.bitDepth! > 0) {
+              bitDepth = mp4Probe.bitDepth;
+            } else if (mp4Probe.isAac) {
+              bitDepth = null;
+            }
+            if (mp4Probe.bitrateKbps != null && mp4Probe.bitrateKbps! > 0) {
+              bitrateKbps = mp4Probe.bitrateKbps;
+            }
           }
-          if (mp4Probe.bitDepth != null && mp4Probe.bitDepth! > 0) {
-            bitDepth = mp4Probe.bitDepth;
-          } else if (mp4Probe.isAac) {
-            bitDepth = null;
-          }
-          if (mp4Probe.bitrateKbps != null && mp4Probe.bitrateKbps! > 0) {
-            bitrateKbps = mp4Probe.bitrateKbps;
-          }
+        } catch (e, st) {
+          ErrorLogger.log('Mp4BoxParser failed for $path',
+              error: e, stackTrace: st, category: 'MediaScanner');
         }
+      }
+
+      if ((codec == null || codec.isEmpty) &&
+          (sampleRate == null || sampleRate <= 0)) {
+        ErrorLogger.log(
+          'Could not extract audio quality metadata for $path; skipping fallback write',
+          category: 'MediaScanner',
+        );
+        return;
       }
 
       await _repository.updateAudioQuality(
@@ -827,21 +891,27 @@ class MediaScannerService {
                 }
               }
 
-              updates.add((
-                songId: song.id,
-                path: song.path,
-                sampleRate:
-                    sampleRate != null && sampleRate > 0 ? sampleRate : 44100,
-                bitDepth: bitDepth != null && bitDepth > 0 ? bitDepth : null,
-                bitrateKbps:
-                    bitrateKbps != null && bitrateKbps > 0 ? bitrateKbps : null,
-                codec: (codec != null && codec.isNotEmpty)
-                    ? codec
-                    : 'UNKNOWN',
-                loudnessRange: lraVal,
-              ));
+              if ((codec != null && codec.isNotEmpty) ||
+                  (sampleRate != null && sampleRate > 0)) {
+                updates.add((
+                  songId: song.id,
+                  path: song.path,
+                  sampleRate:
+                      sampleRate != null && sampleRate > 0 ? sampleRate : 44100,
+                  bitDepth: bitDepth != null && bitDepth > 0 ? bitDepth : null,
+                  bitrateKbps:
+                      bitrateKbps != null && bitrateKbps > 0 ? bitrateKbps : null,
+                  codec: (codec != null && codec.isNotEmpty)
+                      ? codec
+                      : 'UNKNOWN',
+                  loudnessRange: lraVal,
+                ));
+              }
             }
-          } catch (_) {}
+          } catch (e, st) {
+            ErrorLogger.log('Failed to enrich audio quality for ${song.path}',
+                error: e, stackTrace: st, category: 'MediaScanner');
+          }
         }
 
         for (var i = 0; i < pendingSongs.length; i += maxConcurrentReads) {
@@ -1009,25 +1079,6 @@ _ScanMediaResult _parseScannedMediaInIsolate(_ScanMediaInput input) {
     final dateAdded = parseInt(raw['date_added']) ?? parseInt(raw['dateAdded']);
     final size = parseInt(raw['_size']) ?? parseInt(raw['size']);
 
-    final String? fileExt =
-        parseString(raw['file_extension'])?.trim().toLowerCase();
-    final String? mime =
-        (parseString(raw['mime_type']) ?? parseString(raw['mimeType']))
-            ?.trim()
-            .toLowerCase();
-    final String? displayName =
-        parseString(raw['_display_name']) ?? parseString(raw['displayName']);
-    String? initialCodec;
-    if (fileExt != null && fileExt.isNotEmpty) {
-      initialCodec = fileExt.toUpperCase();
-    } else if (mime != null && mime.isNotEmpty) {
-      initialCodec = mime.split('/').last.split(';').first.trim().toUpperCase();
-    } else if (displayName != null && displayName.contains('.')) {
-      initialCodec = displayName.split('.').last.trim().toUpperCase();
-    } else if (path.contains('.')) {
-      initialCodec = path.split('.').last.split('?').first.trim().toUpperCase();
-    }
-
     validSongIds.add(id);
 
     songCompanions.add(
@@ -1048,11 +1099,7 @@ _ScanMediaResult _parseScannedMediaInIsolate(_ScanMediaInput input) {
         fileSize: Value(size),
         genre: Value(genre),
         year: Value(year),
-        codec:
-            initialCodec == null ? const Value.absent() : const Value.absent(),
-        // (initialCodec is ignored until header read)
-        // Header-only; populated by enrichAudioQuality rather than file extension
-        // (initialCodec is ignored until header read)
+        codec: const Value.absent(),
       ),
     );
 

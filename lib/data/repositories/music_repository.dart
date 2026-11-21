@@ -1085,7 +1085,7 @@ class MusicRepository implements IMusicRepository {
   @override
   Future<Result<void>> recordPlayHistory(int songId,
       {bool completed = false}) async {
-    if (songId <= 0) {
+    if (songId == 0) {
       return const Right(null);
     }
     try {
@@ -2481,6 +2481,40 @@ class MusicRepository implements IMusicRepository {
     return companions;
   }
 
+  Future<_CueDiskCheckResult> _checkCueForContainer(
+      SongsTableData container) async {
+    final cuePath = _siblingCuePath(container.path);
+    String? effectiveCuePath;
+    String? rawCueContent;
+    var cueReadFailed = false;
+
+    if (cuePath.isNotEmpty && await File(cuePath).exists()) {
+      try {
+        rawCueContent = await File(cuePath).readAsString();
+        effectiveCuePath = cuePath;
+      } catch (_) {
+        cueReadFailed = true;
+      }
+    } else if (!_embeddedCueMisses.contains(container.path)) {
+      embeddedCueProbeCount++;
+      final embedded =
+          await CueParser.extractEmbeddedCueSheet(container.path);
+      if (embedded != null && embedded.isNotEmpty) {
+        rawCueContent = embedded;
+        effectiveCuePath = 'embedded://${container.path}';
+      } else {
+        _rememberEmbeddedCueMiss(container.path);
+      }
+    }
+
+    return _CueDiskCheckResult(
+      container: container,
+      effectiveCuePath: effectiveCuePath,
+      rawCueContent: rawCueContent,
+      cueReadFailed: cueReadFailed,
+    );
+  }
+
   @override
   Future<Result<int>> expandCueSheets() async {
     try {
@@ -2492,6 +2526,27 @@ class MusicRepository implements IMusicRepository {
                 t.path.equals('').not() &
                 t.path.like('ytmusic://%').not()))
           .get();
+
+      // Batch-fetch existing virtual rows before the loop
+      final allVirtualRows = await (_db.select(_db.songsTable)
+            ..where((t) => t.cueStartMs.isNotNull()))
+          .get();
+      final existingVirtualByPath = <String, List<SongsTableData>>{};
+      for (final row in allVirtualRows) {
+        existingVirtualByPath.putIfAbsent(row.path, () => []).add(row);
+      }
+
+      // Run disk checks outside the transaction with bounded concurrency
+      const diskCheckChunkSize = 32;
+      final diskResults = <_CueDiskCheckResult>[];
+      for (var i = 0; i < containers.length; i += diskCheckChunkSize) {
+        final end = (i + diskCheckChunkSize < containers.length)
+            ? i + diskCheckChunkSize
+            : containers.length;
+        final chunk = containers.sublist(i, end);
+        final results = await Future.wait(chunk.map(_checkCueForContainer));
+        diskResults.addAll(results);
+      }
 
       final companions = <SongsTableCompanion>[];
       final newIdsByPath = <String, List<int>>{};
@@ -2505,31 +2560,11 @@ class MusicRepository implements IMusicRepository {
       final evaluatedPaths = <String>{};
       var expanded = 0;
 
-      for (final container in containers) {
-        final cuePath = _siblingCuePath(container.path);
-        String? effectiveCuePath;
-        String? rawCueContent;
-        var cueReadFailed = false;
-        List<ChapterInfo> chapters = const [];
-
-        if (cuePath.isNotEmpty && await File(cuePath).exists()) {
-          try {
-            rawCueContent = await File(cuePath).readAsString();
-            effectiveCuePath = cuePath;
-          } catch (_) {
-            cueReadFailed = true;
-          }
-        } else if (!_embeddedCueMisses.contains(container.path)) {
-          embeddedCueProbeCount++;
-          final embedded =
-              await CueParser.extractEmbeddedCueSheet(container.path);
-          if (embedded != null && embedded.isNotEmpty) {
-            rawCueContent = embedded;
-            effectiveCuePath = 'embedded://${container.path}';
-          } else {
-            _rememberEmbeddedCueMiss(container.path);
-          }
-        }
+      for (final result in diskResults) {
+        final container = result.container;
+        final rawCueContent = result.rawCueContent;
+        final effectiveCuePath = result.effectiveCuePath;
+        final cueReadFailed = result.cueReadFailed;
 
         if (rawCueContent == null ||
             rawCueContent.isEmpty ||
@@ -2545,10 +2580,8 @@ class MusicRepository implements IMusicRepository {
         final cachedHash = _cueContentHashCache[container.path];
         // If the cue sheet content hasn't changed, reuse existing virtual tracks without re-parsing
         if (cachedHash != null && cachedHash == contentHash) {
-          final existingVirtual = await (_db.select(_db.songsTable)
-                ..where((t) =>
-                    t.path.equals(container.path) & t.cueStartMs.isNotNull()))
-              .get();
+          final existingVirtual =
+              existingVirtualByPath[container.path] ?? const [];
           if (existingVirtual.isNotEmpty) {
             newIdsByPath[container.path] =
                 existingVirtual.map((v) => v.id).toList();
@@ -2560,7 +2593,7 @@ class MusicRepository implements IMusicRepository {
           }
         }
 
-        chapters = CueParser.parse(rawCueContent);
+        final chapters = CueParser.parse(rawCueContent);
 
         if (chapters.isEmpty) {
           evaluatedPaths.add(container.path);
@@ -2610,16 +2643,6 @@ class MusicRepository implements IMusicRepository {
       }
 
       await _db.transaction(() async {
-        if (companions.isNotEmpty) {
-          await _db.batch((batch) {
-            batch.insertAllOnConflictUpdate(_db.songsTable, companions);
-          });
-        }
-        for (final entry in coverByContainerId.entries) {
-          await (_db.update(_db.songsTable)
-                ..where((t) => t.id.equals(entry.key)))
-              .write(SongsTableCompanion(cueFile: Value(entry.value)));
-        }
         // Clear the marker on containers whose cue disappeared so they return
         // to the normal library instead of being hidden forever.
         final markers = await (_db.select(_db.songsTable)
@@ -2628,21 +2651,19 @@ class MusicRepository implements IMusicRepository {
                   t.cueStartMs.isNull() &
                   t.id.isBiggerThanValue(0)))
             .get();
+        final markerIdsToClear = <int>[];
         for (final marker in markers) {
           if (coveredPaths.contains(marker.path)) continue;
           // As with virtual rows, only clear markers for containers this pass
           // actually observed; an absent SD card must not unhide a file that
           // still has its cue sheet on disk.
           if (!evaluatedPaths.contains(marker.path)) continue;
-          await (_db.update(_db.songsTable)
-                ..where((t) => t.id.equals(marker.id)))
-              .write(const SongsTableCompanion(cueFile: Value(null)));
+          markerIdsToClear.add(marker.id);
         }
+
         // Drop virtual rows that no longer belong to a live expansion.
-        final virtualRows = await (_db.select(_db.songsTable)
-              ..where((t) => t.cueStartMs.isNotNull()))
-            .get();
-        for (final row in virtualRows) {
+        final virtualIdsToDelete = <int>[];
+        for (final row in allVirtualRows) {
           // Never delete a virtual row whose container was not conclusively
           // evaluated in this pass (missing/unreadable file): the cue could
           // return on the next scan and the row still owns playlist/history
@@ -2650,19 +2671,47 @@ class MusicRepository implements IMusicRepository {
           if (!evaluatedPaths.contains(row.path)) continue;
           final keep = newIdsByPath[row.path];
           if (keep != null && keep.contains(row.id)) continue;
-          await (_db.delete(_db.songsTable)..where((t) => t.id.equals(row.id)))
-              .go();
+          virtualIdsToDelete.add(row.id);
         }
-      });
 
-      // Keep album/artist counts in step with the virtual tracks now that the
-      // container rows are hidden from listings.
-      await _db.customStatement(
-        "UPDATE albums SET song_count = (SELECT COUNT(*) FROM songs WHERE songs.album_id = albums.id AND songs.is_missing = 0 AND songs.source = '${SongSource.local}' AND songs.path NOT LIKE 'ytmusic://%' AND (songs.cue_file IS NULL OR songs.cue_start_ms IS NOT NULL));",
-      );
-      await _db.customStatement(
-        "UPDATE artists SET song_count = (SELECT COUNT(*) FROM songs WHERE songs.artist_id = artists.id AND songs.is_missing = 0 AND songs.source = '${SongSource.local}' AND songs.path NOT LIKE 'ytmusic://%' AND (songs.cue_file IS NULL OR songs.cue_start_ms IS NOT NULL));",
-      );
+        await _db.batch((batch) {
+          if (companions.isNotEmpty) {
+            batch.insertAllOnConflictUpdate(_db.songsTable, companions);
+          }
+          for (final entry in coverByContainerId.entries) {
+            batch.update(
+              _db.songsTable,
+              SongsTableCompanion(cueFile: Value(entry.value)),
+              where: (t) => t.id.equals(entry.key),
+            );
+          }
+          const batchChunkSize = 500;
+          for (var i = 0; i < markerIdsToClear.length; i += batchChunkSize) {
+            final end = (i + batchChunkSize < markerIdsToClear.length)
+                ? i + batchChunkSize
+                : markerIdsToClear.length;
+            final chunk = markerIdsToClear.sublist(i, end);
+            batch.update(
+              _db.songsTable,
+              const SongsTableCompanion(cueFile: Value(null)),
+              where: (t) => t.id.isIn(chunk),
+            );
+          }
+          for (var i = 0; i < virtualIdsToDelete.length; i += batchChunkSize) {
+            final end = (i + batchChunkSize < virtualIdsToDelete.length)
+                ? i + batchChunkSize
+                : virtualIdsToDelete.length;
+            final chunk = virtualIdsToDelete.sublist(i, end);
+            batch.deleteWhere(
+              _db.songsTable,
+              (t) => t.id.isIn(chunk),
+            );
+          }
+        });
+
+        // Keep album/artist counts in step inside the transaction.
+        await _recalculateAllAlbumAndArtistCounts();
+      });
 
       return Right(expanded);
     } catch (e) {
@@ -3130,63 +3179,61 @@ class MusicRepository implements IMusicRepository {
   }) async {
     try {
       int? survivingId;
-      // Step 1: Read + Compute outside transaction
-      final oldRow = await (_db.select(_db.songsTable)
-            ..where((t) => t.id.equals(oldId)))
-          .getSingleOrNull();
+      final fileExists = await File(newPath).exists();
 
-      // Find the row the scanner minted for the downloaded file (case-insensitive).
-      var newRow = await (_db.select(_db.songsTable)
-            ..where((t) => t.path.lower().equals(newPath.toLowerCase()))
-            ..orderBy([
-              (t) =>
-                  OrderingTerm(expression: t.dateAdded, mode: OrderingMode.desc)
-            ])
-            ..limit(1))
-          .getSingleOrNull();
+      await _db.transaction(() async {
+        final oldRow = await (_db.select(_db.songsTable)
+              ..where((t) => t.id.equals(oldId)))
+            .getSingleOrNull();
 
-      // Fallback: match on normalized metadata
-      final matchMetadata = oldRow ?? fallbackSong;
-      if (newRow == null && matchMetadata != null) {
-        newRow = await (_db.select(_db.songsTable)
-              ..where((t) =>
-                  (t.source.equals(SongSource.local) |
-                      t.isDownloaded.equals(true)) &
-                  t.path.equals('').not() &
-                  t.path.like('ytmusic://%').not() &
-                  t.title.lower().equals(matchMetadata.title.toLowerCase()) &
-                  t.artist.lower().equals(matchMetadata.artist.toLowerCase()) &
-                  t.durationMs.isBetweenValues(matchMetadata.durationMs - 5000,
-                      matchMetadata.durationMs + 5000))
+        // Find the row the scanner minted for the downloaded file (case-insensitive).
+        var newRow = await (_db.select(_db.songsTable)
+              ..where((t) => t.path.lower().equals(newPath.toLowerCase()))
               ..orderBy([
-                (t) => OrderingTerm(
-                    expression: t.dateAdded, mode: OrderingMode.desc)
+                (t) =>
+                    OrderingTerm(expression: t.dateAdded, mode: OrderingMode.desc)
               ])
               ..limit(1))
             .getSingleOrNull();
 
-        // Verify the matched row is not flagged as missing (R3-02)
-        if (newRow != null && newRow.isMissing) {
-          newRow = null;
-        }
-        // A metadata match on a *different* path that still exists is an
-        // unrelated same-title local track, not this download. Hijacking it
-        // marked that file downloaded and orphaned the new one.
-        if (newRow != null &&
-            newRow.path.toLowerCase() != newPath.toLowerCase()) {
-          var matchedPathExists = false;
-          try {
-            matchedPathExists =
-                newRow.path.isNotEmpty && await File(newRow.path).exists();
-          } catch (_) {}
-          if (matchedPathExists) newRow = null;
-        }
-      }
+        // Fallback: match on normalized metadata
+        final matchMetadata = oldRow ?? fallbackSong;
+        if (newRow == null && matchMetadata != null) {
+          newRow = await (_db.select(_db.songsTable)
+                ..where((t) =>
+                    (t.source.equals(SongSource.local) |
+                        t.isDownloaded.equals(true)) &
+                    t.path.equals('').not() &
+                    t.path.like('ytmusic://%').not() &
+                    t.title.lower().equals(matchMetadata.title.toLowerCase()) &
+                    t.artist.lower().equals(matchMetadata.artist.toLowerCase()) &
+                    t.durationMs.isBetweenValues(matchMetadata.durationMs - 5000,
+                        matchMetadata.durationMs + 5000))
+                ..orderBy([
+                  (t) => OrderingTerm(
+                      expression: t.dateAdded, mode: OrderingMode.desc)
+                ])
+                ..limit(1))
+              .getSingleOrNull();
 
-      final fileExists = await File(newPath).exists();
+          // Verify the matched row is not flagged as missing (R3-02)
+          if (newRow != null && newRow.isMissing) {
+            newRow = null;
+          }
+          // A metadata match on a *different* path that still exists is an
+          // unrelated same-title local track, not this download. Hijacking it
+          // marked that file downloaded and orphaned the new one.
+          if (newRow != null &&
+              newRow.path.toLowerCase() != newPath.toLowerCase()) {
+            var matchedPathExists = false;
+            try {
+              matchedPathExists =
+                  newRow.path.isNotEmpty && await File(newRow.path).exists();
+            } catch (_) {}
+            if (matchedPathExists) newRow = null;
+          }
+        }
 
-      // Step 2: Write phase in focused transaction
-      await _db.transaction(() async {
         final affectedAlbumIds = <int?>{oldRow?.albumId, newRow?.albumId};
         final affectedArtistIds = <int?>{oldRow?.artistId, newRow?.artistId};
 
@@ -3234,6 +3281,7 @@ class MusicRepository implements IMusicRepository {
                     stackTrace: st,
                     category: 'MusicRepository',
                   );
+                  rethrow;
                 }
               }
 
@@ -3385,7 +3433,15 @@ class MusicRepository implements IMusicRepository {
                       fromId: d.id,
                       toId: oldId,
                     );
-                  } catch (_) {}
+                  } catch (e, st) {
+                    ErrorLogger.log(
+                      'Failed to merge duplicate song row ${d.id} into $oldId',
+                      error: e,
+                      stackTrace: st,
+                      category: 'MusicRepository',
+                    );
+                    rethrow;
+                  }
                 }
                 await (_db.update(_db.songsTable)
                       ..where((t) => t.id.equals(oldId)))
@@ -3445,7 +3501,15 @@ class MusicRepository implements IMusicRepository {
                 fromId: dupe.id,
                 toId: targetId,
               );
-            } catch (_) {}
+            } catch (e, st) {
+              ErrorLogger.log(
+                'Failed to merge duplicate song row ${dupe.id} into $targetId',
+                error: e,
+                stackTrace: st,
+                category: 'MusicRepository',
+              );
+              rethrow;
+            }
           }
 
           final bestTitle = _downloadedMetadata(newData.title,
@@ -3570,6 +3634,7 @@ class MusicRepository implements IMusicRepository {
               stackTrace: st,
               category: 'MusicRepository',
             );
+            rethrow;
           }
         }
 
@@ -4092,4 +4157,18 @@ String _parentDirPath(String path) {
   final backslash = path.lastIndexOf('\\');
   final i = slash > backslash ? slash : backslash;
   return i <= 0 ? path : path.substring(0, i);
+}
+
+class _CueDiskCheckResult {
+  final SongsTableData container;
+  final String? effectiveCuePath;
+  final String? rawCueContent;
+  final bool cueReadFailed;
+
+  const _CueDiskCheckResult({
+    required this.container,
+    required this.effectiveCuePath,
+    required this.rawCueContent,
+    required this.cueReadFailed,
+  });
 }

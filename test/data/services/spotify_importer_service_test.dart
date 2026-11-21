@@ -312,6 +312,23 @@ void main() {
       expect(unmatched.unmatched.length, 1);
     });
 
+    test('resolveTracks stops and marks remaining as unmatched on cancellation', () async {
+      final mockYtmService = MockYtmService();
+      final service = SpotifyImporterService(ytmService: mockYtmService);
+
+      const isCancelled = true;
+      final result = await service.resolveTracks(
+        [
+          const SpotifyImportTrack(title: 'Track 1', artist: 'Artist 1'),
+          const SpotifyImportTrack(title: 'Track 2', artist: 'Artist 2'),
+        ],
+        isCancelled: () => isCancelled,
+      );
+
+      expect(result.resolved, isEmpty);
+      expect(result.unmatched.length, 2);
+    });
+
     test('dispose closes httpClient only when owned', () {
       final mockClient = MockClient((_) async => http.Response('', 200));
       final serviceInjected = SpotifyImporterService(httpClient: mockClient);

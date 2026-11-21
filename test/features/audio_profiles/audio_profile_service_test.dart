@@ -194,6 +194,27 @@ void main() {
       expect(report.liveStateRefreshed, isTrue);
     });
 
+    test('refreshes effects before reloading settings on live state update',
+        () async {
+      final order = <String>[];
+      final service = buildService(
+        resyncEffects: () async => order.add('resync'),
+        reloadSettings: () async => order.add('reload'),
+      );
+
+      await service.apply(
+        AudioProfile(
+          id: 'ap_order',
+          name: 'Order',
+          createdAt: clock(),
+          appVersion: '1.0.0',
+          values: <String, Object?>{PrefsKeys.eqEnabled: true},
+        ),
+      );
+
+      expect(order, <String>['resync', 'reload']);
+    });
+
     test('keeps a backup of the pre-apply values', () async {
       await prefs.setBool(PrefsKeys.eqEnabled, true);
       final service = buildService();

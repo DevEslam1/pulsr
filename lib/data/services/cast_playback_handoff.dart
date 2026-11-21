@@ -26,6 +26,9 @@ class CastPlaybackHandoff {
   void start() {
     if (_sub != null) return;
     _wasConnected = CastService().sessionStatus.connected;
+    if (_wasConnected && isLocalPlaying()) {
+      unawaited(_pause());
+    }
     unawaited(CastService().isSessionAvailable());
     _sub = CastService().sessionStream.listen(
       _onStatus,
@@ -55,12 +58,20 @@ class CastPlaybackHandoff {
   }
 
   Future<void> _pause() async {
+    _pausedByCast = true;
     try {
       await pauseLocal();
-      _pausedByCast = true;
     } catch (e, st) {
+      _pausedByCast = false;
       ErrorLogger.log('Cast handoff pause failed',
           error: e, stackTrace: st, category: 'CastPlaybackHandoff');
+      return;
+    }
+    if (!CastService().sessionStatus.connected) {
+      if (_pausedByCast) {
+        _pausedByCast = false;
+        unawaited(_resume());
+      }
     }
   }
 

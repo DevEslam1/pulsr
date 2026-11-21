@@ -1,4 +1,5 @@
 // lib/data/audio/song_rating_store.dart
+import 'dart:async';
 import 'dart:convert';
 import 'package:injectable/injectable.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -13,6 +14,11 @@ class SongRatingStore {
 
   final Map<String, int> _ratings = {};
   late final Future<void> ready;
+  final StreamController<void> _changesController =
+      StreamController<void>.broadcast();
+
+  /// Emits whenever song ratings are updated or reloaded.
+  Stream<void> get changes => _changesController.stream;
 
   SongRatingStore() {
     ready = load();
@@ -31,10 +37,14 @@ class SongRatingStore {
     // every previously saved rating.
     await ready;
     final clamped = rating.clamp(0, 5);
+    final prev = _ratings[trackKey] ?? 0;
     if (clamped == 0) {
       _ratings.remove(trackKey);
     } else {
       _ratings[trackKey] = clamped;
+    }
+    if (prev != clamped) {
+      _changesController.add(null);
     }
     await persist();
   }
@@ -54,6 +64,7 @@ class SongRatingStore {
           }
         }
       });
+      _changesController.add(null);
     } catch (e, st) {
       ErrorLogger.log('Failed to load song ratings',
           error: e, stackTrace: st, category: 'SongRatingStore');

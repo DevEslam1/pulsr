@@ -376,24 +376,12 @@ class DownloadTile extends StatelessWidget {
                                 ? null
                                 : '${(progressValue * 100).toStringAsFixed(0)}%',
                             child: progressValue != null
-                                ? Stack(
-                                    children: [
-                                      SizedBox(
-                                        height: 6,
-                                        child: LinearProgressIndicator(
-                                          value: progressValue,
-                                          backgroundColor: p.surfaceContainerHigh,
-                                          valueColor: AlwaysStoppedAnimation<Color>(p.accent),
-                                        ),
-                                      ),
-                                      PulsrProgressBar.determinate(
-                                        value: progressValue,
-                                        height: 6,
-                                        color: p.accent,
-                                        backgroundColor: p.surfaceContainerHigh,
-                                        borderRadius: AppRadii.r4All,
-                                      ),
-                                    ],
+                                ? PulsrProgressBar.determinate(
+                                    value: progressValue,
+                                    height: 6,
+                                    color: p.accent,
+                                    backgroundColor: p.surfaceContainerHigh,
+                                    borderRadius: AppRadii.r4All,
                                   )
                                 : PulsrProgressBar.indeterminate(
                                     height: 6,

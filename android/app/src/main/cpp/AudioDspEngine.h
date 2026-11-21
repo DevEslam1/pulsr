@@ -190,6 +190,7 @@ public:
     ArbitraryResponseEq& arbitraryEq() { return arbitraryEq_; }
     LiveProg& liveProg() { return liveProg_; }
     pulsr::HrtfBinaural& hrtf() { return hrtf_; }
+    int getHrtfLatencyFrames() const { return hrtf_.getLatencyFrames(); }
 
     // Measured chain-of-custody capture. Control threads arm/take windows; the
     // render thread only fills them (see CustodyVerifier.h).
@@ -476,6 +477,8 @@ private:
     ParametricEQ eq_;
     Crossfeed crossfeed_;
     LookaheadLimiter limiter_;
+    LimiterParamSet lastAppliedLimiter_;
+    bool hasLastAppliedLimiter_ = false;
     ConvolutionReverb reverb_;
     SincResampler resampler_;
 
@@ -672,6 +675,7 @@ public:
     /// objects are unconfigured and always report 0; latency must be read from
     /// the engines that actually render audio (one per NativeDspAudioProcessor).
     int getMaxPipelineLatencyFrames();
+    int getMaxHrtfLatencyFrames();
 
     float getLimiterGrDb();
     bool isLimiterActive();

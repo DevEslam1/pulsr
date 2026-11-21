@@ -229,6 +229,15 @@ class ChainOfCustodyReport {
           return 'Not Verified — samples measured identical, but the chain was '
               'not reported bit-perfect while it ran';
         }
+        final bypassLimitation = limitations
+            .cast<String?>()
+            .firstWhere((l) => l!.startsWith('directBypassPath:'),
+                orElse: () => null);
+        if (bypassLimitation != null) {
+          final bypassPath =
+              bypassLimitation.substring('directBypassPath:'.length);
+          return 'Not Verified — direct $bypassPath path bypasses DSP capture';
+        }
         return 'Not Verified — no capture window completed';
     }
   }
@@ -385,6 +394,7 @@ class ChainOfCustodyService {
     int frames = defaultWindowFrames,
     Duration timeout = defaultCollectTimeout,
     bool hashFile = true,
+    String? directBypassPath,
   }) async {
     final limitations = <String>[];
     final nativeReport = await _effectsChannel.getChainOfCustodyReport();
@@ -427,27 +437,46 @@ class ChainOfCustodyService {
       }
     }
 
-    final armResult = await _effectsChannel.armCustodyWindow(
-      frames: frames,
-      sampleRate: sourceSampleRate.toDouble(),
-      bitPerfect: bitPerfectRequested,
-      bypassCompare: bypassCompareActive,
-    );
-    final armed = armResult['armed'] == true;
-    if (!armed) {
-      final reason = armResult['reason'] ?? 'unknown';
-      limitations.add('captureArmFailed:$reason');
-      if (reason == 'unsupportedPlatform') {
-        limitations.add('captureUnsupported:unsupportedPlatform');
-      }
-    }
+    final reportedBypassPath = nativeReport['directBypassPath'] as String?;
+    final resolvedBypassPath =
+        (directBypassPath != null && directBypassPath.isNotEmpty)
+            ? directBypassPath
+            : (reportedBypassPath != null && reportedBypassPath.isNotEmpty)
+                ? reportedBypassPath
+                : (nativeReport['isLowPowerBypassed'] == true
+                    ? 'lowPowerBypass'
+                    : null);
 
     CustodyMeasurement? measurement;
-    if (armed) {
-      measurement = await _awaitWindow(timeout);
-      if (measurement == null) {
-        await _effectsChannel.cancelCustodyWindow();
-        limitations.add('noCaptureWindow:playbackIdleOrEngineUnloaded');
+    var finalReport = nativeReport;
+    if (resolvedBypassPath != null) {
+      // Verified direct/bypass routes skip AudioDspEngine::processInterleaved(),
+      // so arming a DSP capture window would always stall until timeout.
+      limitations.add('directBypassPath:$resolvedBypassPath');
+    } else {
+      final armResult = await _effectsChannel.armCustodyWindow(
+        frames: frames,
+        sampleRate: sourceSampleRate.toDouble(),
+        bitPerfect: bitPerfectRequested,
+        bypassCompare: bypassCompareActive,
+      );
+      final armed = armResult['armed'] == true;
+      if (!armed) {
+        final reason = armResult['reason'] ?? 'unknown';
+        limitations.add('captureArmFailed:$reason');
+        if (reason == 'unsupportedPlatform') {
+          limitations.add('captureUnsupported:unsupportedPlatform');
+        }
+      } else {
+        measurement = await _awaitWindow(timeout);
+        if (measurement == null) {
+          await _effectsChannel.cancelCustodyWindow();
+          limitations.add('noCaptureWindow:playbackIdleOrEngineUnloaded');
+        }
+        final refreshedReport = await _effectsChannel.getChainOfCustodyReport();
+        if (refreshedReport.isNotEmpty) {
+          finalReport = refreshedReport;
+        }
       }
     }
 
@@ -459,7 +488,7 @@ class ChainOfCustodyService {
       decoderCodec: decoderCodec,
       sourceSampleRate: sourceSampleRate,
       sourceBitDepth: sourceBitDepth,
-      nativeReport: nativeReport,
+      nativeReport: finalReport,
       contentSha256: contentSha256,
       fileSizeBytes: fileSizeBytes,
       fileModifiedMs: fileModifiedMs,

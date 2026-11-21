@@ -12,7 +12,7 @@ import 'package:pulsr/data/audio/playback_bookmark_store.dart';
 import 'package:pulsr/data/audio/ab_loop_manager.dart';
 import 'package:pulsr/data/audio/equalizer_manager.dart';
 import 'package:pulsr/data/repositories/prefs_repository.dart';
-import 'package:pulsr/domain/models/audio_quality_info.dart';
+import 'package:pulsr/data/audio/dsd_decoder_helper.dart';
 
 class MockAudioPlayer extends Mock implements AudioPlayer {}
 
@@ -51,13 +51,13 @@ void main() {
       expect(stepUp1, equals('medium'));
     });
 
-    test('B-03: AudioQualityInfo.dsdDopActive forces bit-perfect DoP state',
+    test('B-03: DsdDecoderHelper.dsdDopActive forces bit-perfect DoP state',
         () {
-      AudioQualityInfo.dsdDopActive = true;
-      expect(AudioQualityInfo.dsdDopActive, isTrue);
+      DsdDecoderHelper.dsdDopActive = true;
+      expect(DsdDecoderHelper.dsdDopActive, isTrue);
 
-      AudioQualityInfo.dsdDopActive = false;
-      expect(AudioQualityInfo.dsdDopActive, isFalse);
+      DsdDecoderHelper.dsdDopActive = false;
+      expect(DsdDecoderHelper.dsdDopActive, isFalse);
     });
 
     test(

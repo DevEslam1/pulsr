@@ -206,7 +206,11 @@ class CastService {
     try {
       _sessionAvailable =
           await _sessionChannel.invokeMethod<bool>('isAvailable') ?? false;
-    } catch (e) {
+    } catch (e, st) {
+      if (e is! MissingPluginException) {
+        ErrorLogger.log('Cast isSessionAvailable failed',
+            error: e, stackTrace: st, category: 'Cast');
+      }
       _sessionAvailable = false;
     }
     return _sessionAvailable;
@@ -254,21 +258,32 @@ class CastService {
     _ensureSessionListening();
     try {
       await _sessionChannel.invokeMethod<bool>('startDiscovery');
-    } catch (_) {}
+    } catch (e, st) {
+      if (e is! MissingPluginException) {
+        ErrorLogger.log('Cast startSessionDiscovery failed',
+            error: e, stackTrace: st, category: 'Cast');
+      }
+    }
   }
 
   Future<void> stopSessionDiscovery() async {
     if (!_isAndroid) return;
     try {
       await _sessionChannel.invokeMethod<bool>('stopDiscovery');
-    } catch (_) {}
+    } catch (e, st) {
+      if (e is! MissingPluginException) {
+        ErrorLogger.log('Cast stopSessionDiscovery failed',
+            error: e, stackTrace: st, category: 'Cast');
+      }
+    }
   }
 
   Future<bool> connect(String routeId) async {
     if (!_isAndroid || routeId.trim().isEmpty) return false;
     try {
       return await _sessionChannel
-              .invokeMethod<bool>('connect', {'routeId': routeId}) ??
+              .invokeMethod<bool>('connect', {'routeId': routeId})
+              .timeout(const Duration(seconds: 8)) ??
           false;
     } catch (e, st) {
       ErrorLogger.log('Cast connect failed',
@@ -281,7 +296,11 @@ class CastService {
     if (!_isAndroid) return false;
     try {
       return await _sessionChannel.invokeMethod<bool>('disconnect') ?? false;
-    } catch (_) {
+    } catch (e, st) {
+      if (e is! MissingPluginException) {
+        ErrorLogger.log('Cast disconnect failed',
+            error: e, stackTrace: st, category: 'Cast');
+      }
       return false;
     }
   }
@@ -342,7 +361,7 @@ class CastService {
           if (resolvedDurationMs != null && resolvedDurationMs > 0)
             'durationMs': resolvedDurationMs,
         },
-      );
+      ).timeout(const Duration(seconds: 8));
       return _parseResult(res);
     } catch (e, st) {
       ErrorLogger.log('Cast castLocalFile failed',
@@ -389,7 +408,7 @@ class CastService {
           if (resolvedDurationMs != null && resolvedDurationMs > 0)
             'durationMs': resolvedDurationMs,
         },
-      );
+      ).timeout(const Duration(seconds: 8));
       return _parseResult(res);
     } catch (e, st) {
       ErrorLogger.log('Cast castUrl failed',
@@ -409,7 +428,7 @@ class CastService {
       final dynamic res = await _sessionChannel.invokeMethod<dynamic>(
         'setPlaybackState',
         {'action': action, 'positionMs': positionMs},
-      );
+      ).timeout(const Duration(seconds: 8));
       return _parseResult(res);
     } catch (e, st) {
       ErrorLogger.log('Cast setPlaybackState($action) failed',
@@ -446,9 +465,11 @@ class CastService {
       final dynamic res = await _sessionChannel.invokeMethod<dynamic>(
         'setVolume',
         {'volume': volume.clamp(0.0, 1.0)},
-      );
+      ).timeout(const Duration(seconds: 5));
       return res is Map && res['success'] == true;
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('Cast setVolume failed',
+          error: e, stackTrace: st, category: 'Cast');
       return false;
     }
   }
@@ -461,13 +482,16 @@ class CastService {
   Future<double?> getVolume() async {
     if (!_isAndroid || !_sessionStatus.connected) return null;
     try {
-      final dynamic res =
-          await _sessionChannel.invokeMethod<dynamic>('getVolume');
+      final dynamic res = await _sessionChannel
+          .invokeMethod<dynamic>('getVolume')
+          .timeout(const Duration(seconds: 5));
       if (res is Map && res['success'] == true && res['volume'] is num) {
         return (res['volume'] as num).toDouble().clamp(0.0, 1.0);
       }
       return null;
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('Cast getVolume failed',
+          error: e, stackTrace: st, category: 'Cast');
       return null;
     }
   }
@@ -498,7 +522,7 @@ class CastService {
           'startPositionMs': startPositionMs,
           'repeat': repeatMode,
         },
-      );
+      ).timeout(const Duration(seconds: 8));
       return _parseResult(res);
     } catch (e, st) {
       ErrorLogger.log('Cast castQueue failed',
@@ -524,7 +548,11 @@ class CastService {
     if (!_isAndroid) return false;
     try {
       return await _methodChannel.invokeMethod<bool>('isSupported') ?? false;
-    } catch (_) {
+    } catch (e, st) {
+      if (e is! MissingPluginException) {
+        ErrorLogger.log('Cast isSupported failed',
+            error: e, stackTrace: st, category: 'Cast');
+      }
       return false;
     }
   }
@@ -569,14 +597,24 @@ class CastService {
     _ensureListening();
     try {
       await _methodChannel.invokeMethod<bool>('startDiscovery');
-    } catch (_) {}
+    } catch (e, st) {
+      if (e is! MissingPluginException) {
+        ErrorLogger.log('Cast startDiscovery failed',
+            error: e, stackTrace: st, category: 'Cast');
+      }
+    }
   }
 
   Future<void> stopDiscovery() async {
     if (!_isAndroid) return;
     try {
       await _methodChannel.invokeMethod<bool>('stopDiscovery');
-    } catch (_) {}
+    } catch (e, st) {
+      if (e is! MissingPluginException) {
+        ErrorLogger.log('Cast stopDiscovery failed',
+            error: e, stackTrace: st, category: 'Cast');
+      }
+    }
   }
 
   Future<CastResult> castTo(String deviceId) async {
@@ -596,7 +634,11 @@ class CastService {
     }
   }
 
+  bool _disposed = false;
+
   void dispose() {
+    if (_disposed) return;
+    _disposed = true;
     _subscription?.cancel();
     _subscription = null;
     _sessionSubscription?.cancel();
@@ -606,9 +648,9 @@ class CastService {
     if (!_session.isClosed) _session.close();
     try {
       _sessionStatusNotifier.dispose();
-    } catch (_) {}
-    if (identical(_instance, this)) {
-      _instance = null;
+    } catch (e, st) {
+      ErrorLogger.log('Error disposing Cast session status notifier',
+          error: e, stackTrace: st, category: 'Cast');
     }
   }
 }

@@ -160,7 +160,9 @@ class _AbxScreenState extends State<AbxScreen> {
       final report = _buildCompletedReport();
       final directory =
           await (widget.getTempDirectory ?? getTemporaryDirectory)();
+      if (!mounted) return;
       final artifact = await exportAbxReport(report, directory: directory);
+      if (!mounted) return;
       final ShareResult result = widget.shareReport != null
           ? await widget.shareReport!(artifact)
           : await SharePlus.instance.share(
@@ -207,9 +209,12 @@ class _AbxScreenState extends State<AbxScreen> {
       final report = _buildCompletedReport();
       final directory = await (widget.getSaveDirectory ??
           getApplicationDocumentsDirectory)();
+      if (!mounted) return;
       final artifact = await exportAbxReport(report, directory: directory);
+      if (!mounted) return;
       if (widget.onReportSaved != null) {
         await widget.onReportSaved!(artifact);
+        if (!mounted) return;
       }
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -398,7 +403,7 @@ class _AbxScreenState extends State<AbxScreen> {
                 letter: 'A',
                 label: l10n.abxBypassCondition,
                 selected: state.activeCondition == AbxStimulus.a,
-                onTap: () => _cubit.playCondition(AbxStimulus.a),
+                onTap: () => unawaited(_cubit.playCondition(AbxStimulus.a)),
               ),
             ),
             const SizedBox(width: AppSpacing.xs),
@@ -408,7 +413,7 @@ class _AbxScreenState extends State<AbxScreen> {
                 letter: 'B',
                 label: l10n.abxDspCondition,
                 selected: state.activeCondition == AbxStimulus.b,
-                onTap: () => _cubit.playCondition(AbxStimulus.b),
+                onTap: () => unawaited(_cubit.playCondition(AbxStimulus.b)),
               ),
             ),
             const SizedBox(width: AppSpacing.xs),
@@ -419,7 +424,7 @@ class _AbxScreenState extends State<AbxScreen> {
                 // Hidden stimulus: intentionally unlabelled.
                 label: '\u2022 \u2022 \u2022',
                 selected: state.activeCondition == AbxStimulus.x,
-                onTap: () => _cubit.playCondition(AbxStimulus.x),
+                onTap: () => unawaited(_cubit.playCondition(AbxStimulus.x)),
               ),
             ),
           ],

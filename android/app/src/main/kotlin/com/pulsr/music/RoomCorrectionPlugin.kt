@@ -26,7 +26,7 @@ class RoomCorrectionPlugin private constructor(private val appContext: Context) 
 
     private lateinit var methodChannel: MethodChannel
     private lateinit var eventChannel: EventChannel
-    private var eventSink: EventChannel.EventSink? = null
+    @Volatile private var eventSink: EventChannel.EventSink? = null
     private var audioRecord: AudioRecord? = null
     private var captureThread: Thread? = null
     private val capturing = AtomicBoolean(false)
@@ -229,10 +229,12 @@ class RoomCorrectionPlugin private constructor(private val appContext: Context) 
                 record?.stop()
             } catch (_: Throwable) {}
             try {
-                record?.release()
+                if (thread != null && thread !== Thread.currentThread()) {
+                    thread.join(500)
+                }
             } catch (_: Throwable) {}
             try {
-                thread?.join(500)
+                record?.release()
             } catch (_: Throwable) {}
         }
         if (runCatching { backgroundExecutor.execute(releaseTask) }.isFailure) {

@@ -10,7 +10,7 @@ void main() {
       expect(
           PartySyncController.audibleAnchorPositionMs(
               hostRenderPositionMs: 5000, hostOutputLatencyMs: 180),
-          5180);
+          4820);
     });
 
     test('a zero-latency host anchors at its render position', () {
@@ -34,39 +34,65 @@ void main() {
   });
 
   group('target render position', () {
-    test('a delayed device renders in the past so sound lands on the room', () {
+    test('latency math: wired host + 200ms BT follower yields targetRender = roomPos + 200ms', () {
+      const hostRenderPosition = 10000;
+      const hostWiredLatency = 0;
+      const followerBtLatency = 200;
+
+      final roomPos = PartySyncController.audibleAnchorPositionMs(
+        hostRenderPositionMs: hostRenderPosition,
+        hostOutputLatencyMs: hostWiredLatency,
+      );
+      expect(roomPos, equals(hostRenderPosition));
+
+      final targetRender = PartySyncController.targetRenderPositionMs(
+        roomPositionMs: roomPos,
+        outputLatencyMs: followerBtLatency,
+      );
+      expect(targetRender, equals(roomPos + followerBtLatency));
+      expect(targetRender, equals(10200));
+
+      final error = PartySyncController.signedErrorMs(
+        localRenderMs: targetRender,
+        roomPositionMs: roomPos,
+        outputLatencyMs: followerBtLatency,
+      );
+      expect(error, equals(0));
+    });
+
+    test('a delayed device renders in the future so sound lands on the room', () {
       expect(
           PartySyncController.targetRenderPositionMs(
               roomPositionMs: 10000, outputLatencyMs: 180),
-          9820);
+          10180);
     });
 
     test('never schedules a negative position', () {
       expect(
           PartySyncController.targetRenderPositionMs(
-              roomPositionMs: 100, outputLatencyMs: 400),
+              roomPositionMs: -500, outputLatencyMs: 200),
           0);
     });
 
     test('signed error measures audible disagreement, not position equality', () {
       // The device renders exactly the room position, so a naive comparison
-      // calls this in sync. That audio reaches the listener 180 ms before the
-      // room time it stands for, so it is 180 ms AHEAD.
+      // calls this in sync. That audio reaches the listener 180 ms after the
+      // room time it stands for, so it is 180 ms BEHIND.
       final error = PartySyncController.signedErrorMs(
           localRenderMs: 10000, roomPositionMs: 10000, outputLatencyMs: 180);
-      expect(error, 180);
+      expect(error, -180);
 
-      // Correctly compensated: rendering 180 ms in the past is spot on.
+      // Correctly compensated: rendering 180 ms in the future is spot on.
       expect(
           PartySyncController.signedErrorMs(
-              localRenderMs: 9820, roomPositionMs: 10000, outputLatencyMs: 180),
+              localRenderMs: 10180, roomPositionMs: 10000, outputLatencyMs: 180),
           0);
 
-      // Rendering behind the compensated target is heard late.
+      // Rendering ahead of the compensated target is heard ahead.
       expect(
           PartySyncController.signedErrorMs(
-              localRenderMs: 9700, roomPositionMs: 10000, outputLatencyMs: 180),
-          -120);
+              localRenderMs: 10300, roomPositionMs: 10000, outputLatencyMs: 180),
+          120);
     });
   });
 
@@ -123,7 +149,7 @@ void main() {
       final decision = controller.evaluatePosition(
           localRenderMs: 3000, roomPositionMs: 12000, outputLatencyMs: 200);
       expect(decision.action, SyncAction.seek);
-      expect(decision.seekToMs, 11800);
+      expect(decision.seekToMs, 12200);
     });
 
     test('a compensated target beyond the track end clamps to the duration',
@@ -175,7 +201,8 @@ void main() {
     test('a sub-timer-resolution lead is taken as-is', () {
       final plan = PartySyncController.planStart(
           anchorServerMs: 9605, nowServerMs: 9600);
-      expect(plan.applied, const Duration(milliseconds: 5));
+      expect(plan.applied, Duration.zero);
+      expect(plan.startImmediately, isTrue);
     });
   });
 
@@ -190,7 +217,7 @@ void main() {
       const clockPpm = 50; // generous for a phone audio clock
 
       var room = 60000.0;
-      var localRender = room - outputLatency;
+      var localRender = room + outputLatency;
       var worstError = 0;
 
       // 400 ticks at the reconciliation cadence = 100 s of listening.
@@ -222,11 +249,11 @@ void main() {
       const outputLatency = 220;
 
       final decision = controller.evaluatePosition(
-        localRenderMs: 60000 - outputLatency,
+        localRenderMs: 60000 + outputLatency,
         roomPositionMs: 60000,
         outputLatencyMs: 0,
       );
-      expect(decision.errorMs, -outputLatency);
+      expect(decision.errorMs, outputLatency);
       expect(decision.action, SyncAction.seek);
       expect(decision.seekToMs, 60000);
     });

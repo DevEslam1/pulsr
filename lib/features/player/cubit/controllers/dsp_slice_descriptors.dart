@@ -211,6 +211,30 @@ final List<DspFieldDescriptor> dspSliceFields = <DspFieldDescriptor>[
     withValue: (s, v) => s.copyWith(crossfeedMode: v),
   ),
   DspField<bool>(
+    name: 'isHrtfEnabled',
+    getSlice: (s) => s.isHrtfEnabled,
+    getHandler: (h) => h.isHrtfEnabled,
+    withValue: (s, v) => s.copyWith(isHrtfEnabled: v),
+  ),
+  DspField<double>(
+    name: 'hrtfAzimuth',
+    getSlice: (s) => s.hrtfAzimuth,
+    getHandler: (h) => h.hrtfAzimuth,
+    withValue: (s, v) => s.copyWith(hrtfAzimuth: v),
+  ),
+  DspField<double>(
+    name: 'hrtfElevation',
+    getSlice: (s) => s.hrtfElevation,
+    getHandler: (h) => h.hrtfElevation,
+    withValue: (s, v) => s.copyWith(hrtfElevation: v),
+  ),
+  DspField<String?>(
+    name: 'hrtfSofaPath',
+    getSlice: (s) => s.hrtfSofaPath,
+    getHandler: (h) => h.hrtfSofaPath,
+    withValue: (s, v) => s.copyWith(hrtfSofaPath: v),
+  ),
+  DspField<bool>(
     name: 'isLimiterEnabled',
     getSlice: (s) => s.isLimiterEnabled,
     getHandler: (h) => h.isLimiterEnabled,

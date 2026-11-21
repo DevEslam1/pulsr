@@ -86,19 +86,34 @@ class FeatureGate {
     }
 
     // 2. Native DSD / DoP bitstream domain: no PCM-domain DSP or software volume
-    if (isDsdMode || feature == AudioFeature.nativeDsd || feature == AudioFeature.dop) {
+    if ((feature == AudioFeature.nativeDsd || feature == AudioFeature.dop) &&
+        dspActive) {
+      return const FeatureGateDecision.blocked(
+        reason: FeatureBlockReason.dsdDomain,
+        userMessage:
+            'Disable active DSP stages to stream native DSD or DoP bitstreams.',
+      );
+    }
+    if (isDsdMode) {
       if (feature == AudioFeature.dsp ||
+          feature == AudioFeature.remaster ||
+          feature == AudioFeature.hrtf ||
+          feature == AudioFeature.crossfeed ||
+          feature == AudioFeature.multichannel ||
           feature == AudioFeature.crossfade ||
           feature == AudioFeature.replayGain) {
         return const FeatureGateDecision.blocked(
           reason: FeatureBlockReason.dsdDomain,
-          userMessage: 'DSP, crossfade, and ReplayGain cannot be processed in the 1-bit DSD domain.',
+          userMessage:
+              'DSP, Remaster, multichannel, crossfade, and ReplayGain cannot be processed in the 1-bit DSD domain.',
         );
       }
-      if (feature == AudioFeature.softwareVolume && !backend.canSoftwareVolume) {
+      if (feature == AudioFeature.softwareVolume &&
+          !backend.canSoftwareVolume) {
         return const FeatureGateDecision.blocked(
           reason: FeatureBlockReason.dsdDomain,
-          userMessage: 'Direct DSD requires hardware DAC volume or fixed-volume mode.',
+          userMessage:
+              'Direct DSD requires hardware DAC volume or fixed-volume mode.',
         );
       }
     }
@@ -108,33 +123,35 @@ class FeatureGate {
       if (feature == AudioFeature.dsp ||
           feature == AudioFeature.remaster ||
           feature == AudioFeature.hrtf ||
-          feature == AudioFeature.crossfeed) {
+          feature == AudioFeature.crossfeed ||
+          feature == AudioFeature.replayGain ||
+          feature == AudioFeature.crossfade ||
+          feature == AudioFeature.softwareVolume) {
         return const FeatureGateDecision.blocked(
           reason: FeatureBlockReason.bitPerfectExclusivity,
-          userMessage: 'Bit-perfect output requires an unaltered audio stream without DSP.',
+          userMessage:
+              'Bit-perfect output requires an unaltered audio stream without DSP or software volume.',
         );
       }
     }
 
-    // 4. Remaster exclusivity with Bit-Perfect
-    if (feature == AudioFeature.remaster && bitPerfectActive) {
-      return const FeatureGateDecision.blocked(
-        reason: FeatureBlockReason.bitPerfectExclusivity,
-        userMessage: 'Remaster oversampling modifies samples and cannot coexist with bit-perfect mode.',
-      );
-    }
-
-    // 5. Low-power interlock: mutually exclusive with active DSP stages
+    // 4. Low-power interlock: mutually exclusive with active DSP stages
     if (feature == AudioFeature.lowPower && dspActive) {
       return const FeatureGateDecision.blocked(
         reason: FeatureBlockReason.lowPowerInterlock,
-        userMessage: 'Disable active DSP stages to engage hardware low-power bypass.',
+        userMessage:
+            'Disable active DSP stages to engage hardware low-power bypass.',
       );
     }
-    if (lowPowerActive && (feature == AudioFeature.dsp || feature == AudioFeature.remaster)) {
+    if (lowPowerActive &&
+        (feature == AudioFeature.dsp ||
+            feature == AudioFeature.remaster ||
+            feature == AudioFeature.hrtf ||
+            feature == AudioFeature.crossfeed)) {
       return const FeatureGateDecision.blocked(
         reason: FeatureBlockReason.lowPowerInterlock,
-        userMessage: 'Enabling DSP stages automatically exits low-power mode.',
+        userMessage:
+            'Enabling DSP stages automatically exits low-power mode.',
       );
     }
 

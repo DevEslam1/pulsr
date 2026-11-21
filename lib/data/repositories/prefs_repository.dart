@@ -9,11 +9,26 @@ class PrefsRepository {
   Timer? _batchTimer;
   final Map<String, dynamic> _pendingWrites = {};
 
-  /// Keys removed while a [flush] was in flight. The flush snapshot may still
+  /// Keys removed while an asynchronous write/flush was in flight. The flush snapshot may still
   /// carry their old value; without this tombstone the stale write landed
   /// after `remove()` and resurrected the key.
   final Set<String> _removedKeys = {};
-  int _activeFlushes = 0;
+  Future<void> _writeChain = Future<void>.value();
+
+  Future<T> _enqueueWrite<T>(Future<T> Function() action) {
+    final completer = Completer<T>();
+    _writeChain = _writeChain.then((_) => null, onError: (e, st) {
+      // Chain continuation: prior error was already delivered to its caller via completer.
+    }).then((_) async {
+      try {
+        final result = await action();
+        completer.complete(result);
+      } catch (e, st) {
+        completer.completeError(e, st);
+      }
+    });
+    return completer.future;
+  }
 
   PrefsRepository(this._prefs) {
     // Populate in-memory cache with all existing keys
@@ -55,9 +70,10 @@ class PrefsRepository {
   /// or writes immediately to disk if [immediate] is true (Issue 14).
   Future<void> set<T>(String key, T value, {bool immediate = false}) async {
     _memoryCache[key] = value;
+    _removedKeys.remove(key);
     if (immediate) {
       _pendingWrites.remove(key);
-      await _writeToDisk(key, value);
+      await _enqueueWrite(() => _writeToDisk(key, value));
     } else {
       _pendingWrites[key] = value;
       _scheduleBatchWrite();
@@ -92,54 +108,60 @@ class PrefsRepository {
   Future<void> remove(String key) async {
     _memoryCache.remove(key);
     _pendingWrites.remove(key);
-    // Tombstone before the await while a flush may still hold a snapshot with
-    // this key, so the stale value cannot land after the removal.
-    if (_activeFlushes > 0) _removedKeys.add(key);
-    await _prefs.remove(key);
+    _removedKeys.add(key);
+    await _enqueueWrite(() async {
+      try {
+        await _prefs.remove(key);
+      } finally {
+        _removedKeys.remove(key);
+      }
+    });
   }
 
   Future<void> flush() async {
     _batchTimer?.cancel();
     _batchTimer = null;
-    if (_pendingWrites.isEmpty) return;
+    if (_pendingWrites.isEmpty) {
+      await _enqueueWrite(() async {});
+      return;
+    }
 
     final writes = Map<String, dynamic>.from(_pendingWrites);
     _pendingWrites.clear();
-    Object? firstError;
-    StackTrace? firstStack;
-    _activeFlushes++;
-    try {
-      for (final entry in writes.entries) {
-        // A remove() that landed after the snapshot is authoritative; its
-        // removal already reached (or is queued ahead of) the disk.
-        if (_removedKeys.contains(entry.key)) continue;
-        try {
-          await _writeToDisk(entry.key, entry.value);
-        } catch (e, st) {
-          // `_writeToDisk` already logged the rejection; keep flushing the rest
-          // so one unsupported value cannot drop unrelated queued writes.
-          firstError ??= e;
-          firstStack ??= st;
-          // Transient platform failures are re-queued so the value is not lost
-          // after the caller's error handling: it stays pending for the next
-          // flush (lifecycle pause, dispose) instead of surviving only in the
-          // in-memory cache and vanishing on restart. A deterministic
-          // ArgumentError (unsupported type) is not retried forever, and a
-          // newer write or a remove() for the same key always wins.
-          if (e is! ArgumentError &&
-              !_removedKeys.contains(entry.key) &&
-              !_pendingWrites.containsKey(entry.key)) {
-            _pendingWrites[entry.key] = entry.value;
+
+    await _enqueueWrite(() async {
+      Object? firstError;
+      StackTrace? firstStack;
+      try {
+        for (final entry in writes.entries) {
+          // A remove() that landed after the snapshot is authoritative; its
+          // removal already reached (or is queued ahead of) the disk.
+          if (_removedKeys.contains(entry.key)) continue;
+          try {
+            await _writeToDisk(entry.key, entry.value);
+          } catch (e, st) {
+            // `_writeToDisk` already logged the rejection; keep flushing the rest
+            // so one unsupported value cannot drop unrelated queued writes.
+            firstError ??= e;
+            firstStack ??= st;
+            // Transient platform failures are re-queued so the value is not lost
+            // after the caller's error handling: it stays pending for the next
+            // flush (lifecycle pause, dispose) instead of surviving only in the
+            // in-memory cache and vanishing on restart. A deterministic
+            // ArgumentError (unsupported type) is not retried forever, and a
+            // newer write or a remove() for the same key always wins.
+            if (e is! ArgumentError &&
+                !_removedKeys.contains(entry.key) &&
+                !_pendingWrites.containsKey(entry.key)) {
+              _pendingWrites[entry.key] = entry.value;
+            }
           }
         }
+      } finally {}
+      if (firstError != null) {
+        Error.throwWithStackTrace(firstError, firstStack ?? StackTrace.current);
       }
-    } finally {
-      _activeFlushes--;
-      if (_activeFlushes == 0) _removedKeys.clear();
-    }
-    if (firstError != null) {
-      Error.throwWithStackTrace(firstError, firstStack ?? StackTrace.current);
-    }
+    });
   }
 
   void _scheduleBatchWrite() {

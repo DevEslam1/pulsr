@@ -2018,6 +2018,10 @@ mixin _$DspSlice {
   double get crossfeedDelayUs;
   double get crossfeedFeedDb;
   int get crossfeedMode;
+  bool get isHrtfEnabled;
+  double get hrtfAzimuth;
+  double get hrtfElevation;
+  String? get hrtfSofaPath;
   bool get isLimiterEnabled;
   double get limiterThresholdDb;
   double get limiterReleaseMs;
@@ -2132,10 +2136,14 @@ mixin _$DspSlice {
                 other.crossfeedFeedDb == _this.crossfeedFeedDb) &&
             (identical(other.crossfeedMode, _this.crossfeedMode) ||
                 other.crossfeedMode == _this.crossfeedMode) &&
-            (identical(other.isLimiterEnabled, _this.isLimiterEnabled) ||
-                other.isLimiterEnabled == _this.isLimiterEnabled) &&
-            (identical(other.limiterThresholdDb, _this.limiterThresholdDb) ||
-                other.limiterThresholdDb == _this.limiterThresholdDb) &&
+            (identical(other.isHrtfEnabled, _this.isHrtfEnabled) ||
+                other.isHrtfEnabled == _this.isHrtfEnabled) &&
+            (identical(other.hrtfAzimuth, _this.hrtfAzimuth) ||
+                other.hrtfAzimuth == _this.hrtfAzimuth) &&
+            (identical(other.hrtfElevation, _this.hrtfElevation) || other.hrtfElevation == _this.hrtfElevation) &&
+            (identical(other.hrtfSofaPath, _this.hrtfSofaPath) || other.hrtfSofaPath == _this.hrtfSofaPath) &&
+            (identical(other.isLimiterEnabled, _this.isLimiterEnabled) || other.isLimiterEnabled == _this.isLimiterEnabled) &&
+            (identical(other.limiterThresholdDb, _this.limiterThresholdDb) || other.limiterThresholdDb == _this.limiterThresholdDb) &&
             (identical(other.limiterReleaseMs, _this.limiterReleaseMs) || other.limiterReleaseMs == _this.limiterReleaseMs) &&
             (identical(other.compressorRatio, _this.compressorRatio) || other.compressorRatio == _this.compressorRatio) &&
             (identical(other.compressorAttackMs, _this.compressorAttackMs) || other.compressorAttackMs == _this.compressorAttackMs) &&
@@ -2219,6 +2227,10 @@ mixin _$DspSlice {
       _this.crossfeedDelayUs,
       _this.crossfeedFeedDb,
       _this.crossfeedMode,
+      _this.isHrtfEnabled,
+      _this.hrtfAzimuth,
+      _this.hrtfElevation,
+      _this.hrtfSofaPath,
       _this.isLimiterEnabled,
       _this.limiterThresholdDb,
       _this.limiterReleaseMs,
@@ -2282,7 +2294,7 @@ mixin _$DspSlice {
   @override
   String toString() {
     final _this = this as DspSlice;
-    return 'DspSlice(eqPreset: ${_this.eqPreset}, isEqEnabled: ${_this.isEqEnabled}, isVirtualizerEnabled: ${_this.isVirtualizerEnabled}, virtualizerStrength: ${_this.virtualizerStrength}, isVirtualizerSupported: ${_this.isVirtualizerSupported}, isDynamicsEnabled: ${_this.isDynamicsEnabled}, isDynamicsSupported: ${_this.isDynamicsSupported}, dynamicsPreset: ${_this.dynamicsPreset}, selectedHeadphoneProfile: ${_this.selectedHeadphoneProfile}, isSpatializerSupported: ${_this.isSpatializerSupported}, isSpatializerEnabled: ${_this.isSpatializerEnabled}, volumeBoost: ${_this.volumeBoost}, effectiveVolumeBoost: ${_this.effectiveVolumeBoost}, effectiveBassBoost: ${_this.effectiveBassBoost}, preampDb: ${_this.preampDb}, isVolumeBoostSupported: ${_this.isVolumeBoostSupported}, isBassBoostSupported: ${_this.isBassBoostSupported}, isCrossfeedEnabled: ${_this.isCrossfeedEnabled}, crossfeedDelayUs: ${_this.crossfeedDelayUs}, crossfeedFeedDb: ${_this.crossfeedFeedDb}, crossfeedMode: ${_this.crossfeedMode}, isLimiterEnabled: ${_this.isLimiterEnabled}, limiterThresholdDb: ${_this.limiterThresholdDb}, limiterReleaseMs: ${_this.limiterReleaseMs}, compressorRatio: ${_this.compressorRatio}, compressorAttackMs: ${_this.compressorAttackMs}, compressorMakeupGainDb: ${_this.compressorMakeupGainDb}, isReverbEnabled: ${_this.isReverbEnabled}, reverbPreset: ${_this.reverbPreset}, reverbWetDry: ${_this.reverbWetDry}, stereoBalance: ${_this.stereoBalance}, monoMix: ${_this.monoMix}, isSincResamplerEnabled: ${_this.isSincResamplerEnabled}, isDitherEnabled: ${_this.isDitherEnabled}, ditherTargetBitDepth: ${_this.ditherTargetBitDepth}, isSaturationEnabled: ${_this.isSaturationEnabled}, saturationDrive: ${_this.saturationDrive}, saturationMix: ${_this.saturationMix}, saturationTilt: ${_this.saturationTilt}, saturationMultiband: ${_this.saturationMultiband}, isStereoWidthEnabled: ${_this.isStereoWidthEnabled}, stereoWidth: ${_this.stereoWidth}, isLoudnessContourEnabled: ${_this.isLoudnessContourEnabled}, loudnessContourIntensity: ${_this.loudnessContourIntensity}, isSubCrossoverEnabled: ${_this.isSubCrossoverEnabled}, subCrossoverCornerHz: ${_this.subCrossoverCornerHz}, subCrossoverSlopeDbPerOct: ${_this.subCrossoverSlopeDbPerOct}, subCrossoverGain: ${_this.subCrossoverGain}, subCrossoverBassMono: ${_this.subCrossoverBassMono}, subCrossoverAntiPop: ${_this.subCrossoverAntiPop}, stereoWidthMultiband: ${_this.stereoWidthMultiband}, stereoWidthLow: ${_this.stereoWidthLow}, stereoWidthMid: ${_this.stereoWidthMid}, stereoWidthHigh: ${_this.stereoWidthHigh}, stereoWidthLowCrossoverHz: ${_this.stereoWidthLowCrossoverHz}, stereoWidthHighCrossoverHz: ${_this.stereoWidthHighCrossoverHz}, isMultibandCompressorEnabled: ${_this.isMultibandCompressorEnabled}, multibandCompressorF0: ${_this.multibandCompressorF0}, multibandCompressorF1: ${_this.multibandCompressorF1}, multibandCompressorF2: ${_this.multibandCompressorF2}, multibandCompressorBands: ${_this.multibandCompressorBands}, isDynamicEqEnabled: ${_this.isDynamicEqEnabled}, dynamicEqBands: ${_this.dynamicEqBands}, isViperDdcEnabled: ${_this.isViperDdcEnabled}, viperDdcProfileName: ${_this.viperDdcProfileName}, isArbitraryEqEnabled: ${_this.isArbitraryEqEnabled}, arbitraryEqLinearPhase: ${_this.arbitraryEqLinearPhase}, arbitraryEqString: ${_this.arbitraryEqString}, isLiveProgEnabled: ${_this.isLiveProgEnabled}, liveProgCode: ${_this.liveProgCode}, liveProgStatus: ${_this.liveProgStatus}, isDynamicBassEnabled: ${_this.isDynamicBassEnabled}, dynamicBassStrength: ${_this.dynamicBassStrength}, dynamicBassPreset: ${_this.dynamicBassPreset}, hasOemAudio: ${_this.hasOemAudio}, detectedOemEngines: ${_this.detectedOemEngines}, isQuranModeEnabled: ${_this.isQuranModeEnabled}, quranReciterStyle: ${_this.quranReciterStyle})';
+    return 'DspSlice(eqPreset: ${_this.eqPreset}, isEqEnabled: ${_this.isEqEnabled}, isVirtualizerEnabled: ${_this.isVirtualizerEnabled}, virtualizerStrength: ${_this.virtualizerStrength}, isVirtualizerSupported: ${_this.isVirtualizerSupported}, isDynamicsEnabled: ${_this.isDynamicsEnabled}, isDynamicsSupported: ${_this.isDynamicsSupported}, dynamicsPreset: ${_this.dynamicsPreset}, selectedHeadphoneProfile: ${_this.selectedHeadphoneProfile}, isSpatializerSupported: ${_this.isSpatializerSupported}, isSpatializerEnabled: ${_this.isSpatializerEnabled}, volumeBoost: ${_this.volumeBoost}, effectiveVolumeBoost: ${_this.effectiveVolumeBoost}, effectiveBassBoost: ${_this.effectiveBassBoost}, preampDb: ${_this.preampDb}, isVolumeBoostSupported: ${_this.isVolumeBoostSupported}, isBassBoostSupported: ${_this.isBassBoostSupported}, isCrossfeedEnabled: ${_this.isCrossfeedEnabled}, crossfeedDelayUs: ${_this.crossfeedDelayUs}, crossfeedFeedDb: ${_this.crossfeedFeedDb}, crossfeedMode: ${_this.crossfeedMode}, isHrtfEnabled: ${_this.isHrtfEnabled}, hrtfAzimuth: ${_this.hrtfAzimuth}, hrtfElevation: ${_this.hrtfElevation}, hrtfSofaPath: ${_this.hrtfSofaPath}, isLimiterEnabled: ${_this.isLimiterEnabled}, limiterThresholdDb: ${_this.limiterThresholdDb}, limiterReleaseMs: ${_this.limiterReleaseMs}, compressorRatio: ${_this.compressorRatio}, compressorAttackMs: ${_this.compressorAttackMs}, compressorMakeupGainDb: ${_this.compressorMakeupGainDb}, isReverbEnabled: ${_this.isReverbEnabled}, reverbPreset: ${_this.reverbPreset}, reverbWetDry: ${_this.reverbWetDry}, stereoBalance: ${_this.stereoBalance}, monoMix: ${_this.monoMix}, isSincResamplerEnabled: ${_this.isSincResamplerEnabled}, isDitherEnabled: ${_this.isDitherEnabled}, ditherTargetBitDepth: ${_this.ditherTargetBitDepth}, isSaturationEnabled: ${_this.isSaturationEnabled}, saturationDrive: ${_this.saturationDrive}, saturationMix: ${_this.saturationMix}, saturationTilt: ${_this.saturationTilt}, saturationMultiband: ${_this.saturationMultiband}, isStereoWidthEnabled: ${_this.isStereoWidthEnabled}, stereoWidth: ${_this.stereoWidth}, isLoudnessContourEnabled: ${_this.isLoudnessContourEnabled}, loudnessContourIntensity: ${_this.loudnessContourIntensity}, isSubCrossoverEnabled: ${_this.isSubCrossoverEnabled}, subCrossoverCornerHz: ${_this.subCrossoverCornerHz}, subCrossoverSlopeDbPerOct: ${_this.subCrossoverSlopeDbPerOct}, subCrossoverGain: ${_this.subCrossoverGain}, subCrossoverBassMono: ${_this.subCrossoverBassMono}, subCrossoverAntiPop: ${_this.subCrossoverAntiPop}, stereoWidthMultiband: ${_this.stereoWidthMultiband}, stereoWidthLow: ${_this.stereoWidthLow}, stereoWidthMid: ${_this.stereoWidthMid}, stereoWidthHigh: ${_this.stereoWidthHigh}, stereoWidthLowCrossoverHz: ${_this.stereoWidthLowCrossoverHz}, stereoWidthHighCrossoverHz: ${_this.stereoWidthHighCrossoverHz}, isMultibandCompressorEnabled: ${_this.isMultibandCompressorEnabled}, multibandCompressorF0: ${_this.multibandCompressorF0}, multibandCompressorF1: ${_this.multibandCompressorF1}, multibandCompressorF2: ${_this.multibandCompressorF2}, multibandCompressorBands: ${_this.multibandCompressorBands}, isDynamicEqEnabled: ${_this.isDynamicEqEnabled}, dynamicEqBands: ${_this.dynamicEqBands}, isViperDdcEnabled: ${_this.isViperDdcEnabled}, viperDdcProfileName: ${_this.viperDdcProfileName}, isArbitraryEqEnabled: ${_this.isArbitraryEqEnabled}, arbitraryEqLinearPhase: ${_this.arbitraryEqLinearPhase}, arbitraryEqString: ${_this.arbitraryEqString}, isLiveProgEnabled: ${_this.isLiveProgEnabled}, liveProgCode: ${_this.liveProgCode}, liveProgStatus: ${_this.liveProgStatus}, isDynamicBassEnabled: ${_this.isDynamicBassEnabled}, dynamicBassStrength: ${_this.dynamicBassStrength}, dynamicBassPreset: ${_this.dynamicBassPreset}, hasOemAudio: ${_this.hasOemAudio}, detectedOemEngines: ${_this.detectedOemEngines}, isQuranModeEnabled: ${_this.isQuranModeEnabled}, quranReciterStyle: ${_this.quranReciterStyle})';
   }
 }
 
@@ -2313,6 +2325,10 @@ abstract mixin class $DspSliceCopyWith<$Res> {
       double crossfeedDelayUs,
       double crossfeedFeedDb,
       int crossfeedMode,
+      bool isHrtfEnabled,
+      double hrtfAzimuth,
+      double hrtfElevation,
+      String? hrtfSofaPath,
       bool isLimiterEnabled,
       double limiterThresholdDb,
       double limiterReleaseMs,
@@ -2405,6 +2421,10 @@ class _$DspSliceCopyWithImpl<$Res> implements $DspSliceCopyWith<$Res> {
     Object? crossfeedDelayUs = null,
     Object? crossfeedFeedDb = null,
     Object? crossfeedMode = null,
+    Object? isHrtfEnabled = null,
+    Object? hrtfAzimuth = null,
+    Object? hrtfElevation = null,
+    Object? hrtfSofaPath = freezed,
     Object? isLimiterEnabled = null,
     Object? limiterThresholdDb = null,
     Object? limiterReleaseMs = null,
@@ -2548,6 +2568,22 @@ class _$DspSliceCopyWithImpl<$Res> implements $DspSliceCopyWith<$Res> {
           ? _self.crossfeedMode
           : crossfeedMode // ignore: cast_nullable_to_non_nullable
               as int,
+      isHrtfEnabled: null == isHrtfEnabled
+          ? _self.isHrtfEnabled
+          : isHrtfEnabled // ignore: cast_nullable_to_non_nullable
+              as bool,
+      hrtfAzimuth: null == hrtfAzimuth
+          ? _self.hrtfAzimuth
+          : hrtfAzimuth // ignore: cast_nullable_to_non_nullable
+              as double,
+      hrtfElevation: null == hrtfElevation
+          ? _self.hrtfElevation
+          : hrtfElevation // ignore: cast_nullable_to_non_nullable
+              as double,
+      hrtfSofaPath: freezed == hrtfSofaPath
+          ? _self.hrtfSofaPath
+          : hrtfSofaPath // ignore: cast_nullable_to_non_nullable
+              as String?,
       isLimiterEnabled: null == isLimiterEnabled
           ? _self.isLimiterEnabled
           : isLimiterEnabled // ignore: cast_nullable_to_non_nullable
@@ -2895,6 +2931,10 @@ extension DspSlicePatterns on DspSlice {
             double crossfeedDelayUs,
             double crossfeedFeedDb,
             int crossfeedMode,
+            bool isHrtfEnabled,
+            double hrtfAzimuth,
+            double hrtfElevation,
+            String? hrtfSofaPath,
             bool isLimiterEnabled,
             double limiterThresholdDb,
             double limiterReleaseMs,
@@ -2980,6 +3020,10 @@ extension DspSlicePatterns on DspSlice {
             _that.crossfeedDelayUs,
             _that.crossfeedFeedDb,
             _that.crossfeedMode,
+            _that.isHrtfEnabled,
+            _that.hrtfAzimuth,
+            _that.hrtfElevation,
+            _that.hrtfSofaPath,
             _that.isLimiterEnabled,
             _that.limiterThresholdDb,
             _that.limiterReleaseMs,
@@ -3079,6 +3123,10 @@ extension DspSlicePatterns on DspSlice {
             double crossfeedDelayUs,
             double crossfeedFeedDb,
             int crossfeedMode,
+            bool isHrtfEnabled,
+            double hrtfAzimuth,
+            double hrtfElevation,
+            String? hrtfSofaPath,
             bool isLimiterEnabled,
             double limiterThresholdDb,
             double limiterReleaseMs,
@@ -3163,6 +3211,10 @@ extension DspSlicePatterns on DspSlice {
             _that.crossfeedDelayUs,
             _that.crossfeedFeedDb,
             _that.crossfeedMode,
+            _that.isHrtfEnabled,
+            _that.hrtfAzimuth,
+            _that.hrtfElevation,
+            _that.hrtfSofaPath,
             _that.isLimiterEnabled,
             _that.limiterThresholdDb,
             _that.limiterReleaseMs,
@@ -3261,6 +3313,10 @@ extension DspSlicePatterns on DspSlice {
             double crossfeedDelayUs,
             double crossfeedFeedDb,
             int crossfeedMode,
+            bool isHrtfEnabled,
+            double hrtfAzimuth,
+            double hrtfElevation,
+            String? hrtfSofaPath,
             bool isLimiterEnabled,
             double limiterThresholdDb,
             double limiterReleaseMs,
@@ -3345,6 +3401,10 @@ extension DspSlicePatterns on DspSlice {
             _that.crossfeedDelayUs,
             _that.crossfeedFeedDb,
             _that.crossfeedMode,
+            _that.isHrtfEnabled,
+            _that.hrtfAzimuth,
+            _that.hrtfElevation,
+            _that.hrtfSofaPath,
             _that.isLimiterEnabled,
             _that.limiterThresholdDb,
             _that.limiterReleaseMs,
@@ -3434,6 +3494,10 @@ class _DspSlice extends DspSlice {
       this.crossfeedDelayUs = 350.0,
       this.crossfeedFeedDb = -9.0,
       this.crossfeedMode = 0,
+      this.isHrtfEnabled = false,
+      this.hrtfAzimuth = 30.0,
+      this.hrtfElevation = 0.0,
+      this.hrtfSofaPath,
       this.isLimiterEnabled = false,
       this.limiterThresholdDb = -0.2,
       this.limiterReleaseMs = 50.0,
@@ -3559,6 +3623,17 @@ class _DspSlice extends DspSlice {
   @override
   @JsonKey()
   final int crossfeedMode;
+  @override
+  @JsonKey()
+  final bool isHrtfEnabled;
+  @override
+  @JsonKey()
+  final double hrtfAzimuth;
+  @override
+  @JsonKey()
+  final double hrtfElevation;
+  @override
+  final String? hrtfSofaPath;
   @override
   @JsonKey()
   final bool isLimiterEnabled;
@@ -3806,6 +3881,14 @@ class _DspSlice extends DspSlice {
                 other.crossfeedFeedDb == crossfeedFeedDb) &&
             (identical(other.crossfeedMode, crossfeedMode) ||
                 other.crossfeedMode == crossfeedMode) &&
+            (identical(other.isHrtfEnabled, isHrtfEnabled) ||
+                other.isHrtfEnabled == isHrtfEnabled) &&
+            (identical(other.hrtfAzimuth, hrtfAzimuth) ||
+                other.hrtfAzimuth == hrtfAzimuth) &&
+            (identical(other.hrtfElevation, hrtfElevation) ||
+                other.hrtfElevation == hrtfElevation) &&
+            (identical(other.hrtfSofaPath, hrtfSofaPath) ||
+                other.hrtfSofaPath == hrtfSofaPath) &&
             (identical(other.isLimiterEnabled, isLimiterEnabled) ||
                 other.isLimiterEnabled == isLimiterEnabled) &&
             (identical(other.limiterThresholdDb, limiterThresholdDb) ||
@@ -3824,15 +3907,11 @@ class _DspSlice extends DspSlice {
                 other.reverbPreset == reverbPreset) &&
             (identical(other.reverbWetDry, reverbWetDry) ||
                 other.reverbWetDry == reverbWetDry) &&
-            (identical(other.stereoBalance, stereoBalance) ||
-                other.stereoBalance == stereoBalance) &&
+            (identical(other.stereoBalance, stereoBalance) || other.stereoBalance == stereoBalance) &&
             (identical(other.monoMix, monoMix) || other.monoMix == monoMix) &&
-            (identical(other.isSincResamplerEnabled, isSincResamplerEnabled) ||
-                other.isSincResamplerEnabled == isSincResamplerEnabled) &&
-            (identical(other.isDitherEnabled, isDitherEnabled) ||
-                other.isDitherEnabled == isDitherEnabled) &&
-            (identical(other.ditherTargetBitDepth, ditherTargetBitDepth) ||
-                other.ditherTargetBitDepth == ditherTargetBitDepth) &&
+            (identical(other.isSincResamplerEnabled, isSincResamplerEnabled) || other.isSincResamplerEnabled == isSincResamplerEnabled) &&
+            (identical(other.isDitherEnabled, isDitherEnabled) || other.isDitherEnabled == isDitherEnabled) &&
+            (identical(other.ditherTargetBitDepth, ditherTargetBitDepth) || other.ditherTargetBitDepth == ditherTargetBitDepth) &&
             (identical(other.isSaturationEnabled, isSaturationEnabled) || other.isSaturationEnabled == isSaturationEnabled) &&
             (identical(other.saturationDrive, saturationDrive) || other.saturationDrive == saturationDrive) &&
             (identical(other.saturationMix, saturationMix) || other.saturationMix == saturationMix) &&
@@ -3903,6 +3982,10 @@ class _DspSlice extends DspSlice {
       crossfeedDelayUs,
       crossfeedFeedDb,
       crossfeedMode,
+      isHrtfEnabled,
+      hrtfAzimuth,
+      hrtfElevation,
+      hrtfSofaPath,
       isLimiterEnabled,
       limiterThresholdDb,
       limiterReleaseMs,
@@ -3965,7 +4048,7 @@ class _DspSlice extends DspSlice {
 
   @override
   String toString() {
-    return 'DspSlice(eqPreset: $eqPreset, isEqEnabled: $isEqEnabled, isVirtualizerEnabled: $isVirtualizerEnabled, virtualizerStrength: $virtualizerStrength, isVirtualizerSupported: $isVirtualizerSupported, isDynamicsEnabled: $isDynamicsEnabled, isDynamicsSupported: $isDynamicsSupported, dynamicsPreset: $dynamicsPreset, selectedHeadphoneProfile: $selectedHeadphoneProfile, isSpatializerSupported: $isSpatializerSupported, isSpatializerEnabled: $isSpatializerEnabled, volumeBoost: $volumeBoost, effectiveVolumeBoost: $effectiveVolumeBoost, effectiveBassBoost: $effectiveBassBoost, preampDb: $preampDb, isVolumeBoostSupported: $isVolumeBoostSupported, isBassBoostSupported: $isBassBoostSupported, isCrossfeedEnabled: $isCrossfeedEnabled, crossfeedDelayUs: $crossfeedDelayUs, crossfeedFeedDb: $crossfeedFeedDb, crossfeedMode: $crossfeedMode, isLimiterEnabled: $isLimiterEnabled, limiterThresholdDb: $limiterThresholdDb, limiterReleaseMs: $limiterReleaseMs, compressorRatio: $compressorRatio, compressorAttackMs: $compressorAttackMs, compressorMakeupGainDb: $compressorMakeupGainDb, isReverbEnabled: $isReverbEnabled, reverbPreset: $reverbPreset, reverbWetDry: $reverbWetDry, stereoBalance: $stereoBalance, monoMix: $monoMix, isSincResamplerEnabled: $isSincResamplerEnabled, isDitherEnabled: $isDitherEnabled, ditherTargetBitDepth: $ditherTargetBitDepth, isSaturationEnabled: $isSaturationEnabled, saturationDrive: $saturationDrive, saturationMix: $saturationMix, saturationTilt: $saturationTilt, saturationMultiband: $saturationMultiband, isStereoWidthEnabled: $isStereoWidthEnabled, stereoWidth: $stereoWidth, isLoudnessContourEnabled: $isLoudnessContourEnabled, loudnessContourIntensity: $loudnessContourIntensity, isSubCrossoverEnabled: $isSubCrossoverEnabled, subCrossoverCornerHz: $subCrossoverCornerHz, subCrossoverSlopeDbPerOct: $subCrossoverSlopeDbPerOct, subCrossoverGain: $subCrossoverGain, subCrossoverBassMono: $subCrossoverBassMono, subCrossoverAntiPop: $subCrossoverAntiPop, stereoWidthMultiband: $stereoWidthMultiband, stereoWidthLow: $stereoWidthLow, stereoWidthMid: $stereoWidthMid, stereoWidthHigh: $stereoWidthHigh, stereoWidthLowCrossoverHz: $stereoWidthLowCrossoverHz, stereoWidthHighCrossoverHz: $stereoWidthHighCrossoverHz, isMultibandCompressorEnabled: $isMultibandCompressorEnabled, multibandCompressorF0: $multibandCompressorF0, multibandCompressorF1: $multibandCompressorF1, multibandCompressorF2: $multibandCompressorF2, multibandCompressorBands: $multibandCompressorBands, isDynamicEqEnabled: $isDynamicEqEnabled, dynamicEqBands: $dynamicEqBands, isViperDdcEnabled: $isViperDdcEnabled, viperDdcProfileName: $viperDdcProfileName, isArbitraryEqEnabled: $isArbitraryEqEnabled, arbitraryEqLinearPhase: $arbitraryEqLinearPhase, arbitraryEqString: $arbitraryEqString, isLiveProgEnabled: $isLiveProgEnabled, liveProgCode: $liveProgCode, liveProgStatus: $liveProgStatus, isDynamicBassEnabled: $isDynamicBassEnabled, dynamicBassStrength: $dynamicBassStrength, dynamicBassPreset: $dynamicBassPreset, hasOemAudio: $hasOemAudio, detectedOemEngines: $detectedOemEngines, isQuranModeEnabled: $isQuranModeEnabled, quranReciterStyle: $quranReciterStyle)';
+    return 'DspSlice(eqPreset: $eqPreset, isEqEnabled: $isEqEnabled, isVirtualizerEnabled: $isVirtualizerEnabled, virtualizerStrength: $virtualizerStrength, isVirtualizerSupported: $isVirtualizerSupported, isDynamicsEnabled: $isDynamicsEnabled, isDynamicsSupported: $isDynamicsSupported, dynamicsPreset: $dynamicsPreset, selectedHeadphoneProfile: $selectedHeadphoneProfile, isSpatializerSupported: $isSpatializerSupported, isSpatializerEnabled: $isSpatializerEnabled, volumeBoost: $volumeBoost, effectiveVolumeBoost: $effectiveVolumeBoost, effectiveBassBoost: $effectiveBassBoost, preampDb: $preampDb, isVolumeBoostSupported: $isVolumeBoostSupported, isBassBoostSupported: $isBassBoostSupported, isCrossfeedEnabled: $isCrossfeedEnabled, crossfeedDelayUs: $crossfeedDelayUs, crossfeedFeedDb: $crossfeedFeedDb, crossfeedMode: $crossfeedMode, isHrtfEnabled: $isHrtfEnabled, hrtfAzimuth: $hrtfAzimuth, hrtfElevation: $hrtfElevation, hrtfSofaPath: $hrtfSofaPath, isLimiterEnabled: $isLimiterEnabled, limiterThresholdDb: $limiterThresholdDb, limiterReleaseMs: $limiterReleaseMs, compressorRatio: $compressorRatio, compressorAttackMs: $compressorAttackMs, compressorMakeupGainDb: $compressorMakeupGainDb, isReverbEnabled: $isReverbEnabled, reverbPreset: $reverbPreset, reverbWetDry: $reverbWetDry, stereoBalance: $stereoBalance, monoMix: $monoMix, isSincResamplerEnabled: $isSincResamplerEnabled, isDitherEnabled: $isDitherEnabled, ditherTargetBitDepth: $ditherTargetBitDepth, isSaturationEnabled: $isSaturationEnabled, saturationDrive: $saturationDrive, saturationMix: $saturationMix, saturationTilt: $saturationTilt, saturationMultiband: $saturationMultiband, isStereoWidthEnabled: $isStereoWidthEnabled, stereoWidth: $stereoWidth, isLoudnessContourEnabled: $isLoudnessContourEnabled, loudnessContourIntensity: $loudnessContourIntensity, isSubCrossoverEnabled: $isSubCrossoverEnabled, subCrossoverCornerHz: $subCrossoverCornerHz, subCrossoverSlopeDbPerOct: $subCrossoverSlopeDbPerOct, subCrossoverGain: $subCrossoverGain, subCrossoverBassMono: $subCrossoverBassMono, subCrossoverAntiPop: $subCrossoverAntiPop, stereoWidthMultiband: $stereoWidthMultiband, stereoWidthLow: $stereoWidthLow, stereoWidthMid: $stereoWidthMid, stereoWidthHigh: $stereoWidthHigh, stereoWidthLowCrossoverHz: $stereoWidthLowCrossoverHz, stereoWidthHighCrossoverHz: $stereoWidthHighCrossoverHz, isMultibandCompressorEnabled: $isMultibandCompressorEnabled, multibandCompressorF0: $multibandCompressorF0, multibandCompressorF1: $multibandCompressorF1, multibandCompressorF2: $multibandCompressorF2, multibandCompressorBands: $multibandCompressorBands, isDynamicEqEnabled: $isDynamicEqEnabled, dynamicEqBands: $dynamicEqBands, isViperDdcEnabled: $isViperDdcEnabled, viperDdcProfileName: $viperDdcProfileName, isArbitraryEqEnabled: $isArbitraryEqEnabled, arbitraryEqLinearPhase: $arbitraryEqLinearPhase, arbitraryEqString: $arbitraryEqString, isLiveProgEnabled: $isLiveProgEnabled, liveProgCode: $liveProgCode, liveProgStatus: $liveProgStatus, isDynamicBassEnabled: $isDynamicBassEnabled, dynamicBassStrength: $dynamicBassStrength, dynamicBassPreset: $dynamicBassPreset, hasOemAudio: $hasOemAudio, detectedOemEngines: $detectedOemEngines, isQuranModeEnabled: $isQuranModeEnabled, quranReciterStyle: $quranReciterStyle)';
   }
 }
 
@@ -3998,6 +4081,10 @@ abstract mixin class _$DspSliceCopyWith<$Res>
       double crossfeedDelayUs,
       double crossfeedFeedDb,
       int crossfeedMode,
+      bool isHrtfEnabled,
+      double hrtfAzimuth,
+      double hrtfElevation,
+      String? hrtfSofaPath,
       bool isLimiterEnabled,
       double limiterThresholdDb,
       double limiterReleaseMs,
@@ -4090,6 +4177,10 @@ class __$DspSliceCopyWithImpl<$Res> implements _$DspSliceCopyWith<$Res> {
     Object? crossfeedDelayUs = null,
     Object? crossfeedFeedDb = null,
     Object? crossfeedMode = null,
+    Object? isHrtfEnabled = null,
+    Object? hrtfAzimuth = null,
+    Object? hrtfElevation = null,
+    Object? hrtfSofaPath = freezed,
     Object? isLimiterEnabled = null,
     Object? limiterThresholdDb = null,
     Object? limiterReleaseMs = null,
@@ -4233,6 +4324,22 @@ class __$DspSliceCopyWithImpl<$Res> implements _$DspSliceCopyWith<$Res> {
           ? _self.crossfeedMode
           : crossfeedMode // ignore: cast_nullable_to_non_nullable
               as int,
+      isHrtfEnabled: null == isHrtfEnabled
+          ? _self.isHrtfEnabled
+          : isHrtfEnabled // ignore: cast_nullable_to_non_nullable
+              as bool,
+      hrtfAzimuth: null == hrtfAzimuth
+          ? _self.hrtfAzimuth
+          : hrtfAzimuth // ignore: cast_nullable_to_non_nullable
+              as double,
+      hrtfElevation: null == hrtfElevation
+          ? _self.hrtfElevation
+          : hrtfElevation // ignore: cast_nullable_to_non_nullable
+              as double,
+      hrtfSofaPath: freezed == hrtfSofaPath
+          ? _self.hrtfSofaPath
+          : hrtfSofaPath // ignore: cast_nullable_to_non_nullable
+              as String?,
       isLimiterEnabled: null == isLimiterEnabled
           ? _self.isLimiterEnabled
           : isLimiterEnabled // ignore: cast_nullable_to_non_nullable

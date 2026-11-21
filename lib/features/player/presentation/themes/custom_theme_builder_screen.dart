@@ -157,28 +157,38 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
       } catch (_) {}
     });
 
-    if (result != null && result.trim().isNotEmpty && mounted) {
+    if (!mounted) return;
+
+    if (result != null && result.trim().isNotEmpty) {
       try {
         final decoded = jsonDecode(result.trim()) as Map<String, dynamic>;
-        final colorVal = decoded['accentColor'] as int?;
+        final rawColor = decoded['accentColor'] as int?;
+        final colorVal =
+            rawColor != null && rawColor >= 0 && rawColor <= 0xFFFFFFFF
+                ? (0xFF000000 | rawColor)
+                : null;
         final radiusVal = (decoded['cornerRadius'] as num?)?.toDouble();
         final glowVal = decoded['glowEnabled'] as bool?;
 
         if (colorVal != null) {
           setState(() {
             _accentColor = colorVal;
-            if (radiusVal != null) _cornerRadius = radiusVal.clamp(0.0, 48.0);
+            if (radiusVal != null && radiusVal.isFinite) {
+              _cornerRadius = radiusVal.clamp(0.0, 48.0);
+            }
             if (glowVal != null) _glowEnabled = glowVal;
           });
-          context.read<SettingsCubit>().setCustomAccentColor(Color(colorVal));
           final cubit = context.read<SettingsCubit>();
-          if (radiusVal != null) {
-            await cubit.setCustomThemeRadius(radiusVal);
+          await cubit.setCustomAccentColor(Color(colorVal));
+          if (!mounted) return;
+          if (radiusVal != null && radiusVal.isFinite) {
+            await cubit.setCustomThemeRadius(_cornerRadius);
+            if (!mounted) return;
           }
           if (glowVal != null) {
             await cubit.setCustomThemeGlow(glowVal);
+            if (!mounted) return;
           }
-          if (!mounted) return;
           PulsrToast.show(context,
               message: l10n.themeApplied, icon: Icons.palette_rounded);
         } else {

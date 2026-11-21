@@ -1631,26 +1631,34 @@ void ConvolutionReverb::processInterleaved(float* buffer, int frames, int channe
             inL[i] = buffer[i * channels];
             inR[i] = buffer[i * channels + 1];
         }
+        const float startMix = smoothedEnabledMix_;
         process(inL, inR, outL, outR, frames);
+        const float endMix = smoothedEnabledMix_;
+        const float mixStep = (endMix - startMix) / static_cast<float>(frames);
         for (int i = 0; i < frames; ++i) {
             buffer[i * channels] = outL[i];
             buffer[i * channels + 1] = outR[i];
         }
         // The reverb convolves only L/R; dry surround channels must be delayed
-        // by the same wet-path latency or the multichannel image skews.
+        // by the same wet-path latency or the multichannel image skews. Crossfade
+        // between undelayed and delayed using the block's enable mix ramp
+        // (matching L/R's effectiveDry) so toggling reverb is click-free.
         if (channels > 2) {
             const int delay = std::clamp(
                 reverbLatencyFrames_.load(std::memory_order_relaxed), 0,
                 MAX_HQ_DRY_DELAY - 1);
             const int surroundChannels = std::min(channels, 8);
             for (int i = 0; i < frames; ++i) {
+                const float curMix = startMix + mixStep * static_cast<float>(i + 1);
                 const int readIdx = (surroundDelayIdx_ - delay + MAX_HQ_DRY_DELAY) % MAX_HQ_DRY_DELAY;
                 for (int ch = 2; ch < surroundChannels; ++ch) {
                     const int slot = ch - 2;
                     const float current = buffer[i * channels + ch];
                     const float delayed = (delay > 0) ? surroundDelay_[slot][readIdx] : current;
                     surroundDelay_[slot][surroundDelayIdx_] = current;
-                    buffer[i * channels + ch] = delayed;
+                    buffer[i * channels + ch] = (delay > 0)
+                        ? (curMix * delayed + (1.0f - curMix) * current)
+                        : current;
                 }
                 surroundDelayIdx_ = (surroundDelayIdx_ + 1) % MAX_HQ_DRY_DELAY;
             }

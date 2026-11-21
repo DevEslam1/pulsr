@@ -3594,11 +3594,13 @@ class _ConversionQualityCardState extends State<ConversionQualityCard> {
     // Reconcile the engine with the stored value. Without this the pref only
     // reaches native when the user touches this card, so a chosen kernel would
     // silently revert to the default on the next launch.
-    try {
-      await AudioEffectsChannel().setTapSrcQuality(stored);
-    } catch (_) {
-      // Off Android (or without the DSP bridge) there is nothing to apply;
-      // the card stays usable as a stored preference.
+    if (widget.blockedReason == null && widget.nativeAvailable) {
+      try {
+        await AudioEffectsChannel().setTapSrcQuality(stored);
+      } catch (_) {
+        // Off Android (or without the DSP bridge) there is nothing to apply;
+        // the card stays usable as a stored preference.
+      }
     }
   }
 
@@ -3617,6 +3619,7 @@ class _ConversionQualityCardState extends State<ConversionQualityCard> {
       return;
     }
     final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
     await prefs.setInt(PrefsKeys.tapSrcQuality, quality);
   }
 

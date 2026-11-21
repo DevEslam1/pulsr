@@ -21,6 +21,11 @@ class BpmOverrideStore {
   late final Future<void> ready;
   bool _clearedBeforeLoad = false;
   Future<void> _persistChain = Future<void>.value();
+  final StreamController<void> _changesController =
+      StreamController<void>.broadcast();
+
+  /// Emits whenever per-track BPM overrides change.
+  Stream<void> get changes => _changesController.stream;
 
   BpmOverrideStore() {
     ready = load();
@@ -37,6 +42,7 @@ class BpmOverrideStore {
     await ready;
     if (bpm == null) {
       _overrides.remove(trackKey);
+      _changesController.add(null);
       await persist();
       return true;
     }
@@ -47,6 +53,7 @@ class BpmOverrideStore {
     _overrides.remove(trackKey);
     _overrides[trackKey] = bpm;
     _trimToLimit();
+    _changesController.add(null);
     await persist();
     return true;
   }
@@ -54,6 +61,7 @@ class BpmOverrideStore {
   void clearAll() {
     _clearedBeforeLoad = true;
     _overrides.clear();
+    _changesController.add(null);
     unawaited(persist());
   }
 
@@ -86,6 +94,7 @@ class BpmOverrideStore {
         }
       });
       _trimToLimit();
+      _changesController.add(null);
     } catch (e, st) {
       ErrorLogger.log('Failed to load per-track BPM overrides',
           error: e, stackTrace: st, category: 'BpmOverrideStore');
@@ -104,6 +113,7 @@ class BpmOverrideStore {
       final raw = prefs.getString(prefsKey);
       if (raw == null || raw.isEmpty) {
         _overrides.clear();
+        _changesController.add(null);
         return;
       }
       final decoded = jsonDecode(raw);
@@ -121,6 +131,7 @@ class BpmOverrideStore {
         ..clear()
         ..addAll(restored);
       _trimToLimit();
+      _changesController.add(null);
     } catch (e, st) {
       ErrorLogger.log('Failed to reload per-track BPM overrides',
           error: e, stackTrace: st, category: 'BpmOverrideStore');

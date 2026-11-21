@@ -7,6 +7,7 @@ class PrefsKeys {
   static const String eqGains = 'eq_gains';
   static const String eqBassBoost = 'eq_bass_boost';
   static const String eqPreamp = 'eq_preamp_db';
+  static const String eqAutoPreampEnabled = 'eq_auto_preamp_enabled';
   static const String eqVolumeBoost = 'eq_volume_boost';
   static const String eqVirtualizerEnabled = 'eq_virtualizer_enabled';
   static const String eqVirtualizerStrength = 'eq_virtualizer_strength';
@@ -58,6 +59,7 @@ class PrefsKeys {
   static const String playbackSpeed = 'setting_playback_speed';
   static const String playbackPitch = 'setting_playback_pitch';
   static const String advancedPlaybackSpeed = 'setting_advanced_playback_speed';
+  static const String lastScanEpochSec = 'media_scanner_last_scan_epoch_sec';
   static const String playbackShuffle = 'setting_playback_shuffle';
   static const String playbackRepeatMode = 'setting_playback_repeat_mode';
   static const String autoplayEnabled = 'setting_autoplay_enabled';

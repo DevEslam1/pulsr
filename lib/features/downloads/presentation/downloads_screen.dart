@@ -739,8 +739,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
     );
     if (confirmed == true && context.mounted) {
       final cubit = context.read<DownloadsCubit>();
-      await Future.wait(
-          selectedTasks.map((t) => cubit.deleteDownload(t.videoId)));
+      await _deleteTasksBounded(cubit, selectedTasks);
       if (mounted) setState(() => _selectedVideoIds.clear());
     }
   }
@@ -874,9 +873,21 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
 
     if (confirmed == true && context.mounted) {
       final cubit = context.read<DownloadsCubit>();
-      await Future.wait(
-        completedTasks.map((t) => cubit.deleteDownload(t.videoId)),
-      );
+      await _deleteTasksBounded(cubit, completedTasks);
+    }
+  }
+
+  Future<void> _deleteTasksBounded(
+    DownloadsCubit cubit,
+    List<DownloadTask> tasks, {
+    int maxConcurrency = 4,
+  }) async {
+    for (var i = 0; i < tasks.length; i += maxConcurrency) {
+      final end = (i + maxConcurrency < tasks.length)
+          ? i + maxConcurrency
+          : tasks.length;
+      final chunk = tasks.sublist(i, end);
+      await Future.wait(chunk.map((t) => cubit.deleteDownload(t.videoId)));
     }
   }
 }

@@ -84,8 +84,7 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
                 if (crashSnapshot != null &&
                     crashSnapshot.songId == item.songId) {
                   final preferCrash =
-                      await PositionCrashGuard.shouldPreferCrashGuard(
-                          savedPositionMs);
+                      await PositionCrashGuard.shouldPreferCrashGuard();
                   if (preferCrash ||
                       crashSnapshot.positionMs > savedPositionMs) {
                     savedPositionMs = crashSnapshot.positionMs;
@@ -100,7 +99,13 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
                     }
                   }
                 }
-              } catch (_) {}
+              } catch (e, st) {
+                ErrorLogger.log(
+                    'Failed to check crash guard in restoreLastPlaybackSession',
+                    error: e,
+                    stackTrace: st,
+                    category: 'AudioHandler');
+              }
             }
           }
         }
@@ -294,9 +299,12 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
           final baseSpeed = perSongPlaybackStore
                   .getSpeed(PulsrAudioHandler.trackKeyFor(nextSong)) ??
               _userBaseSpeed;
-          // Synchronize speed on inactive player before loading & playback
+          final basePitch = perSongPlaybackStore
+                  .getPitch(PulsrAudioHandler.trackKeyFor(nextSong)) ??
+              _pitch;
+          // Synchronize speed and pitch on inactive player before loading & playback
           await _inactivePlayer.setSpeed(baseSpeed);
-          await _inactivePlayer.setPitch(_pitch);
+          await _inactivePlayer.setPitch(basePitch);
 
           final canReusePreload =
               _tripleBufferPipeline.preloadedSongId == nextSong.id &&
@@ -510,8 +518,10 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
           await _crossfadeManager.crossfadeVolumes(
             active: active,
             inactive: inactive,
-            fromActiveVol: initialActiveVolume,
-            toInactiveVol: targetNextVolume,
+            fromActiveVol:
+                (initialActiveVolume * _sleepFadeFactor).clamp(0.0, 1.0),
+            toInactiveVol:
+                (targetNextVolume * _sleepFadeFactor).clamp(0.0, 1.0),
             duration: fadeDuration,
             fadeId: currentFadeId,
             isRepeatOne: isRepeatOne,
@@ -548,7 +558,11 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
               currentSessionId ?? _activePlayer.androidAudioSessionId);
           await _pushNativeReplayGain(nextSong);
           try {
-            await _activePlayer.setVolume(_calculateReplayGainVolume(nextSong));
+            await _applyPlayerOutputVolume(
+              _activePlayer,
+              _calculateReplayGainVolume(nextSong),
+              song: nextSong,
+            );
           } catch (e, st) {
             ErrorLogger.log('Failed to apply replay gain volume on swap',
                 error: e, stackTrace: st, category: 'AudioHandler');
@@ -579,11 +593,19 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
             await outgoing.dspClearGainCurve();
           } catch (_) {}
           await Future.delayed(const Duration(milliseconds: 80));
+          if (_disposed || _crossfadeManager.currentFadeId != currentFadeId) {
+            return;
+          }
           final outgoingAfterDelay = _inactivePlayer;
           try {
             await outgoingAfterDelay.stop();
           } catch (_) {}
-          await outgoingAfterDelay.setVolume(_volume);
+          try {
+            await outgoingAfterDelay.setVolume(_volume);
+          } catch (e, st) {
+            ErrorLogger.log('Failed to reset outgoing volume in crossfade',
+                error: e, stackTrace: st, category: 'AudioHandler');
+          }
           // FIX-#5: During crossfade the outgoing player is manually stopped, so
           // ProcessingState.completed never fires.  Notify the sleep timer here
           // so track-count-based timers decrement correctly.
@@ -610,7 +632,9 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
                     error: fallbackError,
                     stackTrace: fallbackSt,
                     category: 'AudioHandler');
-                _errorSubject.add('Playback failed. Please try again.');
+                if (!_errorSubject.isClosed) {
+                  _errorSubject.add('Playback failed. Please try again.');
+                }
                 await _failCurrentPlayback(fatal: true);
               }
             }
@@ -1338,7 +1362,9 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
       // not freeze (item 13).
       _gaplessTargetIndex = null;
       final info = YtmErrorClassifier.classify(e);
-      _errorSubject.add(info.message);
+      if (!_errorSubject.isClosed) {
+        _errorSubject.add(info.message);
+      }
       ErrorLogger.log(
           'Error loading gapless YouTube source for ${song.title} (${e.code})',
           error: e,
@@ -1378,7 +1404,9 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
       }
       final info = YtmErrorClassifier.classify(e);
       final errorMessage = YtmErrorClassifier.displayMessage(e);
-      _errorSubject.add(errorMessage);
+      if (!_errorSubject.isClosed) {
+        _errorSubject.add(errorMessage);
+      }
       ErrorLogger.log('Error loading gapless queue for ${song.title}',
           error: e, stackTrace: st, category: 'AudioHandler');
 
@@ -1512,9 +1540,15 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
   Future<void> playSongAt(int index, {Duration? initialPosition}) async {
     if (index < 0 || index >= _songs.length) return;
     _pendingPlaybackStart = true;
+    final generation = ++_playGeneration;
     final volumeSync = _syncOutputVolumeBeforeLoad();
     if (volumeSync != null) await volumeSync;
-    if (index >= _songs.length) return;
+    if (_disposed ||
+        generation != _playGeneration ||
+        !_pendingPlaybackStart ||
+        index >= _songs.length) {
+      return;
+    }
     cancelPrefetches();
     // playSongAt takes over the active player with a single source; clear any
     // in-flight gapless load target so a stalled one cannot keep
@@ -1525,10 +1559,6 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
     // handler keep waiting for a native advance that can never come: it found
     // no next item, seeked back to track 1 and parked the queue PAUSED.
     _gaplessLoaded = false;
-    // A YouTube resolve below can await for seconds; a second skip during that
-    // window must win. Capture a generation token FIRST so a pre-resolve
-    // failure can bail without touching current playback at all.
-    final generation = ++_playGeneration;
     final song = _songs[index];
     // The tapped track is what the user is waiting on. Mark it foreground and
     // drop queued background warming for other tracks before submitting: a
@@ -1650,7 +1680,9 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
     } on YtmException catch (e, st) {
       if (generation != _playGeneration) return;
       final info = YtmErrorClassifier.classify(e);
-      _errorSubject.add(info.message);
+      if (!_errorSubject.isClosed) {
+        _errorSubject.add(info.message);
+      }
       ErrorLogger.log(
           'Error resolving YouTube stream for ${song.title} (${e.code})',
           error: e,
@@ -1663,7 +1695,9 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
       if (generation != _playGeneration) return;
       // DSD (DSF/DFF) on a platform with no native decoder (e.g. iOS) must
       // fail visibly and skip, never crash or loop on the same row.
-      _errorSubject.add(e.message);
+      if (!_errorSubject.isClosed) {
+        _errorSubject.add(e.message);
+      }
       ErrorLogger.log('DSD playback unsupported for ${song.title}',
           error: e, stackTrace: st, category: 'AudioHandler');
       await _failCurrentPlayback(fatal: false);
@@ -1681,7 +1715,9 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
       }
       final info = YtmErrorClassifier.classify(e);
       final errorMessage = YtmErrorClassifier.displayMessage(e);
-      _errorSubject.add(errorMessage);
+      if (!_errorSubject.isClosed) {
+        _errorSubject.add(errorMessage);
+      }
       ErrorLogger.log('Error playing song ${song.title} (${song.path})',
           error: e, stackTrace: st, category: 'AudioHandler');
       final isFatal = (e is YtmException && e.isFatal) ||
@@ -1774,6 +1810,8 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
 
   @override
   bool get _gaplessMode;
+
+  double get _sleepFadeFactor;
 
   bool get nativeDsdActive;
   bool isNativeDsdCandidate(SongsTableData song);
@@ -1876,6 +1914,8 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
 
   int get _loadQueueGeneration;
   set _loadQueueGeneration(int value);
+
+  bool get _disposed;
 
   void _notifyTrackChanged(SongsTableData song);
 }

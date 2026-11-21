@@ -7,7 +7,6 @@ import 'package:pulsr/data/audio/dsd_decoder_helper.dart';
 import 'package:pulsr/data/audio/native_dsd_producer.dart';
 import 'package:pulsr/data/audio/native_dsd_session.dart';
 import 'package:pulsr/data/services/usb_exclusive_service.dart';
-import 'package:pulsr/domain/models/audio_quality_info.dart';
 
 class MockUsbExclusiveService extends UsbExclusiveService {
   MockUsbExclusiveService() : super.forTest();
@@ -261,8 +260,8 @@ void main() {
     late String dsfPath;
 
     setUp(() async {
-      AudioQualityInfo.dsdNativeActive = false;
-      AudioQualityInfo.dsdDopActive = false;
+      DsdDecoderHelper.dsdNativeActive = false;
+      DsdDecoderHelper.dsdDopActive = false;
       mockUsb = MockUsbExclusiveService();
       producer = NativeDsdProducer(
         service: mockUsb,
@@ -283,8 +282,8 @@ void main() {
       try {
         await tempDir.delete(recursive: true);
       } catch (_) {}
-      AudioQualityInfo.dsdNativeActive = false;
-      AudioQualityInfo.dsdDopActive = false;
+      DsdDecoderHelper.dsdNativeActive = false;
+      DsdDecoderHelper.dsdDopActive = false;
     });
 
     test('prepare parses the header and holds the stream paused', () async {
@@ -296,7 +295,7 @@ void main() {
       expect(session.duration, greaterThan(Duration.zero));
       // No real block yet while loaded-paused.
       expect(producer.firstBlockWritten, isFalse);
-      expect(AudioQualityInfo.dsdNativeActive, isFalse);
+      expect(DsdDecoderHelper.dsdNativeActive, isFalse);
     });
 
     test('status flips only after the first real block and completes once', () async {
@@ -313,7 +312,7 @@ void main() {
       await session.play();
       await active.future.timeout(const Duration(seconds: 2));
       expect(producer.firstBlockWritten, isTrue);
-      expect(AudioQualityInfo.dsdNativeActive, isTrue);
+      expect(DsdDecoderHelper.dsdNativeActive, isTrue);
       await completed.future.timeout(const Duration(seconds: 2));
       expect(session.nativeStatusActive, isTrue);
     });
@@ -329,7 +328,7 @@ void main() {
       await session.preparePath(dsfPath, autoPlay: true);
       await fallback.future.timeout(const Duration(seconds: 3));
       expect(producer.fallbackRequested, isTrue);
-      expect(AudioQualityInfo.dsdNativeActive, isFalse);
+      expect(DsdDecoderHelper.dsdNativeActive, isFalse);
       expect(session.nativeStatusActive, isFalse);
     });
 

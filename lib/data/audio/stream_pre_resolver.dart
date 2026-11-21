@@ -2,6 +2,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import '../../core/utils/error_logger.dart';
 import '../db/app_database.dart';
 import '../../core/services/ytm_url_cache.dart';
 import '../../core/telemetry/clock.dart';
@@ -58,7 +59,10 @@ class PreconnectedSocketPool {
     final future = Future<void>.sync(() async {
       await lookup(host).timeout(_lookupTimeout);
       _warmedAt[host] = DateTime.now();
-    }).catchError((Object _) {}).whenComplete(() {
+    }).catchError((Object e, StackTrace st) {
+      ErrorLogger.log('Best-effort DNS preconnect failed',
+          error: e, stackTrace: st, category: 'PreconnectedSocketPool');
+    }).whenComplete(() {
       // Block body on purpose: returning the removed future here would make
       // whenComplete await the very future it is completing (self-deadlock).
       _inFlight.remove(host);
@@ -383,7 +387,9 @@ class StreamPreResolver {
             quality: quality,
             refreshThreshold: const Duration(minutes: 10),
           );
-        } catch (_) {
+        } catch (e, st) {
+          ErrorLogger.log('needsRefresh check failed',
+              error: e, stackTrace: st, category: 'StreamPreResolver');
           shouldRefresh = false;
         }
         if (!shouldRefresh) {
@@ -414,6 +420,7 @@ class StreamPreResolver {
     // error path below and clears its in-flight entry.
     Future<YtmStream>.sync(() => resolveUrl(videoId,
             quality: quality, title: song.title, artist: song.artist))
+        .timeout(const Duration(seconds: 20))
         .then((stream) {
       if (_disposed || !identical(_activeResolutionTokens[videoId], token)) {
         return;
@@ -424,11 +431,17 @@ class StreamPreResolver {
       unawaited(PreconnectedSocketPool().preconnect(Uri.parse(stream.url)));
       debugPrint(
           '[StreamPreResolver] Successfully pre-resolved track ($videoId)');
-    }).catchError((e) {
+    }).catchError((e, st) {
       if (_disposed || !identical(_activeResolutionTokens[videoId], token)) {
         return;
       }
       _cooldownUntil[videoId] = clock.now().add(failureCooldown);
+      if (_cooldownUntil.length > 100) {
+        final now = clock.now();
+        _cooldownUntil.removeWhere((_, expiry) => now.isAfter(expiry));
+      }
+      ErrorLogger.log('Pre-resolution failed for $videoId non-fatally',
+          error: e, stackTrace: st, category: 'StreamPreResolver');
       debugPrint(
           '[StreamPreResolver] Pre-resolution failed for $videoId non-fatally: $e');
       debugPrint('[StreamPreResolver] Cooling down $videoId for '
@@ -492,6 +505,10 @@ class StreamPreResolver {
   }
 
   bool _isCoolingDown(String videoId) {
+    if (_cooldownUntil.length > 100) {
+      final now = clock.now();
+      _cooldownUntil.removeWhere((_, expiry) => now.isAfter(expiry));
+    }
     final until = _cooldownUntil[videoId];
     if (until == null) return false;
     if (clock.now().isBefore(until)) return true;

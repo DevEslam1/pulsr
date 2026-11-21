@@ -182,6 +182,7 @@ extension _YtmBlockRecoveryCard on _YtmWebLoginSheetState {
     required String userAgent,
     UserPreferredContentMode? contentMode,
   }) async {
+    if (!mounted || _disposed) return;
     final base = _settingsWithIdentity(
       _settings,
       userAgent: userAgent,
@@ -194,29 +195,39 @@ extension _YtmBlockRecoveryCard on _YtmWebLoginSheetState {
     // WebView will be created with it. Calling setSettings on a disposed
     // controller throws invalid_instance_id and made the recovery card look
     // like it had failed.
-    if (controller == null || _webViewGone) return;
-    await controller.setSettings(settings: base);
+    if (controller == null || _webViewGone || _disposed || !mounted) return;
+    try {
+      await controller.setSettings(settings: base);
+    } catch (e, st) {
+      _handleWebViewError('_applyWebViewIdentity setSettings failed', e, st);
+    }
+    if (!mounted || _disposed) return;
   }
 
   /// Recovery card "Retry": manual full ladder — reset attempts, clean
   /// session, default identity selection, reload.
   Future<void> _manualRetryFromBlock() async {
+    if (!mounted || _disposed) return;
     _blockRecovery.reset();
     _uaIdentityOverride = null;
     _hadSuccessfulYtLoad = false;
     _mismatchAutoNavCount = 0;
-    if (mounted) {
+    if (mounted && !_disposed) {
       _setStateSafe(() {
         _blockExhausted = false;
         _blockStatus = 'Retrying sign-in with a clean session…';
       });
     }
     await _clearWebViewCookiesAndCache();
+    if (!mounted || _disposed) return;
+
     await _applyWebViewIdentity(
       _webViewController,
       userAgent: mobileUserAgent,
       contentMode: UserPreferredContentMode.MOBILE,
     );
+    if (!mounted || _disposed) return;
+
     _blockCooldownStopwatch
       ..reset()
       ..start();
@@ -228,6 +239,7 @@ extension _YtmBlockRecoveryCard on _YtmWebLoginSheetState {
 
   /// Recovery card identity toggle: switch UA mode and reload in place.
   Future<void> _switchIdentityManually(BrowserIdentity identity) async {
+    if (!mounted || _disposed) return;
     _uaIdentityOverride = identity;
     final isDesktop = identity == BrowserIdentity.desktop ||
         identity == BrowserIdentity.chromeDesktop;
@@ -238,6 +250,8 @@ extension _YtmBlockRecoveryCard on _YtmWebLoginSheetState {
       });
     }
     await _clearWebViewCookiesAndCache();
+    if (!mounted || _disposed) return;
+
     await _applyWebViewIdentity(
       _webViewController,
       userAgent: _uaFor(identity),
@@ -245,6 +259,8 @@ extension _YtmBlockRecoveryCard on _YtmWebLoginSheetState {
           ? UserPreferredContentMode.DESKTOP
           : UserPreferredContentMode.MOBILE,
     );
+    if (!mounted || _disposed) return;
+
     _blockCooldownStopwatch
       ..reset()
       ..start();

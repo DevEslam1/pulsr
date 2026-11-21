@@ -91,7 +91,7 @@ class PartySyncController {
     required int hostRenderPositionMs,
     required int hostOutputLatencyMs,
   }) =>
-      math.max(0, hostRenderPositionMs + math.max(0, hostOutputLatencyMs));
+      math.max(0, hostRenderPositionMs - math.max(0, hostOutputLatencyMs));
 
   /// The render position a member must be at so that its *heard* audio sits at
   /// [roomPositionMs]. A device with output latency plays slightly in the past.
@@ -99,7 +99,7 @@ class PartySyncController {
     required int roomPositionMs,
     required int outputLatencyMs,
   }) =>
-      math.max(0, roomPositionMs - math.max(0, outputLatencyMs));
+      math.max(0, roomPositionMs + math.max(0, outputLatencyMs));
 
   /// Signed error: positive means this device is audible ahead of the room.
   static int signedErrorMs({
@@ -185,7 +185,7 @@ class PartySyncController {
     if (leadMs < minScheduledStartWaitMs) {
       return StartPlan(
         wait: Duration(milliseconds: leadMs),
-        applied: Duration(milliseconds: leadMs),
+        applied: Duration.zero,
       );
     }
     return StartPlan(

@@ -12,6 +12,7 @@ import 'package:pulsr/core/di/injection.dart';
 import 'package:pulsr/core/errors/failures.dart';
 import 'package:pulsr/core/services/ytm_account_service.dart';
 import 'package:pulsr/core/services/ytm_service.dart';
+import 'package:pulsr/data/audio/song_rating_store.dart';
 import 'package:pulsr/data/db/app_database.dart';
 import 'package:pulsr/domain/models/ytm_track.dart';
 import 'package:pulsr/domain/repositories/music_repository_interface.dart';
@@ -47,6 +48,8 @@ class _FolderUseCases extends Mock implements FolderUseCases {}
 class _Repo extends Mock implements IMusicRepository {}
 
 class _Account extends Mock implements YtmAccountService {}
+
+class _SongRatingStore extends Mock implements SongRatingStore {}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -173,6 +176,33 @@ void main() {
     ]));
     await settle();
     expect(cubit.state.songs.map((s) => s.id).toList(), [1, 2]);
+    await cubit.close();
+  });
+
+  test('LibraryCubit out-of-order async rating sort discarding stale emission',
+      () async {
+    final ratingStore = _SongRatingStore();
+    when(() => ratingStore.getRating(any())).thenReturn(3);
+    getIt.registerSingleton<SongRatingStore>(ratingStore);
+
+    final cubit = create();
+    await settle();
+    cubit.updateSort('rating', false);
+    await settle();
+
+    // First emission has >256 songs so it runs the async Isolate sort
+    final emission1 = manySongs(300);
+    // Second emission has fewer songs (<256) so it evaluates immediately
+    final emission2 = [createTestSong(id: 999, title: 'Winner')];
+
+    songs.add(Right(emission1));
+    songs.add(Right(emission2));
+
+    await settle(150);
+
+    // Stale emission 1 must be discarded and state must hold emission 2
+    expect(cubit.state.songs.length, 1);
+    expect(cubit.state.songs.first.id, 999);
     await cubit.close();
   });
 

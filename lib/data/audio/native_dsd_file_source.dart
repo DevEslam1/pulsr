@@ -6,6 +6,7 @@
 // This reader parses the header once and streams block/byte-interleaved
 // payloads straight from disk, so the producer only ever holds one chunk.
 
+import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 import 'dart:typed_data';
@@ -28,6 +29,8 @@ class NativeDsdFileSource {
   final int channels;
   final int blockSize;
   int _position = 0;
+  int _seekGeneration = 0;
+  Future<void> _opChain = Future<void>.value();
 
   NativeDsdFileSource._({
     required RandomAccessFile file,
@@ -56,12 +59,9 @@ class NativeDsdFileSource {
     final length = await file.length();
     final raf = await file.open(mode: FileMode.read);
     try {
-      final headLen = math.min(length, 256 * 1024);
-      await raf.setPosition(0);
-      final head = await raf.read(headLen);
       final ext = path.split('.').last.toLowerCase();
-      if (ext == 'dsf') return _parseDsf(raf, head, length);
-      if (ext == 'dff') return _parseDff(raf, head, length);
+      if (ext == 'dsf') return await _parseDsf(raf, length);
+      if (ext == 'dff') return await _parseDff(raf, length);
       throw const FormatException('Unsupported DSD container');
     } catch (_) {
       await raf.close();
@@ -69,13 +69,16 @@ class NativeDsdFileSource {
     }
   }
 
-  static NativeDsdFileSource _parseDsf(
-      RandomAccessFile raf, Uint8List head, int fileLength) {
-    if (head.length < 52 ||
-        String.fromCharCodes(head.sublist(0, 4)) != 'DSD ') {
+  static Future<NativeDsdFileSource> _parseDsf(
+      RandomAccessFile raf, int fileLength) async {
+    if (fileLength < 52) {
       throw const FormatException('Not a valid DSF file');
     }
-    final data = ByteData.sublistView(head);
+    await raf.setPosition(0);
+    final magic = await raf.read(4);
+    if (magic.length < 4 || String.fromCharCodes(magic) != 'DSD ') {
+      throw const FormatException('Not a valid DSF file');
+    }
     var pos = 28;
     var channels = 2;
     var sampleRate = 2822400;
@@ -84,22 +87,31 @@ class NativeDsdFileSource {
     var blockSize = 4096;
     var dataOffset = -1;
     var dataSize = -1;
-    while (pos + 12 <= head.length) {
-      final id = String.fromCharCodes(head.sublist(pos, pos + 4));
-      final size = data.getUint64(pos + 4, Endian.little);
+    while (pos + 12 <= fileLength) {
+      await raf.setPosition(pos);
+      final hdr = await raf.read(12);
+      if (hdr.length < 12) break;
+      final hdrData = ByteData.sublistView(hdr);
+      final id = String.fromCharCodes(hdr.sublist(0, 4));
+      final size = hdrData.getUint64(4, Endian.little);
       if (size < 0) break;
-      if (id == 'fmt ' && pos + 52 <= head.length) {
-        channels = data.getUint32(pos + 24, Endian.little);
-        sampleRate = data.getUint32(pos + 28, Endian.little);
-        bitsPerSample = data.getUint32(pos + 32, Endian.little);
-        sampleCount = data.getUint64(pos + 36, Endian.little);
-        blockSize = data.getUint32(pos + 44, Endian.little);
+      if (id == 'fmt ' && pos + 52 <= fileLength) {
+        await raf.setPosition(pos);
+        final fmt = await raf.read(52);
+        if (fmt.length >= 52) {
+          final data = ByteData.sublistView(fmt);
+          channels = data.getUint32(24, Endian.little);
+          sampleRate = data.getUint32(28, Endian.little);
+          bitsPerSample = data.getUint32(32, Endian.little);
+          sampleCount = data.getUint64(36, Endian.little);
+          blockSize = data.getUint32(44, Endian.little);
+        }
       } else if (id == 'data') {
         dataOffset = pos + 12;
         dataSize = size - 12;
         break;
       }
-      if (size <= 0) break;
+      if (size <= 0 || pos + size <= pos) break;
       pos += size;
     }
     if (dataOffset < 0 || dataOffset >= fileLength) {
@@ -127,54 +139,83 @@ class NativeDsdFileSource {
     );
   }
 
-  static NativeDsdFileSource _parseDff(
-      RandomAccessFile raf, Uint8List head, int fileLength) {
-    if (head.length < 32 ||
-        String.fromCharCodes(head.sublist(0, 4)) != 'FRM8') {
+  static Future<NativeDsdFileSource> _parseDff(
+      RandomAccessFile raf, int fileLength) async {
+    if (fileLength < 32) {
       throw const FormatException('Not a valid DFF file');
     }
-    final data = ByteData.sublistView(head);
+    await raf.setPosition(0);
+    final magic = await raf.read(4);
+    if (magic.length < 4 || String.fromCharCodes(magic) != 'FRM8') {
+      throw const FormatException('Not a valid DFF file');
+    }
     var pos = 16;
     var dsdRate = 64;
     var channels = 2;
     var dataOffset = -1;
     var dataSize = -1;
-    while (pos + 12 <= head.length) {
-      final id = String.fromCharCodes(head.sublist(pos, pos + 4));
-      final size = data.getUint64(pos + 4, Endian.big);
+    while (pos + 12 <= fileLength) {
+      await raf.setPosition(pos);
+      final hdr = await raf.read(12);
+      if (hdr.length < 12) break;
+      final hdrData = ByteData.sublistView(hdr);
+      final id = String.fromCharCodes(hdr.sublist(0, 4));
+      final size = hdrData.getUint64(4, Endian.big);
       if (size < 0) break;
       if (id == 'PROP') {
-        final end = math.min(pos + 12 + size, head.length);
+        final end = math.min(pos + 12 + size, fileLength);
         var sub = pos + 16;
         while (sub + 12 <= end) {
-          final subId = String.fromCharCodes(head.sublist(sub, sub + 4));
-          final subSize = data.getUint64(sub + 4, Endian.big);
+          await raf.setPosition(sub);
+          final subHdr = await raf.read(12);
+          if (subHdr.length < 12) break;
+          final subData = ByteData.sublistView(subHdr);
+          final subId = String.fromCharCodes(subHdr.sublist(0, 4));
+          final subSize = subData.getUint64(4, Endian.big);
           if (subSize < 0) break;
           if (subId == 'FS  ' && subSize >= 4 && sub + 16 <= end) {
-            dsdRate = data.getUint32(sub + 12, Endian.big) ~/ 44100;
-          } else if (subId == 'CHNL' &&
-              subSize >= 2 &&
-              sub + 14 <= end) {
-            channels = data.getUint16(sub + 12, Endian.big);
+            await raf.setPosition(sub + 12);
+            final fs = await raf.read(4);
+            if (fs.length == 4) {
+              dsdRate = ByteData.sublistView(fs).getUint32(0, Endian.big) ~/ 44100;
+            }
+          } else if (subId == 'CHNL' && subSize >= 2 && sub + 14 <= end) {
+            await raf.setPosition(sub + 12);
+            final ch = await raf.read(2);
+            if (ch.length == 2) {
+              channels = ByteData.sublistView(ch).getUint16(0, Endian.big);
+            }
           } else if (subId == 'CMPR' && subSize >= 4 && sub + 16 <= end) {
-            final type = String.fromCharCodes(head.sublist(sub + 12, sub + 16));
-            if (type != 'DSD ') {
-              throw DsdUnsupportedException(
-                  'Compressed DFF ($type) is not supported');
+            await raf.setPosition(sub + 12);
+            final cmpr = await raf.read(4);
+            if (cmpr.length == 4) {
+              final type = String.fromCharCodes(cmpr);
+              if (type != 'DSD ') {
+                throw DsdUnsupportedException(
+                    'Compressed DFF ($type) is not supported');
+              }
             }
           }
-          sub += 12 + subSize + (subSize & 1);
+          final nextSub = sub + 12 + subSize + (subSize & 1);
+          if (nextSub <= sub) break;
+          sub = nextSub;
         }
       } else if (id == 'FS  ') {
-        if (size >= 4 && pos + 16 <= head.length) {
-          dsdRate = data.getUint32(pos + 12, Endian.big) ~/ 44100;
+        if (size >= 4 && pos + 16 <= fileLength) {
+          await raf.setPosition(pos + 12);
+          final fs = await raf.read(4);
+          if (fs.length == 4) {
+            dsdRate = ByteData.sublistView(fs).getUint32(0, Endian.big) ~/ 44100;
+          }
         }
       } else if (id == 'DSD ') {
         dataOffset = pos + 12;
         dataSize = size;
         break;
       }
-      pos += 12 + size + (size & 1);
+      final nextPos = pos + 12 + size + (size & 1);
+      if (nextPos <= pos) break;
+      pos = nextPos;
     }
     if (dataOffset < 0 || dataOffset >= fileLength) {
       throw const FormatException('DFF file contains no DSD audio chunk');
@@ -197,49 +238,103 @@ class NativeDsdFileSource {
     );
   }
 
+  Future<T> _serialized<T>(Future<T> Function() fn) {
+    final task = _opChain.then((_) => fn());
+    _opChain = task.then<void>((_) {}, onError: (_, __) {});
+    return task;
+  }
+
   void seek(int byteOffset) {
+    _seekGeneration++;
     _position = byteOffset.clamp(0, totalBytes);
   }
 
-  Future<NativeDsdChunk?> readChunk(int maxBytes) async {
+  Future<NativeDsdChunk?> readChunk(int maxBytes) =>
+      _serialized(() => _readChunkUnlocked(maxBytes));
+
+  Future<NativeDsdChunk?> _readChunkUnlocked(int maxBytes) async {
     if (maxBytes <= 0 || _position >= totalBytes) return null;
+    final startGen = _seekGeneration;
     final want = math.min(maxBytes, totalBytes - _position);
-    if (isDsf) return _readDsfChunk(want);
-    return _readDffChunk(want);
+    if (isDsf) return _readDsfChunk(want, startGen);
+    return _readDffChunk(want, startGen);
   }
 
-  Future<NativeDsdChunk?> _readDsfChunk(int want) async {
+  Future<NativeDsdChunk?> _readDsfChunk(int want, int startGen) async {
     final leftOut = Uint8List(want);
     final rightOut = Uint8List(want);
     var written = 0;
     var perChannelPos = _position;
     while (written < want) {
+      if (_seekGeneration != startGen) return null;
       final blockIndex = perChannelPos ~/ blockSize;
       final within = perChannelPos % blockSize;
       final inBlock = math.min(blockSize - within, want - written);
       final leftOffset =
           dataOffset + blockIndex * blockSize * channels + within;
       final left = await _readAt(leftOffset, inBlock);
-      if (left.length != inBlock) return null;
+      if (_seekGeneration != startGen) return null;
+      if (left.length < inBlock) {
+        if (left.isEmpty && written == 0) return null;
+        if (left.isNotEmpty) {
+          leftOut.setRange(written, written + left.length, left);
+        }
+        leftOut.fillRange(written + left.length, written + inBlock, 0x69);
+        if (channels == 2) {
+          final right = await _readAt(leftOffset + blockSize, inBlock);
+          if (_seekGeneration != startGen) return null;
+          final copyR = math.min(right.length, inBlock);
+          if (copyR > 0) {
+            rightOut.setRange(written, written + copyR, right);
+          }
+          if (copyR < inBlock) {
+            rightOut.fillRange(written + copyR, written + inBlock, 0x69);
+          }
+        } else {
+          rightOut.setRange(written, written + inBlock, leftOut, written);
+        }
+        written += inBlock;
+        perChannelPos = math.min(totalBytes, perChannelPos + inBlock);
+        break;
+      }
       leftOut.setRange(written, written + inBlock, left);
       if (channels == 2) {
         final right = await _readAt(leftOffset + blockSize, inBlock);
-        if (right.length != inBlock) return null;
-        rightOut.setRange(written, written + inBlock, right);
+        if (_seekGeneration != startGen) return null;
+        final copyR = math.min(right.length, inBlock);
+        if (copyR > 0) {
+          rightOut.setRange(written, written + copyR, right);
+        }
+        if (copyR < inBlock) {
+          // Pad short final right-channel block with DSD silence (0x69).
+          rightOut.fillRange(written + copyR, written + inBlock, 0x69);
+          written += inBlock;
+          perChannelPos = math.min(totalBytes, perChannelPos + inBlock);
+          break;
+        }
       } else {
         rightOut.setRange(written, written + inBlock, left);
       }
       written += inBlock;
       perChannelPos += inBlock;
     }
+    if (_seekGeneration != startGen) return null;
+    if (written == 0) return null;
     _position = perChannelPos;
-    return NativeDsdChunk(leftOut, rightOut);
+    if (written == want) {
+      return NativeDsdChunk(leftOut, rightOut);
+    }
+    return NativeDsdChunk(
+      Uint8List.sublistView(leftOut, 0, written),
+      Uint8List.sublistView(rightOut, 0, written),
+    );
   }
 
-  Future<NativeDsdChunk?> _readDffChunk(int want) async {
+  Future<NativeDsdChunk?> _readDffChunk(int want, int startGen) async {
     final frames = want;
     final fileOffset = dataOffset + _position * channels;
     final raw = await _readAt(fileOffset, frames * channels);
+    if (_seekGeneration != startGen) return null;
     final actualFrames = channels == 2 ? raw.length ~/ 2 : raw.length;
     if (actualFrames <= 0) return null;
     final leftOut = Uint8List(actualFrames);
@@ -263,5 +358,5 @@ class NativeDsdFileSource {
     return bytes;
   }
 
-  Future<void> close() => _file.close();
+  Future<void> close() => _serialized(() => _file.close());
 }

@@ -97,6 +97,7 @@ class PlayerCubit extends PulsrCubit<PlayerState>
   // playSong / slot restoration / queue mutations never suppress them.
   SongsTableData? _lastEnrichedTrack;
   SongsTableData? _lastHandledMediaItemTrack;
+  ValueNotifier<int>? _eqReloadNotifier;
 
   /// True once the engine has emitted a non-empty queue. Before that an empty
   /// queue is a cold-start artefact; afterwards it is an intentional clear and
@@ -272,6 +273,14 @@ class PlayerCubit extends PulsrCubit<PlayerState>
         .distinct()
         .listen(AmbientSoundService().onPlayerPlaybackStateChanged);
     _syncAudioEffects(force: true);
+    try {
+      _eqReloadNotifier = _audioHandler.equalizerManager.reloadNotifier;
+      _eqReloadNotifier?.addListener(_onEqualizerReloaded);
+    } catch (_) {
+      // Partial mock/fake audio handlers in unit tests may omit equalizerManager
+      // or leave reloadNotifier unstubbed.
+      _eqReloadNotifier = null;
+    }
     unawaited(_audioHandler.effectsReady.then((_) async {
       if (isClosed) return;
       _syncAudioEffects(force: true);
@@ -280,6 +289,12 @@ class PlayerCubit extends PulsrCubit<PlayerState>
       ErrorLogger.log('Post-init effects re-sync failed',
           error: e, stackTrace: st, category: 'PlayerCubit');
     }));
+  }
+
+  void _onEqualizerReloaded() {
+    if (!isClosed) {
+      _syncAudioEffects(force: true);
+    }
   }
 
   void _syncAudioEffects({bool force = false}) {
@@ -1124,6 +1139,8 @@ class PlayerCubit extends PulsrCubit<PlayerState>
 
   @override
   Future<void> close() async {
+    _eqReloadNotifier?.removeListener(_onEqualizerReloaded);
+    _eqReloadNotifier = null;
     AmbientSoundService().onPlayerPlaybackStateChanged(false);
     final cleanups = <({String name, FutureOr<void> Function() run})>[
       (name: 'transportController', run: transportController.dispose),

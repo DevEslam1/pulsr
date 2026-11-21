@@ -50,6 +50,7 @@ void main() {
   group('CastSessionStatus.fromMap', () {
     test('marks the SDK available and parses session state', () {
       final s = CastSessionStatus.fromMap({
+        'available': true,
         'connected': true,
         'deviceName': 'Living Room',
         'playing': true,

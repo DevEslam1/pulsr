@@ -137,6 +137,8 @@ extension EqualizerRestoreOps on EqualizerManager {
       comparisonSlots[ComparisonSlot.slotA] = currentPreset;
       preampDb = DspParamRanges.preampDb
           .clamp(prefs.getDouble(PrefsKeys.eqPreamp) ?? 0.0);
+      autoPreampEnabled =
+          prefs.getBool(PrefsKeys.eqAutoPreampEnabled) ?? false;
 
       isVirtualizerEnabled =
           prefs.getBool(PrefsKeys.eqVirtualizerEnabled) ?? false;
@@ -478,12 +480,16 @@ extension EqualizerRestoreOps on EqualizerManager {
       // Previously each await toggled DynamicsProcessing causing 20+ JNI hops on audio thread during playback.
       // Now batch independent effects together and defer DynamicsProcessing last to prevent double-processing bypass churn.
       final pendingFutures = <Future<void>>[];
-      if (isEnabled) {
+      pendingFutures
+          .add(_effectsChannel.setLowPowerRoute(isLowPowerRouteEnabled));
+      final effectiveEqEnabled = isEnabled && !isFirCorrectionActive;
+      if (effectiveEqEnabled) {
         // Apply preset first without enabling, then enable atomically
         await _applyCurrentPresetCore();
-        pendingFutures.add(_effectsChannel.setEqEnabled(true));
-        pendingFutures.add(_effectsChannel.setNativeEqEnabled(true));
       }
+      pendingFutures.add(_effectsChannel.setEqEnabled(effectiveEqEnabled));
+      pendingFutures
+          .add(_effectsChannel.setNativeEqEnabled(effectiveEqEnabled));
       if (currentPreset.bassBoost > 0) {
         pendingFutures.add(setBassBoost(currentPreset.bassBoost));
       }
@@ -494,42 +500,48 @@ extension EqualizerRestoreOps on EqualizerManager {
         pendingFutures.add(_effectsChannel.setEqPreamp(preampDb));
       }
       if (_effectsChannel.isVirtualizerSupported) {
-        pendingFutures
-            .add(_effectsChannel.setVirtualizerEnabled(isVirtualizerEnabled));
         if (isVirtualizerEnabled) {
-          pendingFutures.add(
-            _effectsChannel.setVirtualizerStrength(virtualizerStrength),
-          );
+          pendingFutures.add(() async {
+            await _effectsChannel.setVirtualizerStrength(virtualizerStrength);
+            await _effectsChannel.setVirtualizerEnabled(true);
+          }());
+        } else {
+          pendingFutures.add(_effectsChannel.setVirtualizerEnabled(false));
         }
       }
 
       pendingFutures.add(_applySpatializerWithFallback(isSpatializerEnabled));
 
-      if (isCrossfeedEnabled) {
-        pendingFutures.add(
-          _effectsChannel.setCrossfeedParams(
+      if (isCrossfeedEnabled && !isHrtfEnabled) {
+        pendingFutures.add(() async {
+          await _effectsChannel.setCrossfeedParams(
             crossfeedDelayUs,
             crossfeedFeedDb,
             fcut: crossfeedFcut,
-          ),
-        );
-        pendingFutures.add(_effectsChannel.setCrossfeedMode(crossfeedMode));
+          );
+          await _effectsChannel.setCrossfeedMode(crossfeedMode);
+          await _effectsChannel.setCrossfeedEnabled(true);
+        }());
+      } else {
+        pendingFutures.add(_effectsChannel.setCrossfeedEnabled(false));
       }
-      pendingFutures
-          .add(_effectsChannel.setCrossfeedEnabled(isCrossfeedEnabled));
 
       if (isHrtfEnabled) {
-        if (hrtfSofaPath != null && hrtfSofaPath!.isNotEmpty) {
-          pendingFutures.add(_effectsChannel.loadHrtfSofa(hrtfSofaPath!));
-        }
-        pendingFutures.add(_effectsChannel.setHrtfAzimuth(hrtfAzimuth));
-        pendingFutures.add(_effectsChannel.setHrtfElevation(hrtfElevation));
-        pendingFutures.add(_effectsChannel.setHrtfBinauralEnabled(true));
+        pendingFutures.add(() async {
+          if (hrtfSofaPath != null && hrtfSofaPath!.isNotEmpty) {
+            await _effectsChannel.loadHrtfSofa(hrtfSofaPath!);
+          }
+          await _effectsChannel.setHrtfAzimuth(hrtfAzimuth);
+          await _effectsChannel.setHrtfElevation(hrtfElevation);
+          await _effectsChannel.setHrtfBinauralEnabled(true);
+        }());
+      } else {
+        pendingFutures.add(_effectsChannel.setHrtfBinauralEnabled(false));
       }
 
       if (isLimiterEnabled) {
-        pendingFutures.add(
-          _effectsChannel.setLimiterParams(
+        pendingFutures.add(() async {
+          await _effectsChannel.setLimiterParams(
             limiterLookaheadMs,
             limiterThresholdDb,
             limiterReleaseMs,
@@ -537,23 +549,32 @@ extension EqualizerRestoreOps on EqualizerManager {
             attackMs: _hasStoredCompressorParams ? compressorAttackMs : null,
             makeupGainDb:
                 _hasStoredCompressorParams ? compressorMakeupGainDb : null,
-          ),
-        );
+          );
+          await _effectsChannel.setLimiterEnabled(true);
+        }());
+      } else {
+        pendingFutures.add(_effectsChannel.setLimiterEnabled(false));
       }
-      pendingFutures.add(_effectsChannel.setLimiterEnabled(isLimiterEnabled));
 
       if (isReverbEnabled) {
-        pendingFutures.add(_effectsChannel.setReverbPreset(reverbPreset));
-        pendingFutures.add(_effectsChannel.setReverbWetDry(reverbWetDry));
-        pendingFutures.add(
-          _effectsChannel.setReverbParams(
+        pendingFutures.add(() async {
+          if (reverbPreset == ReverbPreset.custom.wireValue &&
+              customImpulseResponse.isNotEmpty) {
+            await _effectsChannel.loadImpulseResponse(customImpulseResponse);
+          } else {
+            await _effectsChannel.setReverbPreset(reverbPreset);
+          }
+          await _effectsChannel.setReverbWetDry(reverbWetDry);
+          await _effectsChannel.setReverbParams(
             predelayMs: reverbPredelayMs,
             damping: reverbDamping,
             crossChannel: reverbCrossChannel,
-          ),
-        );
+          );
+          await _effectsChannel.setReverbEnabled(true);
+        }());
+      } else {
+        pendingFutures.add(_effectsChannel.setReverbEnabled(false));
       }
-      pendingFutures.add(_effectsChannel.setReverbEnabled(isReverbEnabled));
 
       if (stereoBalance != 0.0) {
         pendingFutures.add(_effectsChannel.setStereoBalance(stereoBalance));
@@ -563,24 +584,24 @@ extension EqualizerRestoreOps on EqualizerManager {
           .add(_effectsChannel.setSincResamplerEnabled(isSincResamplerEnabled));
 
       if (isSaturationEnabled) {
-        pendingFutures.add(
-          _effectsChannel.setSaturationParams(
+        pendingFutures.add(() async {
+          await _effectsChannel.setSaturationParams(
             saturationDrive,
             saturationMix,
             saturationTilt,
             mode: saturationMode,
-          ),
-        );
-        pendingFutures.add(
-          _effectsChannel.setSaturationMultiband(saturationMultiband),
-        );
+            multiband: saturationMultiband,
+          );
+          await _effectsChannel.setSaturationMultiband(saturationMultiband);
+          await _effectsChannel.setSaturationEnabled(true);
+        }());
+      } else {
+        pendingFutures.add(_effectsChannel.setSaturationEnabled(false));
       }
-      pendingFutures
-          .add(_effectsChannel.setSaturationEnabled(isSaturationEnabled));
 
       if (isStereoWidthEnabled) {
-        pendingFutures.add(
-          _effectsChannel.setStereoWidthParams(
+        pendingFutures.add(() async {
+          await _effectsChannel.setStereoWidthParams(
             stereoWidth,
             multiband: stereoWidthMultiband,
             lowWidth: stereoWidthLow,
@@ -588,83 +609,87 @@ extension EqualizerRestoreOps on EqualizerManager {
             highWidth: stereoWidthHigh,
             lowCrossoverHz: stereoWidthLowCrossoverHz,
             highCrossoverHz: stereoWidthHighCrossoverHz,
-          ),
-        );
+          );
+          await _effectsChannel.setStereoWidthEnabled(true);
+        }());
+      } else {
+        pendingFutures.add(_effectsChannel.setStereoWidthEnabled(false));
       }
-      pendingFutures
-          .add(_effectsChannel.setStereoWidthEnabled(isStereoWidthEnabled));
 
       if (isLoudnessContourEnabled) {
-        pendingFutures.add(
-          _effectsChannel.setLoudnessContourParams(
+        pendingFutures.add(() async {
+          await _effectsChannel.setLoudnessContourParams(
             loudnessContourIntensity,
             loudnessVolumeLinear,
-          ),
-        );
+          );
+          await _effectsChannel.setLoudnessContourEnabled(true);
+        }());
+      } else {
+        pendingFutures.add(_effectsChannel.setLoudnessContourEnabled(false));
       }
-      pendingFutures.add(
-          _effectsChannel.setLoudnessContourEnabled(isLoudnessContourEnabled));
 
       if (isSubCrossoverEnabled) {
-        pendingFutures.add(
-          _effectsChannel.setSubCrossoverParams(
+        pendingFutures.add(() async {
+          await _effectsChannel.setSubCrossoverParams(
             subCrossoverCornerHz,
             subCrossoverSlopeDbPerOct,
             subCrossoverGain,
             bassMono: subCrossoverBassMono,
             antiPop: subCrossoverAntiPop,
-          ),
-        );
+          );
+          await _effectsChannel.setSubCrossoverEnabled(true);
+        }());
+      } else {
+        pendingFutures.add(_effectsChannel.setSubCrossoverEnabled(false));
       }
-      pendingFutures
-          .add(_effectsChannel.setSubCrossoverEnabled(isSubCrossoverEnabled));
 
       if (isLfeCrossoverEnabled) {
-        pendingFutures.add(
-          _effectsChannel.setLfeCrossoverParams(
+        pendingFutures.add(() async {
+          await _effectsChannel.setLfeCrossoverParams(
             crossoverHz: lfeCrossoverHz,
             lfeLowPassHz: lfeLowPassHz,
             slopeDbPerOct: lfeSlopeDbPerOct,
             lfeGainDb: lfeGainDb,
             lfeChannelIndex: lfeChannelIndex,
             redirectBass: lfeRedirectBass,
-          ),
-        );
+          );
+          await _effectsChannel.setLfeCrossoverEnabled(true);
+        }());
+      } else {
+        pendingFutures.add(_effectsChannel.setLfeCrossoverEnabled(false));
       }
-      pendingFutures
-          .add(_effectsChannel.setLfeCrossoverEnabled(isLfeCrossoverEnabled));
 
-      if (isChannelManagerEnabled) {
-        pendingFutures.add(
-          _effectsChannel.setChannelManagerEnabled(
-            true,
-            channelCount: channelManagerChannelCount,
-          ),
-        );
+      pendingFutures.add(() async {
         for (int ch = 0; ch < 8; ++ch) {
-          pendingFutures.add(
-            _effectsChannel.setChannelManagerChannel(
-              ch,
-              trimDb: channelManagerTrimDb[ch],
-              delayMs: channelManagerDelayMs[ch],
-            ),
+          await _effectsChannel.setChannelManagerChannel(
+            ch,
+            trimDb: channelManagerTrimDb[ch],
+            delayMs: channelManagerDelayMs[ch],
           );
         }
-      }
+        await _effectsChannel.setChannelManagerEnabled(
+          isChannelManagerEnabled,
+          channelCount: channelManagerChannelCount,
+        );
+      }());
 
       if (isDynamicEqEnabled) {
-        pendingFutures.add(_pushDynamicEqConfig());
+        pendingFutures.add(() async {
+          await _pushDynamicEqConfig();
+          await _effectsChannel.setDynamicEqEnabled(true);
+        }());
+      } else {
+        pendingFutures.add(_effectsChannel.setDynamicEqEnabled(false));
       }
-      pendingFutures
-          .add(_effectsChannel.setDynamicEqEnabled(isDynamicEqEnabled));
 
       if (isMultibandCompressorEnabled) {
-        pendingFutures.add(_pushMultibandCompressorConfig());
+        pendingFutures.add(() async {
+          await _pushMultibandCompressorConfig();
+          await _effectsChannel.setMultibandCompressorEnabled(true);
+        }());
+      } else {
+        pendingFutures.add(_effectsChannel.setMultibandCompressorEnabled(false));
       }
-      pendingFutures.add(
-        _effectsChannel
-            .setMultibandCompressorEnabled(isMultibandCompressorEnabled),
-      );
 
       pendingFutures.add(
         _effectsChannel.setDynamicBassParams(
@@ -680,31 +705,47 @@ extension EqualizerRestoreOps on EqualizerManager {
         ),
       );
 
-      if (isViperDdcEnabled && viperDdcContent.isNotEmpty) {
-        pendingFutures.add(_effectsChannel.loadViperDdc(
-          ddcContent: viperDdcContent,
-          profileName: viperDdcProfileName,
-        ));
+      if (isViperDdcEnabled) {
+        pendingFutures.add(() async {
+          if (viperDdcContent.isNotEmpty) {
+            await _effectsChannel.loadViperDdc(
+              ddcContent: viperDdcContent,
+              profileName: viperDdcProfileName,
+            );
+          }
+          await _effectsChannel.setViperDdcEnabled(true);
+        }());
+      } else {
+        pendingFutures.add(_effectsChannel.setViperDdcEnabled(false));
       }
-      pendingFutures.add(_effectsChannel.setViperDdcEnabled(isViperDdcEnabled));
 
-      if (isArbitraryEqEnabled && arbitraryEqString.isNotEmpty) {
-        pendingFutures.add(_effectsChannel.loadArbitraryEq(
-          eqString: arbitraryEqString,
-          linearPhase: arbitraryEqLinearPhase,
-        ));
+      if (isArbitraryEqEnabled) {
+        pendingFutures.add(() async {
+          if (arbitraryEqString.isNotEmpty) {
+            await _effectsChannel.loadArbitraryEq(
+              eqString: arbitraryEqString,
+              linearPhase: arbitraryEqLinearPhase,
+            );
+          }
+          await _effectsChannel.setArbitraryEqEnabled(true);
+        }());
+      } else {
+        pendingFutures.add(_effectsChannel.setArbitraryEqEnabled(false));
       }
-      pendingFutures
-          .add(_effectsChannel.setArbitraryEqEnabled(isArbitraryEqEnabled));
 
-      if (isLiveProgEnabled && liveProgCode.isNotEmpty) {
-        pendingFutures.add(_effectsChannel.loadLiveProgCode(liveProgCode));
-        for (final entry in liveProgSliders.entries) {
-          pendingFutures
-              .add(_effectsChannel.setLiveProgSlider(entry.key, entry.value));
-        }
+      if (isLiveProgEnabled) {
+        pendingFutures.add(() async {
+          if (liveProgCode.isNotEmpty) {
+            await _effectsChannel.loadLiveProgCode(liveProgCode);
+          }
+          for (final entry in liveProgSliders.entries) {
+            await _effectsChannel.setLiveProgSlider(entry.key, entry.value);
+          }
+          await _effectsChannel.setLiveProgEnabled(true);
+        }());
+      } else {
+        pendingFutures.add(_effectsChannel.setLiveProgEnabled(false));
       }
-      pendingFutures.add(_effectsChannel.setLiveProgEnabled(isLiveProgEnabled));
       // Dynamics last — it triggers recalculateActiveStages which disables OEM engine; doing it last prevents intermediate dropout
       // Log individual failures so failed effect stages are diagnosable while allowing remaining stages to complete
       if (pendingFutures.isNotEmpty) {

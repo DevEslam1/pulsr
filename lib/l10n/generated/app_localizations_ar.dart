@@ -10658,6 +10658,37 @@ class AppLocalizationsAr extends AppLocalizations {
   String get commandPaletteActionAudioQuality => 'جودة الصوت والإخراج';
 
   @override
+  String get commandPaletteNavRadioSubtitle => 'بث محطات الراديو عبر الإنترنت';
+
+  @override
+  String get commandPaletteNavDiagnostics => 'التشخيصات';
+
+  @override
+  String get commandPaletteNavDiagnosticsSubtitle =>
+      'سجلات النظام وفحوصات صوت USB والوضع الآمن';
+
+  @override
+  String get commandPaletteNavAudioProfiles => 'ملفات تعريف الصوت';
+
+  @override
+  String get commandPaletteNavAudioProfilesSubtitle =>
+      'إعدادات الصوت المسبقة ومعالجة الإشارات المحفوظة';
+
+  @override
+  String get commandPaletteNavDlna => 'بث DLNA / UPnP';
+
+  @override
+  String get commandPaletteNavDlnaSubtitle =>
+      'بث الصوت إلى أجهزة ومكبرات صوت الشبكة';
+
+  @override
+  String get commandPaletteNavPodcasts => 'البودكاست والكتب الصوتية';
+
+  @override
+  String get commandPaletteNavPodcastsSubtitle =>
+      'المحتوى الصوتي الطويل مع إشارات مرجعية للموضع';
+
+  @override
   String get coachMarkDspTitle => 'معالجة الصوت الأساسية والاستوديو';
 
   @override

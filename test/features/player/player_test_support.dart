@@ -170,6 +170,16 @@ class RecordingAudioHandler extends TestPulsrAudioHandler {
   Future<void> setCrossfeedMode(int mode) async => _record('setCrossfeedMode');
 
   @override
+  Future<void> setHrtfBinaural(
+    bool enabled, {
+    double? azimuth,
+    double? elevation,
+    String? sofaPath,
+    bool? preferenceEnabled,
+  }) async =>
+      _record('setHrtfBinaural');
+
+  @override
   Future<void> setSaturationMultiband(bool multiband) async =>
       _record('setSaturationMultiband');
 

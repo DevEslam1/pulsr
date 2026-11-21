@@ -33,6 +33,31 @@ void main() {
       const MethodChannel(PulsrChannels.hiresDac),
       (call) async => null,
     );
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+      const MethodChannel(PulsrChannels.castSession),
+      (call) async => false,
+    );
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+      const MethodChannel(PulsrChannels.cast),
+      (call) async => false,
+    );
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+      const MethodChannel(PulsrChannels.usbExclusive),
+      (call) async => <String, dynamic>{},
+    );
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+      const MethodChannel(PulsrChannels.usbExclusive),
+      (call) async => null,
+    );
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+      const MethodChannel(PulsrChannels.audioEffects),
+      (call) async => null,
+    );
     mockScanner = MockMediaScannerService();
   });
 
@@ -92,6 +117,8 @@ void main() {
       expect(find.text('Room Correction'), findsNothing);
       expect(find.text('Bit-Perfect USB Pass-Through'), findsNothing);
       expect(find.text('DSP Signal Inspector & Debug'), findsNothing);
+
+      await tester.pumpWidget(const SizedBox());
     });
 
     testWidgets('Professional mode reveals advanced output controls',
@@ -102,6 +129,8 @@ void main() {
 
       expect(find.text('Room Correction'), findsOneWidget);
       expect(find.text('Bit-Perfect USB Pass-Through'), findsOneWidget);
+
+      await tester.pumpWidget(const SizedBox());
     });
   });
 }

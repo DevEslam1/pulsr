@@ -100,14 +100,14 @@ void main() {
       expect(pipeline.inactiveClaim, equals(PlayerClaim.crossfade));
 
       // Release crossfade claim -> now prefetch can claim
-      pipeline.releaseInactive(PlayerClaim.crossfade);
+      await pipeline.releaseInactive(PlayerClaim.crossfade);
       expect(pipeline.inactiveClaim, equals(PlayerClaim.none));
 
       final claimed3 = await pipeline.claimInactive(PlayerClaim.prefetch);
       expect(claimed3, isTrue);
       expect(pipeline.inactiveClaim, equals(PlayerClaim.prefetch));
 
-      pipeline.releaseInactive(PlayerClaim.prefetch);
+      await pipeline.releaseInactive(PlayerClaim.prefetch);
       expect(pipeline.inactiveClaim, equals(PlayerClaim.none));
     });
 

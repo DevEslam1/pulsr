@@ -291,7 +291,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
   // runtime so the UA string matches the engine's Client Hints exactly.
   String get mobileUserAgent => _resolvedUserAgent;
 
-  static const String _ytmBrowseGuardJs = r'''
+  static final String _ytmBrowseGuardJs = '''
 (function () {
   'use strict';
   try {
@@ -342,7 +342,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
 
     // Set Egypt region preference cookie on .youtube.com
     try {
-      document.cookie = "PREF=${YtmLocale.prefCookieValue()}; domain=.youtube.com; path=/";
+      document.cookie = "PREF=${YtmLocale.prefCookieValue().replaceAll(r'\', r'\\').replaceAll('"', r'\"')}; domain=.youtube.com; path=/";
     } catch(e) {}
 
     // Hook ytcfg to enforce Egypt region and disable unavailable state
@@ -511,12 +511,20 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
       // sign-in prompt and `_clearCookiesAndReset()` wiped a session that was
       // perfectly good, forcing a real re-login over something transient.
       accountService.validateSessionDetailed().then((verdict) {
-        if (!mounted) return;
+        if (!mounted || _disposed) return;
         setState(
             () => _isLoggedIn = verdict != SessionValidationResult.invalid);
         if (verdict == SessionValidationResult.invalid) {
           _clearCookiesAndReset(); // start the re-login with a CLEAN jar (fixes B6)
         }
+      }).catchError((error, stackTrace) {
+        if (!mounted || _disposed) return;
+        ErrorLogger.log(
+          'Failed to validate session detailed in login sheet',
+          error: error,
+          stackTrace: stackTrace,
+          category: 'YtmWebLoginSheet',
+        );
       });
     }
 

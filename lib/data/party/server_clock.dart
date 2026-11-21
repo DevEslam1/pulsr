@@ -1,5 +1,4 @@
 // lib/data/party/server_clock.dart
-import 'dart:math' as math;
 
 /// This device's offset from the party server's clock.
 ///
@@ -19,6 +18,7 @@ class ServerClock {
   final int Function() _localNowMs;
 
   final List<_ClockSample> _samples = [];
+  final Set<int> _pendingPings = <int>{};
 
   int? _offsetMs;
   int _roundTripMs = 0;
@@ -52,13 +52,28 @@ class ServerClock {
     return _localNowMs() + offset;
   }
 
+  /// Registers an outgoing ping timestamp into the in-flight ping set.
+  void registerPing(int sentAtLocalMs) {
+    _pendingPings.add(sentAtLocalMs);
+    if (_pendingPings.length > 50) {
+      _pendingPings.remove(_pendingPings.first);
+    }
+  }
+
+  /// True if [sentAtLocalMs] is currently in the in-flight ping set.
+  bool hasPendingPing(int sentAtLocalMs) => _pendingPings.contains(sentAtLocalMs);
+
   /// Records a ping/pong round trip.
   ///
   /// [sentAtLocalMs]: local timestamp when ping left (t0)
   /// [serverMs]: server's timestamp from pong body
   /// [receivedAtLocalMs]: local timestamp when pong arrived (t1)
   void record(int sentAtLocalMs, int serverMs, int receivedAtLocalMs) {
-    final roundTrip = math.max(0, receivedAtLocalMs - sentAtLocalMs);
+    if (receivedAtLocalMs < sentAtLocalMs) return;
+    final roundTrip = receivedAtLocalMs - sentAtLocalMs;
+    if (roundTrip > 5000) return;
+    if (!_pendingPings.remove(sentAtLocalMs)) return;
+
     final midpoint = sentAtLocalMs + (roundTrip ~/ 2);
     final offset = serverMs - midpoint;
 
@@ -93,6 +108,7 @@ class ServerClock {
   /// Clears all samples and resets sync status.
   void reset() {
     _samples.clear();
+    _pendingPings.clear();
     _offsetMs = null;
     _roundTripMs = 0;
   }

@@ -868,7 +868,9 @@ class _RuleCardState extends State<_RuleCard> {
         SmartOperator.greaterThan ||
         SmartOperator.lessThan ||
         SmartOperator.greaterThanOrEqual ||
-        SmartOperator.lessThanOrEqual =>
+        SmartOperator.lessThanOrEqual ||
+        SmartOperator.notContains ||
+        SmartOperator.startsWith =>
           op.label,
         SmartOperator.contains => l.smartRuleOpContains,
         SmartOperator.withinDays => l.smartCriteriaOpWithinDays,

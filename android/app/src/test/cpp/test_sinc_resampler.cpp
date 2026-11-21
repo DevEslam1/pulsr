@@ -100,6 +100,20 @@ int main() {
     testPlanarQualityFidelity(44100.0, 48000.0, 3, "44.1k -> 48k Ultra Planar");
     testPlanarQualityFidelity(96000.0, 48000.0, 2, "96k -> 48k High Planar");
     testPlanarQualityFidelity(44100.0, 96000.0, 1, "44.1k -> 96k Standard Planar");
+    {
+        SincResampler r;
+        r.setEnabled(false);
+        r.setRates(44100.0, 48000.0);
+        std::vector<float> a(16, 0.25f), b(16, 0.25f);
+        const float* inPtrs[2] = { a.data(), a.data() };
+        float* outPtrs[2] = { b.data(), b.data() };
+        if (r.processPlanar(inPtrs, outPtrs, 0, 16, 16) != 0 ||
+            r.processPlanar(inPtrs, outPtrs, 8, 2, -4) != 0 ||
+            r.processPlanar(nullptr, outPtrs, 8, 2, 16) != 0) {
+            std::cerr << "FAIL: SincResampler edge guard failed" << std::endl;
+            std::exit(1);
+        }
+    }
     std::cout << "All SincResampler C++ tests passed successfully!" << std::endl;
     return 0;
 }

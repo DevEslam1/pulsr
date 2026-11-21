@@ -178,12 +178,16 @@ class DownloadService {
           'lyrics': lyrics,
           'artworkPath': artworkPath,
           'removeArtwork': false,
-        });
-        if (result is Map && result['verified'] == false) {
-          ErrorLogger.log(
-            'writeTags unverified on $filePath: ${result['verifiedFields']}',
-            category: 'DownloadService',
-          );
+        }).timeout(const Duration(seconds: 15));
+        final verified =
+            result == true || (result is Map && result['verified'] == true);
+        if (!verified) {
+          if (result is Map && result['verified'] == false) {
+            ErrorLogger.log(
+              'writeTags unverified on $filePath: ${result['verifiedFields']}',
+              category: 'DownloadService',
+            );
+          }
           if (attempt == 0) {
             await Future<void>.delayed(const Duration(milliseconds: 300));
             continue;
@@ -222,10 +226,11 @@ class DownloadService {
   static Future<void> writeSidecarLrc(
       String audioFilePath, String lrcContent) async {
     if (audioFilePath.startsWith('content:')) return;
+    File? tempFile;
     try {
       final lrcPath = '${p.withoutExtension(audioFilePath)}.lrc';
       final tempPath = '$lrcPath.tmp_${DateTime.now().microsecondsSinceEpoch}';
-      final tempFile = File(tempPath);
+      tempFile = File(tempPath);
       await tempFile.writeAsString(lrcContent, flush: true);
       await tempFile.rename(lrcPath);
       ErrorLogger.addBreadcrumb(
@@ -239,6 +244,14 @@ class DownloadService {
         stackTrace: st,
         category: 'DownloadService',
       );
+    } finally {
+      if (tempFile != null) {
+        try {
+          if (await tempFile.exists()) {
+            await tempFile.delete();
+          }
+        } catch (_) {}
+      }
     }
   }
 }

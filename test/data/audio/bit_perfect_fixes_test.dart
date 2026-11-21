@@ -14,7 +14,6 @@ import 'package:pulsr/data/audio/usb_hardware_volume_curve.dart';
 import 'package:pulsr/data/services/hires_audio_service.dart';
 import 'package:pulsr/data/services/usb_exclusive_service.dart';
 import 'package:pulsr/domain/models/audio_output_info.dart';
-import 'package:pulsr/domain/models/audio_quality_info.dart';
 import 'package:pulsr/features/player/cubit/controllers/player_dsp_controller.dart';
 import 'package:pulsr/features/player/cubit/player_state.dart';
 import 'package:pulsr/features/settings/cubit/settings_cubit.dart';
@@ -70,8 +69,8 @@ void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
     FlutterSecureStorage.setMockInitialValues({});
-    AudioQualityInfo.dsdDopActive = false;
-    AudioQualityInfo.dsdNativeActive = false;
+    DsdDecoderHelper.dsdDopActive = false;
+    DsdDecoderHelper.dsdNativeActive = false;
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
   });
 
@@ -162,8 +161,8 @@ void main() {
     final dsfFile = File('${tmpDir.path}/track.dsf')
       ..writeAsBytesSync(_buildMinimalDsfBytes());
 
-    AudioQualityInfo.dsdDopActive = false;
-    AudioQualityInfo.dsdNativeActive = false;
+    DsdDecoderHelper.dsdDopActive = false;
+    DsdDecoderHelper.dsdNativeActive = false;
 
     bool? resolvedDop;
     bool? resolvedNative;
@@ -192,12 +191,12 @@ void main() {
     expect(resolvedDop, isTrue);
     expect(resolvedNative, isFalse);
     // Active global state must remain untouched during background/parallel decode.
-    expect(AudioQualityInfo.dsdDopActive, isFalse);
-    expect(AudioQualityInfo.dsdNativeActive, isFalse);
+    expect(DsdDecoderHelper.dsdDopActive, isFalse);
+    expect(DsdDecoderHelper.dsdNativeActive, isFalse);
 
     // Conversely, pre-resolving a non-DSD FLAC while DoP is currently active
-    // must not clobber AudioQualityInfo.dsdDopActive.
-    AudioQualityInfo.dsdDopActive = true;
+    // must not clobber DsdDecoderHelper.dsdDopActive.
+    DsdDecoderHelper.dsdDopActive = true;
     final decoder = FormatAwareDecoder(
       resolveYtmStream: (song, tag) async => AudioSource.uri(Uri.parse('https://example.com/a.m4a'), tag: tag),
     );
@@ -214,7 +213,7 @@ void main() {
     );
     expect(flacDop, isFalse);
     expect(flacNative, isFalse);
-    expect(AudioQualityInfo.dsdDopActive, isTrue);
+    expect(DsdDecoderHelper.dsdDopActive, isTrue);
   });
 
   test('PlayerDspController resumes suspended Direct USB on matching track rate even with followFormat OFF',

@@ -309,7 +309,7 @@ class MainActivity : AudioServiceActivity() {
             intent?.action != Intent.ACTION_SEND_MULTIPLE
         ) return
         // Multi-share (EXTRA_STREAM as list) previously dropped all but one.
-        if (intent.action == Intent.ACTION_SEND_MULTIPLE || intent.hasExtra(Intent.EXTRA_STREAM)) {
+        if (intent.action == Intent.ACTION_SEND_MULTIPLE) {
             try {
                 val rawList: ArrayList<Uri>? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM, Uri::class.java)
@@ -739,7 +739,7 @@ class MainActivity : AudioServiceActivity() {
                         result.error("INVALID_PATH", "APK path must be inside app storage", null)
                         return@setMethodCallHandler
                     }
-                    if (!file.exists()) {
+                    if (!canonical.exists()) {
                         result.error("FILE_NOT_FOUND", "APK file does not exist at $filePath", null)
                         return@setMethodCallHandler
                     }
@@ -758,7 +758,7 @@ class MainActivity : AudioServiceActivity() {
                         val uri = androidx.core.content.FileProvider.getUriForFile(
                             this@MainActivity,
                             "$packageName.fileprovider",
-                            file
+                            canonical
                         )
                         val installIntent = Intent(Intent.ACTION_VIEW).apply {
                             setDataAndType(uri, "application/vnd.android.package-archive")

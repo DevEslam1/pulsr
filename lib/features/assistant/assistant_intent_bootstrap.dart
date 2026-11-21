@@ -12,6 +12,7 @@
 import 'dart:async';
 
 import 'package:flutter/services.dart';
+import 'package:fpdart/fpdart.dart';
 
 import '../../core/di/injection.dart';
 import '../../core/errors/failures.dart';
@@ -44,7 +45,13 @@ abstract final class AssistantIntentBootstrap {
       _service = AssistantIntentService(
         resolver: AssistantResolver(
           searchSongIds: (query) async => _songIdsOf(
-            await repository.watchAllSongs(searchQuery: query, limit: 50).first,
+            await repository
+                .watchAllSongs(searchQuery: query, limit: 50)
+                .first
+                .timeout(
+                  const Duration(seconds: 3),
+                  onTimeout: () => const Right(<SongsTableData>[]),
+                ),
           ),
           playlistSongIds: (name) async {
             final lists = (await repository.getPlaylists())

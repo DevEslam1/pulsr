@@ -309,6 +309,7 @@ class SettingsCubit extends PulsrCubit<SettingsState>
   }
 
   Future<void> reloadSettings() async {
+    final prev = state;
     _cachedPrefs = null;
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -322,6 +323,52 @@ class SettingsCubit extends PulsrCubit<SettingsState>
     _proxyPassword = '';
     _dirtyFields.clear();
     await _loadPreferences();
+    if (!isClosed && getIt.isRegistered<PulsrAudioHandler>()) {
+      final handler = getIt<PulsrAudioHandler>();
+      if (state.aaudioOutputEnabled != prev.aaudioOutputEnabled ||
+          state.aaudioPreferExclusive != prev.aaudioPreferExclusive ||
+          state.aaudioTargetBufferMs != prev.aaudioTargetBufferMs) {
+        try {
+          await handler.setAaudioOutputEnabled(
+            state.aaudioOutputEnabled,
+            preferExclusive: state.aaudioPreferExclusive,
+            targetBufferMs: state.aaudioTargetBufferMs,
+          );
+        } catch (e, st) {
+          ErrorLogger.log(
+            'Failed to push reloaded AAudio output settings',
+            error: e,
+            stackTrace: st,
+            category: 'SettingsCubit',
+          );
+        }
+      }
+      if (state.dvcEnabled != prev.dvcEnabled) {
+        try {
+          await handler.setDvcEnabled(state.dvcEnabled);
+        } catch (e, st) {
+          ErrorLogger.log(
+            'Failed to push reloaded DVC setting',
+            error: e,
+            stackTrace: st,
+            category: 'SettingsCubit',
+          );
+        }
+      }
+      if (state.usbHardwareVolumeEnabled != prev.usbHardwareVolumeEnabled) {
+        try {
+          await handler
+              .syncUsbHardwareVolumeState(state.usbHardwareVolumeEnabled);
+        } catch (e, st) {
+          ErrorLogger.log(
+            'Failed to push reloaded USB hardware volume setting',
+            error: e,
+            stackTrace: st,
+            category: 'SettingsCubit',
+          );
+        }
+      }
+    }
   }
 
   // FIX-H01: Modularized preferences loaders with isolated try-catch blocks.

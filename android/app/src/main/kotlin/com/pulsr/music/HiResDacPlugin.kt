@@ -162,6 +162,7 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
 
     private val routePoll = object : Runnable {
         override fun run() {
+            if (disposed) return
             if (eventSink == null) return
             val current = com.ryanheise.just_audio.PulsrOutputRouting.snapshot()
             val devices = try {
@@ -197,16 +198,21 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
                 lastRouteSignature = signature
                 notifyDeviceChange()
             }
-            probeHandler.postDelayed(this, 2000)
+            if (!disposed) {
+                probeHandler.postDelayed(this, 2000)
+            }
         }
     }
     private val notifyRunnable = object : Runnable {
         override fun run() {
+            if (disposed) return
             val sink = eventSink ?: return
             val info = try { getAudioOutputDetails(forceRefresh = true) } catch (_: Throwable) {
                 return
             }
+            if (disposed) return
             mainHandler.post {
+                if (disposed) return@post
                 try {
                     sink.success(info)
                 } catch (_: Throwable) {}
@@ -371,6 +377,59 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         probeHandler.post(notifyRunnable)
     }
 
+    private fun runOnProbeThread(
+        result: MethodChannel.Result,
+        errorCode: String,
+        errorMessage: String,
+        work: () -> Any?,
+    ) {
+        if (disposed) {
+            result.error(errorCode, "Audio probe thread is unavailable", null)
+            return
+        }
+        val posted = probeHandler.post {
+            if (disposed) {
+                mainHandler.post {
+                    try {
+                        result.error(errorCode, "Audio probe thread is unavailable", null)
+                    } catch (_: Throwable) {}
+                }
+                return@post
+            }
+            var failed: Throwable? = null
+            val payload = try {
+                work()
+            } catch (t: Throwable) {
+                failed = t
+                Log.w(TAG, "$errorCode failed: ${t.message}")
+                null
+            }
+            mainHandler.post {
+                try {
+                    if (failed == null) {
+                        result.success(payload)
+                    } else {
+                        result.error(errorCode, errorMessage, null)
+                    }
+                } catch (_: Throwable) {}
+            }
+        }
+        if (!posted) {
+            result.error(errorCode, "Audio probe thread is unavailable", null)
+        }
+    }
+
+    private fun selectPreferredOutputRouteOnMain(device: AudioDeviceInfo?) {
+        if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) {
+            try { com.ryanheise.just_audio.PulsrOutputRouting.select(device) } catch (_: Throwable) {}
+        } else {
+            mainHandler.post {
+                if (disposed) return@post
+                try { com.ryanheise.just_audio.PulsrOutputRouting.select(device) } catch (_: Throwable) {}
+            }
+        }
+    }
+
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
             "getAudioOutputInfo" -> {
@@ -410,30 +469,36 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
             }
             "setBitPerfectMode" -> {
                 val enabled = call.argument<Boolean>("enabled") ?: false
-                val success = applyBitPerfectMode(enabled)
-                if (success) bitPerfectRequested = enabled && !directRouteFallbackActive
-                notifyDeviceChange()
-                result.success(success)
+                runOnProbeThread(result, "BIT_PERFECT_MODE_FAILED", "Failed to apply bit-perfect mode") {
+                    val success = applyBitPerfectMode(enabled)
+                    if (success) bitPerfectRequested = enabled && !directRouteFallbackActive
+                    notifyDeviceChange()
+                    success
+                }
             }
             "setBitPerfectModeDetailed" -> {
                 val enabled = call.argument<Boolean>("enabled") ?: false
-                val success = applyBitPerfectMode(enabled)
-                if (success) bitPerfectRequested = enabled && !directRouteFallbackActive
-                notifyDeviceChange()
-                // Rebuild instead of reading the cached map: the route and sink
-                // state just changed, so a cached copy would describe the mode
-                // the app was in before this call.
-                val details = getAudioOutputDetails(forceRefresh = true)
-                result.success(mapOf(
-                    "success" to success,
-                    "reason" to lastBitPerfectReason,
-                    "sinkBitDepth" to details["sinkBitDepth"],
-                    "sinkSampleRate" to details["sinkSampleRate"],
-                ))
+                runOnProbeThread(result, "BIT_PERFECT_MODE_FAILED", "Failed to apply bit-perfect mode") {
+                    val success = applyBitPerfectMode(enabled)
+                    if (success) bitPerfectRequested = enabled && !directRouteFallbackActive
+                    notifyDeviceChange()
+                    // Rebuild instead of reading the cached map: the route and sink
+                    // state just changed, so a cached copy would describe the mode
+                    // the app was in before this call.
+                    val details = getAudioOutputDetails(forceRefresh = true)
+                    mapOf(
+                        "success" to success,
+                        "reason" to lastBitPerfectReason,
+                        "sinkBitDepth" to details["sinkBitDepth"],
+                        "sinkSampleRate" to details["sinkSampleRate"],
+                    )
+                }
             }
             // ── Bluetooth codec control ──────────────────────────────────────
             "getBluetoothCodecInfo" -> {
-                result.success(getBluetoothCodecInfo())
+                runOnProbeThread(result, "BLUETOOTH_CODEC_PROBE_FAILED", "Failed to read Bluetooth codec info") {
+                    getBluetoothCodecInfo()
+                }
             }
             "setBluetoothCodec" -> {
                 val codec = call.argument<String>("codec") ?: "SBC"
@@ -555,12 +620,16 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
                 result.success(openSystemOutputSwitcher())
             }
             "getUsbDacCapabilities" -> {
-            val (uac, label) = probeUsbDac()
-            result.success(mapOf("usbAudioClass" to uac, "usbDacLabel" to label))
-        }
-        "getDirectCapabilities" -> {
-            result.success(mapOf("directFormats" to getCachedDirectFormats()))
-        }
+                runOnProbeThread(result, "USB_DAC_PROBE_FAILED", "Failed to probe USB DAC capabilities") {
+                    val (uac, label) = probeUsbDac()
+                    mapOf("usbAudioClass" to uac, "usbDacLabel" to label)
+                }
+            }
+            "getDirectCapabilities" -> {
+                runOnProbeThread(result, "DIRECT_CAPABILITIES_PROBE_FAILED", "Failed to probe direct capabilities") {
+                    mapOf("directFormats" to getCachedDirectFormats())
+                }
+            }
         "getDopCapabilities" -> {
             // Reading the DAC's raw descriptors is a USB operation with a
             // permission check and must not run on the main thread.
@@ -1690,7 +1759,7 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
                 targetBitDepth = 0
             })
             if (confirmed && wasFallbackRoute && selectedDeviceId == null) {
-                try { com.ryanheise.just_audio.PulsrOutputRouting.select(null) } catch (_: Throwable) {}
+                selectPreferredOutputRouteOnMain(null)
             }
             if (!confirmed) lastBitPerfectReason = "clear_mixer_attributes_failed"
             return confirmed
@@ -1764,7 +1833,7 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
 
         // Direct route fallback for USB DAC when AudioMixerAttributes negotiation is unavailable:
         // Route to USB device via PulsrOutputRouting, but DO NOT claim bitPerfectRequested.
-        com.ryanheise.just_audio.PulsrOutputRouting.select(usbDevice)
+        selectPreferredOutputRouteOnMain(usbDevice)
         mixerAttributesApplied = false
         bitPerfectRequested = false
         directRouteFallbackActive = true
