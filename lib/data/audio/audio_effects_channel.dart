@@ -14,6 +14,46 @@ import '../../core/telemetry/dsp_reliability_tracker.dart';
 
 part 'audio_effects_channel_remaster_ext.dart';
 
+/// One STREAM_MUSIC level together with the route it belongs to.
+///
+/// `getStreamVolume()` has no device argument: it reports whichever route
+/// AudioFlinger currently uses. During a sink rebuild or a Direct USB attach
+/// that can briefly be the speaker while the app already streams to the DAC,
+/// so a bare ratio is not safe to seed output gain from.
+class SystemMusicVolumeReading {
+  final double ratio;
+  final bool routeKnown;
+  final bool isUsb;
+  final int deviceId;
+
+  const SystemMusicVolumeReading({
+    required this.ratio,
+    this.routeKnown = false,
+    this.isUsb = false,
+    this.deviceId = 0,
+  });
+
+  bool get isKnown => ratio.isFinite && ratio >= 0.0;
+
+  factory SystemMusicVolumeReading.fromNative(dynamic raw) {
+    if (raw is num) {
+      return SystemMusicVolumeReading(
+        ratio: raw.isFinite ? raw.toDouble().clamp(0.0, 1.0) : -1.0,
+      );
+    }
+    if (raw is Map) {
+      final dynamic r = raw['ratio'];
+      return SystemMusicVolumeReading(
+        ratio: r is num && r.isFinite ? r.toDouble().clamp(0.0, 1.0) : -1.0,
+        routeKnown: raw['routeKnown'] == true,
+        isUsb: raw['isUsb'] == true,
+        deviceId: (raw['deviceId'] as num?)?.toInt() ?? 0,
+      );
+    }
+    return const SystemMusicVolumeReading(ratio: -1.0);
+  }
+}
+
 class AudioEffectsChannel {
   Future<bool> awaitControlUpdates() async {
     if (!PlatformCapabilities.isAndroid) return true;
@@ -58,14 +98,15 @@ class AudioEffectsChannel {
   /// Stream emitting whenever the native audio route changes (earpods/headphones connected/disconnected).
   Stream<void> get onRouteChanged => _routeChangedController.stream;
 
-  final StreamController<double> _systemVolumeController =
-      StreamController<double>.broadcast();
+  final StreamController<SystemMusicVolumeReading> _systemVolumeController =
+      StreamController<SystemMusicVolumeReading>.broadcast();
 
   /// Stream emitting the Android STREAM_MUSIC volume as a 0..1 ratio whenever
   /// the user changes the hardware media volume. Used to drive the loudness
   /// contour from the system volume instead of the in-app software slider.
   /// Off-Android this never emits (the native observer only exists there).
-  Stream<double> get onSystemVolumeChanged => _systemVolumeController.stream;
+  Stream<SystemMusicVolumeReading> get onSystemVolumeChanged =>
+      _systemVolumeController.stream;
 
   Future<dynamic> _handleNativeCall(MethodCall call) async {
     if (call.method == 'onRouteChanged') {
@@ -75,9 +116,9 @@ class AudioEffectsChannel {
       return;
     }
     if (call.method == 'onSystemVolumeChanged') {
-      final dynamic args = call.arguments;
-      if (args is num && args.isFinite && !_systemVolumeController.isClosed) {
-        _systemVolumeController.add(args.toDouble().clamp(0.0, 1.0));
+      final reading = SystemMusicVolumeReading.fromNative(call.arguments);
+      if (reading.isKnown && !_systemVolumeController.isClosed) {
+        _systemVolumeController.add(reading);
       }
       return;
     }
@@ -1776,6 +1817,40 @@ class AudioEffectsChannel {
         category: 'AudioEffectsChannel',
       );
       return 1.0;
+    }
+  }
+
+  /// Route-tagged STREAM_MUSIC level. `ratio < 0` means the platform could not
+  /// read it; callers must keep their existing level instead of treating that
+  /// as silence or as full scale.
+  Future<SystemMusicVolumeReading> getSystemMusicVolumeDetailed() async {
+    if (!_isAndroid) {
+      return const SystemMusicVolumeReading(ratio: 1.0, routeKnown: true);
+    }
+    try {
+      final dynamic raw = await _channel
+          .invokeMethod<dynamic>('getSystemMusicVolumeDetailed')
+          .timeout(const Duration(seconds: 2));
+      return SystemMusicVolumeReading.fromNative(raw);
+    } on MissingPluginException {
+      // Older native builds only expose the scalar. It carries no route tag,
+      // so the caller must treat it as unverified but still usable.
+      try {
+        final dynamic ratio = await _channel
+            .invokeMethod<dynamic>('getSystemMusicVolume')
+            .timeout(const Duration(seconds: 2));
+        return SystemMusicVolumeReading.fromNative(ratio);
+      } catch (_) {
+        return const SystemMusicVolumeReading(ratio: -1.0);
+      }
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Failed to read route-aware system music volume',
+        error: e,
+        stackTrace: st,
+        category: 'AudioEffectsChannel',
+      );
+      return const SystemMusicVolumeReading(ratio: -1.0);
     }
   }
 

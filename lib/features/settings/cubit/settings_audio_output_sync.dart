@@ -41,6 +41,8 @@ extension SettingsAudioOutputSync on SettingsAudioActions {
     required bool disarmTapSrc,
     required Future<void> Function() body,
     bool syncTapSrcAfter = false,
+    bool seedVolumeAfterRebuild = false,
+    bool expectedUsbRouteAfterRebuild = false,
   }) async {
     final handler = getIt.isRegistered<PulsrAudioHandler>()
         ? getIt<PulsrAudioHandler>()
@@ -79,6 +81,29 @@ extension SettingsAudioOutputSync on SettingsAudioActions {
       // track; without it the platform keeps reporting the mixer as inactive
       // until the next track. Still inside the pause, so the rebuild is silent.
       await handler?.reconfigurePlaybackSink();
+      // A rebuilt sink starts at unity. Re-seed from the system level and
+      // re-apply the user volume before resuming, or the first track after a
+      // Bit-Perfect toggle plays at 100% while the device is lower.
+      if (handler != null) {
+        handler.seedVolumeOnNextRebuild = seedVolumeAfterRebuild;
+        handler.expectedUsbRouteForVolumeSeed =
+            expectedUsbRouteAfterRebuild;
+        try {
+          // Future.sync also covers a test double whose unstubbed method
+          // returns null instead of a Future; a volume re-apply must never
+          // abort the transport transition.
+          await Future<void>.sync(
+            () => handler.reapplyVolumeAfterSinkRebuild(),
+          );
+        } catch (e, st) {
+          ErrorLogger.log(
+            'Failed to reapply volume after the sink rebuild',
+            error: e,
+            stackTrace: st,
+            category: 'SettingsAudioOutputSync',
+          );
+        }
+      }
     } finally {
       _suppressTapSrcSync = prevSuppress;
       if (wasPlaying) {
@@ -133,6 +158,12 @@ extension SettingsAudioOutputSync on SettingsAudioActions {
     return runSinkTransitionMuted(
       disarmTapSrc: enabled,
       syncTapSrcAfter: !enabled,
+      // Entering a bypassed output needs the device level; leaving it must
+      // re-apply the level already known, not read a route mid-restore.
+      seedVolumeAfterRebuild: enabled,
+      expectedUsbRouteAfterRebuild: enabled &&
+          (state.currentOutputDevice?.isUsbDac == true ||
+              _bitPerfectViaDirectStream),
       body: () => _applyBitPerfectPolicy(
         enabled,
         keepPreferenceWhenDisabling: keepPreferenceWhenDisabling,

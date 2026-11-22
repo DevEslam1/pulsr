@@ -1397,9 +1397,20 @@ class PulsrAudioHandler extends BaseAudioHandler
     }
   }
 
+  /// Hint for the next volume seed: the live route is a USB DAC even if
+  /// AudioManager still reports a transient speaker. Set by the settings
+  /// transition, which knows the target route; kept out of the method signature
+  /// so existing handler mocks and callers stay source-compatible.
+  bool expectedUsbRouteForVolumeSeed = false;
+
+  /// Set by the sink-transition envelope: the rebuilt sink needs a fresh
+  /// system-volume seed (entry) or just a re-apply of the known level (exit).
+  bool seedVolumeOnNextRebuild = false;
+
   /// Reconcile the live transport without changing saved speed/pitch/silence
   /// choices. Set the boundary guard before awaiting any player writes.
   Future<void> setBitPerfectTransportPolicy(bool enabled) async {
+    final expectedUsbRoute = expectedUsbRouteForVolumeSeed;
     final previous = _bitPerfectTransportBypass;
     _bitPerfectTransportBypass = enabled;
     try {
@@ -1414,21 +1425,25 @@ class PulsrAudioHandler extends BaseAudioHandler
         // Entering bypass shifts output gain ownership from the Android
         // STREAM_MUSIC mixer to the app/DAC path; seed [_volume] from the
         // system level immediately so playback cannot start at unity (1.0).
-        final volumeSync = _syncOutputVolumeBeforeLoad();
-        if (volumeSync != null) await volumeSync;
+        // `forceSeed` is required: the saved Bit-Perfect preference is written
+        // after this call, so [_shouldForwardSystemVolumeToOutput] still reads
+        // the previous (off) value here.
+        await _refreshLoudnessContourFromSystemVolume(
+          forceUsbHardwareSeed: true,
+          forceSeed: true,
+          expectedUsbRoute: expectedUsbRoute,
+        );
       } else if (previous == true) {
-        // Synchronously reset any Direct USB software attenuation before
-        // resuming normal playback so an async statusStream event cannot race
-        // with play() and leave output muted/attenuated.
-        if (PlatformCapabilities.isAndroid &&
-            _lastDirectUsbVolume >= 0.0 &&
-            (_lastDirectUsbVolume - 1.0).abs() >= 1e-6) {
+        // Leaving bypass must always release the Direct USB software stage.
+        // The status stream may already have cleared [_lastDirectUsbVolume]
+        // before this runs, and gating the reset on that value left the native
+        // gain at the old (possibly 0.0) attenuation — audible as silence after
+        // Bit-Perfect is turned off.
+        if (PlatformCapabilities.isAndroid) {
           _lastDirectUsbVolume = -1.0;
           try {
             await AudioEffectsChannel().setDirectUsbVolume(1.0);
           } catch (_) {}
-        } else {
-          _lastDirectUsbVolume = -1.0;
         }
         await restorePersistedSpeed();
         final skip = silenceSkipController.enabled;
@@ -1504,6 +1519,18 @@ class PulsrAudioHandler extends BaseAudioHandler
   /// Bounded so a slow platform channel cannot delay playback noticeably.
   /// Whether [PulsrAudioHandler] should seed [_volume] from Android's system
   /// STREAM_MUSIC level before starting or switching into a bypassed output.
+  /// Whether a STREAM_MUSIC reading belongs to the route the app is actually
+  /// driving. Direct USB owns the DAC while Android may still report the
+  /// speaker index (often 0) for a moment; seeding from that would mute the
+  /// live stream. An unknown route keeps the previous level instead.
+  @visibleForTesting
+  static bool systemVolumeReadingBelongsToRoute({
+    required bool directUsbStreaming,
+    required bool routeKnown,
+    required bool isUsb,
+  }) =>
+      !directUsbStreaming || !routeKnown || isUsb;
+
   @visibleForTesting
   static bool shouldSeedSystemVolume({
     required bool isAndroid,
@@ -1512,8 +1539,15 @@ class PulsrAudioHandler extends BaseAudioHandler
     required bool forwardSystemVolume,
     bool forceUsbHardwareSeed = false,
     bool externalHardwareVolumeSet = false,
+    bool forceSeed = false,
   }) {
-    if (!isAndroid || dvcEnabled || !forwardSystemVolume) return false;
+    if (!isAndroid || dvcEnabled) return false;
+    // A mode transition (Bit-Perfect on/off, sink rebuild) has just moved gain
+    // ownership between Android's mixer and the app/DAC path. The saved
+    // preference is written later in the transition, so reading it here would
+    // skip the seed and leave the new sink at the 1.0 default.
+    if (forceSeed) return true;
+    if (!forwardSystemVolume) return false;
     if (!hardwareVolumeOwnsOutput) return true;
     return forceUsbHardwareSeed && !externalHardwareVolumeSet;
   }
@@ -1540,6 +1574,8 @@ class PulsrAudioHandler extends BaseAudioHandler
 
   Future<void> _refreshLoudnessContourFromSystemVolume({
     bool forceUsbHardwareSeed = false,
+    bool forceSeed = false,
+    bool expectedUsbRoute = false,
   }) async {
     final shouldSeed = shouldSeedSystemVolume(
       isAndroid: PlatformCapabilities.isAndroid,
@@ -1548,13 +1584,25 @@ class PulsrAudioHandler extends BaseAudioHandler
       forwardSystemVolume: _shouldForwardSystemVolumeToOutput(),
       forceUsbHardwareSeed: forceUsbHardwareSeed,
       externalHardwareVolumeSet: _externalHardwareVolumeSet,
+      forceSeed: forceSeed,
     );
     if (PlatformCapabilities.isAndroid &&
         (_equalizerManager.isLoudnessContourEnabled || shouldSeed)) {
       try {
-        final sys = await AudioEffectsChannel().getSystemMusicVolume();
-        if (sys.isFinite && sys >= 0.0) {
-          _lastSystemVolumeRatio = sys.clamp(0.0, 1.0);
+        final reading =
+            await AudioEffectsChannel().getSystemMusicVolumeDetailed();
+        // A route transition can make getStreamVolume() report the speaker's
+        // index while Direct USB already owns the output. Never seed 0 from a
+        // different route: keep the last level that belonged to this sink.
+        final belongsToThisRoute = systemVolumeReadingBelongsToRoute(
+          directUsbStreaming:
+              UsbExclusiveService().lastStatus.streamingActive ||
+                  expectedUsbRoute,
+          routeKnown: reading.routeKnown,
+          isUsb: reading.isUsb,
+        );
+        if (reading.isKnown && belongsToThisRoute) {
+          _lastSystemVolumeRatio = reading.ratio;
         }
       } catch (e, st) {
         ErrorLogger.log('Failed to query system music volume for loudness',
@@ -1579,6 +1627,35 @@ class PulsrAudioHandler extends BaseAudioHandler
       ]);
     }
     await _feedLoudnessContourVolume();
+  }
+
+  /// Re-applies the user/system level after a sink rebuild.
+  ///
+  /// `reconfigurePlaybackSink()` opens a fresh AudioTrack whose gain starts at
+  /// unity. The Bit-Perfect transition already seeded the intended level, but
+  /// the rebuilt sink must be told about it again or the first track after the
+  /// toggle plays at 100% while the device volume is lower.
+  Future<void> reapplyVolumeAfterSinkRebuild({
+    bool? seedFromSystem,
+    bool? expectedUsbRoute,
+  }) async {
+    final seed = seedFromSystem ?? seedVolumeOnNextRebuild;
+    final routeIsUsb = expectedUsbRoute ?? expectedUsbRouteForVolumeSeed;
+    // Only an entry transition needs a fresh read: the saved preference is
+    // still "off" while the sink is being rebuilt, and the old sink may have
+    // left the player at unity. Leaving Bit-Perfect must NOT re-read, because
+    // the route is mid-restore and getStreamVolume() can report the speaker's
+    // 0 for one event — which would silence the app right after it is turned
+    // off. On exit the level was already seeded on the way in.
+    if (seed) {
+      await _refreshLoudnessContourFromSystemVolume(
+        forceUsbHardwareSeed: true,
+        forceSeed: true,
+        expectedUsbRoute: routeIsUsb,
+      );
+    }
+    await _pushUsbHardwareVolume();
+    await _reapplyActiveVolume();
   }
 
   /// Direct Volume Control: when true the composed gain is applied in the
@@ -1729,10 +1806,12 @@ class PulsrAudioHandler extends BaseAudioHandler
   /// stays attenuated — and a gain of 0 leaves it silent after Bit-Perfect is
   /// turned off. Reset the native stage to unity and re-apply the app volume.
   Future<void> _resetDirectUsbGainAfterStop() async {
-    final bitPerfectArmed = _isBitPerfectBypassEnabled() ||
-        (_cachedPrefs?.getBool(PrefsKeys.bitPerfectOutput) ?? false) ||
-        (_cachedPrefs?.getBool(PrefsKeys.strictBitPerfect) ?? false);
-    if (!bitPerfectArmed && !UsbExclusiveService().lastStatus.streamingActive) {
+    // The old `bitPerfectArmed` guard read preferences that are written after
+    // the stream has already stopped, so it skipped the reset on the exact
+    // transition that needed it. The native stage is gated by
+    // bitPerfect.directUsbActive, so resetting to unity unconditionally is
+    // safe and keeps a stale 0.0 from silencing the ordinary path.
+    if (!UsbExclusiveService().lastStatus.streamingActive) {
       try {
         await AudioEffectsChannel().setDirectUsbVolume(1.0);
       } catch (e, st) {
@@ -3177,15 +3256,24 @@ class PulsrAudioHandler extends BaseAudioHandler
     // While the contour is off we only cache the latest ratio; the
     // software-volume path (setVolume) still owns the value in that case.
     _subscriptions.add(
-      AudioEffectsChannel().onSystemVolumeChanged.listen((ratio) {
+      AudioEffectsChannel().onSystemVolumeChanged.listen((reading) {
         if (_dvcEnabled) {
           // DVC pins STREAM_MUSIC to maximum and applies user gain natively;
           // ignore Android's pinned max stream callbacks so `_volume` is not
           // overwritten back to 1.0.
           return;
         }
-        final clamped =
-            (ratio.isFinite && ratio >= 0.0) ? ratio.clamp(0.0, 1.0) : null;
+        // Route-tagged: a speaker index of 0 during a USB sink rebuild must
+        // not mute the live Direct USB stream.
+        final belongsToThisRoute = systemVolumeReadingBelongsToRoute(
+          directUsbStreaming:
+              UsbExclusiveService().lastStatus.streamingActive,
+          routeKnown: reading.routeKnown,
+          isUsb: reading.isUsb,
+        );
+        final clamped = reading.isKnown && belongsToThisRoute
+            ? reading.ratio.clamp(0.0, 1.0)
+            : null;
         if (clamped != null) {
           _lastSystemVolumeRatio = clamped;
         }

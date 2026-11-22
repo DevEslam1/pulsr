@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.media.AudioAttributes
 import android.media.AudioDeviceCallback
 import android.media.AudioDeviceInfo
 import android.media.AudioManager
@@ -1866,6 +1867,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private var volumeBroadcastReceiver: BroadcastReceiver? = null
     private var pendingVolumeChangeRunnable: Runnable? = null
     @Volatile private var lastSystemVolumeRatio: Double = -1.0
+    @Volatile private var lastSystemVolumeRouteWasUsb: Boolean? = null
 
     fun initPlugin(appContext: Context, messenger: io.flutter.plugin.common.BinaryMessenger) {
         context = appContext
@@ -1948,20 +1950,85 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         pendingVolumeChangeRunnable?.let { mainHandler.removeCallbacks(it) }
         val r = Runnable {
             if (disposed.get()) return@Runnable
-            val ratio = computeSystemMusicVolumeRatio()
+            val reading = computeSystemMusicVolumeReading()
+            val ratio = reading["ratio"] as? Double ?: -1.0
             // Unknown (-1) must not look like any real level: the Dart side
             // would read it as a loudness change and re-seed its volume.
             if (ratio < 0.0) return@Runnable
-            if (abs(ratio - lastSystemVolumeRatio) < 1e-6) return@Runnable
+            if (abs(ratio - lastSystemVolumeRatio) < 1e-6 &&
+                reading["routeKnown"] == true &&
+                reading["isUsb"] == lastSystemVolumeRouteWasUsb) {
+                return@Runnable
+            }
             lastSystemVolumeRatio = ratio
+            lastSystemVolumeRouteWasUsb = reading["isUsb"] == true
             try {
-                methodChannel.invokeMethod("onSystemVolumeChanged", ratio)
+                methodChannel.invokeMethod("onSystemVolumeChanged", reading)
             } catch (e: Exception) {
                 Log.w(TAG, "Failed to send onSystemVolumeChanged to Flutter: ${e.message}")
             }
         }
         pendingVolumeChangeRunnable = r
         mainHandler.postDelayed(r, 60L)
+    }
+
+    /**
+     * The device the system STREAM_MUSIC index belongs to.
+     *
+     * `getStreamVolume()` has no device argument: it reports the index of the
+     * route AudioFlinger currently uses. During a sink rebuild or a Direct USB
+     * attach that route can briefly be the speaker while the app is already
+     * streaming to the DAC. Without this tag the app would seed its volume from
+     * the speaker's index (often 0) and go silent on a USB route.
+     */
+    @Suppress("DEPRECATION")
+    private fun currentVolumeRouteDevice(): AudioDeviceInfo? {
+        val am = context?.getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return null
+        val devices = try {
+            am.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
+        } catch (_: Throwable) {
+            return null
+        }
+        // A live app sink is the strongest statement about where its audio is
+        // going; prefer it over the platform's pre-playback hint.
+        val routedId = try {
+            com.ryanheise.just_audio.PulsrOutputRouting.snapshot()[0]
+        } catch (_: Throwable) {
+            0
+        }
+        if (routedId != 0) {
+            devices.firstOrNull { it.id == routedId }?.let { return it }
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            try {
+                val attrs = AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_MEDIA)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                    .build()
+                val hint = am.getAudioDevicesForAttributes(attrs).firstOrNull()
+                if (hint != null) {
+                    return devices.firstOrNull {
+                        it.type == hint.type &&
+                            (hint.address.isNullOrEmpty() || it.address == hint.address)
+                    } ?: devices.firstOrNull { it.type == hint.type }
+                }
+            } catch (_: Throwable) {}
+        }
+        return null
+    }
+
+    private fun isUsbAudioType(type: Int): Boolean =
+        type == AudioDeviceInfo.TYPE_USB_DEVICE || type == AudioDeviceInfo.TYPE_USB_HEADSET
+
+    /** STREAM_MUSIC ratio plus the route that index actually belongs to. */
+    private fun computeSystemMusicVolumeReading(): Map<String, Any?> {
+        val route = currentVolumeRouteDevice()
+        return mapOf(
+            "ratio" to computeSystemMusicVolumeRatio(),
+            "routeKnown" to (route != null),
+            "isUsb" to (route != null && isUsbAudioType(route.type)),
+            "deviceId" to (route?.id ?: 0),
+        )
     }
 
     // Registers both a Settings ContentObserver and VOLUME_CHANGED_ACTION
@@ -5311,6 +5378,14 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     // to device max, this reads ~1.0, so the contour stays off
                     // even though DVC attenuates digitally — accepted tradeoff.
                     result.success(computeSystemMusicVolumeRatio())
+                }
+
+                "getSystemMusicVolumeDetailed" -> {
+                    // Same level, tagged with the route it belongs to. A route
+                    // transition can make getStreamVolume() report the
+                    // speaker's index while the app already streams to USB;
+                    // Dart must not seed 0 from that transient.
+                    result.success(computeSystemMusicVolumeReading())
                 }
 
                 "getCapabilities" -> {

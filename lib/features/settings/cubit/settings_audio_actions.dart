@@ -45,6 +45,12 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
   Future<void> refreshOutputDevice() =>
       SettingsAudioOutputSync(this).refreshOutputDevice();
 
+  /// Whether the live transport is expected to be a USB DAC right now. Used
+  /// only to reject a STREAM_MUSIC reading that still belongs to a transient
+  /// speaker route during a sink rebuild.
+  bool get _expectedUsbRoute =>
+      state.currentOutputDevice?.isUsbDac == true || _bitPerfectViaDirectStream;
+
   bool get _currentSourceNeedsRawInteger {
     final song = getIt.isRegistered<PulsrAudioHandler>()
         ? getIt<PulsrAudioHandler>().currentSong
@@ -124,12 +130,17 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
     return reason == null || reason.isEmpty ? base : '$base $reason';
   }
 
-  Future<void> _pushBitPerfectBypass(bool enabled) async {
+  Future<void> _pushBitPerfectBypass(
+    bool enabled, {
+    bool expectedUsbRoute = false,
+  }) async {
     if (enabled && AmbientSoundService().isEnabled) {
       await AmbientSoundService().setEnabled(false);
     }
     if (getIt.isRegistered<PulsrAudioHandler>()) {
-      await getIt<PulsrAudioHandler>().setBitPerfectTransportPolicy(enabled);
+      final handler = getIt<PulsrAudioHandler>();
+      handler.expectedUsbRouteForVolumeSeed = expectedUsbRoute;
+      await handler.setBitPerfectTransportPolicy(enabled);
     }
     if (getIt.isRegistered<EqualizerManager>()) {
       await getIt<EqualizerManager>().setBypassDspForBitPerfect(enabled);
@@ -769,8 +780,52 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
             'Crossfade disabled: it is not compatible with Bit-Perfect output.',
       );
 
-  Future<void> setBitPerfectOutput(bool enabled) =>
-      _audioModeMutex.protect(() => _setBitPerfectOutput(enabled));
+  Future<void> setBitPerfectOutput(bool enabled) async {
+    await _audioModeMutex.protect(() => _setBitPerfectOutput(enabled));
+    if (enabled && state.bitPerfectOutput) {
+      unawaited(_alignDirectUsbAfterEnable());
+    }
+  }
+
+  /// The Direct USB sink opens before the decoder publishes its first frame,
+  /// so it can latch the scanner tag (often 16-bit) or the previous track's
+  /// depth. When the decoder then confirms a deeper 24-bit source, restart the
+  /// sink once at the exact depth instead of leaving the low 8 bits truncated.
+  ///
+  /// This is deliberately narrow: an unknown tag, a rate change, or a 32-bit
+  /// decoder carrier is left to the normal per-track negotiation. Only a
+  /// same-rate, too-shallow stream is corrected.
+  Future<void> _alignDirectUsbAfterEnable() async {
+    await Future<void>.delayed(const Duration(milliseconds: 500));
+    if (isClosed ||
+        !state.bitPerfectOutput ||
+        !_bitPerfectViaDirectStream) {
+      return;
+    }
+    await refreshOutputDevice();
+    if (isClosed) return;
+    final handler = getIt.isRegistered<PulsrAudioHandler>()
+        ? getIt<PulsrAudioHandler>()
+        : null;
+    final song = handler?.currentSong;
+    if (song == null) return;
+    final taggedDepth = song.bitDepth ?? 0;
+    if (taggedDepth <= 0 || taggedDepth > 24) return;
+    final status = UsbExclusiveService().lastStatus;
+    if (!status.streamingActive || status.streamingBitDepth <= 0) return;
+    final rate = effectiveSourceSampleRate(
+      tagged: song.sampleRate ?? 0,
+      decoded: state.currentOutputDevice?.decodedSampleRate ?? 0,
+    );
+    if (rate <= 0 || status.streamingSampleRate != rate) return;
+    var depth = effectiveSourceBitDepth(
+      tagged: taggedDepth,
+      decoded: state.currentOutputDevice?.decodedBitDepth ?? 0,
+    );
+    if (depth > 24) depth = taggedDepth;
+    if (depth <= status.streamingBitDepth) return;
+    await setBitPerfectTrackFormat(sampleRate: rate, bitDepth: depth);
+  }
 
   /// Seam for the mute envelope wrapped by [SettingsAudioOutputSync].
   Future<void> _setBitPerfectOutput(
@@ -899,7 +954,9 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
     }
     try {
       await _pushBitPerfectBypass(
-          enabled && (state.bypassDspOnBitPerfect || state.strictBitPerfect));
+        enabled && (state.bypassDspOnBitPerfect || state.strictBitPerfect),
+        expectedUsbRoute: _expectedUsbRoute,
+      );
       if (enabled) await _forceCrossfadeOffForBitPerfect();
     } catch (e, st) {
       ErrorLogger.log('Bit-perfect DSP transition failed',
@@ -1016,7 +1073,7 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
     }
     if (state.bitPerfectOutput) {
       try {
-        await _pushBitPerfectBypass(enabled);
+        await _pushBitPerfectBypass(enabled, expectedUsbRoute: _expectedUsbRoute);
       } catch (_) {
         safeEmit(state.copyWith(error: uiError(_bypassUpdateFailedMessage())));
         return;
@@ -1178,7 +1235,8 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
         // already holds rebuilds the processing chain for nothing, and Strict
         // OFF commonly restores `true` while the chain is already bypassed.
         if (targetBypass != state.bypassDspOnBitPerfect) {
-          await _pushBitPerfectBypass(targetBypass);
+          await _pushBitPerfectBypass(targetBypass,
+              expectedUsbRoute: _expectedUsbRoute);
         }
         safeEmit(state.copyWith(
           strictBitPerfect: false,
@@ -1229,7 +1287,8 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
         await prefs.setBool(PrefsKeys.bitPerfectOutput, prevBitPerfect);
         await prefs.setBool(PrefsKeys.bypassDspOnBitPerfect, prevBypass);
         await prefs.setBool(PrefsKeys.followTrackSampleRate, prevFollowRate);
-        await _pushBitPerfectBypass(prevBitPerfect && prevBypass);
+        await _pushBitPerfectBypass(prevBitPerfect && prevBypass,
+            expectedUsbRoute: _expectedUsbRoute);
       } catch (e, st) {
         ErrorLogger.log('Failed to persist strict bit-perfect revert',
             error: e, stackTrace: st, category: 'Settings');
@@ -1257,7 +1316,7 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
       return;
     }
     try {
-      await _pushBitPerfectBypass(true);
+      await _pushBitPerfectBypass(true, expectedUsbRoute: _expectedUsbRoute);
       await _forceCrossfadeOffForBitPerfect();
     } catch (_) {
       await _rollbackBitPerfectEnable(

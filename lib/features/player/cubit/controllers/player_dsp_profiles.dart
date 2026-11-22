@@ -53,6 +53,13 @@ extension PlayerDspProfilesExtension on PlayerDspController {
           UsbExclusiveService().lastStatus.attached) {
         return;
       }
+      // A mode transition is mid-flight. Its interim route snapshot (paused
+      // sink, Direct USB detaching snd-usb-audio) is not a user route change;
+      // arbitrating on it would queue a disable behind the enable and make the
+      // switch appear to turn itself off.
+      if (_settingsCubit?.audioModeTransitionInFlight == true) {
+        return;
+      }
       try {
         final key = DeviceProfileService.deviceKeyFromInfo(device);
         await service.rememberDevice(key, device.deviceName);
@@ -134,6 +141,7 @@ extension PlayerDspProfilesExtension on PlayerDspController {
   Future<void> _handleDacAutoRouting(AudioOutputInfo device) async {
     final settings = _settingsCubit;
     if (settings == null || _isClosed()) return;
+    if (settings.audioModeTransitionInFlight) return;
 
     // 1. If USB DAC is present among available devices but not active, route to it
     if (!device.isUsbDac) {
@@ -217,6 +225,10 @@ extension PlayerDspProfilesExtension on PlayerDspController {
   ) async {
     final settings = _settingsCubit;
     if (settings == null || _isClosed()) return;
+    // Never arbitrate a mode the transition is still applying. The mutex
+    // serialises the eventual write, but the decision must not be taken on an
+    // interim snapshot.
+    if (settings.audioModeTransitionInFlight) return;
     final song = _getState().currentSong;
     final plan = resolveSmartAudioPlan(
       mode: SmartAudioMode.auto,
@@ -241,10 +253,19 @@ extension PlayerDspProfilesExtension on PlayerDspController {
           _smartAutoBitPerfectApplied = settings.state.bitPerfectOutput;
         }
       } else if (_smartAutoBitPerfectApplied) {
-        if (settings.state.bitPerfectOutput) {
+        // A still-attached / still-armed DAC is not a reason to erase the mode
+        // just because the route snapshot went non-USB for one event. The route
+        // handler owns transport suspension; Smart Audio only revokes what it
+        // itself enabled when the DAC is genuinely gone.
+        final usb = UsbExclusiveService().lastStatus;
+        final dacStillOwnsPath =
+            usb.attached || settings.bitPerfectViaDirectStream;
+        if (!dacStillOwnsPath && settings.state.bitPerfectOutput) {
           await settings.setBitPerfectOutput(false);
         }
-        _smartAutoBitPerfectApplied = false;
+        if (!settings.state.bitPerfectOutput) {
+          _smartAutoBitPerfectApplied = false;
+        }
       }
     } catch (e, st) {
       ErrorLogger.log('Smart Audio quality arbitration failed',

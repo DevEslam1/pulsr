@@ -227,6 +227,17 @@ class SettingsCubit extends PulsrCubit<SettingsState>
                 ? getIt<HiResAudioService>()
                 : HiResAudioService()),
         super(const SettingsState()) {
+    // The Direct USB sink lives in a separate plugin; its start/stop does not
+    // emit an AudioManager route event. Without this subscription the output
+    // card kept claiming EXCLUSIVE after the endpoint had already gone IDLE.
+    autoSub(UsbExclusiveService().statusStream, (status) {
+      if (isClosed) return;
+      _usbStatusRefreshDebounce?.cancel();
+      _usbStatusRefreshDebounce =
+          Timer(const Duration(milliseconds: 200), () {
+        if (!isClosed) unawaited(refreshOutputDevice());
+      });
+    });
     autoSub(_hiResAudioService.outputDeviceStream, (device) {
       if (isClosed) return;
       // When Pulsr's Direct USB sink claims the USB interface, snd-usb-audio
@@ -273,6 +284,12 @@ class SettingsCubit extends PulsrCubit<SettingsState>
     _loadPreferences();
   }
 
+  Timer? _usbStatusRefreshDebounce;
+
+  /// True while a Bit-Perfect / DSP-bypass transition owns the audio mode
+  /// mutex. Route/profile observers must not arbitrate a mode in flight.
+  bool get audioModeTransitionInFlight => _audioModeMutex.isLocked;
+
   /// Theme-schedule ownership lives in [ThemeScheduleController] (god-object
   /// split): the cubit only gates on [SettingsState.autoThemeByTime] and
   /// applies the resulting theme mode. The callback never overrides a manual
@@ -309,6 +326,8 @@ class SettingsCubit extends PulsrCubit<SettingsState>
 
   @override
   Future<void> close() {
+    _usbStatusRefreshDebounce?.cancel();
+    _usbStatusRefreshDebounce = null;
     _themeScheduleController?.dispose();
     _themeScheduleController = null;
     return super.close();
@@ -1307,8 +1326,12 @@ class SettingsCubit extends PulsrCubit<SettingsState>
           // Re-assert the DSP-bypass policy at boot: without this the Kotlin
           // effects plugin keeps its default (bypass off) after a restart and
           // the saved bit-perfect conflict rule is not enforced this session.
-          await _pushBitPerfectBypass(state.bitPerfectOutput &&
-              (state.bypassDspOnBitPerfect || state.strictBitPerfect));
+          await _pushBitPerfectBypass(
+            state.bitPerfectOutput &&
+                (state.bypassDspOnBitPerfect || state.strictBitPerfect),
+            expectedUsbRoute: state.currentOutputDevice?.isUsbDac == true ||
+                _bitPerfectViaDirectStream,
+          );
           if (state.bitPerfectOutput && getIt.isRegistered<PulsrAudioHandler>()) {
             await getIt<PulsrAudioHandler>().reconfigurePlaybackSink();
           }
