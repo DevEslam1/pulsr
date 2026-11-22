@@ -26,7 +26,6 @@ const List<String> _wave1ACleanedNoColorsFiles = [
   'lib/features/player/presentation/themes/painters/cassette_body.dart',
   'lib/features/player/presentation/themes/painters/cd_painters.dart',
   'lib/features/player/presentation/themes/painters/cd_stage.dart',
-  'lib/features/player/presentation/themes/painters/circle_stage.dart',
   'lib/features/player/presentation/themes/painters/platter_scrub.dart',
   'lib/features/player/presentation/themes/painters/vinyl_deck.dart',
   'lib/features/player/presentation/themes/painters/vinyl_painters.dart',

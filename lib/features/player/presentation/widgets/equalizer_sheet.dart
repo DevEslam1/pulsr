@@ -330,7 +330,11 @@ class _EqualizerSheetState extends State<EqualizerSheet>
             child: ConstrainedBox(
               constraints: BoxConstraints(
                 maxWidth: context.isLandscape
-                    ? math.min(MediaQuery.sizeOf(context).width * 0.94, 760.0)
+                    ? (context.isTabletLandscape
+                        ? math.min(
+                            MediaQuery.sizeOf(context).width * 0.90, 1150.0)
+                        : math.min(
+                            MediaQuery.sizeOf(context).width * 0.94, 760.0))
                     : Adaptive.sheetConstraints(context).maxWidth,
                 maxHeight: MediaQuery.sizeOf(context).height *
                     (context.isLandscape ? 0.95 : 0.84),

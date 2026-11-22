@@ -850,18 +850,6 @@ class AppLocalizationsAr extends AppLocalizations {
   String get playerTheme => 'نمط المشغل';
 
   @override
-  String get playerThemeClassic => 'المشغل الكلاسيكي';
-
-  @override
-  String get playerThemeCard => 'البطاقة العائمة';
-
-  @override
-  String get playerThemeCircle => 'القرص الدائري';
-
-  @override
-  String get playerThemeMinimal => 'البسيط النقي';
-
-  @override
   String get visualizerStyle => 'المؤثرات البصرية للصوت';
 
   @override
@@ -5920,13 +5908,6 @@ class AppLocalizationsAr extends AppLocalizations {
       'غلاف خلفي بكامل الشاشة مع أدوات زجاجية مصنفرة';
 
   @override
-  String get settingsThemeClassicStandard => 'قياسي كلاسيكي';
-
-  @override
-  String get settingsThemeClassicStandardDesc =>
-      'تصميم تقليدي عالي الدقة مع توهّج محيطي';
-
-  @override
   String get settingsThemeFullBleed => 'شكل موجي بكامل الشاشة';
 
   @override
@@ -5941,25 +5922,11 @@ class AppLocalizationsAr extends AppLocalizations {
       'واجهة مشغّل كاريوكي بالكلمات المتزامنة المكبّرة';
 
   @override
-  String get settingsThemeMinimalist => 'شكل موجي بسيط';
-
-  @override
-  String get settingsThemeMinimalistDesc =>
-      'تركيز استوديو واسع على مُصوّر الموجة الصوتية الديناميكي';
-
-  @override
   String get settingsThemeRetroCassette => 'مشغّل كاسيت كلاسيكي';
 
   @override
   String get settingsThemeRetroCassetteDesc =>
       'شريط كاسيت قديم ببكرات دوّارة وعدّاد شريط مغناطيسي';
-
-  @override
-  String get settingsThemeVinylCircle => 'دائرة أسطوانة (تدور)';
-
-  @override
-  String get settingsThemeVinylCircleDesc =>
-      'غلاف دائري في الوسط مع حركة دوران مستمرة';
 
   @override
   String get settingsThemeCdTurntable => 'مشغل أسطوانات CD';

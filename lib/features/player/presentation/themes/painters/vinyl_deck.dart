@@ -1,12 +1,14 @@
 part of '../vinyl_player_theme.dart';
 
-/// Turntable hero stage: platter, spinning record, tonearm and RPM badge.
+/// Turntable hero stage: platter, spinning record, tonearm and hardware RPM LED badge.
 class _VinylTurntableDeck extends StatefulWidget {
   final PlayerThemeProps props;
   final bool isTablet;
   final bool isLandscape;
   final AnimationController rotationController;
   final Animation<double> tonearmAnimation;
+  final double plinthRadius;
+  final bool ambientGlow;
 
   const _VinylTurntableDeck({
     required this.props,
@@ -14,6 +16,8 @@ class _VinylTurntableDeck extends StatefulWidget {
     required this.isLandscape,
     required this.rotationController,
     required this.tonearmAnimation,
+    required this.plinthRadius,
+    required this.ambientGlow,
   });
 
   @override
@@ -49,16 +53,38 @@ class _VinylTurntableDeckState extends State<_VinylTurntableDeck> {
     final state = props.state;
     final cubit = props.cubit;
     final activeColor = props.activeColor;
+    final warmAmber = Color.lerp(AppColors.amberDeep, activeColor, 0.32)!;
+    final brassBorder = Color.lerp(
+      PlayerMaterialColors.cassetteShellBorder,
+      AppColors.giltGold,
+      0.24,
+    )!;
+    final plinthStart = Color.lerp(
+      PlayerMaterialColors.deckGradStart,
+      AppColors.onGiltDark,
+      0.34,
+    )!;
+    final plinthMid = Color.lerp(
+      PlayerMaterialColors.deckGradMid,
+      AppColors.onGiltDark,
+      0.28,
+    )!;
+    final plinthEnd = Color.lerp(
+      PlayerMaterialColors.deckGradEnd,
+      AppColors.onGiltDark,
+      0.22,
+    )!;
     final song = state.currentSong;
     // The record label and the ring framing it must share one radius, or a
     // Theme Studio radius would round the clip but leave the frame circular.
     final artRadius = resolveCustomRadius(context, 999);
+    final effectivePlinthRadius = widget.plinthRadius.clamp(8.0, 36.0);
 
     return Center(
       child: ConstrainedBox(
         constraints: BoxConstraints(
-          maxHeight: context.isLandscape ? 300 : (context.isTablet ? 480 : 390),
-          maxWidth: context.isLandscape ? 320 : (context.isTablet ? 500 : 410),
+          maxHeight: context.isLandscape ? 300 : (context.isTablet ? 460 : 370),
+          maxWidth: context.isLandscape ? 320 : (context.isTablet ? 480 : 390),
         ),
         child: AspectRatio(
           aspectRatio: 1.04,
@@ -86,15 +112,15 @@ class _VinylTurntableDeckState extends State<_VinylTurntableDeck> {
                     color: surface.vinylGroove,
                     boxShadow: [
                       BoxShadow(
-                        color: surface.shadowAt(0.5),
-                        blurRadius: 16,
+                        color: surface.shadowAt(0.54),
+                        blurRadius: 18,
                         offset: const Offset(0, 6),
                       ),
                     ],
                   ),
                   child: CustomPaint(
                     painter: _VinylGroovesPainter(
-                      activeColor: activeColor,
+                      activeColor: warmAmber,
                       surface: surface,
                     ),
                     child: Center(
@@ -105,7 +131,7 @@ class _VinylTurntableDeckState extends State<_VinylTurntableDeck> {
                         decoration: BoxDecoration(
                           borderRadius: AppRadii.circular(artRadius),
                           border: Border.all(
-                            color: surface.specularAt(0.3),
+                            color: AppColors.giltGold.withValues(alpha: 0.42),
                             width: 1.5,
                           ),
                         ),
@@ -125,7 +151,7 @@ class _VinylTurntableDeckState extends State<_VinylTurntableDeck> {
                                 highQuality: true,
                                 fallbackIcon: Icons.music_note_rounded,
                               ),
-                            // Center Spindle Hole
+                            // Center Brass-Trimmed Spindle Hole
                             Container(
                               width: 18,
                               height: 18,
@@ -133,14 +159,14 @@ class _VinylTurntableDeckState extends State<_VinylTurntableDeck> {
                                 shape: BoxShape.circle,
                                 gradient: RadialGradient(
                                   colors: [
+                                    AppColors.onGiltLight,
                                     surface.platterMetal,
-                                    surface.platterMetalShadow,
                                     surface.vinylGroove,
                                   ],
-                                  stops: const [0.0, 0.6, 1.0],
+                                  stops: const [0.0, 0.58, 1.0],
                                 ),
                                 border: Border.all(
-                                  color: surface.specularAt(0.30),
+                                  color: AppColors.giltGold.withValues(alpha: 0.45),
                                   width: 1,
                                 ),
                               ),
@@ -167,19 +193,19 @@ class _VinylTurntableDeckState extends State<_VinylTurntableDeck> {
                   behavior: HitTestBehavior.deferToChild,
                   child: Container(
                     decoration: BoxDecoration(
-                      gradient: const LinearGradient(
+                      gradient: LinearGradient(
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                         colors: [
-                          PlayerMaterialColors.deckGradStart,
-                          PlayerMaterialColors.deckGradMid,
-                          PlayerMaterialColors.deckGradEnd,
+                          plinthStart,
+                          plinthMid,
+                          plinthEnd,
                         ],
                       ),
-                      borderRadius: AppRadii.r22All,
+                      borderRadius: AppRadii.circular(effectivePlinthRadius),
                       border: Border.all(
-                        color: PlayerMaterialColors.cassetteShellBorder,
-                        width: 1.5,
+                        color: brassBorder,
+                        width: 1.6,
                       ),
                       boxShadow: [
                         BoxShadow(
@@ -189,18 +215,39 @@ class _VinylTurntableDeckState extends State<_VinylTurntableDeck> {
                           offset: const Offset(0, 12),
                         ),
                         BoxShadow(
-                          color: activeColor.withValues(alpha: 0.08),
-                          blurRadius: 32,
-                          spreadRadius: -4,
+                          color: (widget.ambientGlow ? activeColor : warmAmber)
+                              .withValues(
+                            alpha: widget.ambientGlow ? 0.24 : 0.10,
+                          ),
+                          blurRadius: widget.ambientGlow ? 38 : 30,
+                          spreadRadius: widget.ambientGlow ? 1 : -4,
                         ),
                       ],
                     ),
                     child: Stack(
                       clipBehavior: Clip.none,
                       children: [
-                        // 1. Plinth Studio Branding & Active Status
+                        // 0. Subtle brushed metal sheen across plinth face
+                        Positioned.fill(
+                          child: IgnorePointer(
+                            child: ClipRRect(
+                              borderRadius:
+                                  AppRadii.circular(effectivePlinthRadius),
+                              child: CustomPaint(
+                                painter: _PlinthBrushedOverlayPainter(
+                                  highlight: AppColors.onGiltLight
+                                      .withValues(alpha: 0.045),
+                                  brassCorner:
+                                      AppColors.giltGold.withValues(alpha: 0.36),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+
+                        // 1. Plinth Studio Branding & Active Power LED
                         PositionedDirectional(
-                          top: 14,
+                          top: 13,
                           start: 16,
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
@@ -211,15 +258,15 @@ class _VinylTurntableDeckState extends State<_VinylTurntableDeck> {
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
                                   color: state.isPlaying
-                                      ? surface.ledGlow
+                                      ? AppColors.amberDeep
                                       : surface.specularAt(0.24),
                                   boxShadow: state.isPlaying
                                       ? [
                                           BoxShadow(
-                                            color: surface.ledGlow
-                                                .withValues(alpha: 0.8),
-                                            blurRadius: 6,
-                                            spreadRadius: 1,
+                                            color: AppColors.amberDeep
+                                                .withValues(alpha: 0.85),
+                                            blurRadius: 7,
+                                            spreadRadius: 1.5,
                                           ),
                                         ]
                                       : null,
@@ -249,7 +296,7 @@ class _VinylTurntableDeckState extends State<_VinylTurntableDeck> {
                           height: vinylSize + 8,
                           child: CustomPaint(
                             painter: _PlatterStrobePainter(
-                              activeColor: activeColor,
+                              activeColor: warmAmber,
                               isPlaying: state.isPlaying,
                               surface: surface,
                             ),
@@ -331,7 +378,7 @@ class _VinylTurntableDeckState extends State<_VinylTurntableDeck> {
                             child: Center(
                               child: PlatterScrubPill(
                                 controller: _scrub,
-                                activeColor: activeColor,
+                                activeColor: warmAmber,
                               ),
                             ),
                           ),
@@ -367,7 +414,7 @@ class _VinylTurntableDeckState extends State<_VinylTurntableDeck> {
                                         painter: _TonearmPainter(
                                           pivot: pivotOffset,
                                           angle: currentAngle,
-                                          activeColor: activeColor,
+                                          activeColor: warmAmber,
                                           armLength: armLength,
                                           liftProgress:
                                               widget.tonearmAnimation.value,
@@ -382,66 +429,90 @@ class _VinylTurntableDeckState extends State<_VinylTurntableDeck> {
                           ),
                         ),
 
-                        // 5. Bottom Plinth RPM Badge (33⅓ RPM / Standby - Interactive)
+                        // 5. Crisp Hardware 33⅓ RPM / STANDBY LED Indicator
                         PositionedDirectional(
                           bottom: 12,
                           start: 14,
-                          // A printed badge, not a hidden shortcut: tapping the
-                          // deck means lyrics on every theme, and the speed
-                          // picker lives in the dock where it has a label and a
-                          // 48 dp target. A tap handler here swallowed the
-                          // corner of the stage without advertising itself.
                           child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: AppSpacing.s8,
-                                  vertical: AppSpacing.xxs),
-                              decoration: BoxDecoration(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.s8,
+                              vertical: AppSpacing.xxs,
+                            ),
+                            decoration: BoxDecoration(
+                              color: state.isPlaying
+                                  ? AppColors.amberDeep.withValues(alpha: 0.16)
+                                  : surface.tapeWindow,
+                              borderRadius: AppRadii.r6All,
+                              border: Border.all(
                                 color: state.isPlaying
-                                    ? activeColor.withValues(alpha: 0.15)
-                                    : surface.tapeWindow,
-                                borderRadius: AppRadii.r6All,
-                                border: Border.all(
-                                  color: state.isPlaying
-                                      ? activeColor.withValues(alpha: 0.5)
-                                      : PlayerMaterialColors.recordRim,
-                                  width: 1,
-                                ),
+                                    ? AppColors.amberDeep.withValues(alpha: 0.65)
+                                    : PlayerMaterialColors.recordRim,
+                                width: 1,
                               ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    state.isPlaying
-                                        ? Icons.speed_rounded
-                                        : Icons.pause_circle_outline_rounded,
-                                    size: 11,
-                                    color: state.isPlaying
-                                        ? surface.ledGlow
-                                        : surface.mutedInk,
-                                  ),
-                                  const SizedBox(width: AppSpacing.xxs),
-                                  // Painted plinth legends stay out of the
-                                  // accessibility tree: the stage node names the
-                                  // track, and "STANDBY" bleeding into it made
-                                  // the deck read as a second status line.
-                                  ExcludeSemantics(
-                                    child: Text(
-                                      state.isPlaying
-                                          ? context.l10n.vinylSpeedRpm
-                                          : context.l10n.dspStandby,
-                                      style: TextStyle(
-                                        fontSize: AppFontSize.caption,
-                                        fontWeight: FontWeight.w800,
-                                        letterSpacing: AppTracking.overline,
-                                        color: state.isPlaying
-                                            ? surface.ledGlow
-                                            : surface.mutedInk,
+                              boxShadow: state.isPlaying
+                                  ? [
+                                      BoxShadow(
+                                        color: AppColors.amberDeep
+                                            .withValues(alpha: 0.28),
+                                        blurRadius: 10,
                                       ),
+                                    ]
+                                  : null,
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  width: 6,
+                                  height: 6,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: state.isPlaying
+                                        ? AppColors.amberDeep
+                                        : surface.mutedInk
+                                            .withValues(alpha: 0.38),
+                                    boxShadow: state.isPlaying
+                                        ? [
+                                            BoxShadow(
+                                              color: AppColors.amberDeep
+                                                  .withValues(alpha: 0.90),
+                                              blurRadius: 6,
+                                              spreadRadius: 1,
+                                            ),
+                                          ]
+                                        : null,
+                                  ),
+                                ),
+                                const SizedBox(width: AppSpacing.s6),
+                                Icon(
+                                  state.isPlaying
+                                      ? Icons.speed_rounded
+                                      : Icons.pause_circle_outline_rounded,
+                                  size: 11,
+                                  color: state.isPlaying
+                                      ? AppColors.amberDeep
+                                      : surface.mutedInk,
+                                ),
+                                const SizedBox(width: AppSpacing.xxs),
+                                ExcludeSemantics(
+                                  child: Text(
+                                    state.isPlaying
+                                        ? context.l10n.vinylSpeedRpm
+                                        : context.l10n.dspStandby,
+                                    style: TextStyle(
+                                      fontFamily: 'monospace',
+                                      fontSize: AppFontSize.caption,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: AppTracking.overline,
+                                      color: state.isPlaying
+                                          ? AppColors.onGiltLight
+                                          : surface.mutedInk,
                                     ),
                                   ),
-                                ],
-                              ),
+                                ),
+                              ],
                             ),
+                          ),
                         ),
                       ],
                     ),

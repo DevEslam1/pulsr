@@ -43,7 +43,7 @@ void main() {
 
   setUpAll(() {
     registerFallbackValue(ExperienceMode.normal);
-    registerFallbackValue(PlayerThemeMode.classic);
+    registerFallbackValue(PlayerThemeMode.clean);
     registerFallbackValue(const Color(0xFF000000));
   });
 

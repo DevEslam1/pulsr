@@ -378,4 +378,40 @@ void main() {
     );
     expect(sortedRecent.first.station.url, cairoUrl);
   });
+
+  testWidgets(
+      'hero card uses 2-line editorial title without overflow at 360dp and 200% text scale',
+      (tester) async {
+    for (final locale in const [Locale('en'), Locale('ar')]) {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        buildHarness(
+          locale: locale,
+          child: Builder(
+            builder: (context) => MediaQuery(
+              data: MediaQuery.of(context).copyWith(
+                textScaler: const TextScaler.linear(2.0),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: QuranRadioHeroCarousel(playerCubit: playerCubit),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      final titleText = tester.widget<Text>(
+        find.byKey(const ValueKey('hero_title_cur-quran-minshawi')),
+      );
+      expect(titleText.maxLines, 2);
+      expect(titleText.overflow, TextOverflow.ellipsis);
+    }
+  });
 }

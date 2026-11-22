@@ -1682,7 +1682,7 @@ class _SettingsState extends SettingsState {
       this.customAccentColorValue = 0xFF9B9EF5,
       this.customThemeRadius = 24.0,
       this.customThemeGlow = true,
-      this.playerThemeMode = PlayerThemeMode.classic,
+      this.playerThemeMode = PlayerThemeMode.clean,
       this.playerSliderStyle = PlayerSliderStyle.capsule,
       this.appButtonStyle = AppButtonStyle.rectangular,
       this.visualizerStyle = VisualizerStyle.off,

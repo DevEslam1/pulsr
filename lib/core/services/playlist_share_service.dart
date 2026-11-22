@@ -14,7 +14,7 @@ class SharedPlaylistBundle {
   const SharedPlaylistBundle({
     required this.name,
     required this.tracks,
-    this.appVersion = '1.0.0',
+    this.appVersion = '2.0.0',
     required this.exportTimestamp,
   });
 

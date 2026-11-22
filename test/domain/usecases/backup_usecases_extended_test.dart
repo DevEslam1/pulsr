@@ -356,6 +356,7 @@ void main() {
       expect(prefs.getBool('setting_gapless'), isFalse);
       expect(prefs.getDouble('setting_crossfade'), 5.0);
       expect(prefs.getInt('setting_min_duration'), 12);
+      expect(prefs.getString('setting_player_theme_mode'), 'waveform');
       expect(prefs.getString(PrefsKeys.eqPresetName), 'Rock');
       expect(prefs.getString(PrefsKeys.eqGains), 'gains');
       expect(prefs.getDouble(PrefsKeys.eqPreamp), 2.0);

@@ -555,7 +555,7 @@ pulsr/
 name: pulsr
 description: "Pulsr Music - Premium offline-first local music player"
 publish_to: 'none'
-version: 1.0.0+1
+version: 2.0.0+1
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -1587,7 +1587,7 @@ Future<void> main() async {
   }
 
   // Resolve the installed version before any screen (Settings/About, updater)
-  // reads AppConfig.appVersion. Best-effort: the 1.0.0 fallback is only used
+  // reads AppConfig.appVersion. Best-effort: the 2.0.0 fallback is only used
   // when the platform channel is unavailable.
   await AppConfig.loadInstalledVersion()
       .timeout(const Duration(seconds: 2), onTimeout: () {});

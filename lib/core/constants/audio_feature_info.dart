@@ -959,6 +959,32 @@ class AudioConflicts {
     return AudioSourceSampleFormat.unknown;
   }
 
+  static bool isMp3({String? path, String? codec, String? mimeType}) {
+    final normCodec = codec?.trim().toLowerCase();
+    if (normCodec != null &&
+        (normCodec == 'mp3' ||
+            normCodec.startsWith('mp3') ||
+            normCodec.contains('mp3') ||
+            normCodec == 'audio/mpeg' ||
+            normCodec == 'audio/mp3')) {
+      return true;
+    }
+    final normMime = mimeType?.trim().toLowerCase();
+    if (normMime != null &&
+        (normMime.contains('mp3') ||
+            normMime == 'audio/mpeg' ||
+            normMime == 'audio/mp3')) {
+      return true;
+    }
+    final lowerPath = path?.trim().toLowerCase() ?? '';
+    if (lowerPath.endsWith('.mp3') ||
+        lowerPath.contains('.mp3?') ||
+        lowerPath.contains('.mp3#')) {
+      return true;
+    }
+    return false;
+  }
+
   static String? bitPerfectSourceBlockedReason({
     String? path,
     bool isRadio = false,
@@ -968,6 +994,7 @@ class AudioConflicts {
     String? mimeType,
     bool integer32DirectUsbEligible = false,
     bool requireConfirmedCodec = false,
+    bool strictBitPerfect = false,
   }) {
     final lower = path?.toLowerCase() ?? '';
     // Radio detection: explicit flag or radio:// scheme only.
@@ -1009,14 +1036,18 @@ class AudioConflicts {
       isLossy: isLossy,
     );
 
-    // Policy: Live radio and lossy streams/files (MP3, AAC, Ogg, Opus, etc.)
+    final bool mp3 = isMp3(path: path, codec: codec, mimeType: mimeType);
+
+    // Policy: Live radio and lossy streams/files (AAC, Ogg, Opus, etc.)
     // are blocked from Bit-Perfect playback with conflictLiveOrLossyNotBitPerfect.
-    if (radio || state == AudioSourceCodecState.lossy) {
+    // MP3 (decoded 16-bit PCM pass-through) is allowed for Bit-Perfect mode.
+    if (radio || (state == AudioSourceCodecState.lossy && !mp3)) {
       return L10nHolder.current?.conflictLiveOrLossyNotBitPerfect ??
           'Live radio and lossy streams cannot be played bit-perfect.';
     }
 
-    if (requireConfirmedCodec && state == AudioSourceCodecState.unknown) {
+    final bool mustConfirm = requireConfirmedCodec || strictBitPerfect;
+    if (mustConfirm && state == AudioSourceCodecState.unknown) {
       return bitPerfectReasonMessage('source_codec_unconfirmed');
     }
     return null;

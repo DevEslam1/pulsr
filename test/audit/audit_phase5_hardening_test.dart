@@ -72,20 +72,17 @@ void main() {
     // 2. Player Theme Registry (8 Themes)
     // -------------------------------------------------------------------------
     group('2. Player Themes Verification', () {
-      test('All 11 PlayerThemeMode entries exist and can be resolved', () {
-        expect(PlayerThemeMode.values.length, equals(11));
+      test('All 8 PlayerThemeMode entries exist and can be resolved', () {
+        expect(PlayerThemeMode.values.length, equals(8));
 
         final expectedModes = [
-          PlayerThemeMode.classic,
+          PlayerThemeMode.clean,
           PlayerThemeMode.card,
-          PlayerThemeMode.circle,
-          PlayerThemeMode.minimal,
           PlayerThemeMode.vinyl,
+          PlayerThemeMode.cd,
           PlayerThemeMode.cassette,
           PlayerThemeMode.waveform,
           PlayerThemeMode.lyricsFocus,
-          PlayerThemeMode.cd,
-          PlayerThemeMode.clean,
           PlayerThemeMode.milkdrop,
         ];
 

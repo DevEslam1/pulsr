@@ -14,7 +14,6 @@ import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/theme/pulsr_button_style.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/cached_artwork.dart';
-import '../../../../core/widgets/marquee_text.dart';
 import '../../../../core/widgets/shimmer_skeleton.dart';
 import '../../../../domain/models/radio_station.dart';
 import '../../../../core/widgets/pulsr_bottom_sheet.dart';
@@ -572,11 +571,9 @@ class _QuranRadioHeroCarouselState extends State<QuranRadioHeroCarousel> {
     final shouldAnimate = PulsrMotion.shouldAnimate(context);
     _syncAutoScrollTimer(shouldAnimate);
     final textScale =
-        MediaQuery.textScalerOf(context).scale(1.0).clamp(1.0, 1.8);
-    final effectiveHeight = math.max(
-      widget.height,
-      widget.height + (textScale - 1.0) * 68.0,
-    );
+        MediaQuery.textScalerOf(context).scale(1.0).clamp(1.0, 2.2);
+    final baseHeight = math.max(widget.height, 164.0);
+    final effectiveHeight = baseHeight + (textScale - 1.0) * 96.0;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -652,7 +649,7 @@ class _QuranRadioHeroCarouselState extends State<QuranRadioHeroCarousel> {
           ),
         ),
         if (total > 1) ...[
-          const SizedBox(height: AppSpacing.s8),
+          const SizedBox(height: AppSpacing.s6),
           Center(
             child: _CarouselWindowedDots(
               total: total,
@@ -1057,11 +1054,11 @@ class _QuranHeroCard extends StatelessWidget {
 
         // Cool accent wash on the editorial side, warm gilt wash toward the niche.
         final surfaceStart = Color.alphaBlend(
-          p.accent.withValues(alpha: p.isDark ? 0.09 : 0.06),
+          p.accent.withValues(alpha: p.isDark ? 0.085 : 0.055),
           p.surfaceContainerHigh,
         );
         final surfaceEnd = Color.alphaBlend(
-          gilt.withValues(alpha: p.isDark ? 0.05 : 0.035),
+          gilt.withValues(alpha: p.isDark ? 0.08 : 0.05),
           p.surfaceContainer,
         );
         final isHomeCard = item.artworkAsset.contains('home card') ||
@@ -1107,11 +1104,18 @@ class _QuranHeroCard extends StatelessWidget {
                 child: LayoutBuilder(
                   builder: (context, constraints) {
                     final isWide = constraints.maxWidth >= 500;
-                    final archFraction = isWide ? 0.34 : 0.38;
+                    final isCompact = constraints.maxWidth < 310;
+                    final archFraction =
+                        isWide ? 0.33 : (isCompact ? 0.34 : 0.35);
                     final archWidth = (constraints.maxWidth * archFraction)
-                        .clamp(116.0, 172.0)
+                        .clamp(104.0, 168.0)
                         .toDouble();
-                    final trailingReserved = archWidth + 14.0;
+                    const archEndInset = 8.0;
+                    const textArchGap = 14.0;
+                    final trailingReserved =
+                        archWidth + archEndInset + textArchGap;
+                    final leadingPadding = isCompact ? 14.0 : 16.0;
+                    final textDir = Directionality.of(context);
 
                     return Stack(
                       fit: StackFit.expand,
@@ -1124,7 +1128,7 @@ class _QuranHeroCard extends StatelessWidget {
                                 child: CustomPaint(
                                   painter: _KhatamLatticePainter(
                                     color: gilt.withValues(
-                                      alpha: p.isDark ? 0.055 : 0.05,
+                                      alpha: p.isDark ? 0.05 : 0.045,
                                     ),
                                   ),
                                 ),
@@ -1137,14 +1141,17 @@ class _QuranHeroCard extends StatelessWidget {
                           end: -16,
                           top: -16,
                           bottom: -16,
-                          width: archWidth + 32,
+                          width: archWidth + 36,
                           child: IgnorePointer(
                             child: DecoratedBox(
                               decoration: BoxDecoration(
                                 gradient: RadialGradient(
                                   colors: [
                                     gilt.withValues(
-                                        alpha: isPlaying ? 0.24 : 0.12),
+                                      alpha: p.isCalmDensity
+                                          ? (isPlaying ? 0.12 : 0.05)
+                                          : (isPlaying ? 0.24 : 0.13),
+                                    ),
                                     AppColors.fadeStopTransparent,
                                   ],
                                 ),
@@ -1154,7 +1161,7 @@ class _QuranHeroCard extends StatelessWidget {
                         ),
                         // ── Mihrab niche: arch-clipped artwork + gilt rim ────
                         PositionedDirectional(
-                          end: 8,
+                          end: archEndInset,
                           top: 8,
                           bottom: 8,
                           width: archWidth,
@@ -1221,6 +1228,28 @@ class _QuranHeroCard extends StatelessWidget {
                                           );
                                         },
                                       ),
+                                    // Directional leading-edge fade blends the
+                                    // arched artwork organically into the canvas
+                                    // (mirrors automatically in RTL).
+                                    DecoratedBox(
+                                      decoration: BoxDecoration(
+                                        gradient: LinearGradient(
+                                          begin:
+                                              AlignmentDirectional.centerStart,
+                                          end: AlignmentDirectional.centerEnd,
+                                          colors: [
+                                            surfaceEnd.withValues(
+                                              alpha: p.isDark ? 0.60 : 0.38,
+                                            ),
+                                            surfaceEnd.withValues(
+                                              alpha: p.isDark ? 0.20 : 0.10,
+                                            ),
+                                            AppColors.fadeStopTransparent,
+                                          ],
+                                          stops: const [0.0, 0.24, 0.56],
+                                        ),
+                                      ),
+                                    ),
                                     // Depth scrim toward the niche floor.
                                     DecoratedBox(
                                       decoration: BoxDecoration(
@@ -1230,10 +1259,10 @@ class _QuranHeroCard extends StatelessWidget {
                                           colors: [
                                             AppColors.fadeStopTransparent,
                                             surfaceEnd.withValues(
-                                              alpha: p.isDark ? 0.34 : 0.16,
+                                              alpha: p.isDark ? 0.40 : 0.18,
                                             ),
                                           ],
-                                          stops: const [0.55, 1.0],
+                                          stops: const [0.56, 1.0],
                                         ),
                                       ),
                                     ),
@@ -1247,7 +1276,7 @@ class _QuranHeroCard extends StatelessWidget {
                                   ],
                                 ),
                               ),
-                              // Animated gilt rim + broadcast glow.
+                              // Animated directional gilt rim + broadcast glow.
                               IgnorePointer(
                                 child: TweenAnimationBuilder<double>(
                                   tween:
@@ -1258,6 +1287,7 @@ class _QuranHeroCard extends StatelessWidget {
                                       painter: _MihrabRimPainter(
                                         color: gilt,
                                         glow: glow,
+                                        textDirection: textDir,
                                       ),
                                     );
                                   },
@@ -1279,13 +1309,13 @@ class _QuranHeroCard extends StatelessWidget {
                                   colors: [
                                     AppColors.fadeStopTransparent,
                                     p.isDark
-                                        ? AppColors.specularAt(0.14)
-                                        : AppColors.scrimAt(0.05),
+                                        ? AppColors.specularAt(0.11)
+                                        : AppColors.scrimAt(0.04),
                                     gilt.withValues(
-                                        alpha: isPlaying ? 0.65 : 0.40),
+                                        alpha: isPlaying ? 0.58 : 0.34),
                                     p.isDark
-                                        ? AppColors.specularAt(0.14)
-                                        : AppColors.scrimAt(0.05),
+                                        ? AppColors.specularAt(0.11)
+                                        : AppColors.scrimAt(0.04),
                                     AppColors.fadeStopTransparent,
                                   ],
                                 ),
@@ -1309,7 +1339,7 @@ class _QuranHeroCard extends StatelessWidget {
                         ClipRect(
                           child: Padding(
                             padding: EdgeInsetsDirectional.fromSTEB(
-                              14.0,
+                              leadingPadding,
                               12,
                               trailingReserved,
                               12,
@@ -1329,17 +1359,19 @@ class _QuranHeroCard extends StatelessWidget {
                                           key: ValueKey<bool>(isPlaying),
                                           padding: const EdgeInsets.symmetric(
                                             horizontal: 8,
-                                            vertical: 3,
+                                            vertical: 3.5,
                                           ),
                                           decoration: BoxDecoration(
                                             color: isPlaying
-                                                ? p.accent.withValues(alpha: 0.18)
+                                                ? p.accent
+                                                    .withValues(alpha: 0.18)
                                                 : p.accent
-                                                    .withValues(alpha: 0.11),
-                                            borderRadius: AppRadii.circular(999),
+                                                    .withValues(alpha: 0.10),
+                                            borderRadius:
+                                                AppRadii.circular(999),
                                             border: Border.all(
                                               color: p.accent.withValues(
-                                                alpha: isPlaying ? 0.45 : 0.24,
+                                                alpha: isPlaying ? 0.42 : 0.22,
                                               ),
                                               width: 0.8,
                                             ),
@@ -1352,15 +1384,17 @@ class _QuranHeroCard extends StatelessWidget {
                                                 const SizedBox(width: 5),
                                                 Flexible(
                                                   child: Text(
-                                                    context
-                                                        .l10n.radioLiveOnAirBadge,
+                                                    context.l10n
+                                                        .radioLiveOnAirBadge,
                                                     maxLines: 1,
                                                     overflow:
                                                         TextOverflow.ellipsis,
                                                     style: TextStyle(
                                                       color: p.accent,
-                                                      fontSize: AppFontSize.caption,
-                                                      fontWeight: FontWeight.w800,
+                                                      fontSize:
+                                                          AppFontSize.caption,
+                                                      fontWeight:
+                                                          FontWeight.w800,
                                                       letterSpacing: 0.45,
                                                     ),
                                                   ),
@@ -1379,8 +1413,10 @@ class _QuranHeroCard extends StatelessWidget {
                                                         TextOverflow.ellipsis,
                                                     style: TextStyle(
                                                       color: p.accent,
-                                                      fontSize: AppFontSize.caption,
-                                                      fontWeight: FontWeight.w700,
+                                                      fontSize:
+                                                          AppFontSize.caption,
+                                                      fontWeight:
+                                                          FontWeight.w700,
                                                       letterSpacing: 0.3,
                                                     ),
                                                   ),
@@ -1412,37 +1448,34 @@ class _QuranHeroCard extends StatelessWidget {
                                     ],
                                   ],
                                 ),
-                                const SizedBox(height: 7),
-                                // Station / reciter title.
-                                MarqueeText(
+                                const SizedBox(height: 6),
+                                // Station / reciter editorial 2-line title.
+                                Text(
+                                  reciterTitle,
                                   key: ValueKey('hero_title_${item.station.id}'),
-                                  text: reciterTitle,
-                                  textAlign: isArabic
-                                      ? TextAlign.right
-                                      : TextAlign.left,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  textAlign: TextAlign.start,
                                   textDirection: isArabic
                                       ? TextDirection.rtl
                                       : TextDirection.ltr,
-                                  allowUserPause: false,
-                                  showTooltip: false,
-                                  velocity: 28.0,
-                                  blankSpace: 36.0,
                                   style: TextStyle(
                                     color: p.textPrimary,
-                                    fontSize: AppFontSize.subtitle,
+                                    fontSize: AppFontSize.bodyLarge,
                                     fontWeight: FontWeight.w800,
-                                    height: 1.2,
-                                    letterSpacing: -0.25,
+                                    height: 1.18,
+                                    letterSpacing: AppTracking.title,
                                   ),
                                 ),
-                                const SizedBox(height: 3),
-                                // Subtitle / live ICY surah ticker.
+                                const SizedBox(height: 4),
+                                // Subtitle / live ICY surah readout.
                                 Row(
                                   children: [
                                     if (isPlaying)
                                       Padding(
-                                        padding: const EdgeInsetsDirectional.only(
-                                            end: 4.5),
+                                        padding:
+                                            const EdgeInsetsDirectional.only(
+                                                end: 4.5),
                                         child: Icon(
                                           Icons.graphic_eq_rounded,
                                           size: 13,
@@ -1450,19 +1483,16 @@ class _QuranHeroCard extends StatelessWidget {
                                         ),
                                       ),
                                     Expanded(
-                                      child: MarqueeText(
-                                        key: ValueKey('hero_sub_${item.station.id}'),
-                                        text: displaySubtitle,
-                                        textAlign: isArabic
-                                            ? TextAlign.right
-                                            : TextAlign.left,
+                                      child: Text(
+                                        displaySubtitle,
+                                        key: ValueKey(
+                                            'hero_sub_${item.station.id}'),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        textAlign: TextAlign.start,
                                         textDirection: isArabic
                                             ? TextDirection.rtl
                                             : TextDirection.ltr,
-                                        allowUserPause: false,
-                                        showTooltip: false,
-                                        velocity: 24.0,
-                                        blankSpace: 32.0,
                                         style: TextStyle(
                                           color: isPlaying
                                               ? p.accent
@@ -1471,6 +1501,7 @@ class _QuranHeroCard extends StatelessWidget {
                                           fontWeight: isPlaying
                                               ? FontWeight.w700
                                               : FontWeight.w500,
+                                          height: 1.25,
                                         ),
                                       ),
                                     ),
@@ -1486,47 +1517,66 @@ class _QuranHeroCard extends StatelessWidget {
                                           color: AppColors.fadeStopTransparent,
                                           child: InkWell(
                                             borderRadius: ctaRadius,
-                                            onTap: () => onPlayPressed(isCurrent),
+                                            onTap: () =>
+                                                onPlayPressed(isCurrent),
                                             child: Container(
                                               constraints: const BoxConstraints(
-                                                minHeight: 34,
+                                                minHeight: 35,
                                               ),
                                               padding:
-                                                  EdgeInsetsDirectional.fromSTEB(
+                                                  EdgeInsetsDirectional
+                                                      .fromSTEB(
                                                 isPlaying ? 11 : 10,
-                                                4,
-                                                isPlaying ? 11 : 13,
-                                                4,
+                                                5,
+                                                isPlaying ? 11 : 14,
+                                                5,
                                               ),
                                               decoration: BoxDecoration(
                                                 gradient: LinearGradient(
-                                                  begin: Alignment.topLeft,
-                                                  end: Alignment.bottomRight,
+                                                  begin: AlignmentDirectional
+                                                      .topStart,
+                                                  end: AlignmentDirectional
+                                                      .bottomEnd,
                                                   colors: [
                                                     Color.alphaBlend(
-                                                      AppColors.specularAt(0.20),
+                                                      AppColors.specularAt(
+                                                          0.14),
                                                       gilt,
                                                     ),
                                                     gilt,
+                                                    Color.alphaBlend(
+                                                      AppColors.scrimAt(0.10),
+                                                      gilt,
+                                                    ),
                                                   ],
+                                                  stops: const [0.0, 0.48, 1.0],
                                                 ),
                                                 borderRadius: ctaRadius,
                                                 boxShadow: [
                                                   BoxShadow(
                                                     color: gilt.withValues(
-                                                      alpha:
-                                                          isPlaying ? 0.34 : 0.22,
+                                                      alpha: isPlaying
+                                                          ? 0.34
+                                                          : 0.22,
                                                     ),
                                                     blurRadius: 10,
                                                     offset: const Offset(0, 3),
                                                   ),
+                                                  BoxShadow(
+                                                    color: AppColors.scrimAt(
+                                                      p.isDark ? 0.28 : 0.12,
+                                                    ),
+                                                    blurRadius: 4,
+                                                    offset: const Offset(0, 1),
+                                                  ),
                                                 ],
                                                 border: Border.all(
                                                   color: onGilt.withValues(
-                                                    alpha:
-                                                        isPlaying ? 0.32 : 0.16,
+                                                    alpha: isPlaying
+                                                        ? 0.28
+                                                        : 0.14,
                                                   ),
-                                                  width: 0.9,
+                                                  width: 0.85,
                                                 ),
                                               ),
                                               child: Row(
@@ -1639,12 +1689,14 @@ class _QuranHeroCard extends StatelessWidget {
                                 borderRadius: AppRadii.r24All,
                                 border: Border.all(
                                   color: isPlaying
-                                      ? p.accent.withValues(alpha: 0.78)
+                                      ? p.accent.withValues(alpha: 0.72)
                                       : Color.alphaBlend(
-                                          gilt.withValues(alpha: 0.20),
-                                          p.hairline.withValues(alpha: 0.60),
+                                          gilt.withValues(
+                                            alpha: p.isDark ? 0.16 : 0.22,
+                                          ),
+                                          p.hairline,
                                         ),
-                                  width: isPlaying ? 1.5 : 1.0,
+                                  width: isPlaying ? 1.4 : 0.9,
                                 ),
                               ),
                             ),

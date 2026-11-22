@@ -28,16 +28,13 @@ class MockSettingsCubit extends Mock implements SettingsCubit {}
 
 /// The concrete themes registered by [ThemeRegistry], in registry order.
 const List<PlayerThemeMode> _registeredThemes = <PlayerThemeMode>[
-  PlayerThemeMode.classic,
+  PlayerThemeMode.clean,
   PlayerThemeMode.card,
-  PlayerThemeMode.circle,
-  PlayerThemeMode.minimal,
   PlayerThemeMode.vinyl,
   PlayerThemeMode.cd,
   PlayerThemeMode.cassette,
   PlayerThemeMode.waveform,
   PlayerThemeMode.lyricsFocus,
-  PlayerThemeMode.clean,
   PlayerThemeMode.milkdrop,
 ];
 

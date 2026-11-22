@@ -10,6 +10,7 @@ import 'package:pulsr/features/player/presentation/themes/player_theme.dart';
 import 'package:pulsr/features/player/presentation/themes/theme_registry.dart';
 import 'package:pulsr/features/player/presentation/widgets/audio_visualizer.dart';
 import 'package:pulsr/features/player/presentation/widgets/player_seek_bar.dart';
+import 'package:pulsr/features/player/presentation/widgets/visualizer/milkdrop_renderer.dart';
 import 'package:pulsr/features/player/presentation/widgets/waveform_seek_bar.dart';
 import 'package:pulsr/features/settings/cubit/settings_cubit.dart';
 import 'package:pulsr/features/settings/cubit/settings_state.dart';
@@ -96,7 +97,36 @@ void main() {
 
   const allThemes = PlayerThemeMode.values;
 
-  group('Seek Bar: All styles render cleanly across all 11 themes', () {
+  // Themes that mount PulsrSlider directly (clean/card/waveform use bespoke
+  // full-surface capsule, glass, or oscilloscope scrubbers with slider Semantics).
+  const pulsrSliderThemes = <PlayerThemeMode>{
+    PlayerThemeMode.vinyl,
+    PlayerThemeMode.cd,
+    PlayerThemeMode.cassette,
+    PlayerThemeMode.lyricsFocus,
+    PlayerThemeMode.milkdrop,
+  };
+
+  // Themes that swap their seek track for WaveformSeekBar when enabled.
+  const waveformSeekBarThemes = <PlayerThemeMode>{
+    PlayerThemeMode.clean,
+    PlayerThemeMode.vinyl,
+    PlayerThemeMode.cd,
+    PlayerThemeMode.cassette,
+  };
+
+  // Themes that mount AudioVisualizer when visualizerStyle != off
+  // (milkdrop renders MilkdropRenderer directly; lyricsFocus is lyrics-first).
+  const audioVisualizerThemes = <PlayerThemeMode>{
+    PlayerThemeMode.clean,
+    PlayerThemeMode.card,
+    PlayerThemeMode.vinyl,
+    PlayerThemeMode.cd,
+    PlayerThemeMode.cassette,
+    PlayerThemeMode.waveform,
+  };
+
+  group('Seek Bar: All styles render cleanly across all 8 themes', () {
     const sliderStyles = [
       PlayerSliderStyle.normal,
       PlayerSliderStyle.wavy,
@@ -124,8 +154,16 @@ void main() {
           await tester.pump();
 
           expect(tester.takeException(), isNull);
-          // PulsrSlider must be present for standard slider styles
-          expect(find.byType(PulsrSlider), findsOneWidget);
+          if (pulsrSliderThemes.contains(mode)) {
+            expect(find.byType(PulsrSlider), findsOneWidget);
+          } else {
+            expect(
+              find.byWidgetPredicate(
+                (w) => w is Semantics && w.properties.slider == true,
+              ),
+              findsWidgets,
+            );
+          }
         });
       }
 
@@ -149,12 +187,21 @@ void main() {
         await tester.pump(const Duration(milliseconds: 100));
 
         expect(tester.takeException(), isNull);
-        expect(find.byType(WaveformSeekBar), findsOneWidget);
+        if (waveformSeekBarThemes.contains(mode)) {
+          expect(find.byType(WaveformSeekBar), findsOneWidget);
+        } else {
+          expect(
+            find.byWidgetPredicate(
+              (w) => w is Semantics && w.properties.slider == true,
+            ),
+            findsWidgets,
+          );
+        }
       });
     }
   });
 
-  group('Audio Visualizer: All styles render cleanly across all 11 themes', () {
+  group('Audio Visualizer: All styles render cleanly across all 8 themes', () {
     const activeVisualizerStyles = [
       VisualizerStyle.bar,
       VisualizerStyle.wave,
@@ -187,8 +234,11 @@ void main() {
           await tester.pump();
 
           expect(tester.takeException(), isNull);
-          // AudioVisualizer must be mounted and present in the widget tree
-          expect(find.byType(AudioVisualizer), findsWidgets);
+          if (audioVisualizerThemes.contains(mode)) {
+            expect(find.byType(AudioVisualizer), findsWidgets);
+          } else if (mode == PlayerThemeMode.milkdrop) {
+            expect(find.byType(MilkdropRenderer), findsOneWidget);
+          }
         });
       }
 

@@ -4,11 +4,8 @@ import '../../../settings/cubit/settings_state.dart';
 import 'card_player_theme.dart';
 import 'clean_player_theme.dart';
 import 'cassette_player_theme.dart';
-import 'circle_player_theme.dart';
 import 'cd_player_theme.dart';
-import 'classic_player_theme.dart';
 import 'lyrics_player_theme.dart';
-import 'minimal_player_theme.dart';
 import 'milkdrop_player_theme.dart';
 import 'player_theme.dart';
 import 'player_theme_scaffold.dart' show PlayerThemePreviewScope;
@@ -24,16 +21,13 @@ class ThemeRegistry {
   ThemeRegistry._();
 
   static final Map<PlayerThemeMode, PlayerThemeBuilder> _defaultBuilders = {
-    PlayerThemeMode.classic: (props) => ClassicPlayerTheme(props: props),
+    PlayerThemeMode.clean: (props) => CleanPlayerTheme(props: props),
     PlayerThemeMode.card: (props) => CardPlayerTheme(props: props),
-    PlayerThemeMode.circle: (props) => CirclePlayerTheme(props: props),
-    PlayerThemeMode.minimal: (props) => MinimalPlayerTheme(props: props),
     PlayerThemeMode.vinyl: (props) => VinylPlayerTheme(props: props),
     PlayerThemeMode.cd: (props) => CdPlayerTheme(props: props),
     PlayerThemeMode.cassette: (props) => CassettePlayerTheme(props: props),
     PlayerThemeMode.waveform: (props) => WaveformPlayerTheme(props: props),
     PlayerThemeMode.lyricsFocus: (props) => LyricsPlayerTheme(props: props),
-    PlayerThemeMode.clean: (props) => CleanPlayerTheme(props: props),
     PlayerThemeMode.milkdrop: (props) => MilkdropPlayerTheme(props: props),
   };
 
@@ -54,7 +48,7 @@ class ThemeRegistry {
     if (builder != null) {
       return builder(themedProps);
     }
-    return ClassicPlayerTheme(props: themedProps);
+    return CleanPlayerTheme(props: themedProps);
   }
 
   /// Strips transient banners, radio recommendation cards, lyrics/queue
@@ -99,7 +93,7 @@ class ThemeRegistry {
   /// the whole canvas is scaled into the slot. When [isPreview] is `true`
   /// (the default), transient banners, radio recommendation cards, lyrics/queue
   /// overlays, Hero transitions, device insets, and OS text scaling are
-  /// suppressed inside the thumbnail so all 11 themes fit cleanly with zero
+  /// suppressed inside the thumbnail so all 8 themes fit cleanly with zero
   /// [FittedBox] overflow across Light, Dark, and AMOLED modes.
   static Widget preview(
     PlayerThemeMode mode,

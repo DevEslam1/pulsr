@@ -10,6 +10,7 @@ import '../../core/di/injection.dart';
 import '../../core/utils/error_logger.dart';
 import '../../data/db/app_database.dart';
 import '../../domain/repositories/music_repository_interface.dart';
+import '../../features/settings/cubit/settings_state.dart';
 import '../audio/audio_handler.dart';
 import '../audio/per_song_eq_store.dart';
 import '../audio/per_song_volume_store.dart';
@@ -105,8 +106,9 @@ class ExportBackupUseCase {
       'themeMode': prefs.getString('setting_theme_mode') ?? 'dark',
       'customAccentColorValue':
           prefs.getInt('setting_custom_accent') ?? 0xFF9B9EF5,
-      'playerThemeMode':
-          prefs.getString('setting_player_theme_mode') ?? 'classic',
+      'playerThemeMode': PlayerThemeMode.fromName(
+        prefs.getString('setting_player_theme_mode'),
+      ).name,
       'playerSliderStyle':
           prefs.getString('setting_player_slider_style') ?? 'normal',
       'appButtonStyle':
@@ -988,8 +990,10 @@ class ImportBackupUseCase {
       }
       if (settings.containsKey('playerThemeMode')) {
         final rawPlayerTheme = settings['playerThemeMode'];
-        await prefs.setString('setting_player_theme_mode',
-            rawPlayerTheme is String ? rawPlayerTheme : 'classic');
+        final migratedTheme = PlayerThemeMode.fromName(
+          rawPlayerTheme is String ? rawPlayerTheme : null,
+        );
+        await prefs.setString('setting_player_theme_mode', migratedTheme.name);
         restoredSettingsCount++;
       }
       if (settings.containsKey('visualizerStyle')) {

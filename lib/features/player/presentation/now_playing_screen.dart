@@ -125,7 +125,6 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
     // themes get position from PlayerSeekBar's own selector, so rebuilding the
     // whole screen every second for them is pure waste.
     final needsPositionTick = switch (settingsConfig.playerThemeMode) {
-      PlayerThemeMode.circle ||
       PlayerThemeMode.vinyl ||
       PlayerThemeMode.cassette ||
       PlayerThemeMode.cd =>
@@ -159,9 +158,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
             : settingsConfig.customAccentColor;
         final isDark = Theme.of(context).brightness == Brightness.dark;
         final isAmoled = settingsConfig.themeMode == AppThemeMode.amoled;
-        final isCleanOverlay =
-            settingsConfig.playerThemeMode == PlayerThemeMode.clean &&
-                (state.isLyricsVisible || state.isQueueVisible);
+        final isOverlayActive = state.isLyricsVisible || state.isQueueVisible;
         final baseBgColor = isAmoled
             ? Colors.black
             : (settingsConfig.dynamicThemingEnabled
@@ -169,7 +166,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
                 : (isDark
                     ? AppColors.darkSurface
                     : Theme.of(context).colorScheme.surface));
-        final bgColor = isCleanOverlay
+        final bgColor = isOverlayActive
             ? (isAmoled
                 ? Colors.black
                 : (isDark ? context.palette.deepShade : baseBgColor))
@@ -230,12 +227,11 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
                         ),
                       ),
 
-                    // Adaptive top status-bar legibility scrim (portrait only)
+                    // Adaptive top status-bar legibility scrim (portrait only,
+                    // suppressed while full-screen lyrics/queue overlays are shown)
                     if (MediaQuery.orientationOf(context) !=
                             Orientation.landscape &&
-                        ((!state.isLyricsVisible && !state.isQueueVisible) ||
-                            settingsConfig.playerThemeMode !=
-                                PlayerThemeMode.clean))
+                        !isOverlayActive)
                       PositionedDirectional(
                         top: 0,
                         start: 0,

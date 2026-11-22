@@ -1,578 +1,877 @@
 part of '../waveform_player_theme.dart';
 
-// ---------------------------------------------------------------------------
-// Waveform Hero Stage: Real Waveform Overview + Sonic Pulse + Floating Art
-// ---------------------------------------------------------------------------
-class _WaveformHeroStage extends StatelessWidget {
-  final SongsTableData? song;
-  final Color activeColor;
-  final bool isPlaying;
-  final bool isLandscape;
-  final bool isTablet;
-  final AnimationController waveController;
-  final int? audioSessionId;
-  final String heroTag;
+/// Tall, studio-grade interactive audio oscilloscope centerpiece.
+///
+/// Replaces any standard thin progress slider with a full dB/time-gridded
+/// waveform viewport driven by real decoded PCM peaks from [WaveformService].
+/// - Instant 0ms frame-1 display via [WaveformService.getInstantWaveform],
+///   upgraded asynchronously via [WaveformService.getWaveform] (cached per
+///   track identity so playback ticks never trigger I/O).
+/// - Smooth tap & horizontal drag-to-seek (`cubit.seek`) with RTL awareness,
+///   floating monospace scrub time + delta HUD pill, glowing active playhead
+///   cursor, A/B loop markers when active, and optional subtle FFT trace.
+/// - Position updates are strictly isolated inside [BlocSelector] so parent
+///   widgets never rebuild on playback ticks.
+class _StudioOscilloscopeBay extends StatefulWidget {
+  final PlayerThemeProps props;
+  final bool isCompact;
+  final bool isPreview;
+  final bool customGlow;
 
-  const _WaveformHeroStage({
+  const _StudioOscilloscopeBay({
     super.key,
-    required this.song,
-    required this.activeColor,
-    required this.isPlaying,
-    required this.isLandscape,
-    required this.isTablet,
-    required this.waveController,
-    this.audioSessionId,
-    required this.heroTag,
+    required this.props,
+    required this.isCompact,
+    required this.isPreview,
+    this.customGlow = false,
   });
 
   @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(builder: _buildStage);
-  }
+  State<_StudioOscilloscopeBay> createState() => _StudioOscilloscopeBayState();
+}
 
-  /// Lays the stage out against its own height.
-  ///
-  /// The overview strip is a preview of the same peaks the seek bar already
-  /// draws, so on a stage squeezed to a few dozen pixels by a 200% text-scale
-  /// chrome it steps aside instead of reserving 48 dp the stage does not have.
-  Widget _buildStage(BuildContext context, BoxConstraints stageConstraints) {
-    final song = this.song;
-    // The overview gets a lane of its own under the artwork: painted across the
-    // cover it would be unreadable, and a streamed row has no peaks at all.
-    final SongsTableData? overviewSong =
-        _hasLocalAudioPath(song?.path) ? song : null;
-    final bool showOverview =
-        overviewSong != null && stageConstraints.maxHeight >= 96.0;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Expanded(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final availableW =
-                  constraints.maxWidth - (isTablet ? 20.0 : 4.0);
-              final availableH =
-                  constraints.maxHeight - (isTablet ? 16.0 : 2.0);
-              final maxDimension = math.min(availableW, availableH);
+class _StudioOscilloscopeBayState extends State<_StudioOscilloscopeBay> {
+  double? _dragMs;
+  double? _dragStartMs;
+  bool _dragStarted = false;
+  bool _showRemaining = false;
 
-              final double rawSize = maxDimension;
-              final double maxAllowed = isTablet ? 600.0 : 480.0;
-              final double artSize = isLandscape
-                  ? (constraints.maxHeight * 0.86).clamp(160.0, 360.0)
-                  : (rawSize <= 0 ? 0.0 : math.min(rawSize, maxAllowed));
+  int? _loadedSongId;
+  String? _loadedFilePath;
+  List<double> _instantSamples = const <double>[];
+  Future<List<double>>? _samplesFuture;
 
-              return Stack(
-                alignment: Alignment.center,
-                children: [
-                  // 1. Live FFT Visualizer Waveform Layer (Isolated in RepaintBoundary)
-                  Positioned.fill(
-                    child: RepaintBoundary(
-                      child: Builder(
-                        builder: (context) {
-                          final visualizerStyle = context
-                              .select<SettingsCubit, VisualizerStyle>(
-                                  (c) => c.state.visualizerStyle);
-                          if (visualizerStyle == VisualizerStyle.off) {
-                            return const SizedBox.shrink();
-                          }
-                          return Opacity(
-                            opacity: isPlaying ? 0.65 : 0.25,
-                            child: AudioVisualizer(
-                              style: visualizerStyle,
-                              color: activeColor,
-                              isPlaying: isPlaying,
-                              audioSessionId: audioSessionId,
-                              trackId: song?.id,
-                              trackPath: song?.path,
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  ),
+  void _syncSamplesForSong(SongsTableData? song) {
+    final int songId = song?.id ?? 42;
+    final String? filePath = song?.path;
+    if (_loadedSongId == songId &&
+        _loadedFilePath == filePath &&
+        _instantSamples.isNotEmpty) {
+      return;
+    }
 
-                  // 2. Concentric Sonic Pulse Rings expanding from center
-                  Positioned.fill(
-                    child: TweenAnimationBuilder<double>(
-                      tween: Tween<double>(
-                          begin: 0.0, end: isPlaying ? 1.0 : 0.0),
-                      duration: context.motionMs(320),
-                      curve: Curves.easeOutCubic,
-                      builder: (context, fadeMultiplier, _) {
-                        if (fadeMultiplier <= 0.001) {
-                          return const SizedBox.shrink();
-                        }
-                        return AnimatedBuilder(
-                          animation: waveController,
-                          builder: (context, _) {
-                            return RepaintBoundary(
-                              child: CustomPaint(
-                                painter: _SonicRipplesPainter(
-                                  color: activeColor,
-                                  progress: waveController.value,
-                                  isPlaying: isPlaying,
-                                  baseRadius: artSize * 0.52,
-                                  fadeMultiplier: fadeMultiplier,
-                                ),
-                              ),
-                            );
-                          },
-                        );
-                      },
-                    ),
-                  ),
+    _loadedSongId = songId;
+    _loadedFilePath = filePath;
+    _dragMs = null;
+    _dragStartMs = null;
+    _dragStarted = false;
 
-                  // 3. Center Floating Artwork Squircle with Neon Shadow,
-                  //    Border, and 3D Perspective Tilt (long-press only).
-                  Positioned(
-                    child: _TiltableArtworkSquircle(
-                      size: artSize,
-                      child: Hero(
-                        tag: heroTag,
-                        child: Container(
-                          width: artSize,
-                          height: artSize,
-                          decoration: BoxDecoration(
-                            borderRadius: AppRadii.circular(
-                                resolveCustomRadius(context, AppRadii.r28)),
-                            boxShadow: [
-                              BoxShadow(
-                                color: activeColor.withValues(
-                                    alpha: isPlaying ? 0.42 : 0.22),
-                                blurRadius: isPlaying ? 48 : 28,
-                                spreadRadius: isPlaying ? 4 : 1,
-                                offset: const Offset(0, 12),
-                              ),
-                              BoxShadow(
-                                color: AppColors.scrimAt(0.50),
-                                blurRadius: 24,
-                                offset: const Offset(0, 8),
-                              ),
-                            ],
-                            border: Border.all(
-                              color: AppColors.specularAt(
-                                  isPlaying ? 0.34 : 0.22),
-                              width: 1.5,
-                            ),
-                          ),
-                          clipBehavior: Clip.antiAlias,
-                          child: PlayerArtworkSemantics(
-                            song: song,
-                            child: song != null
-                                ? CachedArtwork(
-                                    id: song.id,
-                                    albumId: song.albumId,
-                                    remoteUrl: song.remoteArtworkUrl ??
-                                        song.artworkUri,
-                                    type: ArtworkType.AUDIO,
-                                    size: artSize,
-                                    borderRadius: 28,
-                                    highQuality: true,
-                                    fallbackIcon: Icons.music_note_rounded,
-                                  )
-                                : ExcludeSemantics(
-                                    child: Builder(
-                                      builder: (context) {
-                                        final surface =
-                                            context.playerSurfacePalette;
-                                        return Container(
-                                          color: surface.tapeWindow
-                                              .withValues(alpha: 0.45),
-                                          child: Icon(
-                                            Icons.music_note_rounded,
-                                            size: artSize * 0.4,
-                                            color: surface.mutedInk,
-                                          ),
-                                        );
-                                      },
-                                    ),
-                                  ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              );
-            },
-          ),
-        ),
-        // 4. Real waveform overview. Static, tinted by playback state, and
-        //    only present when there are decoded peaks to show.
-        if (showOverview)
-          Padding(
-            padding: const EdgeInsets.only(top: AppSpacing.xs),
-            child: SizedBox(
-              height: _kOverviewStripHeight,
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 360),
-                  child: Padding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-                    child: _WaveformOverviewStrip(
-                      songId: overviewSong.id,
-                      filePath: overviewSong.path,
-                      activeColor: activeColor,
-                      isPlaying: isPlaying,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-      ],
+    _instantSamples = WaveformService.instance.getInstantWaveform(
+      songId: songId,
+      filePath: filePath,
+    );
+
+    if (widget.isPreview || song == null) {
+      _samplesFuture = null;
+      return;
+    }
+
+    _samplesFuture = WaveformService.instance.getWaveform(
+      songId: songId,
+      filePath: filePath,
     );
   }
-}
-
-// ---------------------------------------------------------------------------
-// 3D Perspective Tilt Squircle: Touch-responsive Matrix4 perspective rotation
-// ---------------------------------------------------------------------------
-class _TiltableArtworkSquircle extends StatefulWidget {
-  final Widget child;
-  final double size;
-
-  const _TiltableArtworkSquircle({
-    required this.child,
-    required this.size,
-  });
-
-  @override
-  State<_TiltableArtworkSquircle> createState() =>
-      _TiltableArtworkSquircleState();
-}
-
-class _TiltableArtworkSquircleState extends State<_TiltableArtworkSquircle>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _springController;
-  late Animation<Offset> _tiltAnim;
-  Offset _currentTilt = Offset.zero;
 
   @override
   void initState() {
     super.initState();
-    _springController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 350),
-    );
-    _tiltAnim = Tween<Offset>(begin: Offset.zero, end: Offset.zero).animate(
-      CurvedAnimation(parent: _springController, curve: Curves.easeOutCubic),
-    );
-    _springController.addListener(() {
-      setState(() {
-        _currentTilt = _tiltAnim.value;
-      });
-    });
+    _syncSamplesForSong(widget.props.state.currentSong);
   }
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    // Reduce Motion: the release snaps flat instead of tweening back.
-    _springController.duration = context.motionMs(320);
+  void didUpdateWidget(covariant _StudioOscilloscopeBay oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.props.state.currentSong?.id !=
+            widget.props.state.currentSong?.id ||
+        oldWidget.props.state.currentSong?.path !=
+            widget.props.state.currentSong?.path ||
+        oldWidget.isPreview != widget.isPreview) {
+      _syncSamplesForSong(widget.props.state.currentSong);
+    }
   }
 
-  @override
-  void dispose() {
-    _springController.dispose();
-    super.dispose();
-  }
-
-  void _tiltTo(Offset dragDelta) {
-    final half = widget.size / 2;
-    if (half <= 0) return;
-    final dx = (dragDelta.dx / half).clamp(-1.0, 1.0);
-    final dy = (dragDelta.dy / half).clamp(-1.0, 1.0);
-    setState(() {
-      _currentTilt = Offset(dx, dy);
-    });
-  }
-
-  void _onLongPressStart(LongPressStartDetails details) {
-    // The hold is what confirms the intent, so it gets the confirmation tap; the
-    // artwork then tilts with the drag instead of jumping to the finger.
-    PulsrHaptics.light();
-    setState(() => _currentTilt = Offset.zero);
-  }
-
-  void _onLongPressMoveUpdate(LongPressMoveUpdateDetails details) {
-    _tiltTo(details.offsetFromOrigin);
-  }
-
-  void _onLongPressEnd(LongPressEndDetails details) {
-    _springBack();
-  }
-
-  void _springBack() {
-    _tiltAnim = Tween<Offset>(
-      begin: _currentTilt,
-      end: Offset.zero,
-    ).animate(
-      CurvedAnimation(
-        parent: _springController,
-        curve: context.motionCurve(Curves.easeOutCubic),
-      ),
-    );
-    _springController.forward(from: 0.0);
+  double _ratioForDx(double dx, double width, TextDirection direction) {
+    if (width <= 0) return 0.0;
+    final effectiveDx = direction == TextDirection.rtl ? width - dx : dx;
+    return (effectiveDx / width).clamp(0.0, 1.0);
   }
 
   @override
   Widget build(BuildContext context) {
-    final rotX = -_currentTilt.dy * 0.08;
-    final rotY = _currentTilt.dx * 0.08;
-    final transform = Matrix4.identity()
-      ..setEntry(3, 2, 0.0015)
-      ..rotateX(rotX)
-      ..rotateY(rotY);
+    final p = context.palette;
+    final surface = context.playerSurfacePalette;
+    final state = widget.props.state;
+    final cubit = widget.props.cubit;
+    final activeColor = widget.props.activeColor;
+    final song = state.currentSong;
+    final duration = state.duration;
+    final isPlaying = state.isPlaying;
+    final isBuffering = state.isBuffering;
+    final visualizerStyle = context
+        .select<SettingsCubit, VisualizerStyle>((c) => c.state.visualizerStyle);
+    final bayRadius = resolveCustomRadius(context, AppRadii.r18).clamp(
+      AppRadii.r6,
+      AppRadii.r28,
+    );
 
-    return GestureDetector(
-      behavior: HitTestBehavior.translucent,
-      // A plain pan here fought PlayerGestureScope's horizontal swipe (next /
-      // previous) and the tap that toggles lyrics, so a slightly diagonal swipe
-      // either skipped a track or killed the tilt. A long press claims the
-      // arena only after the finger has held still, which gives each gesture a
-      // recogniser of its own: tap = lyrics, swipe = track change, hold + drag
-      // = tilt.
-      onLongPressStart: _onLongPressStart,
-      onLongPressMoveUpdate: _onLongPressMoveUpdate,
-      onLongPressEnd: _onLongPressEnd,
-      onLongPressCancel: _springBack,
-      // The tilt is decoration; the artwork publishes its own image node.
-      excludeFromSemantics: true,
-      child: Transform(
-        alignment: FractionalOffset.center,
-        transform: transform,
-        child: widget.child,
+    final Color screenBg = p.isDark
+        ? Color.lerp(surface.tapeWindow, p.bg, 0.25) ?? surface.tapeWindow
+        : Color.lerp(p.surfaceContainerHigh, p.surface, 0.35) ??
+            p.surfaceContainerHigh;
+    final Color gridColor = p.isDark
+        ? AppColors.specularAt(0.08)
+        : p.hairline.withValues(alpha: 0.72);
+    final Color gridAccentColor = p.isDark
+        ? AppColors.specularAt(0.16)
+        : p.textSecondary.withValues(alpha: 0.25);
+    final Color gridLabelColor = p.isDark
+        ? AppColors.specularAt(0.36)
+        : p.textSecondary.withValues(alpha: 0.65);
+    final Color unplayedWaveColor = p.isDark
+        ? AppColors.specularAt(0.24)
+        : p.textSecondary.withValues(alpha: 0.30);
+
+    final Duration? loopA = widget.isPreview ? null : state.abPointA;
+    final Duration? loopB = widget.isPreview ? null : state.abPointB;
+    final bool abEnabled = !widget.isPreview && state.abLoopEnabled;
+
+    return PlayerGestureScope(
+      behavior: HitTestBehavior.deferToChild,
+      child: Container(
+        decoration: BoxDecoration(
+          color: screenBg,
+          borderRadius: AppRadii.circular(bayRadius),
+          border: Border.all(
+            color: activeColor.withValues(
+              alpha: p.isDark
+                  ? (widget.customGlow ? 0.50 : 0.28)
+                  : (widget.customGlow ? 0.45 : 0.26),
+            ),
+            width: 1.2,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.scrimAt(p.isDark ? 0.45 : 0.12),
+              blurRadius: 18,
+              offset: const Offset(0, 6),
+            ),
+            if (widget.customGlow)
+              BoxShadow(
+                color: activeColor.withValues(alpha: p.isDark ? 0.26 : 0.16),
+                blurRadius: 24,
+                spreadRadius: -2,
+              ),
+          ],
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Main interactive oscilloscope waveform viewport.
+            Expanded(
+              child: FutureBuilder<List<double>>(
+                future: _samplesFuture,
+                initialData: _instantSamples,
+                builder: (context, snapshot) {
+                  final samples =
+                      (snapshot.hasData && snapshot.data!.isNotEmpty)
+                          ? snapshot.data!
+                          : _instantSamples;
+
+                  return BlocSelector<PlayerCubit, PlayerState, Duration>(
+                    selector: (s) => s.position,
+                    builder: (context, position) {
+                      final double maxMs = duration.inMilliseconds.toDouble();
+                      final double currentMs =
+                          position.inMilliseconds.toDouble();
+                      final double effectiveMs = (_dragMs ?? currentMs).clamp(
+                        0.0,
+                        maxMs > 0 ? maxMs : 1.0,
+                      );
+                      final double progress = maxMs > 0
+                          ? (effectiveMs / maxMs).clamp(0.0, 1.0)
+                          : 0.0;
+                      final Duration effectiveDur = _dragMs != null
+                          ? Duration(milliseconds: _dragMs!.round())
+                          : position;
+
+                      Duration clampSeek(Duration delta) {
+                        final target = effectiveDur + delta;
+                        if (target < Duration.zero) return Duration.zero;
+                        if (target > duration) return duration;
+                        return target;
+                      }
+
+                      String readout(Duration d) =>
+                          '${Formatters.formatDuration(d)} / '
+                          '${Formatters.formatDuration(duration)}';
+
+                      final direction = Directionality.of(context);
+
+                      return Semantics(
+                        // Explicit merge boundary so parent PlayerGestureScope's
+                        // tap action never merges into the slider semantics node.
+                        container: true,
+                        slider: true,
+                        label: context.l10n.seekLabel,
+                        value: readout(effectiveDur),
+                        increasedValue:
+                            readout(clampSeek(const Duration(seconds: 10))),
+                        decreasedValue:
+                            readout(clampSeek(const Duration(seconds: -10))),
+                        onIncrease: isBuffering
+                            ? null
+                            : () => cubit
+                                .seek(clampSeek(const Duration(seconds: 10))),
+                        onDecrease: isBuffering
+                            ? null
+                            : () => cubit
+                                .seek(clampSeek(const Duration(seconds: -10))),
+                        excludeSemantics: true,
+                        child: LayoutBuilder(
+                          builder: (context, constraints) {
+                            final double viewportW = constraints.maxWidth;
+
+                            return GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              onHorizontalDragStart: (d) {
+                                if (isBuffering || maxMs <= 0) return;
+                                _dragStarted = true;
+                                PulsrHaptics.selectionClick();
+                                final ratio = _ratioForDx(
+                                  d.localPosition.dx,
+                                  viewportW,
+                                  direction,
+                                );
+                                final targetMs =
+                                    (ratio * maxMs).clamp(0.0, maxMs);
+                                setState(() {
+                                  _dragStartMs = currentMs;
+                                  _dragMs = targetMs;
+                                });
+                              },
+                              onHorizontalDragUpdate: (d) {
+                                if (isBuffering || maxMs <= 0) return;
+                                final ratio = _ratioForDx(
+                                  d.localPosition.dx,
+                                  viewportW,
+                                  direction,
+                                );
+                                final targetMs =
+                                    (ratio * maxMs).clamp(0.0, maxMs);
+                                setState(() => _dragMs = targetMs);
+                              },
+                              onHorizontalDragEnd: (_) {
+                                _dragStarted = false;
+                                if (_dragMs != null) {
+                                  PulsrHaptics.lightImpact();
+                                  cubit.seek(
+                                    Duration(milliseconds: _dragMs!.round()),
+                                  );
+                                  setState(() {
+                                    _dragMs = null;
+                                    _dragStartMs = null;
+                                  });
+                                }
+                              },
+                              onHorizontalDragCancel: () {
+                                _dragStarted = false;
+                                if (_dragMs != null) {
+                                  setState(() {
+                                    _dragMs = null;
+                                    _dragStartMs = null;
+                                  });
+                                }
+                              },
+                              onTapUp: (d) {
+                                if (isBuffering ||
+                                    _dragStarted ||
+                                    maxMs <= 0) {
+                                  return;
+                                }
+                                PulsrHaptics.selectionClick();
+                                final ratio = _ratioForDx(
+                                  d.localPosition.dx,
+                                  viewportW,
+                                  direction,
+                                );
+                                cubit.seek(
+                                  Duration(
+                                    milliseconds: (ratio * maxMs).round(),
+                                  ),
+                                );
+                              },
+                              child: Stack(
+                                fit: StackFit.expand,
+                                children: [
+                                  // 1. Studio dB / time reticle gridlines.
+                                  RepaintBoundary(
+                                    child: CustomPaint(
+                                      painter: _OscilloscopeGridPainter(
+                                        gridColor: gridColor,
+                                        axisColor: gridAccentColor,
+                                        labelColor: gridLabelColor,
+                                        isCompact: widget.isCompact,
+                                      ),
+                                    ),
+                                  ),
+
+                                  // 2. Optional subtle live FFT trace layer
+                                  //    behind the decoded peak waveform.
+                                  if (visualizerStyle != VisualizerStyle.off &&
+                                      !widget.isPreview)
+                                    IgnorePointer(
+                                      child: RepaintBoundary(
+                                        child: Opacity(
+                                          opacity: isPlaying ? 0.24 : 0.10,
+                                          child: AudioVisualizer(
+                                            style: visualizerStyle,
+                                            color: activeColor,
+                                            isPlaying: isPlaying,
+                                            audioSessionId:
+                                                state.audioSessionId,
+                                            trackId: song?.id,
+                                            trackPath: song?.path,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+
+                                  // 3. Real decoded waveform bars + luminous
+                                  //    oscilloscope crest + A/B markers +
+                                  //    glowing active playhead cursor.
+                                  RepaintBoundary(
+                                    child: CustomPaint(
+                                      painter: _OscilloscopeWaveformPainter(
+                                        samples: samples,
+                                        progress: progress,
+                                        activeColor: activeColor,
+                                        unplayedColor: unplayedWaveColor,
+                                        playheadCoreColor: p.isDark
+                                            ? AppColors.onPrimary
+                                            : p.textPrimary,
+                                        duration: duration,
+                                        loopPointA: loopA,
+                                        loopPointB: loopB,
+                                        abLoopEnabled: abEnabled,
+                                        isPlaying: isPlaying,
+                                        isDragging: _dragMs != null,
+                                        isRtl: direction == TextDirection.rtl,
+                                        isDark: p.isDark,
+                                      ),
+                                    ),
+                                  ),
+
+                                  // 4. Floating monospace scrub time & delta
+                                  //    HUD bubble while dragging.
+                                  if (_dragMs != null && viewportW > 80)
+                                    () {
+                                      final deltaMs = _dragStartMs != null
+                                          ? (_dragMs! - _dragStartMs!).round()
+                                          : 0;
+                                      final sign = deltaMs >= 0 ? '+' : '-';
+                                      final deltaStr = Formatters.formatDuration(
+                                        Duration(milliseconds: deltaMs.abs()),
+                                      );
+                                      final hudText =
+                                          '${Formatters.formatDuration(effectiveDur)} ($sign$deltaStr)';
+                                      final double visualRatio =
+                                          direction == TextDirection.rtl
+                                              ? 1.0 - progress
+                                              : progress;
+                                      final double pillStart =
+                                          (visualRatio * viewportW - 60.0)
+                                              .clamp(
+                                        AppSpacing.xs,
+                                        math.max(
+                                          AppSpacing.xs,
+                                          viewportW - 128.0,
+                                        ),
+                                      );
+                                      return PositionedDirectional(
+                                        top: AppSpacing.xs,
+                                        start: pillStart,
+                                        child: IgnorePointer(
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: AppSpacing.s8,
+                                              vertical: AppSpacing.s4,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: p.surfaceContainerHigh
+                                                  .withValues(alpha: 0.94),
+                                              borderRadius: AppRadii.r8All,
+                                              border: Border.all(
+                                                color: activeColor.withValues(
+                                                  alpha: 0.60,
+                                                ),
+                                                width: 1.0,
+                                              ),
+                                              boxShadow: [
+                                                BoxShadow(
+                                                  color:
+                                                      AppColors.scrimAt(0.32),
+                                                  blurRadius: 8,
+                                                  offset: const Offset(0, 2),
+                                                ),
+                                              ],
+                                            ),
+                                            child: Text(
+                                              hudText,
+                                              maxLines: 1,
+                                              style: TextStyle(
+                                                fontFamily: 'monospace',
+                                                fontSize: AppFontSize.caption,
+                                                fontWeight: FontWeight.w800,
+                                                color: p.textPrimary,
+                                                fontFeatures: const [
+                                                  FontFeature.tabularFigures(),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    }(),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+
+            // Bottom integrated monospace oscilloscope timecode bezel bar
+            // driven strictly by BlocSelector (zero parent rebuilds).
+            Container(
+              decoration: BoxDecoration(
+                color: p.isDark
+                    ? AppColors.scrimAt(0.28)
+                    : p.surface.withValues(alpha: 0.72),
+                border: Border(
+                  top: BorderSide(color: gridAccentColor, width: 0.9),
+                ),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+              child: BlocSelector<PlayerCubit, PlayerState,
+                  ({Duration position, Duration duration})>(
+                selector: (s) => (position: s.position, duration: s.duration),
+                builder: (context, span) {
+                  final effectivePos = _dragMs != null
+                      ? Duration(milliseconds: _dragMs!.round())
+                      : span.position;
+                  final remaining = span.duration > effectivePos
+                      ? span.duration - effectivePos
+                      : Duration.zero;
+                  final elapsedText = Formatters.formatDuration(effectivePos);
+                  final trailingText = _showRemaining
+                      ? '-${Formatters.formatDuration(remaining)}'
+                      : Formatters.formatDuration(span.duration);
+
+                  final bool hasLoop = loopA != null || loopB != null;
+                  final String loopSummary = hasLoop
+                      ? 'A ${loopA != null ? Formatters.formatDuration(loopA) : '--:--'} · B ${loopB != null ? Formatters.formatDuration(loopB) : '--:--'}'
+                      : '${span.duration.inMilliseconds > 0 ? ((effectivePos.inMilliseconds / span.duration.inMilliseconds) * 100).clamp(0, 100).round() : 0}%';
+
+                  return Row(
+                    children: [
+                      Text(
+                        elapsedText,
+                        style: TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: AppFontSize.label,
+                          fontWeight: FontWeight.w800,
+                          color: _dragMs != null ? activeColor : p.textPrimary,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.xs),
+                      Expanded(
+                        child: Center(
+                          child: Text(
+                            loopSummary,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: AppFontSize.caption,
+                              fontWeight: FontWeight.w700,
+                              color:
+                                  abEnabled ? activeColor : p.textSecondary,
+                              fontFeatures: const [
+                                FontFeature.tabularFigures(),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.xs),
+                      Semantics(
+                        button: true,
+                        label: trailingText,
+                        excludeSemantics: true,
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () {
+                            PulsrHaptics.selectionClick();
+                            setState(
+                              () => _showRemaining = !_showRemaining,
+                            );
+                          },
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(
+                              minWidth: AppSpacing.minTouchTarget,
+                              minHeight: AppSpacing.minTouchTarget,
+                            ),
+                            child: Align(
+                              alignment: AlignmentDirectional.centerEnd,
+                              child: Text(
+                                trailingText,
+                                style: TextStyle(
+                                  fontFamily: 'monospace',
+                                  fontSize: AppFontSize.label,
+                                  fontWeight: FontWeight.w700,
+                                  color: p.textSecondary,
+                                  fontFeatures: const [
+                                    FontFeature.tabularFigures(),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
-// ---------------------------------------------------------------------------
-// Sonic Ripples Painter: Expanding acoustic wavefronts radiating outward
-// ---------------------------------------------------------------------------
-class _SonicRipplesPainter extends CustomPainter {
-  final Color color;
-  final double progress;
-  final bool isPlaying;
-  final double baseRadius;
-  final double fadeMultiplier;
+/// Paints studio oscilloscope dB reference lines, vertical time-division
+/// reticle ticks, center 0-axis hairline, and subtle dB scale calibrations.
+class _OscilloscopeGridPainter extends CustomPainter {
+  final Color gridColor;
+  final Color axisColor;
+  final Color labelColor;
+  final bool isCompact;
 
-  _SonicRipplesPainter({
-    required this.color,
-    required this.progress,
-    required this.isPlaying,
-    required this.baseRadius,
-    this.fadeMultiplier = 1.0,
+  _OscilloscopeGridPainter({
+    required this.gridColor,
+    required this.axisColor,
+    required this.labelColor,
+    required this.isCompact,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (fadeMultiplier <= 0.001) return;
+    if (size.width <= 0 || size.height <= 0) return;
 
-    final center = Offset(size.width / 2, size.height / 2);
-    final maxExpansion = math.max(size.width, size.height) * 0.50;
+    final gridPaint = Paint()
+      ..color = gridColor
+      ..strokeWidth = 0.75;
+    final axisPaint = Paint()
+      ..color = axisColor
+      ..strokeWidth = 1.0;
 
-    const ringCount = 3;
-    for (int i = 0; i < ringCount; i++) {
-      final ringProgress = (progress + (i / ringCount)) % 1.0;
-      final currentRadius = baseRadius + (ringProgress * maxExpansion);
-      // Smooth bell curve opacity scaled by graceful fade-out multiplier
-      final alpha = ((math.sin(ringProgress * math.pi) * 0.40) * fadeMultiplier)
-          .clamp(0.0, 1.0);
+    // 1. Horizontal amplitude / dB reference lines (top +0dB, ±6dB, center 0).
+    final double midY = size.height / 2;
+    canvas.drawLine(Offset(0, midY), Offset(size.width, midY), axisPaint);
 
-      final paint = Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = (2.5 * (1.0 - ringProgress * 0.6)).clamp(1.0, 2.5)
-        ..color = color.withValues(alpha: alpha);
-
-      canvas.drawCircle(center, currentRadius, paint);
+    for (final double frac in const [0.16, 0.33, 0.67, 0.84]) {
+      final y = size.height * frac;
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
     }
-  }
 
-  @override
-  bool shouldRepaint(covariant _SonicRipplesPainter oldDelegate) {
-    return oldDelegate.progress != progress ||
-        oldDelegate.isPlaying != isPlaying ||
-        oldDelegate.color != color ||
-        oldDelegate.baseRadius != baseRadius ||
-        oldDelegate.fadeMultiplier != fadeMultiplier;
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Real Waveform Overview Strip
-// ---------------------------------------------------------------------------
-/// Height of the overview lane under the artwork.
-const double _kOverviewStripHeight = 40.0;
-
-/// Dips the playhead through 120 steps, so the strip is not rebuilt on every
-/// position tick while still stepping smoothly enough for a thin playhead.
-const int _kOverviewSteps = 120;
-
-/// Only a local row has PCM to analyse. [WaveformService.getWaveform] hands back
-/// a generated placeholder for anything streamed, so those rows never reach it:
-/// an invented graph is the exact defect the fake spectrum HUD had, only quieter.
-bool _hasLocalAudioPath(String? path) {
-  if (path == null || path.isEmpty) return false;
-  if (path.startsWith('http')) return false;
-  return !path.startsWith('ytmusic://');
-}
-
-/// Peak overview of the current track, drawn from decoded samples.
-///
-/// [WaveformService.getWaveform] is the only source: it returns the cached
-/// native PCM peaks for a local file (the same list the seek bar draws). It is
-/// deliberately not seeded with [WaveformService.getInstantWaveform], whose
-/// synchronous result is the generator's deterministic placeholder, and the
-/// strip renders nothing at all until real peaks exist.
-class _WaveformOverviewStrip extends StatefulWidget {
-  final int songId;
-  final String? filePath;
-  final Color activeColor;
-  final bool isPlaying;
-
-  const _WaveformOverviewStrip({
-    required this.songId,
-    required this.filePath,
-    required this.activeColor,
-    required this.isPlaying,
-  });
-
-  @override
-  State<_WaveformOverviewStrip> createState() => _WaveformOverviewStripState();
-}
-
-class _WaveformOverviewStripState extends State<_WaveformOverviewStrip> {
-  Future<List<double>>? _samplesFuture;
-  int? _loadedSongId;
-  String? _loadedPath;
-
-  Future<List<double>> _samplesForCurrentSong() {
-    if (_samplesFuture == null ||
-        _loadedSongId != widget.songId ||
-        _loadedPath != widget.filePath) {
-      _loadedSongId = widget.songId;
-      _loadedPath = widget.filePath;
-      // Default sample count on purpose: it shares the seek bar's cache entry,
-      // so opening Now Playing never decodes the same file twice.
-      _samplesFuture = WaveformService.instance.getWaveform(
-        songId: widget.songId,
-        filePath: widget.filePath,
+    // 2. Vertical time-division reticle lines (8 equal studio divisions) +
+    //    crisp top/bottom calibration tick marks.
+    const int divisions = 8;
+    for (int i = 1; i < divisions; i++) {
+      final x = (size.width / divisions) * i;
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), gridPaint);
+      canvas.drawLine(Offset(x, 0), Offset(x, 5.0), axisPaint);
+      canvas.drawLine(
+        Offset(x, size.height - 5.0),
+        Offset(x, size.height),
+        axisPaint,
       );
     }
-    return _samplesFuture!;
-  }
 
-  static int _playedStep(PlayerState state) {
-    final durationMs = state.duration.inMilliseconds;
-    if (durationMs <= 0) return 0;
-    final step =
-        (state.position.inMilliseconds / durationMs) * _kOverviewSteps;
-    return step.round().clamp(0, _kOverviewSteps);
+    // 3. Subtle dB scale calibration markings along the leading edge.
+    if (!isCompact && size.height >= 120 && size.width >= 200) {
+      final labels = <(double, String)>[
+        (size.height * 0.16, '0 dB'),
+        (size.height * 0.33, '-6 dB'),
+        (size.height * 0.67, '-6 dB'),
+      ];
+      for (final (y, text) in labels) {
+        final painter = TextPainter(
+          text: TextSpan(
+            text: text,
+            style: TextStyle(
+              fontFamily: 'monospace',
+              fontSize: AppFontSize.caption,
+              fontWeight: FontWeight.w700,
+              color: labelColor,
+            ),
+          ),
+          textDirection: TextDirection.ltr,
+        )..layout();
+        painter.paint(canvas, Offset(AppSpacing.xs, y - painter.height - 1));
+      }
+    }
   }
 
   @override
-  Widget build(BuildContext context) {
-    return ExcludeSemantics(
-      child: FutureBuilder<List<double>>(
-        future: _samplesForCurrentSong(),
-        builder: (context, snapshot) {
-          final samples = snapshot.data;
-          if (samples == null || samples.isEmpty) {
-            // Nothing decoded yet (or the file could not be read): show nothing
-            // rather than filler that pretends to be this recording.
-            return const SizedBox.shrink();
-          }
-          return RepaintBoundary(
-            // Only the strip subscribes to position; the theme itself must not
-            // rebuild for a playhead nudge.
-            child: BlocSelector<PlayerCubit, PlayerState, int>(
-              selector: _playedStep,
-              builder: (context, step) => CustomPaint(
-                size: const Size(double.infinity, _kOverviewStripHeight),
-                painter: _WaveformOverviewPainter(
-                  samples: samples,
-                  progress: (step / _kOverviewSteps).clamp(0.0, 1.0),
-                  activeColor: widget.activeColor,
-                  isPlaying: widget.isPlaying,
-                ),
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
+  bool shouldRepaint(covariant _OscilloscopeGridPainter oldDelegate) =>
+      oldDelegate.gridColor != gridColor ||
+      oldDelegate.axisColor != axisColor ||
+      oldDelegate.labelColor != labelColor ||
+      oldDelegate.isCompact != isCompact;
 }
 
-/// Mirrored peak bars with the played part in the accent colour. Static apart
-/// from the played/unplayed boundary, which steps through [_kOverviewSteps]
-/// instead of rebuilding per frame.
-class _WaveformOverviewPainter extends CustomPainter {
+/// Paints the studio oscilloscope waveform peaks, luminous played crest line,
+/// A/B loop shaded region + pins, and glowing vertical playhead cursor.
+class _OscilloscopeWaveformPainter extends CustomPainter {
   final List<double> samples;
   final double progress;
   final Color activeColor;
+  final Color unplayedColor;
+  final Color playheadCoreColor;
+  final Duration duration;
+  final Duration? loopPointA;
+  final Duration? loopPointB;
+  final bool abLoopEnabled;
   final bool isPlaying;
+  final bool isDragging;
+  final bool isRtl;
+  final bool isDark;
 
-  _WaveformOverviewPainter({
+  _OscilloscopeWaveformPainter({
     required this.samples,
     required this.progress,
     required this.activeColor,
+    required this.unplayedColor,
+    required this.playheadCoreColor,
+    required this.duration,
+    required this.loopPointA,
+    required this.loopPointB,
+    required this.abLoopEnabled,
     required this.isPlaying,
+    required this.isDragging,
+    required this.isRtl,
+    required this.isDark,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
     if (samples.isEmpty || size.width <= 0 || size.height <= 0) return;
 
+    if (isRtl) {
+      canvas.save();
+      canvas.translate(size.width, 0);
+      canvas.scale(-1, 1);
+    }
+
+    final double padX = AppSpacing.sm;
+    final double usableW = math.max(1.0, size.width - padX * 2);
+    final double usableH = math.max(12.0, size.height - AppSpacing.md * 2);
     final double midY = size.height / 2;
-    final int count = samples.length;
-    final double slot = size.width / count;
-    final double barWidth = math.max(1.0, slot * 0.62);
-    final double playedX = size.width * progress;
+    final double playheadX = padX + usableW * progress.clamp(0.0, 1.0);
 
+    // 1. A/B Loop shaded region & markers (when active).
+    final int durMs = duration.inMilliseconds;
+    if (durMs > 0 && (loopPointA != null || loopPointB != null)) {
+      final double? ax = loopPointA != null
+          ? padX +
+              usableW *
+                  (loopPointA!.inMilliseconds / durMs).clamp(0.0, 1.0)
+          : null;
+      final double? bx = loopPointB != null
+          ? padX +
+              usableW *
+                  (loopPointB!.inMilliseconds / durMs).clamp(0.0, 1.0)
+          : null;
+
+      if (ax != null && bx != null) {
+        final left = math.min(ax, bx);
+        final right = math.max(ax, bx);
+        canvas.drawRect(
+          Rect.fromLTRB(left, 0, right, size.height),
+          Paint()
+            ..color = activeColor.withValues(
+              alpha: abLoopEnabled ? 0.16 : 0.08,
+            ),
+        );
+      }
+
+      void drawPin(double x, String tag) {
+        canvas.drawLine(
+          Offset(x, 0),
+          Offset(x, size.height),
+          Paint()
+            ..color = activeColor.withValues(alpha: abLoopEnabled ? 0.85 : 0.55)
+            ..strokeWidth = 1.4,
+        );
+        final badgeRect = RRect.fromRectAndRadius(
+          Rect.fromLTWH(x - 9, 4, 18, 16),
+          const Radius.circular(AppRadii.r4),
+        );
+        canvas.drawRRect(
+          badgeRect,
+          Paint()..color = activeColor,
+        );
+        final tp = TextPainter(
+          text: TextSpan(
+            text: tag,
+            style: TextStyle(
+              fontFamily: 'monospace',
+              fontSize: AppFontSize.caption,
+              fontWeight: FontWeight.w900,
+              color: AppColors.textOnAccent(activeColor),
+            ),
+          ),
+          textDirection: TextDirection.ltr,
+        )..layout();
+        tp.paint(canvas, Offset(x - tp.width / 2, 12 - tp.height / 2));
+      }
+
+      if (ax != null) drawPin(ax, 'A');
+      if (bx != null) drawPin(bx, 'B');
+    }
+
+    // 2. Resample peaks smoothly to match viewport density (~3.5dp per bar).
+    final int targetBars = (usableW / 4.2).round().clamp(24, 110);
+    final List<double> bars = List<double>.generate(targetBars, (i) {
+      final double pos =
+          samples.length == 1 ? 0.0 : (i / (targetBars - 1)) * (samples.length - 1);
+      final int lo = pos.floor().clamp(0, samples.length - 1);
+      final int hi = (lo + 1).clamp(0, samples.length - 1);
+      final double frac = pos - lo;
+      return (samples[lo] * (1.0 - frac) + samples[hi] * frac).clamp(0.05, 1.0);
+    }, growable: false);
+
+    final double slot = usableW / targetBars;
+    final double barW = math.max(1.8, slot * 0.56);
+    final double ampScale = isDragging ? 1.08 : 0.96;
+
+    final unplayedPaint = Paint()..color = unplayedColor;
     final playedPaint = Paint()
-      ..color = activeColor.withValues(alpha: isPlaying ? 1.0 : 0.70);
-    final unplayedPaint = Paint()
-      ..color = activeColor.withValues(alpha: isPlaying ? 0.26 : 0.16);
+      ..shader = LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [
+          activeColor.withValues(alpha: 0.95),
+          Color.lerp(activeColor, playheadCoreColor, isDark ? 0.28 : 0.10)!,
+          activeColor.withValues(alpha: 0.95),
+        ],
+      ).createShader(Rect.fromLTWH(padX, 0, usableW, size.height));
 
-    for (int i = 0; i < count; i++) {
-      final double centerX = slot * (i + 0.5);
-      final double barHeight =
-          (samples[i].clamp(0.0, 1.0) * size.height).clamp(1.5, size.height);
+    final topEnvelope = Path();
+    final bottomEnvelope = Path();
+
+    for (int i = 0; i < targetBars; i++) {
+      final double cx = padX + slot * (i + 0.5);
+      final double peakH =
+          (bars[i] * usableH * ampScale).clamp(4.0, usableH);
+      final double topY = midY - peakH / 2;
+      final double bottomY = midY + peakH / 2;
+
+      if (i == 0) {
+        topEnvelope.moveTo(cx, topY);
+        bottomEnvelope.moveTo(cx, bottomY);
+      } else {
+        topEnvelope.lineTo(cx, topY);
+        bottomEnvelope.lineTo(cx, bottomY);
+      }
+
       final rrect = RRect.fromRectAndRadius(
         Rect.fromCenter(
-          center: Offset(centerX, midY),
-          width: barWidth,
-          height: barHeight,
+          center: Offset(cx, midY),
+          width: barW,
+          height: peakH,
         ),
-        Radius.circular(barWidth / 2),
+        Radius.circular(barW / 2),
       );
-      canvas.drawRRect(
-        rrect,
-        centerX <= playedX ? playedPaint : unplayedPaint,
+      canvas.drawRRect(rrect, cx <= playheadX ? playedPaint : unplayedPaint);
+    }
+
+    // 3. Luminous oscilloscope trace crest clipped to the played region.
+    if (progress > 0.005) {
+      canvas.save();
+      canvas.clipRect(Rect.fromLTRB(padX, 0, playheadX, size.height));
+      final crestPaint = Paint()
+        ..color = Color.lerp(activeColor, playheadCoreColor, 0.45)!
+            .withValues(alpha: isDark ? 0.72 : 0.55)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.4
+        ..strokeJoin = StrokeJoin.round;
+      canvas.drawPath(topEnvelope, crestPaint);
+      canvas.drawPath(bottomEnvelope, crestPaint);
+      canvas.restore();
+    }
+
+    // 4. Glowing active oscilloscope playhead cursor + diamond reticle caps.
+    if (!GpuBudget.isGpuSaverActive && (isPlaying || isDragging)) {
+      canvas.drawLine(
+        Offset(playheadX, 2),
+        Offset(playheadX, size.height - 2),
+        Paint()
+          ..color = activeColor.withValues(alpha: isDragging ? 0.65 : 0.45)
+          ..strokeWidth = isDragging ? 7.0 : 5.5
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5.0),
       );
     }
 
-    // Playhead: a hairline, so the played/unplayed boundary is unambiguous.
-    final headPaint = Paint()
-      ..color = activeColor.withValues(alpha: isPlaying ? 0.95 : 0.55)
-      ..strokeWidth = 1.4
-      ..strokeCap = StrokeCap.round;
     canvas.drawLine(
-      Offset(playedX, 0),
-      Offset(playedX, size.height),
-      headPaint,
+      Offset(playheadX, 0),
+      Offset(playheadX, size.height),
+      Paint()
+        ..color = playheadCoreColor
+        ..strokeWidth = isDragging ? 2.2 : 1.8
+        ..strokeCap = StrokeCap.round,
     );
+
+    // Top & bottom precision triangular reticle markers.
+    final markerPaint = Paint()..color = activeColor;
+    final topCap = Path()
+      ..moveTo(playheadX, 8)
+      ..lineTo(playheadX - 5, 0)
+      ..lineTo(playheadX + 5, 0)
+      ..close();
+    final bottomCap = Path()
+      ..moveTo(playheadX, size.height - 8)
+      ..lineTo(playheadX - 5, size.height)
+      ..lineTo(playheadX + 5, size.height)
+      ..close();
+    canvas.drawPath(topCap, markerPaint);
+    canvas.drawPath(bottomCap, markerPaint);
+
+    if (isRtl) canvas.restore();
   }
 
   @override
-  bool shouldRepaint(covariant _WaveformOverviewPainter oldDelegate) =>
+  bool shouldRepaint(covariant _OscilloscopeWaveformPainter oldDelegate) =>
       oldDelegate.samples != samples ||
       oldDelegate.progress != progress ||
       oldDelegate.activeColor != activeColor ||
-      oldDelegate.isPlaying != isPlaying;
+      oldDelegate.unplayedColor != unplayedColor ||
+      oldDelegate.playheadCoreColor != playheadCoreColor ||
+      oldDelegate.duration != duration ||
+      oldDelegate.loopPointA != loopPointA ||
+      oldDelegate.loopPointB != loopPointB ||
+      oldDelegate.abLoopEnabled != abLoopEnabled ||
+      oldDelegate.isPlaying != isPlaying ||
+      oldDelegate.isDragging != isDragging ||
+      oldDelegate.isRtl != isRtl ||
+      oldDelegate.isDark != isDark;
 }
-

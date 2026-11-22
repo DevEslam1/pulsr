@@ -848,18 +848,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get playerTheme => 'Now Playing Style';
 
   @override
-  String get playerThemeClassic => 'Classic Deck';
-
-  @override
-  String get playerThemeCard => 'Floating Card';
-
-  @override
-  String get playerThemeCircle => 'Vinyl Circle';
-
-  @override
-  String get playerThemeMinimal => 'Pure Minimal';
-
-  @override
   String get visualizerStyle => 'Audio Visualizer';
 
   @override
@@ -5965,13 +5953,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Full-bleed background artwork with frosted glass controls';
 
   @override
-  String get settingsThemeClassicStandard => 'Classic Standard';
-
-  @override
-  String get settingsThemeClassicStandardDesc =>
-      'Traditional high-definition layout with ambient glow';
-
-  @override
   String get settingsThemeFullBleed => 'Full-Bleed Waveform';
 
   @override
@@ -5986,25 +5967,11 @@ class AppLocalizationsEn extends AppLocalizations {
       'Magnified synchronized lyrics-first karaoke player interface';
 
   @override
-  String get settingsThemeMinimalist => 'Minimalist Waveform';
-
-  @override
-  String get settingsThemeMinimalistDesc =>
-      'Spacious studio focus on dynamic audio waveform visualizer';
-
-  @override
   String get settingsThemeRetroCassette => 'Retro Cassette Deck';
 
   @override
   String get settingsThemeRetroCassetteDesc =>
       'Vintage cassette tape with spinning spools & magnetic tape counter';
-
-  @override
-  String get settingsThemeVinylCircle => 'Vinyl Circle (Spinning)';
-
-  @override
-  String get settingsThemeVinylCircleDesc =>
-      'Centered circular artwork with continuous spinning animation';
 
   @override
   String get settingsThemeCdTurntable => 'CD Turntable';

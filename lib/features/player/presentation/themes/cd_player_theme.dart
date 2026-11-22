@@ -3,38 +3,48 @@ import 'dart:math' as math;
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 import '../../../../core/motion/pulsr_motion.dart';
+import '../../../../core/performance/gpu_budget.dart';
+import '../../../../core/services/waveform_service.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/theme/player_material_colors.dart';
-import '../../../../core/constants/app_typography.dart';
-import '../../../../core/utils/adaptive.dart';
+import '../../../../core/utils/formatters.dart';
 import '../../../../core/utils/l10n_extensions.dart';
+import '../../../../core/utils/pulsr_haptics.dart';
 import '../../../../core/widgets/cached_artwork.dart';
-import '../../../../data/db/app_database.dart';
+import '../../../../core/widgets/marquee_text.dart';
+import '../../../../core/widgets/pulsr_slider.dart';
+import '../../../../core/widgets/pulsr_toast.dart';
+import '../../../settings/cubit/settings_cubit.dart';
+import '../../../settings/cubit/settings_state.dart';
+import '../../../sheets/song_options_sheet.dart';
 import '../../cubit/player_cubit.dart';
 import '../../cubit/player_state.dart';
-import '../../../settings/cubit/settings_cubit.dart';
+import '../widgets/audio_quality_sheet.dart';
 import '../widgets/audio_visualizer.dart';
 import '../widgets/player_gesture_scope.dart';
+import '../widgets/player_volume_bar.dart';
+import '../widgets/waveform_seek_bar.dart';
 import 'painters/platter_scrub.dart';
 import 'player_shape.dart';
 import 'player_theme.dart';
 import 'player_theme_chrome.dart';
-import 'player_theme_scaffold.dart';
-import 'package:pulsr/core/constants/app_spacing.dart';
-import 'package:pulsr/core/constants/app_radii.dart';
-import 'package:pulsr/core/constants/app_colors.dart';
-import '../../../../core/performance/gpu_budget.dart';
+import 'player_theme_scaffold.dart' show PlayerThemePreviewScope;
 
 part 'painters/cd_stage.dart';
 part 'painters/cd_painters.dart';
 part 'parts/cd_player_theme_build.dart';
 
-/// CD Jewel Case Player Theme:
-/// A rotating iridescent compact disc seated in a translucent jewel case, with
-/// a hinge spine, recessed tray, spider hub, VFD read-out and an optical pickup
-/// sled that lights up while playing. Deliberately unlike the vinyl plinth: no
-/// tonearm, no strobe rim, no RPM badge.
+/// CD Turntable Player Theme (Y2K Transparent Jewel Case / Discman):
+/// Full-screen brushed cool-silver/titanium Discman faceplate framing an
+/// iridescent spinning compact disc inside a realistic transparent acrylic
+/// jewel case with a vertical ribbed spine, backlit monospace dot-matrix LCD
+/// track/time readout, slim metallic seek bar, and precision rectangular
+/// brushed-metal transport keys.
 class CdPlayerTheme extends StatefulWidget {
   final PlayerThemeProps props;
 
@@ -88,7 +98,9 @@ class _CdPlayerThemeState extends State<CdPlayerTheme>
   }
 
   bool _allowMotion(BuildContext context) =>
-      PulsrMotion.shouldAnimate(context) && context.motionEnabled;
+      PulsrMotion.shouldAnimate(context) &&
+      context.motionEnabled &&
+      !PlayerThemePreviewScope.of(context);
 
   @override
   void didChangeDependencies() {

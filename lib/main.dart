@@ -200,7 +200,7 @@ Future<void> main() async {
   }
 
   // Resolve the installed version before any screen (Settings/About, updater)
-  // reads AppConfig.appVersion. Best-effort: the 1.0.0 fallback is only used
+  // reads AppConfig.appVersion. Best-effort: the 2.0.0 fallback is only used
   // when the platform channel is unavailable.
   await AppConfig.loadInstalledVersion()
       .timeout(const Duration(seconds: 2), onTimeout: () {});

@@ -62,6 +62,9 @@ List<Widget> buildFavoritesSlivers({
   final hasOnlineTracks =
       songs.any((s) => s.remoteId != null && s.remoteId!.isNotEmpty);
 
+  final isCenteredEmpty =
+      (!hasAnyInScope && !isLoading) || (songs.isEmpty && searchQuery.isNotEmpty);
+
   return [
     // ---------- Canonical Local / Online Scope Switcher ----------
     SliverToBoxAdapter(
@@ -70,7 +73,7 @@ List<Widget> buildFavoritesSlivers({
           pagePad,
           AppSpacing.sm,
           pagePad,
-          AppSpacing.xs,
+          AppSpacing.s14,
         ),
         child: SourceScopeSwitcher(
           persistKey: 'favorites',
@@ -89,7 +92,7 @@ List<Widget> buildFavoritesSlivers({
           pagePad,
           0,
           pagePad,
-          AppSpacing.sm,
+          AppSpacing.md,
         ),
         child: _FavoritesHeaderCard(
           songs: songs,
@@ -116,62 +119,99 @@ List<Widget> buildFavoritesSlivers({
 
     // ---------- Empty / Loading / Filtered / Grid / List Content ----------
     if (!hasAnyInScope)
-      SliverToBoxAdapter(
-        child: isLoading
-            ? SkeletonList(
-                padding: EdgeInsetsDirectional.fromSTEB(
-                  pagePad,
-                  AppSpacing.md,
-                  pagePad,
-                  PulsrLayoutMetrics.scrollBottom(context),
+      if (isLoading)
+        SliverToBoxAdapter(
+          child: SkeletonList(
+            padding: EdgeInsetsDirectional.fromSTEB(
+              pagePad,
+              AppSpacing.xs,
+              pagePad,
+              PulsrLayoutMetrics.scrollBottom(context),
+            ),
+          ),
+        )
+      else
+        SliverLayoutBuilder(
+          builder: (context, constraints) {
+            final dockReserve = PulsrLayoutMetrics.scrollBottom(context);
+            final visibleHeight = (constraints.viewportMainAxisExtent -
+                    constraints.precedingScrollExtent -
+                    dockReserve -
+                    AppSpacing.sm)
+                .clamp(0.0, double.infinity);
+            return SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsetsDirectional.only(
+                  top: AppSpacing.sm,
+                  bottom: dockReserve,
                 ),
-              )
-            : Padding(
-                padding: const EdgeInsets.symmetric(vertical: AppSpacing.s40),
-                child: Center(
-                  child: PulsrEmptyState(
-                    icon: isOnline
-                        ? Icons.cloud_off_rounded
-                        : Icons.favorite_border_rounded,
-                    iconColor: isOnline ? p.accent : p.favorite,
-                    title:
-                        isOnline ? l10n.noOnlineFavorites : l10n.noLocalFavorites,
-                    subtitle: isOnline
-                        ? l10n.browseSyncPullSubtitle
-                        : l10n.noLocalFavoritesSubtitle,
-                    primaryActionLabel: isOnline &&
-                            AppConfig.ytmEnabled &&
-                            onSyncOnline != null
-                        ? l10n.syncYouTubeMusic
-                        : null,
-                    primaryActionIcon: isOnline &&
-                            AppConfig.ytmEnabled &&
-                            onSyncOnline != null
-                        ? Icons.sync_rounded
-                        : null,
-                    onPrimaryAction: isOnline && AppConfig.ytmEnabled
-                        ? onSyncOnline
-                        : null,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: visibleHeight),
+                  child: Center(
+                    child: PulsrEmptyState(
+                      icon: isOnline
+                          ? Icons.cloud_off_rounded
+                          : Icons.favorite_border_rounded,
+                      iconColor: isOnline ? p.accent : p.favorite,
+                      title: isOnline
+                          ? l10n.noOnlineFavorites
+                          : l10n.noLocalFavorites,
+                      subtitle: isOnline
+                          ? l10n.browseSyncPullSubtitle
+                          : l10n.noLocalFavoritesSubtitle,
+                      primaryActionLabel: isOnline &&
+                              AppConfig.ytmEnabled &&
+                              onSyncOnline != null
+                          ? l10n.syncYouTubeMusic
+                          : null,
+                      primaryActionIcon: isOnline &&
+                              AppConfig.ytmEnabled &&
+                              onSyncOnline != null
+                          ? Icons.sync_rounded
+                          : null,
+                      onPrimaryAction: isOnline && AppConfig.ytmEnabled
+                          ? onSyncOnline
+                          : null,
+                    ),
                   ),
                 ),
               ),
-      )
+            );
+          },
+        )
     else if (songs.isEmpty && searchQuery.isNotEmpty)
-      SliverToBoxAdapter(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: AppSpacing.s40),
-          child: Center(
-            child: PulsrEmptyState(
-              icon: Icons.search_off_rounded,
-              title: l10n.browseNoSongsMatch,
-              subtitle: '"$searchQuery"',
-              primaryActionLabel: onClearSearch != null ? l10n.clear : null,
-              primaryActionIcon:
-                  onClearSearch != null ? Icons.clear_rounded : null,
-              onPrimaryAction: onClearSearch,
+      SliverLayoutBuilder(
+        builder: (context, constraints) {
+          final dockReserve = PulsrLayoutMetrics.scrollBottom(context);
+          final visibleHeight = (constraints.viewportMainAxisExtent -
+                  constraints.precedingScrollExtent -
+                  dockReserve -
+                  AppSpacing.sm)
+              .clamp(0.0, double.infinity);
+          return SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsetsDirectional.only(
+                top: AppSpacing.sm,
+                bottom: dockReserve,
+              ),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: visibleHeight),
+                child: Center(
+                  child: PulsrEmptyState(
+                    icon: Icons.search_off_rounded,
+                    title: l10n.browseNoSongsMatch,
+                    subtitle: '"$searchQuery"',
+                    primaryActionLabel:
+                        onClearSearch != null ? l10n.clear : null,
+                    primaryActionIcon:
+                        onClearSearch != null ? Icons.clear_rounded : null,
+                    onPrimaryAction: onClearSearch,
+                  ),
+                ),
+              ),
             ),
-          ),
-        ),
+          );
+        },
       )
     else if (isGrid)
       SliverPadding(
@@ -302,9 +342,10 @@ List<Widget> buildFavoritesSlivers({
         },
       ),
 
-    SliverToBoxAdapter(
-      child: SizedBox(height: PulsrLayoutMetrics.scrollBottom(context)),
-    ),
+    if (!isCenteredEmpty && !(isLoading && !hasAnyInScope))
+      SliverToBoxAdapter(
+        child: SizedBox(height: PulsrLayoutMetrics.scrollBottom(context)),
+      ),
   ];
 }
 
@@ -361,84 +402,37 @@ class _FavoritesHeaderCard extends StatelessWidget {
                   : AppRadii.r18All,
               onTap: onViewAll,
               child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.md,
-                  vertical: AppSpacing.sm,
-                ),
-                child: Row(
-                  children: [
-                    if (songs.isNotEmpty)
-                      CachedArtwork(
-                        id: songs.first.id,
-                        albumId: songs.first.albumId,
-                        remoteUrl:
-                            songs.first.remoteArtworkUrl ?? songs.first.artworkUri,
-                        size: 46,
-                        borderRadius: AppRadii.r12,
-                      )
-                    else
-                      Container(
-                        width: 46,
-                        height: 46,
-                        decoration: BoxDecoration(
-                          color: (isOnline ? p.accent : p.favorite)
-                              .withValues(alpha: 0.15),
-                          borderRadius: AppRadii.r12All,
-                        ),
-                        child: Icon(
-                          isOnline
-                              ? Icons.cloud_rounded
-                              : Icons.favorite_rounded,
-                          color: isOnline ? p.accent : p.favorite,
-                          size: 22,
-                        ),
-                      ),
-                    const SizedBox(width: AppSpacing.sm),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            l10n.unifiedFavoritesHeader,
-                            style: TextStyle(
-                              fontSize: AppFontSize.callout,
-                              fontWeight: FontWeight.w800,
-                              color: p.textPrimary,
-                            ),
-                          ),
-                          Text(
-                            songs.isNotEmpty
-                                ? '${l10n.tracksCount(songs.length)} • ${Formatters.formatDuration(Duration(milliseconds: totalDurationMs))}'
-                                : l10n.unifiedFavoritesHeaderSubtitle,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: AppFontSize.caption,
-                              color: p.textSecondary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (onViewAll != null)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.s10,
-                          vertical: AppSpacing.xxs,
+                padding: const EdgeInsetsDirectional.all(AppSpacing.md),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final inlineAction =
+                        onViewAll != null && constraints.maxWidth >= 480;
+                    final stackedAction =
+                        onViewAll != null && !inlineAction;
+
+                    Widget buildViewAllPill() {
+                      return Container(
+                        padding: const EdgeInsetsDirectional.symmetric(
+                          horizontal: AppSpacing.sm,
+                          vertical: AppSpacing.s6,
                         ),
                         decoration: BoxDecoration(
                           color: p.accent.withValues(alpha: 0.14),
-                          borderRadius: AppRadii.r8All,
+                          borderRadius: AppRadii.r10All,
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text(
-                              l10n.unifiedFavoritesViewAll,
-                              style: TextStyle(
-                                fontSize: AppFontSize.caption,
-                                fontWeight: FontWeight.w700,
-                                color: p.accent,
+                            Flexible(
+                              child: Text(
+                                l10n.unifiedFavoritesViewAll,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: AppFontSize.caption,
+                                  fontWeight: FontWeight.w700,
+                                  color: p.accent,
+                                ),
                               ),
                             ),
                             const SizedBox(width: AppSpacing.xxs),
@@ -449,8 +443,89 @@ class _FavoritesHeaderCard extends StatelessWidget {
                             ),
                           ],
                         ),
-                      ),
-                  ],
+                      );
+                    }
+
+                    return Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            if (songs.isNotEmpty)
+                              CachedArtwork(
+                                id: songs.first.id,
+                                albumId: songs.first.albumId,
+                                remoteUrl: songs.first.remoteArtworkUrl ??
+                                    songs.first.artworkUri,
+                                size: 46,
+                                borderRadius: AppRadii.r12,
+                              )
+                            else
+                              Container(
+                                width: 46,
+                                height: 46,
+                                decoration: BoxDecoration(
+                                  color: (isOnline ? p.accent : p.favorite)
+                                      .withValues(alpha: 0.15),
+                                  borderRadius: AppRadii.r12All,
+                                ),
+                                child: Icon(
+                                  isOnline
+                                      ? Icons.cloud_rounded
+                                      : Icons.favorite_rounded,
+                                  color: isOnline ? p.accent : p.favorite,
+                                  size: 22,
+                                ),
+                              ),
+                            const SizedBox(width: AppSpacing.md),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    l10n.unifiedFavoritesHeader,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: AppFontSize.callout,
+                                      fontWeight: FontWeight.w800,
+                                      color: p.textPrimary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: AppSpacing.s4),
+                                  Text(
+                                    songs.isNotEmpty
+                                        ? '${l10n.tracksCount(songs.length)} • ${Formatters.formatDuration(Duration(milliseconds: totalDurationMs))}'
+                                        : l10n.unifiedFavoritesHeaderSubtitle,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: AppFontSize.caption,
+                                      color: p.textSecondary,
+                                      height: 1.35,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            if (inlineAction) ...[
+                              const SizedBox(width: AppSpacing.md),
+                              buildViewAllPill(),
+                            ],
+                          ],
+                        ),
+                        if (stackedAction) ...[
+                          const SizedBox(height: AppSpacing.sm),
+                          Align(
+                            alignment: AlignmentDirectional.centerEnd,
+                            child: buildViewAllPill(),
+                          ),
+                        ],
+                      ],
+                    );
+                  },
                 ),
               ),
             ),
@@ -473,23 +548,18 @@ class _FavoritesHeaderCard extends StatelessWidget {
                       runSpacing: AppSpacing.xxs,
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        Text(
-                          l10n.tracksCount(songs.length),
-                          style: TextStyle(
-                            color: p.textSecondary,
-                            fontSize: AppFontSize.label,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
                         if (losslessCount > 0)
                           Container(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 1,
+                              horizontal: AppSpacing.s6,
+                              vertical: AppSpacing.s2,
                             ),
                             decoration: BoxDecoration(
-                              color: p.info.withValues(alpha: 0.15),
-                              borderRadius: AppRadii.r4All,
+                              color: p.info.withValues(alpha: 0.14),
+                              borderRadius: AppRadii.r6All,
+                              border: Border.all(
+                                color: p.info.withValues(alpha: 0.24),
+                              ),
                             ),
                             child: Text(
                               context.l10n.losslessCountLabel(losslessCount),
@@ -504,12 +574,12 @@ class _FavoritesHeaderCard extends StatelessWidget {
                     ),
                   ),
                   Wrap(
-                    spacing: AppSpacing.xxs,
+                    spacing: AppSpacing.xs,
                     runSpacing: AppSpacing.xxs,
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       if (songs.isNotEmpty) ...[
-                        FilledButton.tonalIcon(
+                        FilledButton.icon(
                           onPressed: onPlayAll,
                           icon: const Icon(Icons.play_arrow_rounded, size: 18),
                           label: Text(l10n.playAll),
@@ -518,9 +588,18 @@ class _FavoritesHeaderCard extends StatelessWidget {
                               0,
                               AppSpacing.minTouchTarget,
                             ),
-                            visualDensity: VisualDensity.compact,
-                            backgroundColor: p.accent.withValues(alpha: 0.15),
-                            foregroundColor: p.accent,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.md,
+                              vertical: AppSpacing.s10,
+                            ),
+                            backgroundColor: p.accent,
+                            foregroundColor: p.onAccent,
+                            elevation: 0,
+                            shape: const StadiumBorder(),
+                            textStyle: const TextStyle(
+                              fontSize: AppFontSize.bodySmall,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                         ),
                         IconButton.filledTonal(
@@ -533,6 +612,9 @@ class _FavoritesHeaderCard extends StatelessWidget {
                             ),
                             backgroundColor: p.surfaceContainerHigh,
                             foregroundColor: p.textPrimary,
+                            shape: CircleBorder(
+                              side: BorderSide(color: p.hairline),
+                            ),
                           ),
                           tooltip: l10n.shuffle,
                         ),
@@ -547,8 +629,11 @@ class _FavoritesHeaderCard extends StatelessWidget {
                                 AppSpacing.minTouchTarget,
                                 AppSpacing.minTouchTarget,
                               ),
-                              backgroundColor: p.accent.withValues(alpha: 0.15),
+                              backgroundColor: p.surfaceContainerHigh,
                               foregroundColor: p.accent,
+                              shape: CircleBorder(
+                                side: BorderSide(color: p.hairline),
+                              ),
                             ),
                             tooltip: l10n.browseDownloadAllLikedSongs,
                           ),
@@ -563,8 +648,11 @@ class _FavoritesHeaderCard extends StatelessWidget {
                                 AppSpacing.minTouchTarget,
                                 AppSpacing.minTouchTarget,
                               ),
-                              backgroundColor: p.accent.withValues(alpha: 0.15),
+                              backgroundColor: p.surfaceContainerHigh,
                               foregroundColor: p.accent,
+                              shape: CircleBorder(
+                                side: BorderSide(color: p.hairline),
+                              ),
                             ),
                             tooltip: l10n.syncYouTubeMusic,
                           ),
@@ -579,6 +667,9 @@ class _FavoritesHeaderCard extends StatelessWidget {
                               ),
                               backgroundColor: p.surfaceContainerHigh,
                               foregroundColor: p.textPrimary,
+                              shape: CircleBorder(
+                                side: BorderSide(color: p.hairline),
+                              ),
                             ),
                             tooltip: l10n.importByPlaylistLink,
                           ),

@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pulsr/features/home/presentation/widgets/quick_discovery_header.dart';
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
 void main() {
@@ -211,6 +212,199 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(current, SourceScope.local);
+    });
+
+    testWidgets('output pill and scope switcher scale cleanly at 200% text scale',
+        (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: MediaQuery(
+            data: const MediaQueryData(
+              size: Size(390, 844),
+              textScaler: TextScaler.linear(2.0),
+            ),
+            child: Scaffold(
+              body: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const ActiveAudioOutputPill(),
+                  CompactSourceScopeSwitcher(
+                    selectedScope: SourceScope.local,
+                    onChanged: (_) {},
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.byKey(const ValueKey('active_audio_output_pill')),
+          findsOneWidget);
+      expect(find.byKey(const ValueKey('compact_source_scope_switcher')),
+          findsOneWidget);
+    });
+
+    testWidgets(
+        'CompactSourceScopeSwitcher fits 360dp Arabic RTL @ 2.0x text scale without overflow',
+        (tester) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: const Locale('ar'),
+          localizationsDelegates: appLocalizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: MediaQuery(
+            data: const MediaQueryData(
+              size: Size(360, 800),
+              textScaler: TextScaler.linear(2.0),
+            ),
+            child: Directionality(
+              textDirection: TextDirection.rtl,
+              child: Scaffold(
+                body: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: CompactSourceScopeSwitcher(
+                      selectedScope: SourceScope.online,
+                      onChanged: (_) {},
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.byKey(const ValueKey('compact_source_scope_switcher')),
+          findsOneWidget);
+      final switcherSize = tester.getSize(
+          find.byKey(const ValueKey('compact_source_scope_switcher')));
+      expect(switcherSize.width, closeTo(320.0, 0.5));
+      expect(switcherSize.height, greaterThanOrEqualTo(48.0));
+    });
+
+    testWidgets(
+        'spans full content width as 50/50 equal segments on mobile with >=48dp touch targets',
+        (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: MediaQuery(
+            data: const MediaQueryData(size: Size(390, 844)),
+            child: Scaffold(
+              body: Padding(
+                padding: const EdgeInsetsDirectional.symmetric(horizontal: 16),
+                child: CompactSourceScopeSwitcher(
+                  selectedScope: SourceScope.local,
+                  onChanged: (_) {},
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final trackRect = tester.getRect(
+          find.byKey(const ValueKey('compact_source_scope_switcher')));
+      final localRect =
+          tester.getRect(find.byKey(const ValueKey('scope_segment_local')));
+      final onlineRect =
+          tester.getRect(find.byKey(const ValueKey('scope_segment_online')));
+
+      expect(trackRect.width, closeTo(358.0, 0.5));
+      expect(trackRect.height, greaterThanOrEqualTo(48.0));
+      expect(localRect.width, closeTo(onlineRect.width, 0.5));
+      expect(localRect.height, greaterThanOrEqualTo(48.0));
+      expect(onlineRect.height, greaterThanOrEqualTo(48.0));
+    });
+
+    testWidgets(
+        'constrains cleanly to maxWidth 400 on tablet/wide viewports',
+        (tester) async {
+      tester.view.physicalSize = const Size(900, 1200);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: MediaQuery(
+            data: const MediaQueryData(size: Size(900, 1200)),
+            child: Scaffold(
+              body: Padding(
+                padding: const EdgeInsetsDirectional.symmetric(horizontal: 24),
+                child: CompactSourceScopeSwitcher(
+                  selectedScope: SourceScope.online,
+                  onChanged: (_) {},
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final trackSize = tester.getSize(
+          find.byKey(const ValueKey('compact_source_scope_switcher')));
+      expect(trackSize.width, closeTo(400.0, 0.5));
+      expect(trackSize.height, greaterThanOrEqualTo(48.0));
+    });
+
+    testWidgets('renders safely inside unbounded horizontal constraints',
+        (tester) async {
+      SourceScope current = SourceScope.local;
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: UnconstrainedBox(
+              child: StatefulBuilder(
+                builder: (context, setState) => CompactSourceScopeSwitcher(
+                  selectedScope: current,
+                  onChanged: (next) => setState(() => current = next),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.byKey(const ValueKey('compact_source_scope_switcher')),
+          findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('scope_segment_online')));
+      await tester.pumpAndSettle();
+      expect(current, SourceScope.online);
     });
   });
 }

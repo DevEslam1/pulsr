@@ -10,14 +10,14 @@ Color _giltOf(BuildContext context) {
   return Color.lerp(
     p.accent,
     AppColors.giltGold,
-    p.isDark ? 0.58 : 0.50,
+    p.isDark ? 0.66 : 0.56,
   )!;
 }
 
 Color _onGilt(Color gilt) {
-  return ThemeData.estimateBrightnessForColor(gilt) == Brightness.dark
-      ? AppColors.onGiltLight
-      : AppColors.onGiltDark;
+  return gilt.computeLuminance() > 0.198
+      ? AppColors.onGiltDark
+      : AppColors.onGiltLight;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -74,39 +74,57 @@ class _MihrabClipper extends CustomClipper<Path> {
 class _MihrabRimPainter extends CustomPainter {
   final Color color;
   final double glow;
+  final TextDirection textDirection;
 
-  const _MihrabRimPainter({required this.color, required this.glow});
+  const _MihrabRimPainter({
+    required this.color,
+    required this.glow,
+    this.textDirection = TextDirection.ltr,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
     final path = _mihrabPath(size.width, size.height);
+    final rect = Offset.zero & size;
     if (glow > 0.01) {
       canvas.drawPath(
         path,
         Paint()
           ..style = PaintingStyle.stroke
-          ..strokeWidth = 6
-          ..color = color.withValues(alpha: 0.30 * glow)
+          ..strokeWidth = 5.5
+          ..color = color.withValues(alpha: 0.26 * glow)
           ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5),
       );
     }
+    final rimShader = LinearGradient(
+      begin: AlignmentDirectional.topEnd.resolve(textDirection),
+      end: AlignmentDirectional.bottomStart.resolve(textDirection),
+      colors: [
+        color.withValues(alpha: 0.44 + 0.36 * glow),
+        color.withValues(alpha: 0.28 + 0.32 * glow),
+        color.withValues(alpha: 0.12 + 0.24 * glow),
+      ],
+      stops: const [0.0, 0.55, 1.0],
+    ).createShader(rect);
     canvas.drawPath(
       path,
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.3
-        ..color = color.withValues(alpha: 0.55 + 0.35 * glow),
+        ..strokeWidth = 1.15
+        ..shader = rimShader,
     );
     canvas.drawCircle(
       Offset(size.width / 2, 2.2),
-      2.0,
-      Paint()..color = color.withValues(alpha: 0.9),
+      1.8,
+      Paint()..color = color.withValues(alpha: 0.78 + 0.20 * glow),
     );
   }
 
   @override
   bool shouldRepaint(covariant _MihrabRimPainter oldDelegate) =>
-      oldDelegate.color != color || oldDelegate.glow != glow;
+      oldDelegate.color != color ||
+      oldDelegate.glow != glow ||
+      oldDelegate.textDirection != textDirection;
 }
 
 /// Faint eight-fold star lattice etched across the card surface — painted once
@@ -284,7 +302,11 @@ class _ArchThumb extends StatelessWidget {
           ),
           IgnorePointer(
             child: CustomPaint(
-              painter: _MihrabRimPainter(color: _giltOf(context), glow: 0),
+              painter: _MihrabRimPainter(
+                color: _giltOf(context),
+                glow: 0,
+                textDirection: Directionality.of(context),
+              ),
             ),
           ),
         ],
@@ -326,9 +348,7 @@ class _SortOptionChip extends StatelessWidget {
                   : p.surfaceContainerHigh.withValues(alpha: 0.55),
               borderRadius: AppRadii.r12All,
               border: Border.all(
-                color: selected
-                    ? p.accent.withValues(alpha: 0.60)
-                    : p.hairline.withValues(alpha: 0.7),
+                color: selected ? p.accent.withValues(alpha: 0.60) : p.hairline,
                 width: selected ? 1.2 : 0.8,
               ),
             ),
@@ -396,23 +416,36 @@ class _CarouselWindowedDots extends StatelessWidget {
               final isActive = i == currentPage;
               final isEdgeClipped =
                   (i == start && start > 0) || (i == end - 1 && end < total);
-              final dotSize = isEdgeClipped ? 3.5 : 5.5;
+              final dotSize = isEdgeClipped ? 3.0 : 4.2;
               Widget glyph = AnimatedContainer(
                 duration: context.motion(PulsrMotion.layout),
                 curve: context.motionCurve(PulsrMotion.enter),
-                width: isActive ? 20.0 : dotSize,
-                height: isActive ? 6.0 : dotSize,
+                width: isActive ? 18.0 : dotSize,
+                height: isActive ? 4.5 : dotSize,
                 decoration: BoxDecoration(
                   color: isActive
-                      ? gilt
+                      ? null
                       : p.textTertiary
-                          .withValues(alpha: isEdgeClipped ? 0.22 : 0.36),
-                  borderRadius: BorderRadius.circular(isActive ? 3.0 : 1.2),
+                          .withValues(alpha: isEdgeClipped ? 0.20 : 0.34),
+                  gradient: isActive
+                      ? LinearGradient(
+                          begin: AlignmentDirectional.centerStart,
+                          end: AlignmentDirectional.centerEnd,
+                          colors: [
+                            Color.alphaBlend(
+                              AppColors.specularAt(0.18),
+                              gilt,
+                            ),
+                            gilt,
+                          ],
+                        )
+                      : null,
+                  borderRadius: BorderRadius.circular(isActive ? 999 : 1.0),
                   boxShadow: isActive
                       ? [
                           BoxShadow(
-                            color: gilt.withValues(alpha: 0.40),
-                            blurRadius: 6,
+                            color: gilt.withValues(alpha: 0.28),
+                            blurRadius: 4,
                             offset: const Offset(0, 1),
                           ),
                         ]
@@ -431,7 +464,7 @@ class _CarouselWindowedDots extends StatelessWidget {
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 2.5,
-                      vertical: 6,
+                      vertical: 4.0,
                     ),
                     child: glyph,
                   ),

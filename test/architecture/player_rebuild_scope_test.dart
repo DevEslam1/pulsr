@@ -291,7 +291,6 @@ void main() {
       final arms = decl!.group(1)!;
 
       for (final theme in const [
-        'PlayerThemeMode.circle',
         'PlayerThemeMode.vinyl',
         'PlayerThemeMode.cassette',
         'PlayerThemeMode.cd',

@@ -3,6 +3,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/constants/audio_feature_info.dart';
+import '../../../../core/services/ambient_sound_service.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/pulsr_dialog.dart';
 import '../../../../data/audio/bit_perfect_chain.dart';
@@ -85,6 +86,12 @@ Future<bool> requestBitPerfectOutput(BuildContext context, bool enable) async {
 
   final l = context.l10n;
   final conflicts = <_Conflict>[];
+  if (AmbientSoundService().isEnabled) {
+    conflicts.add(_Conflict(
+      l.ambientSounds,
+      () => AmbientSoundService().setEnabled(false),
+    ));
+  }
   final s = settings.state;
   if (s.crossfadeSeconds > 0.01) {
     conflicts.add(_Conflict(

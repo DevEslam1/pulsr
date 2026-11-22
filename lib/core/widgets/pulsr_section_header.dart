@@ -4,6 +4,7 @@ import '../constants/app_colors.dart';
 import '../constants/app_radii.dart';
 import '../constants/app_spacing.dart';
 import '../constants/app_typography.dart';
+import '../motion/pulsr_motion.dart';
 import '../theme/aura_theme.dart';
 import '../theme/pulsr_button_style.dart';
 import '../utils/adaptive.dart';
@@ -157,71 +158,137 @@ class PulsrSectionHeader extends StatelessWidget {
           if (trailing != null)
             trailing!
           else if (actionLabel != null && onAction != null)
-            ConstrainedBox(
-              constraints: const BoxConstraints(
-                maxWidth: 168,
-                minHeight: 40,
-              ),
-              child: PulsrPressable(
-                pressedScale: 0.95,
-                focusBorderRadius:
-                    isCapsule ? context.buttonRadius(rectRadius: 6.0) : AppRadii.full,
-                onTap: onAction,
-                child: Align(
-                  alignment: AlignmentDirectional.centerEnd,
-                  widthFactor: 1.0,
-                  child: Container(
-                    padding: const EdgeInsetsDirectional.only(
-                      start: AppSpacing.s10,
-                      end: AppSpacing.xs,
-                      top: 6,
-                      bottom: 6,
-                    ),
-                    decoration: isCapsule
-                        ? PulsrCapsuleStyle.decoration(p,
-                            borderRadius: context.buttonRadius(rectRadius: 6.0))
-                        : BoxDecoration(
-                            color: p.accent.withValues(alpha: p.isDark ? 0.14 : 0.09),
-                            borderRadius: AppRadii.full,
-                            border: Border.all(
-                              color: p.accent.withValues(alpha: 0.30),
-                              width: 0.8,
-                            ),
-                          ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Flexible(
-                          child: Text(
-                            actionLabel!,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontFamily: 'Manrope',
-                              color: isCapsule
-                                  ? PulsrCapsuleStyle.foregroundColor(p)
-                                  : p.accent,
-                              fontWeight: FontWeight.w800,
-                              fontSize: isCapsule ? 11.5 : AppFontSize.label,
-                              letterSpacing: isCapsule ? 0.2 : AppTracking.label,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 2),
-                        Icon(
-                          Icons.chevron_right_rounded,
-                          size: 16,
-                          color: isCapsule
-                              ? PulsrCapsuleStyle.secondaryForegroundColor(p)
-                              : p.accent,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
+            _SectionActionButton(
+              label: actionLabel!,
+              onTap: onAction!,
+              isCapsule: isCapsule,
             ),
         ],
+      ),
+    );
+  }
+}
+
+/// Lightweight editorial trailing action for [PulsrSectionHeader].
+///
+/// Renders clean accent-tinted text + chevron with subtle hover/press ink in
+/// classic mode (eliminating heavy filled maroon pills), while honoring
+/// [PulsrCapsuleStyle] when glass/capsule button style is active.
+class _SectionActionButton extends StatefulWidget {
+  final String label;
+  final VoidCallback onTap;
+  final bool isCapsule;
+
+  const _SectionActionButton({
+    required this.label,
+    required this.onTap,
+    required this.isCapsule,
+  });
+
+  @override
+  State<_SectionActionButton> createState() => _SectionActionButtonState();
+}
+
+class _SectionActionButtonState extends State<_SectionActionButton> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final isCapsule = widget.isCapsule;
+    final radius =
+        isCapsule ? context.buttonRadius(rectRadius: 6.0) : AppRadii.full;
+    final hoverFill = isCapsule
+        ? null
+        : (_hovered
+            ? p.accent.withValues(alpha: p.isDark ? 0.11 : 0.08)
+            : Colors.transparent);
+
+    return MouseRegion(
+      onEnter: (_) {
+        if (!_hovered) setState(() => _hovered = true);
+      },
+      onExit: (_) {
+        if (_hovered) setState(() => _hovered = false);
+      },
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(
+          maxWidth: 168,
+          minHeight: 44,
+        ),
+        child: PulsrPressable(
+          pressedScale: 0.96,
+          hapticStyle: PulsrHapticStyle.selection,
+          focusBorderRadius: radius,
+          onTap: widget.onTap,
+          child: Align(
+            alignment: AlignmentDirectional.centerEnd,
+            widthFactor: 1.0,
+            child: AnimatedContainer(
+              duration: context.motion(PulsrDurations.tap),
+              curve: context.motionCurve(Curves.easeOutCubic),
+              padding: isCapsule
+                  ? const EdgeInsetsDirectional.only(
+                      start: AppSpacing.s10,
+                      end: AppSpacing.xs,
+                      top: AppSpacing.s6,
+                      bottom: AppSpacing.s6,
+                    )
+                  : const EdgeInsetsDirectional.only(
+                      start: AppSpacing.xs,
+                      end: AppSpacing.xxs,
+                      top: AppSpacing.s6,
+                      bottom: AppSpacing.s6,
+                    ),
+              decoration: isCapsule
+                  ? PulsrCapsuleStyle.decoration(
+                      p,
+                      borderRadius: radius,
+                    )
+                  : BoxDecoration(
+                      color: hoverFill,
+                      borderRadius: radius,
+                    ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Flexible(
+                    child: Text(
+                      widget.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontFamily: 'Manrope',
+                        color: isCapsule
+                            ? PulsrCapsuleStyle.foregroundColor(p)
+                            : p.accent,
+                        fontWeight: FontWeight.w700,
+                        fontSize: isCapsule
+                            ? AppFontSize.caption
+                            : AppFontSize.label,
+                        letterSpacing: AppTracking.label,
+                      ),
+                    ),
+                  ),
+                  AnimatedPadding(
+                    duration: context.motion(PulsrDurations.tap),
+                    curve: context.motionCurve(Curves.easeOutCubic),
+                    padding: EdgeInsetsDirectional.only(
+                      start: _hovered ? AppSpacing.s4 : AppSpacing.s2,
+                    ),
+                    child: Icon(
+                      Icons.chevron_right_rounded,
+                      size: 16,
+                      color: isCapsule
+                          ? PulsrCapsuleStyle.secondaryForegroundColor(p)
+                          : p.accent.withValues(alpha: 0.85),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

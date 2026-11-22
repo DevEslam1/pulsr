@@ -198,7 +198,7 @@ void main() {
           final playerCubit = stubPlayerCubit(playingState());
 
           for (final mode in const [
-            PlayerThemeMode.classic,
+            PlayerThemeMode.clean,
             PlayerThemeMode.vinyl,
             PlayerThemeMode.cd,
             PlayerThemeMode.milkdrop,

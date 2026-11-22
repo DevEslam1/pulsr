@@ -14,8 +14,10 @@ import 'package:pulsr/data/db/app_database.dart';
 import 'package:pulsr/features/player/cubit/player_cubit.dart';
 import 'package:pulsr/features/player/cubit/player_state.dart';
 import 'package:pulsr/features/player/presentation/widgets/tablet_player_bar.dart';
-import 'package:pulsr/features/player/presentation/themes/classic_player_theme.dart';
+import 'package:pulsr/features/player/presentation/themes/card_player_theme.dart';
+import 'package:pulsr/features/player/presentation/themes/player_surface_shell.dart';
 import 'package:pulsr/features/player/presentation/themes/player_theme.dart';
+import 'package:pulsr/features/player/presentation/themes/player_tools_sheet.dart';
 import 'package:pulsr/features/settings/cubit/settings_cubit.dart';
 import 'package:pulsr/features/settings/cubit/settings_state.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
@@ -171,7 +173,7 @@ void main() {
   });
 
   testWidgets(
-      'ClassicPlayerTheme renders controls cleanly without an added wrapper box in landscape mode',
+      'CardPlayerTheme renders spatial card deck and glass controls cleanly in landscape mode',
       (tester) async {
     final theme = AuraTheme.customTheme(
       const Color(0xFF00E5FF),
@@ -216,7 +218,7 @@ void main() {
                 padding: EdgeInsets.only(left: 40, right: 20),
               ),
               child: Scaffold(
-                body: ClassicPlayerTheme(props: props),
+                body: CardPlayerTheme(props: props),
               ),
             ),
           ),
@@ -225,11 +227,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.byType(ClassicPlayerTheme), findsOneWidget);
-
-    // Verify right controls pane is clean and NOT wrapped in a Container box
-    final controlsPane = find.byKey(const ValueKey('track_controls_pane'));
-    expect(controlsPane, findsOneWidget);
-    expect(controlsPane.evaluate().first.widget is! Container, isTrue);
+    expect(tester.takeException(), isNull);
+    expect(find.byType(CardPlayerTheme), findsOneWidget);
+    expect(find.byType(PlayerSurfaceShell), findsOneWidget);
+    expect(find.byType(PlayerToolsTriggerButton), findsOneWidget);
+    expect(find.byIcon(Icons.pause_rounded), findsOneWidget);
   });
 }

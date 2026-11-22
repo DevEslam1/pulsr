@@ -31,7 +31,7 @@ class StudioToolsRail extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = context.palette;
     final textScale =
-        MediaQuery.textScalerOf(context).scale(1.0).clamp(1.0, 1.6);
+        MediaQuery.textScalerOf(context).scale(1.0).clamp(1.0, 2.0);
     final railHeight = math.max(48.0, (48.0 * textScale).roundToDouble());
 
     final items =
@@ -139,12 +139,14 @@ class StudioToolsRail extends StatelessWidget {
         SizedBox(
           height: railHeight,
           child: PulsrScrollEdgeFade(
+            extent: 44,
             child: ListView.separated(
               key: const ValueKey('studio_tools_horizontal_list'),
               scrollDirection: Axis.horizontal,
               physics: const BouncingScrollPhysics(),
-              padding: EdgeInsetsDirectional.symmetric(
-                horizontal: Adaptive.pagePadding(context),
+              padding: EdgeInsetsDirectional.only(
+                start: Adaptive.pagePadding(context),
+                end: Adaptive.pagePadding(context) + AppSpacing.md,
               ),
               itemCount: items.length,
               separatorBuilder: (_, __) =>

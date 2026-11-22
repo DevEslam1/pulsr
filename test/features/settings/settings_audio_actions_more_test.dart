@@ -281,7 +281,7 @@ void main() {
     }
 
     final rejectedSources = {
-      'lossy': _transitionSong(path: '/music/track.mp3', codec: 'mp3', depth: 16),
+      'lossy': _transitionSong(path: '/music/track.aac', codec: 'aac', depth: 16),
       'radio': _transitionSong(source: SongSource.radio),
       'float32': _transitionSong(path: '/music/track.wav', codec: 'pcm_f32le', depth: 32),
       'unsupported integer32': _transitionSong(path: '/music/track.wav', codec: 'pcm_s32le', depth: 32),

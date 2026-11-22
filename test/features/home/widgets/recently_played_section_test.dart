@@ -7,12 +7,15 @@ import 'package:flutter_localizations/flutter_localizations.dart'
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 import 'package:pulsr/core/errors/failures.dart';
 import 'package:pulsr/core/theme/aura_theme.dart';
+import 'package:pulsr/core/widgets/pulsr_scroll_edge_fade.dart';
 import 'package:pulsr/core/widgets/pulsr_section_header.dart';
 import 'package:pulsr/core/widgets/shimmer_skeleton.dart';
 import 'package:pulsr/data/db/app_database.dart';
 import 'package:pulsr/domain/usecases/get_songs_usecase.dart';
+import 'package:pulsr/features/home/presentation/widgets/home_card_metrics.dart';
 import 'package:pulsr/features/home/presentation/widgets/recently_played_section.dart';
 import 'package:pulsr/features/home/presentation/widgets/section_error.dart';
 import 'package:pulsr/features/library/cubit/library_cubit.dart';
@@ -90,6 +93,7 @@ void main() {
   Widget wrap(
     Widget child, {
     Size size = const Size(390, 844),
+    double textScale = 1.0,
   }) =>
       MultiBlocProvider(
         providers: [
@@ -105,7 +109,11 @@ void main() {
           ],
           supportedLocales: AppLocalizations.supportedLocales,
           home: MediaQuery(
-            data: MediaQueryData(size: size, disableAnimations: true),
+            data: MediaQueryData(
+              size: size,
+              textScaler: TextScaler.linear(textScale),
+              disableAnimations: true,
+            ),
             child: Scaffold(
               body: SingleChildScrollView(child: child),
             ),
@@ -295,6 +303,66 @@ void main() {
       verify(() => getSongs.watchRecentlyPlayed(limit: 100))
           .called(greaterThan(0));
       verifyNever(() => getSongs.watchRecentlyPlayed(limit: 150));
+    });
+
+    testWidgets(
+        'wraps horizontal rail in PulsrScrollEdgeFade(extent: 40) and establishes 2-tier typography',
+        (tester) async {
+      stubRecentlyPlayed(Right<AppFailure, List<SongsTableData>>(_songs(3)));
+
+      await tester.pumpWidget(
+        wrap(RecentlyPlayedSection(getSongsUseCase: getSongs, isTablet: false)),
+      );
+      await tester.pumpAndSettle();
+
+      final fade = tester.widget<PulsrScrollEdgeFade>(
+        find.byType(PulsrScrollEdgeFade),
+      );
+      expect(fade.extent, 40);
+
+      final titleWidget = tester.widget<Text>(find.text('Recent 1'));
+      expect(titleWidget.maxLines, 1);
+      expect(titleWidget.style?.fontSize, AppFontSize.bodySmall);
+      expect(titleWidget.style?.fontWeight, FontWeight.w700);
+
+      final artistWidget = tester.widget<Text>(find.text('Artist 1'));
+      expect(artistWidget.maxLines, 1);
+      expect(artistWidget.style?.fontSize, AppFontSize.caption);
+    });
+
+    testWidgets('shows equalizer badge for currently playing track',
+        (tester) async {
+      final songs = _songs(2);
+      when(() => playerCubit.state).thenReturn(
+        PlayerState(
+          playback: PlaybackSlice(currentSong: songs.first, isPlaying: true),
+        ),
+      );
+      stubRecentlyPlayed(Right<AppFailure, List<SongsTableData>>(songs));
+
+      await tester.pumpWidget(
+        wrap(RecentlyPlayedSection(getSongsUseCase: getSongs, isTablet: false)),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(HomeCardPlayBadge), findsNWidgets(2));
+      expect(find.byKey(const ValueKey('eq')), findsOneWidget);
+    });
+
+    testWidgets('renders without overflow at 200% text scale', (tester) async {
+      stubRecentlyPlayed(Right<AppFailure, List<SongsTableData>>(_songs(3)));
+
+      await tester.pumpWidget(
+        wrap(
+          RecentlyPlayedSection(getSongsUseCase: getSongs, isTablet: false),
+          textScale: 2.0,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('Recent 1'), findsOneWidget);
+      expect(find.text('Artist 1'), findsOneWidget);
     });
   });
 }

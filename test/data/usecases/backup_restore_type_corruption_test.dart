@@ -81,7 +81,7 @@ void main() {
     final prefs = await SharedPreferences.getInstance();
     expect(prefs.getString('setting_theme_mode'), 'dark');
     expect(prefs.getInt('setting_custom_accent'), 0xFF9B9EF5);
-    expect(prefs.getString('setting_player_theme_mode'), 'classic');
+    expect(prefs.getString('setting_player_theme_mode'), 'clean');
     expect(prefs.getString('setting_visualizer_style'), 'bar');
 
     final song = await (db.select(db.songsTable)..where((t) => t.id.equals(10)))
@@ -93,5 +93,36 @@ void main() {
     expect(queue, hasLength(1));
     expect(queue.single.songId, 10);
     expect(queue.single.isCurrent, isTrue);
+  });
+
+  test('legacy removed playerThemeMode strings migrate cleanly on import',
+      () async {
+    final cases = <String, String>{
+      'classic': 'clean',
+      'circle': 'vinyl',
+      'minimal': 'waveform',
+      'PlayerThemeMode.classic': 'clean',
+      'PlayerThemeMode.circle': 'vinyl',
+      'PlayerThemeMode.minimal': 'waveform',
+      'unknown_legacy_theme': 'clean',
+    };
+
+    for (final entry in cases.entries) {
+      SharedPreferences.setMockInitialValues({});
+      final backup = jsonEncode({
+        'version': 4,
+        'settings': {
+          'playerThemeMode': entry.key,
+        },
+      });
+      await importUseCase.execute(backup);
+      final prefs = await SharedPreferences.getInstance();
+      expect(
+        prefs.getString('setting_player_theme_mode'),
+        entry.value,
+        reason: 'Backup playerThemeMode "${entry.key}" must migrate to '
+            '"${entry.value}"',
+      );
+    }
   });
 }

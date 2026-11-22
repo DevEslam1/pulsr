@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/theme/aura_theme.dart';
+import 'package:pulsr/core/widgets/pulsr_pressable.dart';
 import 'package:pulsr/features/home/presentation/widgets/quick_tile.dart';
 
 void main() {
@@ -52,6 +53,39 @@ void main() {
       await tester.pump();
 
       expect(taps, 1);
+    });
+
+    testWidgets('uses PulsrPressable and renders cleanly at 200% text scale',
+        (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AuraTheme.darkTheme,
+          home: MediaQuery(
+            data: const MediaQueryData(
+              size: Size(360, 800),
+              textScaler: TextScaler.linear(2.0),
+            ),
+            child: Scaffold(
+              body: Center(
+                child: SizedBox(
+                  width: 170,
+                  child: QuickTile(
+                    title: 'Favorites',
+                    subtitle: 'Liked tracks',
+                    icon: Icons.favorite_rounded,
+                    color: Colors.pink,
+                    onTap: () {},
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.byType(PulsrPressable), findsOneWidget);
     });
   });
 }

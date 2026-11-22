@@ -591,10 +591,10 @@ void main() {
         AudioConflicts.bitPerfectSourceBlockedReason(path: 'https://example.com/radio/track.flac', bitDepth: 16),
         isNull,
       );
-      // Lossy files with 16-bit or unknown depth blocked
+      // MP3 allows bit-perfect (decoded 16-bit PCM pass-through)
       expect(
         AudioConflicts.bitPerfectSourceBlockedReason(path: '/music/track.mp3', bitDepth: 16),
-        contains('Live radio and lossy streams'),
+        isNull,
       );
       expect(
         AudioConflicts.bitPerfectSourceBlockedReason(path: '/music/track.aac', bitDepth: 0),
@@ -694,7 +694,7 @@ void main() {
       );
       expect(AudioConflicts.bitPerfectSourceBlockedReason(codec: 'dsd_lsbf_planar'), isNull);
       expect(AudioConflicts.bitPerfectSourceBlockedReason(codec: 'dsd_msbf'), isNull);
-      expect(AudioConflicts.bitPerfectSourceBlockedReason(codec: 'mp3'), contains('Live radio and lossy streams'));
+      expect(AudioConflicts.bitPerfectSourceBlockedReason(codec: 'mp3'), isNull);
       expect(AudioConflicts.bitPerfectSourceBlockedReason(codec: 'aac'), contains('Live radio and lossy streams'));
       expect(AudioConflicts.bitPerfectSourceBlockedReason(codec: 'mp4a.40.2'), contains('Live radio and lossy streams'));
       expect(AudioConflicts.bitPerfectSourceBlockedReason(codec: 'opus'), contains('Live radio and lossy streams'));

@@ -13,6 +13,7 @@ import '../../../core/bloc/base_cubit.dart';
 import '../../../core/constants/channels.dart';
 import '../../../core/errors/app_error.dart';
 import '../../../core/constants/prefs_keys.dart';
+import '../../../core/services/ambient_sound_service.dart';
 import '../../../core/services/settings_cache.dart';
 import '../../../core/utils/pulsr_haptics.dart';
 import '../../../data/audio/mqa_decoder_helper.dart';
@@ -389,8 +390,12 @@ class SettingsCubit extends PulsrCubit<SettingsState>
     );
     final customAccentValue = prefs.getInt(_keyCustomAccent) ?? 0xFF9B9EF5;
 
-    final playerThemeStr =
-        prefs.getString(_keyPlayerThemeMode) ?? PlayerThemeMode.classic.name;
+    final rawPlayerThemeStr = prefs.getString(_keyPlayerThemeMode);
+    final playerThemeMode = PlayerThemeMode.fromName(rawPlayerThemeStr);
+    if (rawPlayerThemeStr != null &&
+        rawPlayerThemeStr != playerThemeMode.name) {
+      unawaited(prefs.setString(_keyPlayerThemeMode, playerThemeMode.name));
+    }
     final playerSliderStyleStr = prefs.getString(_keyPlayerSliderStyle);
     final playerSliderStyle = PlayerSliderStyle.values.firstWhere(
       (e) => e.name == playerSliderStyleStr,
@@ -400,11 +405,6 @@ class SettingsCubit extends PulsrCubit<SettingsState>
     final appButtonStyle = AppButtonStyle.values.firstWhere(
       (e) => e.name == appButtonStyleStr,
       orElse: () => AppButtonStyle.rectangular,
-    );
-
-    final playerThemeMode = PlayerThemeMode.values.firstWhere(
-      (e) => e.name == playerThemeStr,
-      orElse: () => PlayerThemeMode.classic,
     );
 
     final visualizerStyleStr =

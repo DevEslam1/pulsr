@@ -147,7 +147,9 @@
 ## 4. Experience and interface
 
 ### Now Playing
-- 11 themes: Classic Standard, Card Glass Overlay, Vinyl Circle, Minimalist Waveform, Vinyl Turntable Studio, CD Turntable, Retro Cassette Deck, Full-Bleed Waveform, Karaoke Lyrics Immersion, Clean Modern Flow and Milkdrop Visualizer.
+- 8 themes: Clean Modern Flow, Card Glass Overlay, Vinyl Turntable Studio, CD Turntable, Retro Cassette Deck, Studio Waveform, Karaoke Lyrics Immersion, and Milkdrop Visualizer. Custom Theme Studio included.
+- Legacy theme preference migration: `classic` → `clean`, `circle` → `vinyl`, `minimal` → `waveform` with self-healing persistence.
+- Decoupled theme chrome via `PlayerSurfaceShell` and expandable secondary tools drawer via `PlayerToolsSheet`.
 - Theme Studio with palette, corner radius, ambient glow, live preview and JSON export/import.
 - AMOLED pure black, light theme, high-contrast mode and scheduled light/dark switching.
 

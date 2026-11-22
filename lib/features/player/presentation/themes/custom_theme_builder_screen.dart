@@ -34,7 +34,7 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
   bool _glowEnabled = true;
   bool _initializedFromSettings = false;
   bool _showPlayerPreview = false;
-  PlayerThemeMode _selectedPreviewTheme = PlayerThemeMode.classic;
+  PlayerThemeMode _selectedPreviewTheme = PlayerThemeMode.clean;
 
   @override
   void didChangeDependencies() {
@@ -46,6 +46,7 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
       _accentColor = s.customAccentColorValue;
       _cornerRadius = s.customThemeRadius;
       _glowEnabled = s.customThemeGlow;
+      _selectedPreviewTheme = s.playerThemeMode;
     } catch (_) {}
   }
 
@@ -567,14 +568,10 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
   String _getThemeTitle(PlayerThemeMode mode, BuildContext context) {
     final l10n = context.l10n;
     switch (mode) {
-      case PlayerThemeMode.classic:
-        return l10n.settingsThemeClassicStandard;
+      case PlayerThemeMode.clean:
+        return l10n.settingsThemeClean;
       case PlayerThemeMode.card:
         return l10n.settingsThemeCardGlass;
-      case PlayerThemeMode.circle:
-        return l10n.settingsThemeVinylCircle;
-      case PlayerThemeMode.minimal:
-        return l10n.settingsThemeMinimalist;
       case PlayerThemeMode.vinyl:
         return l10n.settingsThemeVinylTurntable;
       case PlayerThemeMode.cd:
@@ -585,8 +582,6 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
         return l10n.settingsThemeFullBleed;
       case PlayerThemeMode.lyricsFocus:
         return l10n.settingsThemeKaraoke;
-      case PlayerThemeMode.clean:
-        return l10n.settingsThemeClean;
       case PlayerThemeMode.milkdrop:
         return l10n.settingsThemeMilkdrop;
     }
@@ -594,14 +589,10 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
 
   IconData _getThemeIcon(PlayerThemeMode mode) {
     switch (mode) {
-      case PlayerThemeMode.classic:
-        return Icons.art_track_rounded;
+      case PlayerThemeMode.clean:
+        return Icons.crop_portrait_rounded;
       case PlayerThemeMode.card:
         return Icons.layers_rounded;
-      case PlayerThemeMode.circle:
-        return Icons.radio_button_checked_rounded;
-      case PlayerThemeMode.minimal:
-        return Icons.crop_portrait_rounded;
       case PlayerThemeMode.vinyl:
         return Icons.album_rounded;
       case PlayerThemeMode.cd:
@@ -612,8 +603,6 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
         return Icons.waves_rounded;
       case PlayerThemeMode.lyricsFocus:
         return Icons.lyrics_rounded;
-      case PlayerThemeMode.clean:
-        return Icons.crop_portrait_rounded;
       case PlayerThemeMode.milkdrop:
         return Icons.blur_on_rounded;
     }

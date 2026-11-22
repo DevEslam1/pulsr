@@ -773,12 +773,12 @@ void main() {
       );
       expect(alacBlock, isNull);
 
-      // 4. Lossy local file (MP3) blocked per policy with clear message
+      // 4. Lossy local file (MP3) allowed (decoded 16-bit PCM pass-through)
       final mp3Block = AudioConflicts.bitPerfectSourceBlockedReason(
         path: '/storage/music/song.mp3',
         bitDepth: 16,
       );
-      expect(mp3Block, contains('Live radio and lossy streams'));
+      expect(mp3Block, isNull);
 
       // 5. 32-bit float source gets dedicated 32-bit localized message
       final floatBlock = AudioConflicts.bitPerfectSourceBlockedReason(

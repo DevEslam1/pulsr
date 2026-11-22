@@ -85,7 +85,8 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
         // resetting software gain to 1.0 on every track boundary.
         final awaitingFirstDecodedFrame = rate <= 0 &&
             song.source != SongSource.radio &&
-            codecState != AudioSourceCodecState.lossy &&
+            (codecState != AudioSourceCodecState.lossy ||
+                AudioConflicts.isMp3(path: song.path, codec: song.codec)) &&
             depth <= 24;
         if (awaitingFirstDecodedFrame && !state.strictBitPerfect) {
           return true;
@@ -124,6 +125,9 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
   }
 
   Future<void> _pushBitPerfectBypass(bool enabled) async {
+    if (enabled && AmbientSoundService().isEnabled) {
+      await AmbientSoundService().setEnabled(false);
+    }
     if (getIt.isRegistered<PulsrAudioHandler>()) {
       await getIt<PulsrAudioHandler>().setBitPerfectTransportPolicy(enabled);
     }
@@ -214,22 +218,44 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
         _lastDirectUsbFailure = sourceBlock;
         return false;
       }
-      final trackDepth = resolveFollowBitDepth(
-        trackBitDepth: sourceDepth,
+      final isKnownMp3 = AudioConflicts.isMp3(path: song?.path, codec: song?.codec);
+      final effectiveSourceDepth = (sourceDepth <= 0 && isKnownMp3) ? 16 : sourceDepth;
+      final dacSupportedDepths = status.advertisedFormats
+          .map((f) =>
+              (f['bitResolution'] as num?)?.toInt() ??
+              (((f['subslotSize'] as num?)?.toInt() ?? 0) * 8))
+          .where((d) => d == 16 || d == 24 || d == 32)
+          .toSet();
+      final dacMaxDepth = dacSupportedDepths.isNotEmpty
+          ? dacSupportedDepths.reduce(math.max)
+          : 0;
+      final effectiveDeviceDepth = dacMaxDepth > 0
+          ? dacMaxDepth
+          : (state.currentOutputDevice?.availableDevices
+                  .where((d) => d.isCurrent)
+                  .firstOrNull
+                  ?.maxBitDepth ??
+              state.currentOutputDevice?.bitDepth ??
+              0);
+      var trackDepth = resolveFollowBitDepth(
+        trackBitDepth: effectiveSourceDepth,
         streamingBitDepth: status.streamingBitDepth,
-        deviceBitDepth: state.currentOutputDevice?.availableDevices
-                .where((d) => d.isCurrent)
-                .firstOrNull
-                ?.maxBitDepth ??
-            state.currentOutputDevice?.bitDepth ??
-            0,
+        deviceBitDepth: effectiveDeviceDepth,
       );
+      if (dacSupportedDepths.isNotEmpty && !dacSupportedDepths.contains(trackDepth)) {
+        if (trackDepth > 24 && dacSupportedDepths.contains(24)) {
+          trackDepth = 24;
+        } else if (dacSupportedDepths.contains(16)) {
+          trackDepth = 16;
+        }
+      }
+      final effectiveRate = trackRate ?? _directStreamSampleRate();
+      final codecState = song != null
+          ? AudioConflicts.classifySourceCodec(path: song.path, codec: song.codec)
+          : AudioSourceCodecState.unknown;
       if (song != null &&
-          (trackRate == null ||
-              !HiResAudioService.validTargetSampleRates.contains(trackRate) ||
-              AudioConflicts.classifySourceCodec(
-                      path: song.path, codec: song.codec) ==
-                  AudioSourceCodecState.unknown)) {
+          (!HiResAudioService.validTargetSampleRates.contains(effectiveRate) ||
+              (codecState == AudioSourceCodecState.unknown && !isKnownMp3))) {
         _lastDirectUsbFailure =
             'Source format is unconfirmed; direct playback suspended.';
         return false;
@@ -239,12 +265,23 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
       // always opens in 2-channel mode even for multichannel tracks.
       final producerChannels =
           await UsbExclusiveService().getProducerChannels();
+      int effectiveProducerChannels = producerChannels;
+      // Do not let producerChannels == 1 force mono if the DAC only supports stereo.
+      // If the DAC has no 1-channel endpoints in advertised formats, default to stereo (2).
+      if (effectiveProducerChannels == 1) {
+        final dacSupportsMono = status.advertisedFormats.any(
+          (f) => ((f['channels'] as num?)?.toInt() ?? 0) == 1,
+        );
+        if (!dacSupportsMono) {
+          effectiveProducerChannels = 2;
+        }
+      }
       final effectiveChannels =
-          channels ?? (producerChannels > 0 ? producerChannels : 2);
+          channels ?? (effectiveProducerChannels > 0 ? effectiveProducerChannels : 2);
       // Retain ownership even after a failed start until teardown is confirmed.
       _bitPerfectViaDirectStream = true;
       final res = await usb.startStreaming(
-        sampleRate: trackRate ?? _directStreamSampleRate(),
+        sampleRate: effectiveRate,
         bitDepth: trackDepth,
         channels: effectiveChannels,
         strict: strict,
@@ -504,14 +541,55 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
       direct = _bitPerfectViaDirectStream;
     } else if (direct) {
       await UsbExclusiveService().resetChannelMismatchFrames();
+      final status = await UsbExclusiveService().getStatus();
       final producerChannels =
           await UsbExclusiveService().getProducerChannels();
+      int effectiveProducerChannels = producerChannels;
+      if (effectiveProducerChannels == 1) {
+        final dacSupportsMono = status.advertisedFormats.any(
+          (f) => ((f['channels'] as num?)?.toInt() ?? 0) == 1,
+        );
+        if (!dacSupportsMono) {
+          effectiveProducerChannels = 2;
+        }
+      }
       final int effectiveChannels =
-          channels ?? (producerChannels > 0 ? producerChannels : 2);
+          channels ?? (effectiveProducerChannels > 0 ? effectiveProducerChannels : 2);
+      final dacSupportedDepths = status.advertisedFormats
+          .map((f) =>
+              (f['bitResolution'] as num?)?.toInt() ??
+              (((f['subslotSize'] as num?)?.toInt() ?? 0) * 8))
+          .where((d) => d == 16 || d == 24 || d == 32)
+          .toSet();
+      final dacMaxDepth = dacSupportedDepths.isNotEmpty
+          ? dacSupportedDepths.reduce(math.max)
+          : 0;
+      final effectiveDeviceDepth = dacMaxDepth > 0
+          ? dacMaxDepth
+          : (state.currentOutputDevice?.availableDevices
+                  .where((d) => d.isCurrent)
+                  .firstOrNull
+                  ?.maxBitDepth ??
+              state.currentOutputDevice?.bitDepth ??
+              0);
+      final isKnownMp3 = AudioConflicts.isMp3(path: song?.path, codec: song?.codec);
+      final effectiveSourceDepth = (sourceDepth <= 0 && isKnownMp3) ? 16 : sourceDepth;
+      var trackDepth = resolveFollowBitDepth(
+        trackBitDepth: effectiveSourceDepth,
+        streamingBitDepth: status.streamingBitDepth,
+        deviceBitDepth: effectiveDeviceDepth,
+      );
+      if (dacSupportedDepths.isNotEmpty && !dacSupportedDepths.contains(trackDepth)) {
+        if (trackDepth > 24 && dacSupportedDepths.contains(24)) {
+          trackDepth = 24;
+        } else if (dacSupportedDepths.contains(16)) {
+          trackDepth = 16;
+        }
+      }
       final res = await UsbExclusiveService().startStreaming(
         sampleRate: sampleRate,
         channels: effectiveChannels,
-        bitDepth: sourceDepth,
+        bitDepth: trackDepth,
         strict: state.strictBitPerfect,
         renderMode: await _usbRenderModeForActiveDac(),
       );

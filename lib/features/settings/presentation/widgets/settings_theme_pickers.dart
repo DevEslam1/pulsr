@@ -26,26 +26,20 @@ import 'package:pulsr/core/motion/pulsr_motion.dart';
 
 String getThemeModeTitle(PlayerThemeMode mode, AppLocalizations l10n) {
   switch (mode) {
-    case PlayerThemeMode.classic:
-      return l10n.settingsThemeClassicStandard;
+    case PlayerThemeMode.clean:
+      return l10n.settingsThemeClean;
     case PlayerThemeMode.card:
       return l10n.settingsThemeCardGlass;
-    case PlayerThemeMode.circle:
-      return l10n.settingsThemeVinylCircle;
-    case PlayerThemeMode.minimal:
-      return l10n.settingsThemeMinimalist;
     case PlayerThemeMode.vinyl:
       return l10n.settingsThemeVinylTurntable;
+    case PlayerThemeMode.cd:
+      return l10n.settingsThemeCdTurntable;
     case PlayerThemeMode.cassette:
       return l10n.settingsThemeRetroCassette;
     case PlayerThemeMode.waveform:
       return l10n.settingsThemeFullBleed;
     case PlayerThemeMode.lyricsFocus:
       return l10n.settingsThemeKaraoke;
-    case PlayerThemeMode.cd:
-      return l10n.settingsThemeCdTurntable;
-    case PlayerThemeMode.clean:
-      return l10n.settingsThemeClean;
     case PlayerThemeMode.milkdrop:
       return l10n.settingsThemeMilkdrop;
   }
@@ -191,26 +185,20 @@ class _ThemePreviewThumbnail extends StatelessWidget {
 
   Widget _buildPreviewIcon(Color tint) {
     switch (mode) {
-      case PlayerThemeMode.classic:
-        return Icon(Icons.crop_square_rounded, size: 22, color: tint);
+      case PlayerThemeMode.clean:
+        return Icon(Icons.crop_portrait_rounded, size: 22, color: tint);
       case PlayerThemeMode.card:
         return Icon(Icons.layers_rounded, size: 22, color: tint);
-      case PlayerThemeMode.circle:
-        return Icon(Icons.album_rounded, size: 22, color: tint);
-      case PlayerThemeMode.minimal:
-        return Icon(Icons.graphic_eq_rounded, size: 22, color: tint);
       case PlayerThemeMode.vinyl:
         return Icon(Icons.radio_button_checked_rounded, size: 22, color: tint);
+      case PlayerThemeMode.cd:
+        return Icon(Icons.album_outlined, size: 22, color: tint);
       case PlayerThemeMode.cassette:
         return Icon(Icons.developer_board_rounded, size: 22, color: tint);
       case PlayerThemeMode.waveform:
         return Icon(Icons.waves_rounded, size: 22, color: tint);
       case PlayerThemeMode.lyricsFocus:
         return Icon(Icons.mic_external_on_rounded, size: 22, color: tint);
-      case PlayerThemeMode.cd:
-        return Icon(Icons.album_outlined, size: 22, color: tint);
-      case PlayerThemeMode.clean:
-        return Icon(Icons.crop_portrait_rounded, size: 22, color: tint);
       case PlayerThemeMode.milkdrop:
         return Icon(Icons.blur_on_rounded, size: 22, color: tint);
     }
@@ -239,28 +227,10 @@ void showThemePickerSheet(
       icon: Icons.crop_portrait_rounded,
     ),
     (
-      mode: PlayerThemeMode.classic,
-      title: context.l10n.settingsThemeClassicStandard,
-      subtitle: context.l10n.settingsThemeClassicStandardDesc,
-      icon: Icons.square_outlined,
-    ),
-    (
       mode: PlayerThemeMode.card,
       title: context.l10n.settingsThemeCardGlass,
       subtitle: context.l10n.settingsThemeCardGlassDesc,
       icon: Icons.layers_rounded,
-    ),
-    (
-      mode: PlayerThemeMode.circle,
-      title: context.l10n.settingsThemeVinylCircle,
-      subtitle: context.l10n.settingsThemeVinylCircleDesc,
-      icon: Icons.album_rounded,
-    ),
-    (
-      mode: PlayerThemeMode.minimal,
-      title: context.l10n.settingsThemeMinimalist,
-      subtitle: context.l10n.settingsThemeMinimalistDesc,
-      icon: Icons.graphic_eq_rounded,
     ),
     (
       mode: PlayerThemeMode.vinyl,
@@ -848,63 +818,98 @@ class _ThemeMockupCard extends StatelessWidget {
         return Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(width: 60, height: 4, color: p.hairline),
-            const SizedBox(height: 4),
-            Container(width: 90, height: 6, color: primaryColor),
-            const SizedBox(height: 4),
-            Container(width: 70, height: 4, color: p.hairline),
-          ],
-        );
-      case PlayerThemeMode.circle:
-        return Container(
-          width: 58,
-          height: 58,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: primaryColor.withValues(alpha: 0.2),
-            border: Border.all(color: primaryColor, width: 2),
-          ),
-          child: Icon(Icons.music_note_rounded, color: primaryColor, size: 28),
-        );
-      case PlayerThemeMode.card:
-        return Container(
-          width: 70,
-          height: 48,
-          decoration: BoxDecoration(
-            color: primaryColor.withValues(alpha: 0.25),
-            borderRadius: AppRadii.r8All,
-            border: Border.all(color: primaryColor.withValues(alpha: 0.4)),
-          ),
-          child: Center(
-            child: Icon(Icons.layers_rounded, color: p.textSecondary, size: 22),
-          ),
-        );
-      case PlayerThemeMode.minimal:
-        return Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(width: 50, height: 3, color: primaryColor),
-            const SizedBox(width: 4),
             Container(
-              width: 8,
-              height: 8,
+              width: 58,
+              height: 4,
               decoration: BoxDecoration(
-                shape: BoxShape.circle,
+                color: p.hairline,
+                borderRadius: AppRadii.r2All,
+              ),
+            ),
+            const SizedBox(height: 5),
+            Container(
+              width: 88,
+              height: 7,
+              decoration: BoxDecoration(
                 color: primaryColor,
+                borderRadius: AppRadii.r4All,
+                boxShadow: [
+                  BoxShadow(
+                    color: primaryColor.withValues(alpha: 0.4),
+                    blurRadius: 6,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 5),
+            Container(
+              width: 72,
+              height: 4,
+              decoration: BoxDecoration(
+                color: p.hairline,
+                borderRadius: AppRadii.r2All,
               ),
             ),
           ],
         );
-      case PlayerThemeMode.classic:
-        return Container(
-          width: 50,
-          height: 50,
-          decoration: BoxDecoration(
-            color: primaryColor.withValues(alpha: 0.15),
-            borderRadius: AppRadii.r6All,
-            border: Border.all(color: primaryColor.withValues(alpha: 0.3)),
+      case PlayerThemeMode.card:
+        return SizedBox(
+          width: 86,
+          height: 56,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              PositionedDirectional(
+                start: 0,
+                child: Container(
+                  width: 34,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: p.surfaceContainerHigh.withValues(alpha: 0.7),
+                    borderRadius: AppRadii.r8All,
+                    border: Border.all(color: p.hairline),
+                  ),
+                ),
+              ),
+              PositionedDirectional(
+                end: 0,
+                child: Container(
+                  width: 34,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: p.surfaceContainerHigh.withValues(alpha: 0.7),
+                    borderRadius: AppRadii.r8All,
+                    border: Border.all(color: p.hairline),
+                  ),
+                ),
+              ),
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: primaryColor.withValues(alpha: 0.28),
+                  borderRadius: AppRadii.r10All,
+                  border: Border.all(
+                    color: primaryColor.withValues(alpha: 0.65),
+                    width: 1.2,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: primaryColor.withValues(alpha: 0.22),
+                      blurRadius: 8,
+                    ),
+                  ],
+                ),
+                child: Center(
+                  child: Icon(
+                    Icons.layers_rounded,
+                    color: p.textPrimary,
+                    size: 20,
+                  ),
+                ),
+              ),
+            ],
           ),
-          child: Icon(Icons.play_arrow_rounded, color: primaryColor, size: 28),
         );
       case PlayerThemeMode.clean:
         return Column(

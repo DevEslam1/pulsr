@@ -1,7 +1,7 @@
 name: pulsr
 description: "Pulsr Music - Premium offline-first local music player"
 publish_to: 'none'
-version: 1.0.0+1
+version: 2.0.0+1
 
 environment:
   # The binding entry requirement is the Flutter floor: material_ui 1.11.x and

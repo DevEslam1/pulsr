@@ -17,7 +17,7 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
         return SkeletonList(
           padding: EdgeInsetsDirectional.fromSTEB(
             Adaptive.pagePadding(context),
-            AppSpacing.md,
+            AppSpacing.sm,
             Adaptive.pagePadding(context),
             PulsrLayoutMetrics.scrollBottom(context),
           ),
@@ -55,7 +55,7 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
                 addRepaintBoundaries: true,
                 padding: EdgeInsetsDirectional.fromSTEB(
                   Adaptive.pagePadding(context),
-                  AppSpacing.md,
+                  AppSpacing.sm,
                   Adaptive.pagePadding(context),
                   PulsrLayoutMetrics.scrollBottom(context),
                 ),
@@ -269,7 +269,7 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
         return SkeletonList(
           padding: EdgeInsetsDirectional.fromSTEB(
             Adaptive.pagePadding(context),
-            AppSpacing.md,
+            AppSpacing.sm,
             Adaptive.pagePadding(context),
             PulsrLayoutMetrics.scrollBottom(context),
           ),
@@ -307,7 +307,7 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
                 addRepaintBoundaries: true,
                 padding: EdgeInsetsDirectional.fromSTEB(
                   Adaptive.pagePadding(context),
-                  AppSpacing.md,
+                  AppSpacing.sm,
                   Adaptive.pagePadding(context),
                   PulsrLayoutMetrics.scrollBottom(context),
                 ),
@@ -552,7 +552,7 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
         return SkeletonList(
           padding: EdgeInsetsDirectional.fromSTEB(
             Adaptive.pagePadding(context),
-            AppSpacing.md,
+            AppSpacing.sm,
             Adaptive.pagePadding(context),
             PulsrLayoutMetrics.scrollBottom(context),
           ),
@@ -649,7 +649,7 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
     return Padding(
       padding: EdgeInsetsDirectional.fromSTEB(
         Adaptive.pagePadding(context),
-        AppSpacing.s8,
+        AppSpacing.sm,
         Adaptive.pagePadding(context),
         AppSpacing.xxs,
       ),
@@ -702,7 +702,7 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
         return SkeletonList(
           padding: EdgeInsetsDirectional.fromSTEB(
             Adaptive.pagePadding(context),
-            AppSpacing.md,
+            AppSpacing.sm,
             Adaptive.pagePadding(context),
             PulsrLayoutMetrics.scrollBottom(context),
           ),
@@ -749,7 +749,7 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
         addRepaintBoundaries: true,
         padding: EdgeInsetsDirectional.fromSTEB(
           Adaptive.pagePadding(context),
-          AppSpacing.md,
+          AppSpacing.sm,
           Adaptive.pagePadding(context),
           PulsrLayoutMetrics.scrollBottom(context),
         ),

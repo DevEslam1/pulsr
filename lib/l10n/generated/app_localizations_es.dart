@@ -855,18 +855,6 @@ class AppLocalizationsEs extends AppLocalizations {
   String get playerTheme => 'Estilo del reproductor';
 
   @override
-  String get playerThemeClassic => 'Clásico';
-
-  @override
-  String get playerThemeCard => 'Tarjeta flotante';
-
-  @override
-  String get playerThemeCircle => 'Vinilo circular';
-
-  @override
-  String get playerThemeMinimal => 'Minimalista puro';
-
-  @override
   String get visualizerStyle => 'Visualizador de audio';
 
   @override
@@ -5978,13 +5966,6 @@ class AppLocalizationsEs extends AppLocalizations {
       'Portada de fondo a pantalla completa con controles de vidrio esmerilado';
 
   @override
-  String get settingsThemeClassicStandard => 'Estándar clásico';
-
-  @override
-  String get settingsThemeClassicStandardDesc =>
-      'Diseño tradicional de alta definición con brillo ambiental';
-
-  @override
   String get settingsThemeFullBleed => 'Forma de onda a pantalla completa';
 
   @override
@@ -5999,25 +5980,11 @@ class AppLocalizationsEs extends AppLocalizations {
       'Interfaz de karaoke con letras sincronizadas ampliadas';
 
   @override
-  String get settingsThemeMinimalist => 'Forma de onda minimalista';
-
-  @override
-  String get settingsThemeMinimalistDesc =>
-      'Enfoque de estudio amplio en el visualizador de onda dinámica';
-
-  @override
   String get settingsThemeRetroCassette => 'Pletina retro';
 
   @override
   String get settingsThemeRetroCassetteDesc =>
       'Cinta de casete vintage con carretes giratorios y contador';
-
-  @override
-  String get settingsThemeVinylCircle => 'Círculo de vinilo (girando)';
-
-  @override
-  String get settingsThemeVinylCircleDesc =>
-      'Portada circular centrada con animación de giro continuo';
 
   @override
   String get settingsThemeCdTurntable => 'Tocadiscos CD';

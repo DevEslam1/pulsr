@@ -122,7 +122,7 @@ void main() {
         child: _app(
           Scaffold(
             body: ThemeRegistry.build(
-              PlayerThemeMode.classic,
+              PlayerThemeMode.clean,
               PlayerThemeProps(
                 state: state,
                 cubit: cubit,

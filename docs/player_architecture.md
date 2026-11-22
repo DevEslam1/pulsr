@@ -66,20 +66,17 @@ All focus losses, noisy unplug events, system sound dings, and call interruption
 
 ## 5. Now Playing Themes Architecture (`ThemeRegistry`)
 
-`ThemeRegistry` (`lib/features/player/presentation/themes/theme_registry.dart`) maps `PlayerThemeMode` values to modular widget builders:
-1. `PlayerThemeMode.classic` — `ClassicPlayerTheme`
-2. `PlayerThemeMode.card` — `CardPlayerTheme`
-3. `PlayerThemeMode.circle` — `CirclePlayerTheme`
-4. `PlayerThemeMode.minimal` — `MinimalPlayerTheme`
-5. `PlayerThemeMode.vinyl` — `VinylPlayerTheme`
-6. `PlayerThemeMode.cd` — `CdPlayerTheme` (compact disc with rainbow sheen and rotating optical tray)
-7. `PlayerThemeMode.cassette` — `CassettePlayerTheme` (animated magnetic tape spools and tape counter)
-8. `PlayerThemeMode.waveform` — `WaveformPlayerTheme`
-9. `PlayerThemeMode.lyricsFocus` — `LyricsPlayerTheme`
-10. `PlayerThemeMode.clean` — `CleanPlayerTheme`
-11. `PlayerThemeMode.milkdrop` — `MilkdropPlayerTheme` (GPU shader surface with Canvas fallback)
+`ThemeRegistry` (`lib/features/player/presentation/themes/theme_registry.dart`) maps `PlayerThemeMode` values to modular widget builders, built on top of `PlayerSurfaceShell` (`player_surface_shell.dart`) and `PlayerToolsSheet` (`player_tools_sheet.dart`):
+1. `PlayerThemeMode.clean` — `CleanPlayerTheme` (Apple Music-inspired borderless artwork, smooth mesh gradient, capsule scrubber)
+2. `PlayerThemeMode.card` — `CardPlayerTheme` (spatial live blurred canvas, swipeable stacked album card deck, frosted control card)
+3. `PlayerThemeMode.vinyl` — `VinylPlayerTheme` (grooved rotating vinyl, animated tonearm drop/lift, 33⅓ RPM LED, rotary transport)
+4. `PlayerThemeMode.cd` — `CdPlayerTheme` (iridescent compact disc, translucent Y2K acrylic jewel case with ribbed spine, dot-matrix LCD)
+5. `PlayerThemeMode.cassette` — `CassettePlayerTheme` (full-screen anodized chassis, spinning tape spools, 16-segment LED VU meters, mechanical keys)
+6. `PlayerThemeMode.waveform` — `WaveformPlayerTheme` (interactive seekable oscilloscope centerpiece from `WaveformService`, audio telemetry strip)
+7. `PlayerThemeMode.lyricsFocus` — `LyricsPlayerTheme` (70% viewport synced scrolling LRC lyrics stage, glowing active line, tap-to-seek)
+8. `PlayerThemeMode.milkdrop` — `MilkdropPlayerTheme` (edge-to-edge `shaders/milkdrop.frag` GPU shader surface with Canvas fallback under GPU Saver, tap-to-immerse)
 
-Each theme composes `PlayerThemeScaffold` and `PlayerThemeChrome` with dedicated canvas painters under `themes/painters/`.
+Each theme owns its full-screen visual identity via `PlayerSurfaceShell`, while secondary actions (A/B loop, EQ/DSP, DAC, Speed, Quran, Ambient, Sleep Timer, Party) are housed in `PlayerToolsSheet`. Legacy saved preferences (`classic`, `circle`, `minimal`) gracefully migrate to `clean`, `vinyl`, and `waveform`.
 
 ---
 

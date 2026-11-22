@@ -31,7 +31,7 @@ import 'package:pulsr/domain/models/quran_metadata.dart';
 import 'package:pulsr/features/player/cubit/controllers/player_controllers.dart';
 import 'package:pulsr/features/player/cubit/player_cubit.dart';
 import 'package:pulsr/features/player/cubit/player_state.dart';
-import 'package:pulsr/features/player/presentation/themes/circle_player_theme.dart';
+import 'package:pulsr/features/player/presentation/themes/cd_player_theme.dart';
 import 'package:pulsr/features/player/presentation/themes/player_theme.dart';
 import 'package:pulsr/features/player/presentation/themes/vinyl_player_theme.dart';
 import 'package:pulsr/features/player/presentation/widgets/audio_visualizer.dart';
@@ -189,7 +189,8 @@ void main() {
       when(() => mockPlayerCubit.stream).thenAnswer((_) => const Stream<PlayerState>.empty());
     });
 
-    testWidgets('_CircleArtwork cancels drag on song change', (tester) async {
+    testWidgets('CdPlayerTheme platter cancels drag on song change',
+        (tester) async {
       await tester.binding.setSurfaceSize(const Size(500, 950));
       addTearDown(() => tester.binding.setSurfaceSize(null));
 
@@ -204,7 +205,7 @@ void main() {
                 BlocProvider<PlayerCubit>.value(value: mockPlayerCubit),
                 BlocProvider<SettingsCubit>.value(value: mockSettingsCubit),
               ],
-              child: CirclePlayerTheme(
+              child: CdPlayerTheme(
                 props: PlayerThemeProps(
                   state: PlayerState(
                     playback: PlaybackSlice(

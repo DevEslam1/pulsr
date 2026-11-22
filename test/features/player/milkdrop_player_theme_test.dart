@@ -9,7 +9,9 @@ import 'package:pulsr/domain/models/milkdrop_preset.dart';
 import 'package:pulsr/features/player/cubit/player_cubit.dart';
 import 'package:pulsr/features/player/cubit/player_state.dart';
 import 'package:pulsr/features/player/presentation/themes/milkdrop_player_theme.dart';
+import 'package:pulsr/features/player/presentation/themes/player_surface_shell.dart';
 import 'package:pulsr/features/player/presentation/themes/player_theme.dart';
+import 'package:pulsr/features/player/presentation/themes/player_tools_sheet.dart';
 import 'package:pulsr/features/player/presentation/themes/theme_registry.dart';
 import 'package:pulsr/features/player/presentation/widgets/audio_visualizer.dart';
 import 'package:pulsr/features/player/presentation/widgets/visualizer/milkdrop_renderer.dart';
@@ -97,7 +99,7 @@ void main() {
   }
 
   group('MilkdropPlayerTheme Tests', () {
-    testWidgets('renders full-screen Milkdrop visualizer behind artwork',
+    testWidgets('renders full-screen MilkdropRenderer canvas with preset switcher and glass capsule',
         (tester) async {
       tester.view.physicalSize = const Size(390, 844);
       tester.view.devicePixelRatio = 1.0;
@@ -106,19 +108,23 @@ void main() {
       await tester.pumpWidget(createHost());
       await tester.pump();
 
+      expect(tester.takeException(), isNull);
       expect(find.byType(MilkdropPlayerTheme), findsOneWidget);
+      expect(find.byType(PlayerSurfaceShell), findsOneWidget);
+      expect(find.byType(MilkdropRenderer), findsOneWidget);
+      expect(find.byType(PlayerToolsTriggerButton), findsOneWidget);
 
-      final visualizerFinder = find.byType(AudioVisualizer);
-      expect(visualizerFinder, findsOneWidget);
-
-      final visualizerWidget = tester.widget<AudioVisualizer>(visualizerFinder);
-      expect(visualizerWidget.style, equals(VisualizerStyle.milkdrop));
-      expect(visualizerWidget.color, equals(Colors.white));
-      expect(visualizerWidget.transparentBackground, isTrue);
-
-      expect(
-          find.byKey(const ValueKey('artwork_view_milkdrop')), findsOneWidget);
-      expect(find.text('MILKDROP'), findsOneWidget);
+      // Preset switcher shows active Milkdrop preset and cycles on tap
+      final firstPreset = MilkdropPresetLibrary.presets.first.name;
+      expect(find.text(firstPreset), findsOneWidget);
+      if (MilkdropPresetLibrary.presets.length > 1) {
+        await tester.tap(find.text(firstPreset));
+        await tester.pump();
+        expect(
+          find.text(MilkdropPresetLibrary.presets[1].name),
+          findsOneWidget,
+        );
+      }
     });
 
     testWidgets('renders properly in landscape mode across screen',
@@ -132,8 +138,9 @@ void main() {
       );
       await tester.pump();
 
+      expect(tester.takeException(), isNull);
       expect(find.byType(MilkdropPlayerTheme), findsOneWidget);
-      expect(find.byType(AudioVisualizer), findsOneWidget);
+      expect(find.byType(MilkdropRenderer), findsOneWidget);
     });
 
     testWidgets('respects a disabled visualizer setting', (tester) async {

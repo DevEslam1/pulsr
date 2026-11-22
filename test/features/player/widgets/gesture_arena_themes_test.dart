@@ -39,7 +39,6 @@ void main() {
   const platterThemes = <PlayerThemeMode>{
     PlayerThemeMode.vinyl,
     PlayerThemeMode.cd,
-    PlayerThemeMode.circle,
     PlayerThemeMode.waveform,
   };
   // Cassette's center acrylic well owns horizontal scrub (see cassette_body.dart),
@@ -50,7 +49,7 @@ void main() {
     PlayerThemeMode.cassette,
   };
 
-  group('Gesture arena across all 11 player themes', () {
+  group('Gesture arena across all 8 player themes', () {
     for (final mode in PlayerThemeMode.values) {
       testWidgets(
         '${mode.name}: vertical dismiss vs platter pan vs horizontal swipe never double-fires',

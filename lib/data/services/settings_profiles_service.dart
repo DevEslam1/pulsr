@@ -4,6 +4,7 @@ import 'package:injectable/injectable.dart';
 import 'package:mutex/mutex.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/utils/error_logger.dart';
+import '../../features/settings/cubit/settings_state.dart';
 
 enum ProfileType { home, car, gym, sleep, custom }
 
@@ -40,7 +41,7 @@ class SettingsProfile {
     this.crossfadeEnabled = false,
     this.crossfadeSeconds = 0.0,
     this.bitPerfectEnabled = false,
-    this.playerTheme = 'classic',
+    this.playerTheme = 'clean',
     this.saturationEnabled,
     this.stereoWidthEnabled,
     this.loudnessContourEnabled,
@@ -86,7 +87,8 @@ class SettingsProfile {
         crossfadeEnabled: json['crossfadeEnabled'] as bool? ?? false,
         crossfadeSeconds: (json['crossfadeSeconds'] as num?)?.toDouble() ?? 0.0,
         bitPerfectEnabled: json['bitPerfectEnabled'] as bool? ?? false,
-        playerTheme: json['playerTheme'] as String? ?? 'classic',
+        playerTheme:
+            PlayerThemeMode.fromName(json['playerTheme'] as String?).name,
         saturationEnabled: json['saturationEnabled'] as bool?,
         stereoWidthEnabled: json['stereoWidthEnabled'] as bool?,
         loudnessContourEnabled: json['loudnessContourEnabled'] as bool?,
@@ -204,7 +206,7 @@ class SettingsProfile {
       volumeBoost: 0.3,
       crossfadeEnabled: true,
       crossfadeSeconds: 4.0,
-      playerTheme: 'minimal',
+      playerTheme: 'waveform',
     ),
     SettingsProfile(
       id: 'profile_gym',
@@ -223,7 +225,7 @@ class SettingsProfile {
       eqPresetName: 'Vocal Boost',
       crossfadeEnabled: true,
       crossfadeSeconds: 8.0,
-      playerTheme: 'minimal',
+      playerTheme: 'waveform',
     ),
   ];
 }

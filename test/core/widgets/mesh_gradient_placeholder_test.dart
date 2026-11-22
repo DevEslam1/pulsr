@@ -112,5 +112,60 @@ void main() {
       expect(find.byType(MeshGradientPlaceholder), findsOneWidget);
       expect(find.text('CN'), findsOneWidget);
     });
+
+    testWidgets(
+        'renders card-size frosted editorial medallion for Arabic and Latin titles',
+        (tester) async {
+      await tester.pumpWidget(_wrap(
+        const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            MeshGradientPlaceholder(
+              size: 138,
+              borderRadius: 18,
+              title: 'محمد رمضان',
+              artist: 'حبيبي انا',
+            ),
+            MeshGradientPlaceholder(
+              size: 138,
+              borderRadius: 18,
+              title: 'pulsr-playback-smoke',
+              artist: 'Unknown',
+            ),
+          ],
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(MeshGradientPlaceholder), findsNWidgets(2));
+      expect(find.text('مر'), findsOneWidget);
+      expect(find.text('PU'), findsOneWidget);
+      expect(find.byType(BackdropFilter), findsNWidgets(2));
+    });
+
+    testWidgets('skips BackdropFilter under high contrast accessibility mode',
+        (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AuraTheme.darkTheme,
+          home: const MediaQuery(
+            data: MediaQueryData(highContrast: true),
+            child: Scaffold(
+              body: Center(
+                child: MeshGradientPlaceholder(
+                  size: 138,
+                  borderRadius: 18,
+                  title: 'Pulsr Smoke',
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('PS'), findsOneWidget);
+      expect(find.byType(BackdropFilter), findsNothing);
+    });
   });
 }

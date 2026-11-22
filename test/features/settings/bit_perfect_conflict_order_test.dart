@@ -10,6 +10,9 @@ import 'package:pulsr/features/settings/presentation/widgets/bit_perfect_conflic
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+import 'package:pulsr/core/services/ambient_sound_service.dart';
+
+class _MockAmbientSoundService extends Mock implements AmbientSoundService {}
 class _MockSettingsCubit extends Mock implements SettingsCubit {}
 
 class _MockPlayerCubit extends Mock implements PlayerCubit {}
@@ -213,5 +216,53 @@ void main() {
     // The multiband compressor is only reachable through the master switch, so
     // it has to run whenever anything effect-like is still active.
     expect(disabled, contains('masterEffects'));
+  });
+
+  testWidgets(
+      'AmbientSoundService is included in conflicts and disabled on confirm',
+      (tester) async {
+    final mockAmbient = _MockAmbientSoundService();
+    when(() => mockAmbient.isEnabled).thenReturn(true);
+    when(() => mockAmbient.setEnabled(false)).thenAnswer((_) async {});
+    AmbientSoundService.testInstance = mockAmbient;
+    addTearDown(() => AmbientSoundService.testInstance = null);
+
+    var bitPerfectState = false;
+    final cubit = _MockSettingsCubit();
+    when(() => cubit.state).thenAnswer((_) => SettingsState(bitPerfectOutput: bitPerfectState));
+    when(() => cubit.stream).thenAnswer((_) => const Stream.empty());
+    when(() => cubit.setBitPerfectOutput(any())).thenAnswer((invocation) async {
+      bitPerfectState = invocation.positionalArguments.first as bool;
+    });
+
+    await tester.pumpWidget(
+      BlocProvider<SettingsCubit>.value(
+        value: cubit,
+        child: MaterialApp(
+          localizationsDelegates: appLocalizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Builder(
+            builder: (context) => Scaffold(
+              body: Center(
+                child: ElevatedButton(
+                  onPressed: () => requestBitPerfectOutput(context, true),
+                  child: const Text('go'),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('go'));
+    await tester.pumpAndSettle();
+    expect(find.byType(FilledButton), findsOneWidget);
+    expect(find.text('Ambient Sounds'), findsOneWidget);
+
+    await tester.tap(find.byType(FilledButton));
+    await tester.pumpAndSettle();
+
+    verify(() => mockAmbient.setEnabled(false)).called(1);
   });
 }

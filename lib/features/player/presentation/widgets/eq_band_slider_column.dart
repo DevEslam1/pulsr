@@ -336,6 +336,8 @@ class _VerticalEqSliderState extends State<_VerticalEqSlider> {
     final p = context.palette;
     final surfacePalette = context.playerSurfacePalette;
     final animate = PulsrMotion.shouldAnimate(context);
+    final isTabletLandscape = Adaptive.isTabletLandscape(context);
+    final sliderHeight = isTabletLandscape ? 200.0 : 140.0;
     final gain = (_isDragging && _dragGain != null ? _dragGain! : widget.value)
         .clamp(_VerticalEqSlider.min, _VerticalEqSlider.max);
 
@@ -383,13 +385,13 @@ class _VerticalEqSliderState extends State<_VerticalEqSlider> {
 
         // Vertical Slider Track (>= 48dp wide hit target)
         ConstrainedBox(
-          constraints: const BoxConstraints(
+          constraints: BoxConstraints(
             minWidth: AppSpacing.minTouchTarget,
-            minHeight: 140,
-            maxHeight: 140,
+            minHeight: sliderHeight,
+            maxHeight: sliderHeight,
           ),
           child: SizedBox(
-            height: 140,
+            height: sliderHeight,
             width: double.infinity,
             child: LayoutBuilder(
               builder: (context, constraints) {

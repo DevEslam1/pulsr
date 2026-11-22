@@ -1684,30 +1684,6 @@ abstract class AppLocalizations {
   /// **'Now Playing Style'**
   String get playerTheme;
 
-  /// No description provided for @playerThemeClassic.
-  ///
-  /// In en, this message translates to:
-  /// **'Classic Deck'**
-  String get playerThemeClassic;
-
-  /// No description provided for @playerThemeCard.
-  ///
-  /// In en, this message translates to:
-  /// **'Floating Card'**
-  String get playerThemeCard;
-
-  /// No description provided for @playerThemeCircle.
-  ///
-  /// In en, this message translates to:
-  /// **'Vinyl Circle'**
-  String get playerThemeCircle;
-
-  /// No description provided for @playerThemeMinimal.
-  ///
-  /// In en, this message translates to:
-  /// **'Pure Minimal'**
-  String get playerThemeMinimal;
-
   /// No description provided for @visualizerStyle.
   ///
   /// In en, this message translates to:
@@ -10655,18 +10631,6 @@ abstract class AppLocalizations {
   /// **'Full-bleed background artwork with frosted glass controls'**
   String get settingsThemeCardGlassDesc;
 
-  /// No description provided for @settingsThemeClassicStandard.
-  ///
-  /// In en, this message translates to:
-  /// **'Classic Standard'**
-  String get settingsThemeClassicStandard;
-
-  /// No description provided for @settingsThemeClassicStandardDesc.
-  ///
-  /// In en, this message translates to:
-  /// **'Traditional high-definition layout with ambient glow'**
-  String get settingsThemeClassicStandardDesc;
-
   /// No description provided for @settingsThemeFullBleed.
   ///
   /// In en, this message translates to:
@@ -10691,18 +10655,6 @@ abstract class AppLocalizations {
   /// **'Magnified synchronized lyrics-first karaoke player interface'**
   String get settingsThemeKaraokeDesc;
 
-  /// No description provided for @settingsThemeMinimalist.
-  ///
-  /// In en, this message translates to:
-  /// **'Minimalist Waveform'**
-  String get settingsThemeMinimalist;
-
-  /// No description provided for @settingsThemeMinimalistDesc.
-  ///
-  /// In en, this message translates to:
-  /// **'Spacious studio focus on dynamic audio waveform visualizer'**
-  String get settingsThemeMinimalistDesc;
-
   /// No description provided for @settingsThemeRetroCassette.
   ///
   /// In en, this message translates to:
@@ -10714,18 +10666,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Vintage cassette tape with spinning spools & magnetic tape counter'**
   String get settingsThemeRetroCassetteDesc;
-
-  /// No description provided for @settingsThemeVinylCircle.
-  ///
-  /// In en, this message translates to:
-  /// **'Vinyl Circle (Spinning)'**
-  String get settingsThemeVinylCircle;
-
-  /// No description provided for @settingsThemeVinylCircleDesc.
-  ///
-  /// In en, this message translates to:
-  /// **'Centered circular artwork with continuous spinning animation'**
-  String get settingsThemeVinylCircleDesc;
 
   /// No description provided for @settingsThemeCdTurntable.
   ///

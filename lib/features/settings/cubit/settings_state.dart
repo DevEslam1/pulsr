@@ -24,17 +24,54 @@ enum VisualDensityMode { comfortable, calm }
 enum ThemeColorSource { system, artwork, custom }
 
 enum PlayerThemeMode {
-  classic,
+  clean,
   card,
-  circle,
-  minimal,
   vinyl,
+  cd,
   cassette,
   waveform,
   lyricsFocus,
-  cd,
-  clean,
-  milkdrop,
+  milkdrop;
+
+  /// Parses a persisted or imported theme identifier into a valid
+  /// [PlayerThemeMode].
+  ///
+  /// Gracefully migrates legacy removed themes (`classic` -> `clean`,
+  /// `circle` -> `vinyl`, `minimal` -> `waveform`), handles optional
+  /// `'PlayerThemeMode.'` prefixes and case/whitespace variations, and falls
+  /// back to [PlayerThemeMode.clean] for null, empty, or unknown values.
+  static PlayerThemeMode fromName(String? raw) {
+    if (raw == null) return PlayerThemeMode.clean;
+    var normalized = raw.trim();
+    if (normalized.isEmpty) return PlayerThemeMode.clean;
+    final dotIndex = normalized.lastIndexOf('.');
+    if (dotIndex >= 0 && dotIndex < normalized.length - 1) {
+      normalized = normalized.substring(dotIndex + 1).trim();
+    }
+    switch (normalized.toLowerCase()) {
+      case 'classic':
+      case 'clean':
+        return PlayerThemeMode.clean;
+      case 'card':
+        return PlayerThemeMode.card;
+      case 'circle':
+      case 'vinyl':
+        return PlayerThemeMode.vinyl;
+      case 'cd':
+        return PlayerThemeMode.cd;
+      case 'cassette':
+        return PlayerThemeMode.cassette;
+      case 'minimal':
+      case 'waveform':
+        return PlayerThemeMode.waveform;
+      case 'lyricsfocus':
+        return PlayerThemeMode.lyricsFocus;
+      case 'milkdrop':
+        return PlayerThemeMode.milkdrop;
+      default:
+        return PlayerThemeMode.clean;
+    }
+  }
 }
 
 enum PlayerSliderStyle { normal, wavy, capsule, minimal }
@@ -111,10 +148,10 @@ abstract class SettingsState with _$SettingsState {
     @Default('system') String languageCode,
     @Default(0xFF9B9EF5) int customAccentColorValue,
     // Custom Theme Studio shape controls. Applied to the now-playing chrome
-    // bars and the classic player card so the builder has a real effect.
+    // bars and theme surfaces so the builder has a real effect.
     @Default(24.0) double customThemeRadius,
     @Default(true) bool customThemeGlow,
-    @Default(PlayerThemeMode.classic) PlayerThemeMode playerThemeMode,
+    @Default(PlayerThemeMode.clean) PlayerThemeMode playerThemeMode,
     @Default(PlayerSliderStyle.capsule) PlayerSliderStyle playerSliderStyle,
     @Default(AppButtonStyle.rectangular) AppButtonStyle appButtonStyle,
     @Default(VisualizerStyle.off) VisualizerStyle visualizerStyle,

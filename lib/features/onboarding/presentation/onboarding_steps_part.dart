@@ -24,9 +24,9 @@ extension _OnboardingStepsPart on _OnboardingScreenState {
 
     final themes = <({PlayerThemeMode mode, String title, IconData icon})>[
       (
-        mode: PlayerThemeMode.classic,
-        title: l10n.settingsThemeClassicStandard,
-        icon: Icons.crop_square_rounded,
+        mode: PlayerThemeMode.clean,
+        title: l10n.settingsThemeClean,
+        icon: Icons.crop_portrait_rounded,
       ),
       (
         mode: PlayerThemeMode.card,

@@ -36,7 +36,7 @@ void main() {
 
   setUpAll(() {
     registerFallbackValue(ExperienceMode.normal);
-    registerFallbackValue(PlayerThemeMode.classic);
+    registerFallbackValue(PlayerThemeMode.clean);
   });
 
   setUp(() {

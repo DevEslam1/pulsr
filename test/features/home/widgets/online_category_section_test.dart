@@ -7,6 +7,7 @@ import 'package:flutter_localizations/flutter_localizations.dart'
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/theme/aura_theme.dart';
+import 'package:pulsr/core/widgets/pulsr_scroll_edge_fade.dart';
 import 'package:pulsr/data/db/app_database.dart';
 import 'package:pulsr/domain/models/ytm_track.dart';
 import 'package:pulsr/features/home/presentation/widgets/online_category_section.dart';
@@ -118,6 +119,10 @@ void main() {
       expect(find.text('TRENDING NOW'), findsOneWidget);
       expect(find.text('Track One'), findsWidgets);
       expect(find.byType(TrendingCard), findsNWidgets(3));
+      final fade = tester.widget<PulsrScrollEdgeFade>(
+        find.byType(PulsrScrollEdgeFade),
+      );
+      expect(fade.extent, 40);
       verify(() => playerCubit.warmStreams(any(), count: 2)).called(1);
     });
 

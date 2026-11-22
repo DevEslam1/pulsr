@@ -27,7 +27,7 @@ void main() {
   late _MockSettingsCubit settingsCubit;
 
   setUpAll(() {
-    registerFallbackValue(PlayerThemeMode.classic);
+    registerFallbackValue(PlayerThemeMode.clean);
   });
 
   setUp(() {
@@ -60,7 +60,7 @@ void main() {
         when(() => settingsCubit.state).thenReturn(
           SettingsState(
             themeMode: entry.value.mode,
-            playerThemeMode: PlayerThemeMode.classic,
+            playerThemeMode: PlayerThemeMode.clean,
             reduceMotion: true,
           ),
         );
@@ -104,7 +104,7 @@ void main() {
                       onPressed: () => showThemePickerSheet(
                         context,
                         settingsCubit,
-                        PlayerThemeMode.classic,
+                        PlayerThemeMode.clean,
                       ),
                       child: const Text('open'),
                     ),

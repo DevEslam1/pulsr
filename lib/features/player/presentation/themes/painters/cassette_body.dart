@@ -1,5 +1,134 @@
 part of '../cassette_player_theme.dart';
 
+/// Full-screen anodized brushed-aluminum Walkman chassis painter with machined
+/// horizontal panel seams, brushed grain, corner screws, and subtle ambient glow.
+/// Strictly zero raw hex literals and zero `Colors.*` references.
+class _AnodizedDeckChassisPainter extends CustomPainter {
+  final Color topColor;
+  final Color midColor;
+  final Color bottomColor;
+  final Color seamHighlight;
+  final Color seamShadow;
+  final Color screwColor;
+  final Color glowColor;
+
+  _AnodizedDeckChassisPainter({
+    required this.topColor,
+    required this.midColor,
+    required this.bottomColor,
+    required this.seamHighlight,
+    required this.seamShadow,
+    required this.screwColor,
+    required this.glowColor,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+
+    // 1. Anodized metal base gradient
+    final basePaint = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [topColor, midColor, bottomColor],
+        stops: const [0.0, 0.52, 1.0],
+      ).createShader(rect);
+    canvas.drawRect(rect, basePaint);
+
+    // 2. Subtle radial glow behind cassette bay
+    final bayCenter = Offset(size.width * 0.5, size.height * 0.32);
+    final haloRadius = math.max(size.width, size.height) * 0.55;
+    final haloPaint = Paint()
+      ..shader = RadialGradient(
+        colors: [glowColor, glowColor.withValues(alpha: 0.0)],
+      ).createShader(Rect.fromCircle(center: bayCenter, radius: haloRadius));
+    canvas.drawRect(rect, haloPaint);
+
+    // 3. Fine horizontal brushed anodized aluminum texture
+    final isGpuSaver = GpuBudget.isGpuSaverActive;
+    final step = isGpuSaver ? 14.0 : 6.0;
+    final grainPaint = Paint()
+      ..color = seamHighlight
+      ..strokeWidth = 0.7;
+    for (double y = 0; y < size.height; y += step) {
+      if ((y ~/ step).isEven) {
+        canvas.drawLine(Offset(0, y), Offset(size.width, y), grainPaint);
+      }
+    }
+
+    // 4. Machined chassis panel seam grooves (separating bay / meter / keybank)
+    final seamShadowPaint = Paint()
+      ..color = seamShadow
+      ..strokeWidth = 1.2;
+    final seamLightPaint = Paint()
+      ..color = seamHighlight
+      ..strokeWidth = 1.0;
+
+    for (final ratio in const [0.54, 0.78]) {
+      final y = size.height * ratio;
+      canvas.drawLine(Offset(14, y), Offset(size.width - 14, y), seamShadowPaint);
+      canvas.drawLine(
+        Offset(14, y + 1.2),
+        Offset(size.width - 14, y + 1.2),
+        seamLightPaint,
+      );
+    }
+
+    // 5. Outer chassis inset bezel hairline
+    final bezelRect = RRect.fromRectAndRadius(
+      rect.deflate(6),
+      const Radius.circular(AppRadii.r16),
+    );
+    canvas.drawRRect(
+      bezelRect,
+      Paint()
+        ..color = seamHighlight
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.0,
+    );
+
+    // 6. Machined corner chassis screws
+    const double margin = 16.0;
+    final corners = [
+      const Offset(margin, margin),
+      Offset(size.width - margin, margin),
+      Offset(margin, size.height - margin),
+      Offset(size.width - margin, size.height - margin),
+    ];
+    final screwFill = Paint()
+      ..color = screwColor.withValues(alpha: 0.75)
+      ..style = PaintingStyle.fill;
+    final screwRim = Paint()
+      ..color = seamShadow
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0;
+    final screwSlot = Paint()
+      ..color = seamShadow
+      ..strokeWidth = 1.1;
+
+    for (final c in corners) {
+      canvas.drawCircle(c, 3.6, screwFill);
+      canvas.drawCircle(c, 3.6, screwRim);
+      canvas.drawLine(
+        Offset(c.dx - 2.2, c.dy - 1.2),
+        Offset(c.dx + 2.2, c.dy + 1.2),
+        screwSlot,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _AnodizedDeckChassisPainter oldDelegate) =>
+      oldDelegate.topColor != topColor ||
+      oldDelegate.midColor != midColor ||
+      oldDelegate.bottomColor != bottomColor ||
+      oldDelegate.seamHighlight != seamHighlight ||
+      oldDelegate.seamShadow != seamShadow ||
+      oldDelegate.screwColor != screwColor ||
+      oldDelegate.glowColor != glowColor;
+}
+
 /// Ultra-detailed skeuomorphic cassette shell with dynamic magnetic tape transfer,
 /// 3-digit mechanical rolling counter, stereo VU level meters, and acrylic glass sheen.
 class _CassetteBody extends StatefulWidget {
@@ -66,9 +195,6 @@ class _CassetteBodyState extends State<_CassetteBody> {
       _scrubBaseMs = baseMs;
       _scrubTargetMs = baseMs;
       _scrubTravelPx = 0.0;
-      // Detents are counted from the drag origin, so the first click lands
-      // after 5 s of scrub in either direction rather than on an arbitrary
-      // multiple of five seconds in the track's timeline.
       _detentIndex = 0;
     });
   }
@@ -131,110 +257,96 @@ class _CassetteBodyState extends State<_CassetteBody> {
     final progress = durationMs > 0
         ? (state.position.inMilliseconds / durationMs).clamp(0.0, 1.0)
         : 0.0;
-    // While the finger is down the tape packs and the mechanical counter must
-    // show where the seek will land, not where playback currently is.
     final displayProgress = _isScrubbing && durationMs > 0
         ? (_scrubTargetMs! / durationMs).clamp(0.0, 1.0)
         : progress;
 
-    // The shell is decorative: it prints no information that is not already
-    // in the chrome (PlayerTrackHeader announces title, artist and transport
-    // state), so the fixed 450x296 artwork box may legitimately ignore text
-    // scaling. The scrub pill is transient feedback mirrored by the slider
-    // node below, not a reading surface.
     return MediaQuery.withNoTextScaling(
       child: Center(
         child: ConstrainedBox(
           constraints: BoxConstraints(
-            maxHeight: widget.isLandscape ? 270 : (widget.isTablet ? 380 : 310),
-            maxWidth: widget.isLandscape ? 410 : (widget.isTablet ? 560 : 450),
+            maxHeight: widget.isLandscape ? 260 : (widget.isTablet ? 360 : 285),
+            maxWidth: widget.isLandscape ? 400 : (widget.isTablet ? 540 : 440),
           ),
           child: AspectRatio(
             aspectRatio: 1.52,
-            child: FittedBox(
-              fit: BoxFit.contain,
-              child: SizedBox(
-                width: 450,
-                height: 450 / 1.52,
-                child: Container(
-                  padding: const EdgeInsets.all(AppSpacing.sm),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        surface.cassetteShell,
-                        PlayerMaterialColors.cassetteBodyMid,
-                        surface.tapeWindow,
+            child: PlayerGestureScope(
+              behavior: HitTestBehavior.deferToChild,
+              child: FittedBox(
+                fit: BoxFit.contain,
+                child: SizedBox(
+                  width: 450,
+                  height: 450 / 1.52,
+                  child: Container(
+                    padding: const EdgeInsets.all(AppSpacing.sm),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          surface.cassetteShell,
+                          PlayerMaterialColors.cassetteBodyMid,
+                          surface.tapeWindow,
+                        ],
+                      ),
+                      borderRadius: AppRadii.r20All,
+                      border: Border.all(
+                        color: PlayerMaterialColors.cassetteBodyBorder,
+                        width: 3.5,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: surface.shadowAt(0.6),
+                          blurRadius: 24,
+                          offset: const Offset(0, 10),
+                        ),
+                        BoxShadow(
+                          color: widget.activeColor.withValues(alpha: 0.08),
+                          blurRadius: 30,
+                          spreadRadius: -2,
+                        ),
                       ],
                     ),
-                    borderRadius: AppRadii.r20All,
-                    border: Border.all(
-                      color: PlayerMaterialColors.cassetteBodyBorder,
-                      width: 3.5,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: surface.shadowAt(0.6),
-                        blurRadius: 30,
-                        offset: const Offset(0, 14),
-                      ),
-                      BoxShadow(
-                        color: widget.activeColor.withValues(alpha: 0.08),
-                        blurRadius: 36,
-                        spreadRadius: -2,
-                      ),
-                    ],
-                  ),
-                  child: Stack(
-                    children: [
-                      // 1. Four Corner Screws
-                      const PositionedDirectional(
-                          top: 4, start: 4, child: _CassetteScrew()),
-                      const PositionedDirectional(
-                          top: 4, end: 4, child: _CassetteScrew()),
-                      const PositionedDirectional(
-                          bottom: 4, start: 4, child: _CassetteScrew()),
-                      const PositionedDirectional(
-                          bottom: 4, end: 4, child: _CassetteScrew()),
+                    child: Stack(
+                      children: [
+                        // 1. Four Corner Screws
+                        const PositionedDirectional(
+                            top: 4, start: 4, child: _CassetteScrew()),
+                        const PositionedDirectional(
+                            top: 4, end: 4, child: _CassetteScrew()),
+                        const PositionedDirectional(
+                            bottom: 4, start: 4, child: _CassetteScrew()),
+                        const PositionedDirectional(
+                            bottom: 4, end: 4, child: _CassetteScrew()),
 
-                      // 2. Main Cassette Body Layout
-                      Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.s8,
-                          vertical: AppSpacing.xxs,
-                        ),
-                        child: Column(
-                          children: [
-                            // Cassette Label Header with Stereo VU Meters.
-                            // Label print is decorative: the deck's semantics
-                            // node already announces the track and its state.
-                            ExcludeSemantics(
-                              child:
-                                  _buildCassetteHeader(context, state.isPlaying),
-                            ),
-
-                            const SizedBox(height: AppSpacing.s8),
-
-                            // Center Acrylic Window with Tape Pack and Reels
-                            Expanded(
-                              child: _buildScrubSurface(
-                                progress: displayProgress,
-                                isPlaying: state.isPlaying,
+                        // 2. Main Cassette Body Layout
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.s8,
+                            vertical: AppSpacing.xxs,
+                          ),
+                          child: Column(
+                            children: [
+                              ExcludeSemantics(
+                                child: _buildCassetteHeader(
+                                    context, state.isPlaying),
                               ),
-                            ),
-
-                            const SizedBox(height: AppSpacing.s8),
-
-                            // Bottom Label & Mechanical Head Notch (decorative
-                            // print - excluded from semantics, see above).
-                            ExcludeSemantics(
-                              child: _buildBottomSection(context, song),
-                            ),
-                          ],
+                              const SizedBox(height: AppSpacing.s8),
+                              Expanded(
+                                child: _buildScrubSurface(
+                                  progress: displayProgress,
+                                  isPlaying: state.isPlaying,
+                                ),
+                              ),
+                              const SizedBox(height: AppSpacing.s8),
+                              ExcludeSemantics(
+                                child: _buildBottomSection(context, song),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -289,7 +401,7 @@ class _CassetteBodyState extends State<_CassetteBody> {
                       fontSize: AppFontSize.tiny,
                       fontWeight: FontWeight.w700,
                       color: surface.mutedInk,
-                      letterSpacing: 0.8,
+                      letterSpacing: AppTracking.overline,
                     ),
                   ),
                 ],
@@ -325,7 +437,7 @@ class _CassetteBodyState extends State<_CassetteBody> {
                       fontSize: AppFontSize.tiny,
                       fontWeight: FontWeight.w700,
                       color: surface.mutedInk,
-                      letterSpacing: 0.8,
+                      letterSpacing: AppTracking.overline,
                     ),
                   ),
                 ],
@@ -338,12 +450,6 @@ class _CassetteBodyState extends State<_CassetteBody> {
   }
 
   /// Horizontal scrub surface over the acrylic well.
-  ///
-  /// The shell used to be dead decoration: progress only moved tape-pack radii
-  /// and a three-digit counter, so there was no way to seek from the stage.
-  /// The well is the one wide, flat surface on the cassette, which makes it the
-  /// natural scrub strip. It competes with the stage's next/previous swipe only
-  /// for horizontal pointers, and the inner recognizer wins that arena.
   Widget _buildScrubSurface({
     required double progress,
     required bool isPlaying,
@@ -364,9 +470,6 @@ class _CassetteBodyState extends State<_CassetteBody> {
       builder: (context, constraints) {
         final wellWidth = constraints.maxWidth;
         return Semantics(
-          // Keeps the tape well its own node. Without the boundary the shell's
-          // "Now playing …" description merges into the slider, and the reader
-          // announces a seek bar whose label is the whole deck.
           container: true,
           slider: true,
           label: context.l10n.seekLabel,
@@ -375,8 +478,6 @@ class _CassetteBodyState extends State<_CassetteBody> {
           decreasedValue: seekLabel(clampSeek(const Duration(seconds: -10))),
           onIncrease: () => _seekBy(const Duration(seconds: 10)),
           onDecrease: () => _seekBy(const Duration(seconds: -10)),
-          // The well's painted internals (counter digits, ruler ticks) are
-          // decoration; this is the only node assistive tech should reach.
           excludeSemantics: true,
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
@@ -401,13 +502,9 @@ class _CassetteBodyState extends State<_CassetteBody> {
     );
   }
 
-  /// Delta read-out while scrubbing, reusing the rounded dark pill with an
-  /// active-colour rim that the vinyl and CD platters show, so all the
-  /// skeuomorphic themes speak the same scrub language.
+  /// Delta read-out while scrubbing.
   Widget _buildScrubDeltaPill(BuildContext context) {
     final surface = context.playerSurfacePalette;
-    // Rounded to tenths first so a backwards drag reads "-12.3s" and never
-    // "-0.0s" when the finger barely moves.
     final deltaTenths = ((_scrubTargetMs! - _scrubBaseMs) / 100).round();
     final deltaText = (deltaTenths / 10).toStringAsFixed(1);
     final label = deltaTenths > 0 ? '+${deltaText}s' : '${deltaText}s';
@@ -451,9 +548,6 @@ class _CassetteBodyState extends State<_CassetteBody> {
     bool isPlaying,
   ) {
     final surface = context.playerSurfacePalette;
-    // Tape pack radius calculation (Tape transfers smoothly from Left to Right)
-    // Left spool starts full (r=42) and drains to empty hub (r=26)
-    // Right spool starts empty hub (r=26) and fills to full (r=42)
     const double minR = 26.0;
     const double maxR = 43.0;
     final leftTapeRadius =
@@ -514,8 +608,9 @@ class _CassetteBodyState extends State<_CassetteBody> {
                   top: Radius.circular(8),
                 ),
                 border: Border.all(
-                    color: PlayerMaterialColors.cassetteBridgeBorder,
-                    width: 1.5),
+                  color: PlayerMaterialColors.cassetteBridgeBorder,
+                  width: 1.5,
+                ),
               ),
               child: Center(
                 child: Container(
@@ -536,14 +631,11 @@ class _CassetteBodyState extends State<_CassetteBody> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // Left Spool Pack (Draining)
                 _buildReelPack(
                   surface: surface,
                   tapeRadius: leftTapeRadius,
                   isLeft: true,
                 ),
-
-                // Center Ruler Markings on Acrylic
                 Column(
                   mainAxisSize: MainAxisSize.min,
                   children: List.generate(
@@ -558,8 +650,6 @@ class _CassetteBodyState extends State<_CassetteBody> {
                     ),
                   ),
                 ),
-
-                // Right Spool Pack (Accumulating)
                 _buildReelPack(
                   surface: surface,
                   tapeRadius: rightTapeRadius,
@@ -612,7 +702,7 @@ class _CassetteBodyState extends State<_CassetteBody> {
             ),
           ),
 
-          // Rotating White Spool Hub with Teeth (Isolated in outer + inner RepaintBoundary)
+          // Rotating White Spool Hub with Teeth
           RepaintBoundary(
             child: RotationTransition(
               turns: widget.spoolController,
@@ -624,7 +714,9 @@ class _CassetteBodyState extends State<_CassetteBody> {
                     shape: BoxShape.circle,
                     color: PlayerMaterialColors.cassetteReelHub,
                     border: Border.all(
-                        color: PlayerMaterialColors.cassetteReelRim, width: 3),
+                      color: PlayerMaterialColors.cassetteReelRim,
+                      width: 3,
+                    ),
                     boxShadow: [
                       BoxShadow(
                         color: surface.shadowAt(0.45),
@@ -655,13 +747,6 @@ class _CassetteBodyState extends State<_CassetteBody> {
   }
 
   /// Bottom section: printed label and trapezoidal deck housing notch.
-  ///
-  /// The title/artist line is the sticker a listener would have written on the
-  /// shell, so it stays purely cosmetic: the call site wraps this whole section
-  /// in [ExcludeSemantics] and PlayerTrackHeader already announces the same
-  /// track. That is also why the live song text is allowed to sit inside the
-  /// shell's no-text-scaling MediaQuery - nothing here is the only copy of a
-  /// piece of information.
   Widget _buildBottomSection(BuildContext context, SongsTableData? song) {
     final surface = context.playerSurfacePalette;
     return Container(
@@ -674,7 +759,9 @@ class _CassetteBodyState extends State<_CassetteBody> {
         color: surface.cassetteShell,
         borderRadius: AppRadii.r8All,
         border: Border.all(
-            color: PlayerMaterialColors.cassetteCapstanBorder, width: 1),
+          color: PlayerMaterialColors.cassetteCapstanBorder,
+          width: 1,
+        ),
       ),
       child: Row(
         children: [
@@ -691,7 +778,7 @@ class _CassetteBodyState extends State<_CassetteBody> {
                     fontSize: AppFontSize.label,
                     fontWeight: FontWeight.w700,
                     color: surface.highContrastInk,
-                    letterSpacing: 0.2,
+                    letterSpacing: AppTracking.label,
                   ),
                 ),
                 Text(
@@ -702,7 +789,7 @@ class _CassetteBodyState extends State<_CassetteBody> {
                     fontSize: AppFontSize.caption,
                     fontWeight: FontWeight.w600,
                     color: surface.mutedInk,
-                    letterSpacing: 0.5,
+                    letterSpacing: AppTracking.medium,
                   ),
                 ),
               ],
@@ -722,7 +809,7 @@ class _CassetteBodyState extends State<_CassetteBody> {
                   fontSize: AppFontSize.tiny,
                   fontWeight: FontWeight.w800,
                   color: surface.mutedInk,
-                  letterSpacing: 0.6,
+                  letterSpacing: AppTracking.medium,
                 ),
               ),
             ),
@@ -744,7 +831,6 @@ class _CassetteTapeCounter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final surface = context.playerSurfacePalette;
-    // AUDIT-FIX: Map progress to full 3-digit counter range 0..999
     final count = (progress * 999).clamp(0, 999).toInt();
     final digits = count.toString().padLeft(3, '0');
 
@@ -754,7 +840,9 @@ class _CassetteTapeCounter extends StatelessWidget {
         color: surface.vinylGroove,
         borderRadius: AppRadii.r4All,
         border: Border.all(
-            color: PlayerMaterialColors.cassetteHeadBorder, width: 1.2),
+          color: PlayerMaterialColors.cassetteHeadBorder,
+          width: 1.2,
+        ),
         boxShadow: [
           BoxShadow(
             color: surface.shadowAt(0.87),
@@ -847,6 +935,11 @@ class _CassetteStereoVuMeterState extends State<_CassetteStereoVuMeter>
     );
   }
 
+  bool _allowMotion(BuildContext context) =>
+      !PlayerThemePreviewScope.of(context) &&
+      PulsrMotion.shouldAnimate(context) &&
+      context.motionEnabled;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -854,7 +947,8 @@ class _CassetteStereoVuMeterState extends State<_CassetteStereoVuMeter>
   }
 
   void _syncVu() {
-    final shouldSpin = widget.isPlaying && context.motionEnabled;
+    final allowMotion = _allowMotion(context);
+    final shouldSpin = widget.isPlaying && allowMotion;
     if (shouldSpin) {
       if (!_vuController.isAnimating) {
         _vuController.repeat(reverse: true);
@@ -863,7 +957,7 @@ class _CassetteStereoVuMeterState extends State<_CassetteStereoVuMeter>
       if (_vuController.isAnimating) {
         _vuController.stop();
       }
-      if (!context.motionEnabled) {
+      if (!allowMotion) {
         _vuController.value = 0.0;
       } else if (_vuController.value > 0.0) {
         _vuController.animateTo(0.0, duration: context.motionMs(260));
@@ -905,30 +999,36 @@ class _CassetteStereoVuMeterState extends State<_CassetteStereoVuMeter>
 
   @override
   Widget build(BuildContext context) {
+    final allowMotion = _allowMotion(context);
     return AnimatedBuilder(
       animation: _vuController,
       builder: (context, _) {
-        final val = _vuController.value;
-        final theta = val * 2 * math.pi;
+        final double leftLevel;
+        final double rightLevel;
+        if (!widget.isPlaying) {
+          leftLevel = 0.08;
+          rightLevel = 0.08;
+        } else if (!allowMotion) {
+          leftLevel = 0.58;
+          rightLevel = 0.48;
+          _leftPeak = 0.72;
+          _rightPeak = 0.64;
+        } else {
+          final val = _vuController.value;
+          final theta = val * 2 * math.pi;
 
-        // Common rhythmic beat foundation (L and R pulse together)
-        final beatBase =
-            math.sin(theta).abs() * 0.45 + (math.sin(theta * 2.0).abs() * 0.22);
+          final beatBase = math.sin(theta).abs() * 0.45 +
+              (math.sin(theta * 2.0).abs() * 0.22);
 
-        // Independent harmonic stereo components at prime ratios
-        final leftHarmonic = math.sin(theta * 3.0 + 0.4).abs() * 0.18 +
-            math.cos(theta * 7.0).abs() * 0.08;
-        final rightHarmonic = math.cos(theta * 5.0 - 0.5).abs() * 0.18 +
-            math.sin(theta * 11.0).abs() * 0.08;
+          final leftHarmonic = math.sin(theta * 3.0 + 0.4).abs() * 0.18 +
+              math.cos(theta * 7.0).abs() * 0.08;
+          final rightHarmonic = math.cos(theta * 5.0 - 0.5).abs() * 0.18 +
+              math.sin(theta * 11.0).abs() * 0.08;
 
-        final leftLevel = widget.isPlaying
-            ? (0.16 + beatBase + leftHarmonic).clamp(0.08, 0.98)
-            : 0.08;
-        final rightLevel = widget.isPlaying
-            ? (0.16 + beatBase + rightHarmonic).clamp(0.08, 0.98)
-            : 0.08;
-
-        _updatePeaks(leftLevel, rightLevel);
+          leftLevel = (0.16 + beatBase + leftHarmonic).clamp(0.08, 0.98);
+          rightLevel = (0.16 + beatBase + rightHarmonic).clamp(0.08, 0.98);
+          _updatePeaks(leftLevel, rightLevel);
+        }
 
         return Column(
           mainAxisSize: MainAxisSize.min,
@@ -1152,28 +1252,22 @@ class _MagneticTapePathPainter extends CustomPainter {
     final w = size.width;
     final h = size.height;
 
-    // Spool centers (matching Row padding 28 + spool radius 45)
     final leftCenter = Offset(73.0, h / 2);
     final rightCenter = Offset(w - 73.0, h / 2);
 
-    // Guide roller centers near lower corners
     final leftRoller = Offset(44.0, h - 22.0);
     final rightRoller = Offset(w - 44.0, h - 22.0);
     const rollerRadius = 5.5;
 
-    // Outer tangent start on left tape pack
     final leftTangent = Offset(
       leftCenter.dx - leftTapeRadius * 0.96,
       leftCenter.dy + leftTapeRadius * 0.28,
     );
-
-    // Outer tangent end on right tape pack
     final rightTangent = Offset(
       rightCenter.dx + rightTapeRadius * 0.96,
       rightCenter.dy + rightTapeRadius * 0.28,
     );
 
-    // --- 1. Guide Rollers (Metallic Bushings & Pins) ---
     final rollerBushingPaint = Paint()
       ..color = PlayerMaterialColors.cassettePinchGold
       ..style = PaintingStyle.fill;
@@ -1193,39 +1287,32 @@ class _MagneticTapePathPainter extends CustomPainter {
       canvas.drawCircle(roller, 2.0, rollerAxlePaint);
     }
 
-    // --- 2. Magnetic Tape Ribbon Path ---
     final tapePath = Path();
     tapePath.moveTo(leftTangent.dx, leftTangent.dy);
-    // Line down to left guide roller outer edge
     tapePath.lineTo(leftRoller.dx - rollerRadius + 1.0, leftRoller.dy);
-    // Wrap around bottom of left roller
     tapePath.quadraticBezierTo(
       leftRoller.dx,
       leftRoller.dy + rollerRadius,
       leftRoller.dx + rollerRadius + 4.0,
       leftRoller.dy + rollerRadius - 1.0,
     );
-    // Straight across the bottom read-head aperture notch
     tapePath.lineTo(
       rightRoller.dx - rollerRadius - 4.0,
       rightRoller.dy + rollerRadius - 1.0,
     );
-    // Wrap around bottom of right roller
     tapePath.quadraticBezierTo(
       rightRoller.dx,
       rightRoller.dy + rollerRadius,
       rightRoller.dx + rollerRadius - 1.0,
       rightRoller.dy,
     );
-    // Angled up to right tape pack outer tangent
     tapePath.lineTo(rightTangent.dx, rightTangent.dy);
 
-    // Ferric oxide dark magnetic tape body
     final tapePaint = Paint()
-      ..shader = LinearGradient(
+      ..shader = const LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
-        colors: const [
+        colors: [
           PlayerMaterialColors.cassetteRibbonStart,
           PlayerMaterialColors.cassetteRibbonMid,
           PlayerMaterialColors.cassetteRibbonEnd,
@@ -1236,7 +1323,6 @@ class _MagneticTapePathPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
 
-    // Specular sheen highlight along the tape edge
     final sheenPaint = Paint()
       ..color = surface.specularAt(0.18)
       ..style = PaintingStyle.stroke

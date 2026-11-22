@@ -8,8 +8,10 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
 import 'package:pulsr/core/services/ytm_account_service.dart';
 import 'package:pulsr/core/services/ytm_service.dart';
+import 'package:pulsr/core/theme/aura_theme.dart';
 import 'package:pulsr/data/db/app_database.dart';
 import 'package:pulsr/domain/usecases/get_songs_usecase.dart';
 import 'package:pulsr/features/home/presentation/home_screen.dart';
@@ -260,5 +262,49 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Playback stops when screen is off?'), findsOneWidget);
+  });
+
+  testWidgets('Favorites and Focus Flow quick tiles use distinct accent colors',
+      (tester) async {
+    await pumpScreen(tester);
+
+    final tiles = tester.widgetList<QuickTile>(find.byType(QuickTile)).toList();
+    expect(tiles, hasLength(2));
+    expect(tiles[0].color, isNot(equals(tiles[1].color)));
+  });
+
+  testWidgets(
+      'top ambient glow renders on Dark theme and is disabled on pure-black AMOLED',
+      (tester) async {
+    await pumpScreen(tester);
+    expect(find.byKey(const ValueKey('home_ambient_top_glow')), findsOneWidget);
+
+    final amoledTheme = AuraTheme.customTheme(
+      AppColors.primary,
+      brightness: Brightness.dark,
+      isAmoled: true,
+    );
+    useScreenSize(tester, const Size(900, 1800));
+    await tester.pumpWidget(
+      screenHarness(
+        size: const Size(900, 1800),
+        providers: [
+          BlocProvider<PlayerCubit>.value(value: player),
+          BlocProvider<LibraryCubit>.value(value: libraryCubit),
+          BlocProvider<SettingsCubit>.value(value: settingsCubit),
+        ],
+        child: Theme(
+          data: amoledTheme,
+          child: HomeScreen(
+            ytmService: ytm,
+            ytmAccountService: account,
+            getSongsUseCase: getSongs,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('home_ambient_top_glow')), findsNothing);
   });
 }

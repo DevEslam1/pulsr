@@ -1,9 +1,7 @@
 part of '../clean_player_theme.dart';
 
-/// Left-aligned title/artist block plus the frosted action circles.
-///
-/// Extracted so the layout composition in [CleanPlayerTheme] reads as structure
-/// rather than text styling — the hardcoded whites hid here, not in the layout.
+/// Left-aligned bold track title & artist block with frosted Favorite & More
+/// action buttons (and Download when streaming a remote track).
 class _CleanTrackHeader extends StatelessWidget {
   final PlayerThemeProps props;
   final PlayerThemeMetrics metrics;
@@ -23,6 +21,18 @@ class _CleanTrackHeader extends StatelessWidget {
     final cubit = props.cubit;
     final activeColor = props.activeColor;
     final deck = _CleanDeckColors.of(context);
+    final isFavorite = song?.isFavorite == true;
+
+    final double titleFontSize = metrics.isTablet
+        ? AppFontSize.headline
+        : (metrics.isVeryShortHeight
+            ? AppFontSize.title
+            : AppFontSize.titleLarge);
+    final double artistFontSize = metrics.isTablet
+        ? AppFontSize.bodyLarge
+        : (metrics.isVeryShortHeight
+            ? AppFontSize.bodySmall
+            : AppFontSize.callout);
 
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
@@ -39,82 +49,62 @@ class _CleanTrackHeader extends StatelessWidget {
                   textAlign: TextAlign.start,
                   style: TextStyle(
                     color: deck.primary,
-                    fontSize:
-                        (metrics.titleFontSize + 2.0).clamp(16.0, 24.0),
+                    fontSize: titleFontSize,
                     fontWeight: FontWeight.w700,
-                    letterSpacing: -0.4,
+                    letterSpacing: AppTracking.heading,
+                    height: 1.18,
                   ),
                 ),
-                const SizedBox(height: 3),
+                const SizedBox(height: AppSpacing.s2),
                 Text(
                   song?.artist ?? context.l10n.unknownArtist,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: deck.secondary,
-                    fontSize:
-                        (metrics.artistFontSize + 1.0).clamp(12.0, 16.5),
+                    fontSize: artistFontSize,
                     fontWeight: FontWeight.w500,
-                    letterSpacing: -0.1,
+                    letterSpacing: AppTracking.title,
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(width: 10),
-          // Action buttons on right: Download / Add to Playlist, Star (Favorite)
-          // & More (...)
-          if (song != null) ...[
-            if (hasDownload)
-              _CleanActionCircleButton(
-                tooltip: context.l10n.downloadLabel,
-                child: YtmDownloadButton(
-                  song: song,
-                  activeColor: activeColor,
-                  iconColor: deck.primary,
-                  iconSize: 19,
-                ),
-              )
-            else
-              _CleanActionCircleButton(
-                icon: Icons.playlist_add_rounded,
+          const SizedBox(width: AppSpacing.xs),
+          if (hasDownload && song != null)
+            _CleanActionCircleButton(
+              tooltip: context.l10n.downloadLabel,
+              child: YtmDownloadButton(
+                song: song,
+                activeColor: activeColor,
                 iconColor: deck.primary,
-                tooltip: context.l10n.addToPlaylist,
-                onTap: () {
-                  PulsrHaptics.lightImpact();
-                  AddToPlaylistSheet.show(context, song: song);
-                },
+                iconSize: 19,
               ),
-            const SizedBox(width: 8),
-          ],
+            ),
           _CleanActionCircleButton(
-            icon: (song?.isFavorite == true)
-                ? Icons.star_rounded
-                : Icons.star_outline_rounded,
-            iconColor: (song?.isFavorite == true)
-                ? AppColors.amberDeep
-                : deck.primary,
-            tooltip: (song?.isFavorite == true)
-                ? context.l10n.unlike
-                : context.l10n.like,
-            onTap: () {
-              if (song != null) {
-                PulsrHaptics.selection();
-                cubit.toggleFavorite(song.id);
-              }
-            },
+            icon: isFavorite
+                ? Icons.favorite_rounded
+                : Icons.favorite_border_rounded,
+            iconColor: isFavorite ? AppColors.favorite : deck.primary,
+            isToggled: isFavorite,
+            tooltip: isFavorite ? context.l10n.unlike : context.l10n.like,
+            onTap: song == null
+                ? null
+                : () {
+                    PulsrHaptics.selection();
+                    cubit.toggleFavorite(song.id);
+                  },
           ),
-          const SizedBox(width: 8),
           _CleanActionCircleButton(
             icon: Icons.more_horiz_rounded,
             iconColor: deck.primary,
             tooltip: context.l10n.moreOptions,
-            onTap: () {
-              if (song != null) {
-                PulsrHaptics.lightImpact();
-                SongOptionsSheet.show(context, song: song);
-              }
-            },
+            onTap: song == null
+                ? null
+                : () {
+                    PulsrHaptics.lightImpact();
+                    SongOptionsSheet.show(context, song: song);
+                  },
           ),
         ],
       ),
@@ -122,17 +112,12 @@ class _CleanTrackHeader extends StatelessWidget {
   }
 }
 
-/// Circular frosted translucent button matching the reference photo (Star and
-/// More ...).
-///
-/// The visible circle stays 36 dp so the header keeps its Apple-tight rhythm,
-/// but the tap target is padded out to [AppSpacing.minTouchTarget] (48 dp): a
-/// 36 dp `InkWell` misses the Android accessibility minimum, and these circles
-/// sit in the hardest-to-reach strip of the screen.
+/// Accessible >= 48dp frosted circular action button with 36dp visual disc.
 class _CleanActionCircleButton extends StatelessWidget {
   final IconData? icon;
   final Widget? child;
   final Color? iconColor;
+  final bool isToggled;
   final String tooltip;
   final VoidCallback? onTap;
 
@@ -140,6 +125,7 @@ class _CleanActionCircleButton extends StatelessWidget {
     this.icon,
     this.child,
     this.iconColor,
+    this.isToggled = false,
     required this.tooltip,
     this.onTap,
   });
@@ -147,27 +133,38 @@ class _CleanActionCircleButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final deck = _CleanDeckColors.of(context);
-    return Material(
-      color: Colors.transparent,
-      child: Tooltip(
-        message: tooltip,
-        child: InkWell(
-          onTap: onTap,
-          customBorder: const CircleBorder(),
-          child: SizedBox(
-            width: AppSpacing.minTouchTarget,
-            height: AppSpacing.minTouchTarget,
-            child: Center(
-              child: Ink(
-                width: _cleanActionCircleSize,
-                height: _cleanActionCircleSize,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: deck.frostedFill,
-                ),
-                child: Center(
-                  child: child ??
-                      Icon(icon, size: 20, color: iconColor ?? deck.primary),
+    return Semantics(
+      button: true,
+      toggled: isToggled,
+      enabled: onTap != null || child != null,
+      label: tooltip,
+      excludeSemantics: child == null,
+      child: Material(
+        color: Colors.transparent,
+        child: Tooltip(
+          message: tooltip,
+          child: InkWell(
+            onTap: onTap,
+            customBorder: const CircleBorder(),
+            child: SizedBox(
+              width: AppSpacing.minTouchTarget,
+              height: AppSpacing.minTouchTarget,
+              child: Center(
+                child: Ink(
+                  width: _cleanActionCircleSize,
+                  height: _cleanActionCircleSize,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: deck.frostedFill,
+                    border: Border.all(
+                      color: deck.frostedBorder,
+                      width: 0.8,
+                    ),
+                  ),
+                  child: Center(
+                    child: child ??
+                        Icon(icon, size: 20, color: iconColor ?? deck.primary),
+                  ),
                 ),
               ),
             ),

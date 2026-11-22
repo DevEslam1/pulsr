@@ -1,5 +1,214 @@
 part of '../vinyl_player_theme.dart';
 
+/// Full-screen warm brushed-aluminum / dark walnut analog hi-fi backdrop painter.
+/// Strictly zero raw hex literals and zero `Colors.*` references.
+class _VinylBrushedChassisPainter extends CustomPainter {
+  final Color topColor;
+  final Color midColor;
+  final Color bottomColor;
+  final Color grainLight;
+  final Color grainDark;
+  final Color amberGlow;
+
+  _VinylBrushedChassisPainter({
+    required this.topColor,
+    required this.midColor,
+    required this.bottomColor,
+    required this.grainLight,
+    required this.grainDark,
+    required this.amberGlow,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+
+    // 1. Base vertical brushed-chassis gradient
+    final bgPaint = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [topColor, midColor, bottomColor],
+        stops: const [0.0, 0.48, 1.0],
+      ).createShader(rect);
+    canvas.drawRect(rect, bgPaint);
+
+    // 2. Warm analog studio lamp radial halo behind the turntable stage
+    final glowCenter = Offset(size.width * 0.5, size.height * 0.34);
+    final glowRadius = math.max(size.width, size.height) * 0.58;
+    final haloPaint = Paint()
+      ..shader = RadialGradient(
+        colors: [
+          amberGlow,
+          amberGlow.withValues(alpha: 0.0),
+        ],
+        stops: const [0.0, 1.0],
+      ).createShader(Rect.fromCircle(center: glowCenter, radius: glowRadius));
+    canvas.drawRect(rect, haloPaint);
+
+    // 3. Subtle horizontal brushed-metal / walnut grain striations
+    final isGpuSaver = GpuBudget.isGpuSaverActive;
+    final stepY = isGpuSaver ? 14.0 : 6.0;
+    final lightLinePaint = Paint()
+      ..color = grainLight
+      ..strokeWidth = 0.8;
+    final darkLinePaint = Paint()
+      ..color = grainDark
+      ..strokeWidth = 0.7;
+
+    int idx = 0;
+    for (double y = 0; y < size.height; y += stepY) {
+      final isLight = idx.isEven;
+      final wave = (math.sin(idx * 0.73) * 0.5 + 0.5);
+      final paint = isLight ? lightLinePaint : darkLinePaint;
+      if (wave > 0.32) {
+        canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
+      }
+      idx++;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _VinylBrushedChassisPainter oldDelegate) =>
+      oldDelegate.topColor != topColor ||
+      oldDelegate.midColor != midColor ||
+      oldDelegate.bottomColor != bottomColor ||
+      oldDelegate.grainLight != grainLight ||
+      oldDelegate.grainDark != grainDark ||
+      oldDelegate.amberGlow != amberGlow;
+}
+
+/// Subtle brushed-surface sheen & machined corner rivets for the turntable plinth.
+class _PlinthBrushedOverlayPainter extends CustomPainter {
+  final Color highlight;
+  final Color brassCorner;
+
+  _PlinthBrushedOverlayPainter({
+    required this.highlight,
+    required this.brassCorner,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final sheenPaint = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          highlight,
+          highlight.withValues(alpha: 0.0),
+          highlight.withValues(alpha: 0.55),
+          highlight.withValues(alpha: 0.0),
+        ],
+        stops: const [0.0, 0.38, 0.68, 1.0],
+      ).createShader(Offset.zero & size);
+    canvas.drawRect(Offset.zero & size, sheenPaint);
+
+    // Four machined brass corner rivets
+    const inset = 10.0;
+    final rivets = [
+      const Offset(inset, inset),
+      Offset(size.width - inset, inset),
+      Offset(inset, size.height - inset),
+      Offset(size.width - inset, size.height - inset),
+    ];
+    final rivetPaint = Paint()
+      ..color = brassCorner
+      ..style = PaintingStyle.fill;
+    for (final r in rivets) {
+      canvas.drawCircle(r, 2.0, rivetPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _PlinthBrushedOverlayPainter oldDelegate) =>
+      oldDelegate.highlight != highlight ||
+      oldDelegate.brassCorner != brassCorner;
+}
+
+/// Precision analog calibration tick marks under the warm progress slider.
+class _AnalogCalibrationTicksPainter extends CustomPainter {
+  final Color tickColor;
+  final Color accentColor;
+  final double progress;
+
+  _AnalogCalibrationTicksPainter({
+    required this.tickColor,
+    required this.accentColor,
+    required this.progress,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const int tickCount = 13;
+    final activeIndex = (progress * (tickCount - 1)).round();
+    for (int i = 0; i < tickCount; i++) {
+      final x = (i / (tickCount - 1)) * size.width;
+      final isMajor = i % 4 == 0;
+      final h = isMajor ? size.height : size.height * 0.55;
+      final yTop = (size.height - h) / 2;
+      final paint = Paint()
+        ..color = i <= activeIndex ? accentColor : tickColor
+        ..strokeWidth = isMajor ? 1.3 : 0.9
+        ..strokeCap = StrokeCap.round;
+      canvas.drawLine(Offset(x, yTop), Offset(x, yTop + h), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _AnalogCalibrationTicksPainter oldDelegate) =>
+      oldDelegate.tickColor != tickColor ||
+      oldDelegate.accentColor != accentColor ||
+      oldDelegate.progress != progress;
+}
+
+/// Knurled perimeter notch markings painted inside the rotary Play/Pause dial.
+class _RotaryDialKnurlPainter extends CustomPainter {
+  final Color notchColor;
+  final Color indicatorColor;
+
+  _RotaryDialKnurlPainter({
+    required this.notchColor,
+    required this.indicatorColor,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final outerR = (size.width / 2) - 2.2;
+    final innerR = outerR - 3.2;
+    final notchPaint = Paint()
+      ..color = notchColor
+      ..strokeWidth = 1.1
+      ..strokeCap = StrokeCap.round;
+
+    const int notches = 24;
+    for (int i = 0; i < notches; i++) {
+      final angle = (i * 2 * math.pi) / notches;
+      final p1 = Offset(
+        center.dx + innerR * math.cos(angle),
+        center.dy + innerR * math.sin(angle),
+      );
+      final p2 = Offset(
+        center.dx + outerR * math.cos(angle),
+        center.dy + outerR * math.sin(angle),
+      );
+      canvas.drawLine(p1, p2, notchPaint);
+    }
+
+    // Top 12-o'clock engraved index pip
+    final pipPaint = Paint()
+      ..color = indicatorColor
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(Offset(center.dx, center.dy - outerR + 1.4), 1.6, pipPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _RotaryDialKnurlPainter oldDelegate) =>
+      oldDelegate.notchColor != notchColor ||
+      oldDelegate.indicatorColor != indicatorColor;
+}
+
 class _VinylGroovesPainter extends CustomPainter {
   final Color activeColor;
   final PlayerSurfacePalette surface;
@@ -60,9 +269,9 @@ class _VinylGroovesPainter extends CustomPainter {
     canvas.drawCircle(center, labelRadius + 5, deadWaxPaint);
     canvas.drawCircle(center, labelRadius + 9, deadWaxPaint);
 
-    // Subtle accent halo ring right around the label perimeter
+    // Subtle warm accent halo ring right around the label perimeter
     final labelHaloPaint = Paint()
-      ..color = activeColor.withValues(alpha: 0.22)
+      ..color = activeColor.withValues(alpha: 0.28)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.2;
     canvas.drawCircle(center, labelRadius + 2, labelHaloPaint);
@@ -137,7 +346,7 @@ class _PlatterStrobePainter extends CustomPainter {
   final PlayerSurfacePalette surface;
 
   _PlatterStrobePainter({
-    this.activeColor = PlayerMaterialColors.cartridgeAccentRed,
+    this.activeColor = AppColors.amberDeep,
     this.isPlaying = true,
     required this.surface,
   });
@@ -281,8 +490,8 @@ class _TonearmPainter extends CustomPainter {
 
   void _drawGimbalBase(Canvas canvas) {
     final basePaint = Paint()
-      ..shader = RadialGradient(
-        colors: const [
+      ..shader = const RadialGradient(
+        colors: [
           PlayerMaterialColors.gimbalHighlight,
           PlayerMaterialColors.gimbalMid,
           PlayerMaterialColors.gimbalShadow,
@@ -310,7 +519,7 @@ class _TonearmPainter extends CustomPainter {
       ..shader = const LinearGradient(
         colors: [
           PlayerMaterialColors.counterweightStemLight,
-          PlayerMaterialColors.counterweightStemDark
+          PlayerMaterialColors.counterweightStemDark,
         ],
       ).createShader(const Rect.fromLTWH(-2.5, -34, 5, 34))
       ..style = PaintingStyle.fill;
@@ -322,7 +531,7 @@ class _TonearmPainter extends CustomPainter {
       stemPaint,
     );
 
-    final weightRect = const Rect.fromLTWH(-10, -28, 20, 16);
+    const weightRect = Rect.fromLTWH(-10, -28, 20, 16);
     final weightPaint = Paint()
       ..shader = const LinearGradient(
         begin: Alignment.centerLeft,
@@ -340,7 +549,7 @@ class _TonearmPainter extends CustomPainter {
       weightPaint,
     );
 
-    final calibRect = const Rect.fromLTWH(-10, -18, 20, 4);
+    const calibRect = Rect.fromLTWH(-10, -18, 20, 4);
     final calibPaint = Paint()..color = PlayerMaterialColors.calibrationStrip;
     canvas.drawRect(calibRect, calibPaint);
 
@@ -420,7 +629,7 @@ class _TonearmPainter extends CustomPainter {
         end: Alignment.bottomRight,
         colors: [
           PlayerMaterialColors.headshellHighlight,
-          PlayerMaterialColors.headshellShadow
+          PlayerMaterialColors.headshellShadow,
         ],
       ).createShader(
           Rect.fromLTWH(headshellEnd.dx - 6, headshellStart.dy, 12, 22));
@@ -432,6 +641,19 @@ class _TonearmPainter extends CustomPainter {
     );
     final stylusHousingPaint = Paint()..color = activeColor;
     canvas.drawRRect(stylusHousingRect, stylusHousingPaint);
+
+    // Subtle warm stylus contact glow when tonearm is dropped onto groove
+    if (liftProgress > 0.8) {
+      final glowAlpha = ((liftProgress - 0.8) / 0.2).clamp(0.0, 1.0) * 0.45;
+      final stylusGlowPaint = Paint()
+        ..color = activeColor.withValues(alpha: glowAlpha)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4.0);
+      canvas.drawCircle(
+        Offset(headshellEnd.dx, headshellEnd.dy + 11),
+        4.0,
+        stylusGlowPaint,
+      );
+    }
 
     final needlePaint = Paint()
       ..color = surface.highContrastInk

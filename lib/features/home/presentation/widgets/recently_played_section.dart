@@ -12,12 +12,14 @@ import '../../../../core/utils/adaptive.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/utils/track_display_info.dart';
 import '../../../../core/widgets/cached_artwork.dart';
+import '../../../../core/widgets/pulsr_scroll_edge_fade.dart';
 import '../../../../core/widgets/pulsr_section_header.dart';
 import '../../../../core/widgets/shimmer_skeleton.dart';
 import '../../../../core/widgets/staggered_reveal.dart';
 import '../../../../data/db/app_database.dart';
 import '../../../../domain/usecases/get_songs_usecase.dart';
 import '../../../player/cubit/player_cubit.dart';
+import '../../../player/cubit/player_state.dart';
 import 'home_card_metrics.dart';
 import 'section_error.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
@@ -153,30 +155,40 @@ class _RecentlyPlayedSectionState extends State<RecentlyPlayedSection> {
           PulsrSectionHeader(title: context.l10n.recentlyPlayed),
           SizedBox(
             height: scaledCarouselHeight(context, widget.isTablet),
-            child: SkeletonShimmer(
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                physics: const NeverScrollableScrollPhysics(),
-                padding: EdgeInsets.symmetric(
-                    horizontal: Adaptive.pagePadding(context)),
-                children: [
-                  for (var i = 0; i < 3; i++)
-                    Padding(
-                      padding:
-                          const EdgeInsetsDirectional.only(end: AppSpacing.s14),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          SkeletonBox(
-                              width: size, height: size, radius: AppRadii.r18),
-                          const SizedBox(height: AppSpacing.xs),
-                          SkeletonLine(width: size * 0.8, height: 12),
-                          const SizedBox(height: AppSpacing.s2),
-                          SkeletonLine(width: size * 0.5, height: 10),
-                        ],
+            child: PulsrScrollEdgeFade(
+              extent: 40,
+              child: SkeletonShimmer(
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  physics: const NeverScrollableScrollPhysics(),
+                  padding: EdgeInsetsDirectional.fromSTEB(
+                    Adaptive.pagePadding(context),
+                    AppSpacing.s2,
+                    Adaptive.pagePadding(context),
+                    0,
+                  ),
+                  children: [
+                    for (var i = 0; i < 3; i++)
+                      Padding(
+                        padding: const EdgeInsetsDirectional.only(
+                            end: AppSpacing.s14),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SkeletonBox(
+                              width: size,
+                              height: size,
+                              radius: AppRadii.r18,
+                            ),
+                            const SizedBox(height: AppSpacing.xs),
+                            SkeletonLine(width: size * 0.78, height: 13),
+                            const SizedBox(height: AppSpacing.s4),
+                            SkeletonLine(width: size * 0.50, height: 11),
+                          ],
+                        ),
                       ),
-                    ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -245,133 +257,165 @@ class _RecentlyPlayedSectionState extends State<RecentlyPlayedSection> {
                 actionLabel: context.l10n.browseSeeAll,
                 onAction: () => context.push('/recents'),
               ),
-              SizedBox(
-                height: scaledCarouselHeight(context, widget.isTablet),
-                child: ListView.builder(
-                  controller: _scrollController,
-                  scrollDirection: Axis.horizontal,
-                  physics: const BouncingScrollPhysics(),
-                  addAutomaticKeepAlives: false,
-                  addRepaintBoundaries: true,
-                  padding: EdgeInsets.symmetric(
-                      horizontal: Adaptive.pagePadding(context)),
-                  itemCount: totalItemCount,
-                  itemBuilder: (context, index) {
-                    if (index >= songs.length) {
-                      return Padding(
-                        padding: const EdgeInsetsDirectional.only(
-                            end: AppSpacing.s14),
-                        child: SkeletonShimmer(
-                          child: SizedBox(
-                            width: size,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                SkeletonBox(
-                                  width: size,
-                                  height: size,
-                                  radius: AppRadii.r18,
-                                ),
-                                const SizedBox(height: AppSpacing.xs),
-                                SkeletonLine(width: size * 0.75, height: 12),
-                                const SizedBox(height: AppSpacing.s2),
-                                SkeletonLine(width: size * 0.5, height: 10),
-                              ],
-                            ),
-                          ),
+              BlocSelector<PlayerCubit, PlayerState,
+                  ({int? songId, bool isPlaying})>(
+                selector: (state) => (
+                  songId: state.currentSong?.id,
+                  isPlaying: state.isPlaying,
+                ),
+                builder: (context, playback) {
+                  return SizedBox(
+                    height: scaledCarouselHeight(context, widget.isTablet),
+                    child: PulsrScrollEdgeFade(
+                      extent: 40,
+                      child: ListView.builder(
+                        controller: _scrollController,
+                        scrollDirection: Axis.horizontal,
+                        physics: const BouncingScrollPhysics(),
+                        addAutomaticKeepAlives: false,
+                        addRepaintBoundaries: true,
+                        padding: EdgeInsetsDirectional.fromSTEB(
+                          Adaptive.pagePadding(context),
+                          AppSpacing.s2,
+                          Adaptive.pagePadding(context),
+                          0,
                         ),
-                      );
-                    }
-
-                    final song = songs[index];
-                    final displayInfo = TrackDisplayInfo.resolve(
-                      rawTitle: song.title,
-                      rawArtist: song.artist,
-                    );
-                    return StaggeredReveal(
-                      index: index,
-                      horizontal: true,
-                      groupKey: songs.isEmpty ? '' : '${songs.first.id}',
-                      child: Padding(
-                        padding: const EdgeInsetsDirectional.only(
-                            end: AppSpacing.s14),
-                        child: InkWell(
-                          borderRadius: AppRadii.r20All,
-                          onTap: () => _playFromSection(
-                            playerCubit,
-                            song,
-                            songs,
-                          ),
-                          child: SizedBox(
-                            width: size,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Stack(
-                                  children: [
-                                    CachedArtwork(
-                                      id: song.id,
-                                      remoteUrl: song.remoteArtworkUrl ??
-                                          song.artworkUri,
-                                      albumId: song.albumId,
-                                      type: ArtworkType.AUDIO,
-                                      size: size,
-                                      borderRadius: AppRadii.r18,
-                                      title: displayInfo.title,
-                                      artist: displayInfo.artist,
-                                    ),
-                                    PositionedDirectional(
-                                      end: 8,
-                                      bottom: 8,
-                                      child: ExcludeSemantics(
-                                        child: Container(
-                                          width: 34,
-                                          height: 34,
-                                          decoration: BoxDecoration(
-                                            color: p.accent,
-                                            shape: BoxShape.circle,
-                                            boxShadow:
-                                                PulsrElevation.level1(context),
-                                          ),
-                                          child: Icon(Icons.play_arrow_rounded,
-                                              color: p.onAccent, size: 22),
-                                        ),
+                        itemCount: totalItemCount,
+                        itemBuilder: (context, index) {
+                          if (index >= songs.length) {
+                            return Padding(
+                              padding: const EdgeInsetsDirectional.only(
+                                  end: AppSpacing.s14),
+                              child: SkeletonShimmer(
+                                child: SizedBox(
+                                  width: size,
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      SkeletonBox(
+                                        width: size,
+                                        height: size,
+                                        radius: AppRadii.r18,
                                       ),
-                                    ),
-                                  ],
+                                      const SizedBox(height: AppSpacing.xs),
+                                      SkeletonLine(
+                                          width: size * 0.78, height: 13),
+                                      const SizedBox(height: AppSpacing.s4),
+                                      SkeletonLine(
+                                          width: size * 0.50, height: 11),
+                                    ],
+                                  ),
                                 ),
-                                const SizedBox(height: AppSpacing.xs),
-                                SizedBox(
-                                  height: scaledTitleBoxHeight(context),
-                                  child: Text(
-                                    displayInfo.title,
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      color: p.textPrimary,
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: AppFontSize.label,
-                                      height: 1.25,
+                              ),
+                            );
+                          }
+
+                          final song = songs[index];
+                          final displayInfo = TrackDisplayInfo.resolve(
+                            rawTitle: song.title,
+                            rawArtist: song.artist,
+                          );
+                          final isCurrent = playback.songId == song.id;
+                          return StaggeredReveal(
+                            index: index,
+                            horizontal: true,
+                            groupKey: songs.isEmpty ? '' : '${songs.first.id}',
+                            child: Padding(
+                              padding: const EdgeInsetsDirectional.only(
+                                  end: AppSpacing.s14),
+                              child: Semantics(
+                                button: true,
+                                label:
+                                    '${displayInfo.title}, ${displayInfo.artist}',
+                                hint: context.l10n.play,
+                                child: InkWell(
+                                  borderRadius: AppRadii.r20All,
+                                  onTap: () => _playFromSection(
+                                    playerCubit,
+                                    song,
+                                    songs,
+                                  ),
+                                  child: SizedBox(
+                                    width: size,
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Stack(
+                                          children: [
+                                            HomeCardArtworkFrame(
+                                              radius: AppRadii.r18,
+                                              child: CachedArtwork(
+                                                id: song.id,
+                                                remoteUrl:
+                                                    song.remoteArtworkUrl ??
+                                                        song.artworkUri,
+                                                albumId: song.albumId,
+                                                type: ArtworkType.AUDIO,
+                                                size: size,
+                                                borderRadius: AppRadii.r18,
+                                                title: displayInfo.title,
+                                                artist: displayInfo.artist,
+                                              ),
+                                            ),
+                                            PositionedDirectional(
+                                              end: AppSpacing.xs,
+                                              bottom: AppSpacing.xs,
+                                              child: HomeCardPlayBadge(
+                                                isCurrent: isCurrent,
+                                                isPlaying: playback.isPlaying,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: AppSpacing.xs),
+                                        SizedBox(
+                                          height: scaledTitleBoxHeight(context),
+                                          child: Align(
+                                            alignment:
+                                                AlignmentDirectional.centerStart,
+                                            child: Text(
+                                              displayInfo.title,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(
+                                                color: isCurrent
+                                                    ? p.accent
+                                                    : p.textPrimary,
+                                                fontWeight: FontWeight.w700,
+                                                fontSize: AppFontSize.bodySmall,
+                                                letterSpacing:
+                                                    AppTracking.title,
+                                                height: 1.25,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(height: AppSpacing.s2),
+                                        Text(
+                                          displayInfo.artist,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            color: p.textSecondary,
+                                            fontSize: AppFontSize.caption,
+                                            fontWeight: FontWeight.w500,
+                                            height: 1.25,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
                                 ),
-                                const SizedBox(height: AppSpacing.s2),
-                                Text(
-                                  displayInfo.artist,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                      color: p.textSecondary,
-                                      fontSize: AppFontSize.label),
-                                ),
-                              ],
+                              ),
                             ),
-                          ),
-                        ),
+                          );
+                        },
                       ),
-                    );
-                  },
-                ),
+                    ),
+                  );
+                },
               ),
             ],
           ),

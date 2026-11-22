@@ -163,7 +163,7 @@ void main() {
         'TabletPlayerBar renders matching Hero tag for active theme mode',
         (tester) async {
       for (final mode in [
-        PlayerThemeMode.classic,
+        PlayerThemeMode.clean,
         PlayerThemeMode.card,
         PlayerThemeMode.milkdrop
       ]) {

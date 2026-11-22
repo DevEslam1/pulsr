@@ -6,12 +6,9 @@ import 'package:pulsr/features/player/cubit/player_state.dart';
 import 'package:pulsr/features/player/presentation/themes/card_player_theme.dart';
 import 'package:pulsr/features/player/presentation/themes/cassette_player_theme.dart';
 import 'package:pulsr/features/player/presentation/themes/cd_player_theme.dart';
-import 'package:pulsr/features/player/presentation/themes/circle_player_theme.dart';
 import 'package:pulsr/features/player/presentation/themes/clean_player_theme.dart';
-import 'package:pulsr/features/player/presentation/themes/classic_player_theme.dart';
 import 'package:pulsr/features/player/presentation/themes/milkdrop_player_theme.dart';
 import 'package:pulsr/features/player/presentation/themes/lyrics_player_theme.dart';
-import 'package:pulsr/features/player/presentation/themes/minimal_player_theme.dart';
 import 'package:pulsr/features/player/presentation/themes/player_theme.dart';
 import 'package:pulsr/features/player/presentation/themes/theme_registry.dart';
 import 'package:pulsr/features/player/presentation/themes/vinyl_player_theme.dart';
@@ -41,20 +38,12 @@ void main() {
     test('All 8 PlayerThemeModes resolve to concrete theme widget instances',
         () {
       expect(
-        ThemeRegistry.build(PlayerThemeMode.classic, dummyProps),
-        isA<ClassicPlayerTheme>(),
+        ThemeRegistry.build(PlayerThemeMode.clean, dummyProps),
+        isA<CleanPlayerTheme>(),
       );
       expect(
         ThemeRegistry.build(PlayerThemeMode.card, dummyProps),
         isA<CardPlayerTheme>(),
-      );
-      expect(
-        ThemeRegistry.build(PlayerThemeMode.circle, dummyProps),
-        isA<CirclePlayerTheme>(),
-      );
-      expect(
-        ThemeRegistry.build(PlayerThemeMode.minimal, dummyProps),
-        isA<MinimalPlayerTheme>(),
       );
       expect(
         ThemeRegistry.build(PlayerThemeMode.vinyl, dummyProps),
@@ -77,10 +66,6 @@ void main() {
         isA<CdPlayerTheme>(),
       );
       expect(
-        ThemeRegistry.build(PlayerThemeMode.clean, dummyProps),
-        isA<CleanPlayerTheme>(),
-      );
-      expect(
         ThemeRegistry.build(PlayerThemeMode.milkdrop, dummyProps),
         isA<MilkdropPlayerTheme>(),
       );
@@ -92,27 +77,27 @@ void main() {
           .toList(growable: false);
       expect(tags.toSet(), hasLength(PlayerThemeMode.values.length));
 
-      final built = ThemeRegistry.build(PlayerThemeMode.minimal, dummyProps);
+      final built = ThemeRegistry.build(PlayerThemeMode.waveform, dummyProps);
       expect(
-        (built as MinimalPlayerTheme).props.heroTag,
-        nowPlayingArtHeroTag(PlayerThemeMode.minimal),
+        (built as WaveformPlayerTheme).props.heroTag,
+        nowPlayingArtHeroTag(PlayerThemeMode.waveform),
       );
     });
 
     test('ThemeRegistry allows registration of overrides and safe reset', () {
       ThemeRegistry.register(
-        PlayerThemeMode.classic,
-        (props) => const SizedBox(key: ValueKey('custom_classic')),
+        PlayerThemeMode.clean,
+        (props) => const SizedBox(key: ValueKey('custom_clean')),
       );
 
       final overridden =
-          ThemeRegistry.build(PlayerThemeMode.classic, dummyProps);
+          ThemeRegistry.build(PlayerThemeMode.clean, dummyProps);
       expect(overridden, isA<SizedBox>());
 
       ThemeRegistry.reset();
 
-      final restored = ThemeRegistry.build(PlayerThemeMode.classic, dummyProps);
-      expect(restored, isA<ClassicPlayerTheme>());
+      final restored = ThemeRegistry.build(PlayerThemeMode.clean, dummyProps);
+      expect(restored, isA<CleanPlayerTheme>());
     });
   });
 }

@@ -226,26 +226,47 @@ extension PlayerDspFollowRate on PlayerDspController {
         // are not involved on that path (resolved above alongside directOwned).
         final activeDevice =
             device?.availableDevices.where((d) => d.isCurrent).firstOrNull;
-        final deviceDepth =
-            activeDevice?.maxBitDepth ?? (device?.bitDepth ?? 0);
-        // An unread track depth is not a 16-bit track. Resolve it against the
-        // live direct stream and the route's advertised depth so a 24-bit file
-        // with missing metadata is never silently narrowed on the exclusive
-        // path.
-        final depth = resolveFollowBitDepth(
-          trackBitDepth: effectiveSourceBitDepth(
-              tagged: song.bitDepth ?? 0,
-              decoded: device?.decodedBitDepth ?? 0),
+        final dacSupportedDepths = usb.lastStatus.advertisedFormats
+            .map((f) =>
+                (f['bitResolution'] as num?)?.toInt() ??
+                (((f['subslotSize'] as num?)?.toInt() ?? 0) * 8))
+            .where((d) => d == 16 || d == 24 || d == 32)
+            .toSet();
+        final dacMaxDepth = dacSupportedDepths.isNotEmpty
+            ? dacSupportedDepths.fold<int>(0, (prev, elem) => elem > prev ? elem : prev)
+            : 0;
+        final deviceDepth = (directOwned && dacMaxDepth > 0)
+            ? dacMaxDepth
+            : (activeDevice?.maxBitDepth ?? (device?.bitDepth ?? 0));
+        final isKnownMp3 = AudioConflicts.isMp3(path: song.path, codec: song.codec);
+        final rawDepth = effectiveSourceBitDepth(
+            tagged: song.bitDepth ?? 0,
+            decoded: device?.decodedBitDepth ?? 0);
+        final effectiveSourceDepth = (rawDepth <= 0 && isKnownMp3) ? 16 : rawDepth;
+        var depth = resolveFollowBitDepth(
+          trackBitDepth: effectiveSourceDepth,
           streamingBitDepth:
               directStreaming ? usb.lastStatus.streamingBitDepth : 0,
           deviceBitDepth: deviceDepth,
         );
+        if (dacSupportedDepths.isNotEmpty && !dacSupportedDepths.contains(depth)) {
+          if (depth > 24 && dacSupportedDepths.contains(24)) {
+            depth = 24;
+          } else if (dacSupportedDepths.contains(16)) {
+            depth = 16;
+          }
+        }
         // The mode belongs in the dedup key: switching Bit-Perfect off and on
         // reopens the output, so the previous confirmation is no longer valid.
         final producerChannels =
             directOwned ? await usb.getProducerChannels() : 2;
         if (_isClosed()) return;
-        final trackChannels = producerChannels > 0 ? producerChannels : 2;
+        final dacSupportsMono = usb.lastStatus.advertisedFormats.any(
+          (f) => ((f['channels'] as num?)?.toInt() ?? 0) == 1,
+        );
+        final trackChannels = (producerChannels > 0 && (producerChannels != 1 || dacSupportsMono))
+            ? producerChannels
+            : 2;
         final route =
             '${activeDevice?.id}|${usb.lastStatus.deviceId}|${device?.activeDeviceType}'
             '|${settings.bitPerfectOutput}|${settings.strictBitPerfect}'

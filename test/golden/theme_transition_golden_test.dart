@@ -70,7 +70,7 @@ void main() {
       'Theme switching crossfades smoothly mid-transition with continuity',
       (tester) async {
     final modeNotifier =
-        ValueNotifier<PlayerThemeMode>(PlayerThemeMode.classic);
+        ValueNotifier<PlayerThemeMode>(PlayerThemeMode.clean);
 
     final props = PlayerThemeProps(
       state: mockPlayerCubit.state,
@@ -130,11 +130,11 @@ void main() {
     await tester.pumpWidget(buildTransitionHarness());
     await tester.pumpAndSettle();
 
-    // Verify initial theme (classic) rendered
+    // Verify initial theme (clean) rendered
     expect(
       find.byWidgetPredicate(
         (w) =>
-            w is Hero && w.tag == nowPlayingArtHeroTag(PlayerThemeMode.classic),
+            w is Hero && w.tag == nowPlayingArtHeroTag(PlayerThemeMode.clean),
       ),
       findsOneWidget,
     );
@@ -148,15 +148,14 @@ void main() {
 
     // Mid-transition: both outgoing and incoming theme trees coexist in AnimatedSwitcher
     // without hero tag collisions (because tags are per-theme unique)
-    final classicHero = find.byWidgetPredicate(
-      (w) =>
-          w is Hero && w.tag == nowPlayingArtHeroTag(PlayerThemeMode.classic),
+    final cleanHero = find.byWidgetPredicate(
+      (w) => w is Hero && w.tag == nowPlayingArtHeroTag(PlayerThemeMode.clean),
     );
     final cardHero = find.byWidgetPredicate(
       (w) => w is Hero && w.tag == nowPlayingArtHeroTag(PlayerThemeMode.card),
     );
 
-    expect(classicHero, findsOneWidget);
+    expect(cleanHero, findsOneWidget);
     expect(cardHero, findsOneWidget);
 
     // If golden image exists, assert pixel match for mid-transition frame
@@ -175,7 +174,7 @@ void main() {
     expect(
       find.byWidgetPredicate(
         (w) =>
-            w is Hero && w.tag == nowPlayingArtHeroTag(PlayerThemeMode.classic),
+            w is Hero && w.tag == nowPlayingArtHeroTag(PlayerThemeMode.clean),
       ),
       findsNothing,
     );

@@ -6,7 +6,7 @@
   ### Premium Offline-First Audiophile Player for Android
 
   <p align="center">
-    <strong>22-Stage Native C++ DSP • 10/32/64-Band EQ • 652 AutoEQ Profiles • DSD512 • 11 Player Themes • Pulsr Party • Quran Mode • Cast &amp; Remote Sources • Zero Telemetry</strong>
+    <strong>22-Stage Native C++ DSP • 10/32/64-Band EQ • 652 AutoEQ Profiles • DSD512 • 8 Player Themes • Pulsr Party • Quran Mode • Cast &amp; Remote Sources • Zero Telemetry</strong>
   </p>
 
   <p align="center">
@@ -35,7 +35,7 @@
 
 **Pulsr Music** is an offline-first audiophile player for Android, built with Flutter, Dart, BLoC and Drift SQLite. A native C++20 engine handles real-time DSP, while a small Go server powers synchronized group listening.
 
-It combines a 22-stage DSP chain, bit-perfect USB-DAC output, 11 Now Playing themes, karaoke with live pitch tracking, an offline 114-surah Quran Mode, DLNA casting and SMB/WebDAV/FTP remote sources. The **Pure** build is provably offline: the INTERNET permission is removed at manifest level. The optional **Plus** build adds YouTube Music behind a compile-time flag.
+It combines a 22-stage DSP chain, bit-perfect USB-DAC output, 8 Now Playing themes, karaoke with live pitch tracking, an offline 114-surah Quran Mode, DLNA casting and SMB/WebDAV/FTP remote sources. The **Pure** build is provably offline: the INTERNET permission is removed at manifest level. The optional **Plus** build adds YouTube Music behind a compile-time flag.
 
 > **Verification status (2026-11-20):** all §8 audio sections are code-complete and covered by host/unit/widget suites; device-only attestations (USB DSD/UAC2, multichannel DAC, Android FIR, Cast/UPnP receiver, ADC loopback, battery run) are still pending. No section is certified 10/10 without that hardware evidence.
 
@@ -49,7 +49,7 @@ It combines a 22-stage DSP chain, bit-perfect USB-DAC output, 11 Now Playing the
 |---|---|
 | **DSP** | 22 native stages, 16 concurrent engines, 64-band parametric EQ, dedicated FIR stage, 8-band dynamic EQ, 4-band compressor, true-peak limiter, 9 reverb programs, crossfeed, saturation, bass management, 2–8 channel manager |
 | **Hi-Res** | DSD64–DSD512 decode to 768 kHz PCM, dedicated pull-session native DSD, DoP carriers, SACD ISO extraction, USB-DAC exclusive output with UAC2 volume, AAudio direct, 32-bit float path |
-| **Experience** | 11 Now Playing themes + Theme Studio, 8 visualizer styles + Milkdrop shader, karaoke pitch highway, synced lyrics, ambient mixer |
+| **Experience** | 8 Now Playing themes + Theme Studio, 8 visualizer styles + Milkdrop shader, karaoke pitch highway, synced lyrics, ambient mixer |
 | **Library** | Reactive Drift SQLite index, 8 views, tag/artwork editor, 16-field smart playlists, duplicate cleanup, CUE sheets, 3 queue slots, 500-station radio store |
 | **Network** | Optional YouTube Music, resumable chunked downloads, proxy/DoH, DLNA/UPnP casting, SMB/WebDAV/FTP sources |
 | **Social** | Pulsr Party (Go WebSocket server, 2–10 members), Last.fm/ListenBrainz/Libre.fm/webhook scrobbling, Discord Rich Presence |
@@ -109,23 +109,20 @@ npx serve website
 - **Measurement Harness & Gates**: High-dynamic-range Kaiser window ($\beta=18.0$, $>150$ dB sidelobe suppression) FFT analysis, CCIF 19+20 kHz twin-tone IMD2/IMD3, identical-channel crosstalk detection, and a host-level proof dossier ([docs/PROOF_PACK_2026-11-20.md](docs/PROOF_PACK_2026-11-20.md)). Hardware loopback and device attestations remain pending.
 - **Diagnostics**: 19 telemetry slots, xrun counters, thermal/RTF state, safe mode, self-test and a redacted support bundle.
 
-### 💎 3. Aura Design & 11 Player Themes
+### 💎 3. Aura Design & 8 Player Themes
 
-Themes are real player surfaces, not colour swaps (`ThemeRegistry`):
+Themes are real player surfaces, not colour swaps (`ThemeRegistry`), each owning its own background surface, typography, scrubber and transport controls via `PlayerSurfaceShell`:
 
-1. **Classic Standard** — traditional high-density layout with ambient glow.
-2. **Card Glass Overlay** — full-bleed artwork with frosted glass controls.
-3. **Vinyl Circle** — centered circular artwork with a continuous spin.
-4. **Minimalist Waveform** — spacious studio focus on the waveform.
-5. **Vinyl Turntable Studio** — grooved record, center label and tonearm.
-6. **CD Turntable** — iridescent disc with stylus and track index.
-7. **Retro Cassette Deck** — spinning spools and magnetic tape.
-8. **Full-Bleed Waveform** — audio-reactive waveform backdrop.
-9. **Karaoke Lyrics Immersion** — full-screen synchronized lyrics.
-10. **Clean Modern Flow** — borderless artwork, capsule slider and quick actions.
-11. **Milkdrop Visualizer** — GPU shader visuals behind the artwork.
+1. **Clean Modern Flow** — Apple Music-inspired borderless artwork, capsule slider and minimal action row.
+2. **Card Glass Overlay** — full-bleed live blurred canvas, swipeable stacked album card deck and frosted-glass control card.
+3. **Vinyl Turntable Studio** — warm analog dark brushed-aluminum/walnut deck, grooved vinyl, tonearm drop/lift animation, 33⅓ RPM LED and rotary transport.
+4. **CD Turntable** — iridescent disc, Y2K acrylic jewel case with ribbed spine, backlit dot-matrix LCD and brushed-metal transport keys.
+5. **Retro Cassette Deck** — full-screen anodized Walkman chassis, spinning spools, 16-segment glowing LED VU meters and mechanical deck keys.
+6. **Studio Waveform** — audiophile oscilloscope centerpiece from `WaveformService`, compact corner thumbnail and audio telemetry strip.
+7. **Karaoke Lyrics Immersion** — 70% viewport synced scrolling LRC lyrics stage, glowing active line, tap-to-seek and ultra-slim floating pill.
+8. **Milkdrop Visualizer** — edge-to-edge `shaders/milkdrop.frag` GPU canvas with Canvas fallback under GPU Saver, preset cycling and tap-to-immerse.
 
-**Theme Studio** adds palette, corner radius and ambient glow controls, live preview and JSON export/import. AMOLED pure black, light and high-contrast modes are included, plus a scheduled light/dark switch.
+**Theme Studio** adds palette, corner radius and ambient glow controls, live preview and JSON export/import. AMOLED pure black, light and high-contrast modes are included, plus a scheduled light/dark switch. Secondary tools (A/B loop, EQ/DSP, Output/DAC, Speed, Quran, Ambient, Timer, Party) are neatly tucked into an expandable `PlayerToolsSheet`.
 
 ### 🎤 4. Lyrics, Karaoke & Visualizers
 
@@ -230,7 +227,7 @@ Pulsr follows Clean Architecture with a feature-first presentation layer and a n
 
 ```text
 Presentation (Flutter)
-  GoRouter · AppShell · Now Playing (11 themes) · Cubits/Freezed
+  GoRouter · AppShell · Now Playing (8 themes) · Cubits/Freezed
         │
 Domain
   Entities · use cases · repository interfaces · SmartAudioPlan · bit-perfect policy

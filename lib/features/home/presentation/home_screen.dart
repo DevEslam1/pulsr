@@ -13,6 +13,7 @@ import 'package:pulsr/core/motion/pulsr_motion.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/di/injection.dart';
+import '../../../core/performance/gpu_budget.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/l10n_extensions.dart';
@@ -309,6 +310,10 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
     final currentTab = showOnlineTab ? _selectedTab : 0;
     final safePadding = MediaQuery.paddingOf(context);
     final basePad = Adaptive.pagePadding(context);
+    final isPureBlack = p.isDark && p.bg.computeLuminance() < 0.001;
+    final isHighContrast = MediaQuery.maybeHighContrastOf(context) ?? false;
+    final showAmbientGlow =
+        !isPureBlack && !p.isCalmDensity && !isHighContrast && !GpuBudget.isEnabled;
     // Sections already apply [basePad] horizontally, so only add the delta
     // needed to clear a physical display cutout without double-padding.
     final cutoutLeft = safePadding.left > 0
@@ -332,267 +337,325 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
         }
       },
       builder: (context, homeState) => Scaffold(
-      body: SafeArea(
-        top: true,
-        bottom: false,
-        left: false,
-        right: false,
-        child: Padding(
-          padding: Directionality.of(context) == TextDirection.rtl
-              ? EdgeInsetsDirectional.only(start: cutoutRight, end: cutoutLeft)
-              : EdgeInsetsDirectional.only(start: cutoutLeft, end: cutoutRight),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: Adaptive.contentConstraints(context),
-              child: RefreshIndicator(
-              color: p.accent,
-              backgroundColor: p.surfaceContainer,
-              onRefresh: () async {
-                if (currentTab == 0) {
-                  final count =
-                      await context.read<SettingsCubit>().rescanLibrary();
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).clearSnackBars();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(context.l10n.scanResult(count)),
-                        duration: const Duration(seconds: 2),
+        body: Stack(
+          children: [
+            if (showAmbientGlow)
+              PositionedDirectional(
+                key: const ValueKey('home_ambient_top_glow'),
+                top: 0,
+                start: 0,
+                end: 0,
+                height: 280,
+                child: IgnorePointer(
+                  child: ExcludeSemantics(
+                    child: RepaintBoundary(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: RadialGradient(
+                            center: const AlignmentDirectional(-0.55, -1.0),
+                            radius: 1.35,
+                            colors: [
+                              p.accent.withValues(alpha: p.isDark ? 0.14 : 0.075),
+                              p.accent.withValues(alpha: p.isDark ? 0.045 : 0.025),
+                              p.accent.withValues(alpha: 0.0),
+                            ],
+                            stops: const [0.0, 0.48, 1.0],
+                          ),
+                        ),
                       ),
-                    );
-                  }
-                } else {
-                  await context
-                      .read<HomeCubit>()
-                      .refreshCategory(_selectedOnlineCategory);
-                }
-              },
-              child: ValueListenableBuilder<double>(
-                valueListenable: PulsrDockTracker.dockHeight,
-                builder: (context, dockHeight, _) {
-                  final bottomPad = dockHeight > 0
-                      ? dockHeight + AppSpacing.md
-                      : PulsrLayoutMetrics.scrollBottom(context, extra: 24.0);
-                  return ListView(
-                    key: const PageStorageKey('home_screen_scroll'),
-                    physics: const AlwaysScrollableScrollPhysics(
-                        parent: BouncingScrollPhysics()),
-                    padding: EdgeInsets.only(bottom: bottomPad),
-                    children: [
-                      // ---------- Header ----------
-                      Padding(
-                        padding: EdgeInsetsDirectional.fromSTEB(
-                            Adaptive.pagePadding(context),
-                            AppSpacing.md,
-                            Adaptive.pagePadding(context),
-                            0),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    MaterialLocalizations.of(context)
-                                        .formatMediumDate(clock.now())
-                                        .toUpperCase(),
-                                    style: TextStyle(
-                                      color: p.textTertiary,
-                                      fontSize: AppFontSize.caption,
-                                      fontWeight: FontWeight.w700,
-                                      letterSpacing: 1.1,
-                                    ),
-                                  ),
-                                  const SizedBox(height: AppSpacing.s6),
-                                  Text(
-                                    _getGreeting(context),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .headlineMedium
-                                        ?.copyWith(
-                                            fontWeight: FontWeight.w800,
-                                            letterSpacing: -0.5),
-                                  ),
-                                ],
+                    ),
+                  ),
+                ),
+              ),
+            SafeArea(
+              top: true,
+              bottom: false,
+              left: false,
+              right: false,
+              child: Padding(
+                padding: Directionality.of(context) == TextDirection.rtl
+                    ? EdgeInsetsDirectional.only(
+                        start: cutoutRight, end: cutoutLeft)
+                    : EdgeInsetsDirectional.only(
+                        start: cutoutLeft, end: cutoutRight),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: Adaptive.contentConstraints(context),
+                    child: RefreshIndicator(
+                      color: p.accent,
+                      backgroundColor: p.surfaceContainer,
+                      onRefresh: () async {
+                        if (currentTab == 0) {
+                          final count = await context
+                              .read<SettingsCubit>()
+                              .rescanLibrary();
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).clearSnackBars();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(context.l10n.scanResult(count)),
+                                duration: const Duration(seconds: 2),
                               ),
-                            ),
-                            if (offlineOnly)
-                              Flexible(
-                                child: Padding(
-                                  padding: const EdgeInsetsDirectional.only(
-                                      end: AppSpacing.xs),
-                                  child: Chip(
-                                    avatar: Icon(Icons.wifi_off_rounded,
-                                        size: 14, color: p.accent),
-                                    label: Text(
-                                      context.l10n.offlineOnlyMode,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        fontSize: AppFontSize.caption,
-                                        fontWeight: FontWeight.w700,
-                                        color: p.accent,
+                            );
+                          }
+                        } else {
+                          await context
+                              .read<HomeCubit>()
+                              .refreshCategory(_selectedOnlineCategory);
+                        }
+                      },
+                      child: ValueListenableBuilder<double>(
+                        valueListenable: PulsrDockTracker.dockHeight,
+                        builder: (context, dockHeight, _) {
+                          final bottomPad = dockHeight > 0
+                              ? dockHeight + safePadding.bottom + AppSpacing.xl
+                              : PulsrLayoutMetrics.scrollBottom(
+                                  context,
+                                  extra: AppSpacing.xl,
+                                );
+                          return ListView(
+                            key: const PageStorageKey('home_screen_scroll'),
+                            physics: const AlwaysScrollableScrollPhysics(
+                                parent: BouncingScrollPhysics()),
+                            padding: EdgeInsetsDirectional.only(bottom: bottomPad),
+                            children: [
+                              // ---------- Header ----------
+                              Padding(
+                                padding: EdgeInsetsDirectional.fromSTEB(
+                                    Adaptive.pagePadding(context),
+                                    AppSpacing.md,
+                                    Adaptive.pagePadding(context),
+                                    0),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  children: [
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            MaterialLocalizations.of(context)
+                                                .formatMediumDate(clock.now())
+                                                .toUpperCase(),
+                                            style: TextStyle(
+                                              color: p.textTertiary,
+                                              fontSize: AppFontSize.caption,
+                                              fontWeight: FontWeight.w700,
+                                              letterSpacing: 1.1,
+                                            ),
+                                          ),
+                                          const SizedBox(height: AppSpacing.s4),
+                                          Text(
+                                            _getGreeting(context),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .headlineMedium
+                                                ?.copyWith(
+                                                    fontWeight: FontWeight.w800,
+                                                    letterSpacing: -0.5),
+                                          ),
+                                        ],
                                       ),
                                     ),
-                                    backgroundColor: p.accentContainer,
-                                    side: BorderSide(color: p.hairline),
-                                    visualDensity: VisualDensity.compact,
-                                  ),
+                                    if (offlineOnly)
+                                      Flexible(
+                                        child: Padding(
+                                          padding:
+                                              const EdgeInsetsDirectional.only(
+                                                  end: AppSpacing.xs),
+                                          child: Chip(
+                                            avatar: Icon(Icons.wifi_off_rounded,
+                                                size: 14, color: p.accent),
+                                            label: Text(
+                                              context.l10n.offlineOnlyMode,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(
+                                                fontSize: AppFontSize.caption,
+                                                fontWeight: FontWeight.w700,
+                                                color: p.accent,
+                                              ),
+                                            ),
+                                            backgroundColor: p.accentContainer,
+                                            side: BorderSide(
+                                                color: p.borderSubtle),
+                                            visualDensity:
+                                                VisualDensity.compact,
+                                          ),
+                                        ),
+                                      ),
+                                    const ActiveAudioOutputPill(),
+                                    const SizedBox(width: AppSpacing.xs),
+                                    IconButton(
+                                      key: const ValueKey(
+                                          'home_settings_button'),
+                                      constraints: const BoxConstraints(
+                                        minWidth: AppSpacing.minTouchTarget,
+                                        minHeight: AppSpacing.minTouchTarget,
+                                      ),
+                                      icon: Icon(
+                                        Icons.settings_outlined,
+                                        color: p.textSecondary,
+                                        size: 22,
+                                      ),
+                                      tooltip: context.l10n.settings,
+                                      onPressed: () =>
+                                          context.push('/settings'),
+                                    ),
+                                  ],
                                 ),
                               ),
-                            const ActiveAudioOutputPill(),
-                            const SizedBox(width: AppSpacing.xs),
-                            IconButton(
-                              key: const ValueKey('home_settings_button'),
-                              constraints: const BoxConstraints(
-                                minWidth: AppSpacing.minTouchTarget,
-                                minHeight: AppSpacing.minTouchTarget,
-                              ),
-                              icon: Icon(
-                                Icons.settings_outlined,
-                                color: p.textSecondary,
-                                size: 22,
-                              ),
-                              tooltip: context.l10n.settings,
-                              onPressed: () => context.push('/settings'),
-                            ),
-                          ],
-                        ),
-                      ),
 
-                      // ---------- Notification Permission Denied Banner (B-37) ----------
-                      if (_notificationDenied && !_notificationBannerDismissed)
-                        Padding(
-                          padding: EdgeInsetsDirectional.fromSTEB(
-                            Adaptive.pagePadding(context),
-                            AppSpacing.sm,
-                            Adaptive.pagePadding(context),
-                            0,
-                          ),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: AppSpacing.md,
-                              vertical: AppSpacing.sm,
-                            ),
-                            decoration: BoxDecoration(
-                              color: p.surfaceContainer,
-                              borderRadius: AppRadii.cardRadius,
-                              border: Border.all(
-                                  color: p.accent.withValues(alpha: 0.3)),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(Icons.notifications_off_outlined,
-                                    color: p.accent, size: 20),
-                                const SizedBox(width: AppSpacing.sm),
-                                Expanded(
-                                  child: Text(
-                                    context.l10n.playbackStopsScreenOff,
-                                    style: TextStyle(
-                                      color: p.textSecondary,
-                                      fontSize: AppFontSize.caption,
+                              // ---------- Notification Permission Denied Banner (B-37) ----------
+                              if (_notificationDenied &&
+                                  !_notificationBannerDismissed)
+                                Padding(
+                                  padding: EdgeInsetsDirectional.fromSTEB(
+                                    Adaptive.pagePadding(context),
+                                    AppSpacing.sm,
+                                    Adaptive.pagePadding(context),
+                                    0,
+                                  ),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: AppSpacing.md,
+                                      vertical: AppSpacing.sm,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: p.surfaceContainer,
+                                      borderRadius: AppRadii.cardRadius,
+                                      border: Border.all(
+                                          color:
+                                              p.accent.withValues(alpha: 0.3)),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.notifications_off_outlined,
+                                            color: p.accent, size: 20),
+                                        const SizedBox(width: AppSpacing.sm),
+                                        Expanded(
+                                          child: Text(
+                                            context
+                                                .l10n.playbackStopsScreenOff,
+                                            style: TextStyle(
+                                              color: p.textSecondary,
+                                              fontSize: AppFontSize.caption,
+                                            ),
+                                          ),
+                                        ),
+                                        TextButton(
+                                          onPressed: () async {
+                                            await openAppSettings();
+                                            final prefs =
+                                                await SharedPreferences
+                                                    .getInstance();
+                                            await prefs.setBool(
+                                                'notification_permission_denied',
+                                                false);
+                                            if (mounted) {
+                                              setState(() =>
+                                                  _notificationDenied = false);
+                                            }
+                                          },
+                                          child:
+                                              Text(context.l10n.openSettings),
+                                        ),
+                                        IconButton(
+                                          constraints: const BoxConstraints(
+                                              minWidth:
+                                                  AppSpacing.minTouchTarget,
+                                              minHeight:
+                                                  AppSpacing.minTouchTarget),
+                                          icon:
+                                              const Icon(Icons.close, size: 16),
+                                          tooltip: context.l10n.close,
+                                          onPressed: () {
+                                            if (mounted) {
+                                              setState(() =>
+                                                  _notificationBannerDismissed =
+                                                      true);
+                                            }
+                                          },
+                                        ),
+                                      ],
                                     ),
                                   ),
                                 ),
-                                TextButton(
-                                  onPressed: () async {
-                                    await openAppSettings();
-                                    final prefs =
-                                        await SharedPreferences.getInstance();
-                                    await prefs.setBool(
-                                        'notification_permission_denied',
-                                        false);
-                                    if (mounted) {
-                                      setState(
-                                          () => _notificationDenied = false);
-                                    }
-                                  },
-                                  child: Text(context.l10n.openSettings),
+
+                              // ---------- Segmented Tab Selector (Local vs Online) ----------
+                              if (showOnlineTab) ...[
+                                const SizedBox(height: AppSpacing.md),
+                                Padding(
+                                  padding: EdgeInsetsDirectional.symmetric(
+                                      horizontal:
+                                          Adaptive.pagePadding(context)),
+                                  child: CompactSourceScopeSwitcher(
+                                    persistKey: 'home',
+                                    selectedScope: _scope,
+                                    onChanged: (next) =>
+                                        setState(() => _scope = next),
+                                  ),
                                 ),
-                                IconButton(
-                                  constraints: const BoxConstraints(
-                                      minWidth: AppSpacing.minTouchTarget,
-                                      minHeight: AppSpacing.minTouchTarget),
-                                  icon: const Icon(Icons.close, size: 16),
-                                  tooltip: context.l10n.close,
-                                  onPressed: () {
-                                    if (mounted) {
-                                      setState(() =>
-                                          _notificationBannerDismissed = true);
-                                    }
-                                  },
+                              ] else if (offlineOnly) ...[
+                                const SizedBox(height: AppSpacing.md),
+                                Padding(
+                                  padding: EdgeInsets.symmetric(
+                                      horizontal:
+                                          Adaptive.pagePadding(context)),
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.cloud_off_rounded,
+                                          size: 14, color: p.textTertiary),
+                                      const SizedBox(width: AppSpacing.s6),
+                                      Expanded(
+                                        child: Text(
+                                          context.l10n.homeOfflineNotice,
+                                          style: TextStyle(
+                                              color: p.textTertiary,
+                                              fontSize: AppFontSize.label),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ],
-                            ),
-                          ),
-                        ),
 
-                      // ---------- Segmented Tab Selector (Local vs Online) ----------
-                      if (showOnlineTab) ...[
-                        const SizedBox(height: AppSpacing.sm),
-                        Padding(
-                          padding: EdgeInsets.symmetric(
-                              horizontal: Adaptive.pagePadding(context)),
-                          child: Align(
-                            alignment: AlignmentDirectional.centerStart,
-                            child: CompactSourceScopeSwitcher(
-                              persistKey: 'home',
-                              selectedScope: _scope,
-                              onChanged: (next) =>
-                                  setState(() => _scope = next),
-                            ),
-                          ),
-                        ),
-                      ] else if (offlineOnly) ...[
-                        const SizedBox(height: AppSpacing.md),
-                        Padding(
-                          padding: EdgeInsets.symmetric(
-                              horizontal: Adaptive.pagePadding(context)),
-                          child: Row(
-                            children: [
-                              Icon(Icons.cloud_off_rounded,
-                                  size: 14, color: p.textTertiary),
-                              const SizedBox(width: AppSpacing.s6),
-                              Expanded(
-                                child: Text(
-                                  context.l10n.homeOfflineNotice,
-                                  style: TextStyle(
-                                      color: p.textTertiary,
-                                      fontSize: AppFontSize.label),
+                              // ---------- Content (Local vs Online) ----------
+                              AnimatedSwitcher(
+                                duration: context.motion(PulsrDurations.layout),
+                                switchInCurve:
+                                    context.motionCurve(Curves.easeOutCubic),
+                                switchOutCurve:
+                                    context.motionCurve(Curves.easeInCubic),
+                                child: KeyedSubtree(
+                                  key: ValueKey('home_tab_$currentTab'),
+                                  child: currentTab == 0
+                                      ? _buildLocalView(
+                                          context,
+                                          p,
+                                          getSongsUseCase,
+                                          playerCubit,
+                                          isTablet)
+                                      : (showOnlineTab
+                                          ? _buildOnlineView(context, p,
+                                              playerCubit, isTablet)
+                                          : const SizedBox.shrink()),
                                 ),
                               ),
                             ],
-                          ),
-                        ),
-                      ],
-
-                      // ---------- Content (Local vs Online) ----------
-                      AnimatedSwitcher(
-                        duration: context.motion(PulsrDurations.layout),
-                        switchInCurve: context.motionCurve(Curves.easeOutCubic),
-                        switchOutCurve: context.motionCurve(Curves.easeInCubic),
-                        child: KeyedSubtree(
-                          key: ValueKey('home_tab_$currentTab'),
-                          child: currentTab == 0
-                              ? _buildLocalView(context, p, getSongsUseCase,
-                                  playerCubit, isTablet)
-                              : (showOnlineTab
-                                  ? _buildOnlineView(
-                                      context, p, playerCubit, isTablet)
-                                  : const SizedBox.shrink()),
-                        ),
+                          );
+                        },
                       ),
-                    ],
-                  );
-                },
+                    ),
+                  ),
+                ),
               ),
             ),
-          ),
+          ],
         ),
-        ),
-      ),
       ),
     );
   }
@@ -757,7 +820,9 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                 title: context.l10n.focusFlow,
                 subtitle: context.l10n.topPlayedTracks,
                 icon: Icons.headphones_rounded,
-                color: AppColors.mint,
+                color: p.isDark
+                    ? AppColors.qualityBadgeCyan
+                    : AppColors.catGestures,
                 onTap: onFocusFlowTap,
                 trailingIcon: Icons.play_arrow_rounded,
                 trailingIconSize: 20,
@@ -899,8 +964,8 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                     p.accent.withValues(alpha: 0.18),
                     p.surfaceContainer,
                   ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+                  begin: AlignmentDirectional.topStart,
+                  end: AlignmentDirectional.bottomEnd,
                 ),
                 borderRadius: AppRadii.r20All,
                 border: Border.all(color: p.accent.withValues(alpha: 0.3)),

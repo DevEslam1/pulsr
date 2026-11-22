@@ -407,6 +407,7 @@ extension _EqSheetShell on _EqualizerSheetState {
     String? dspBlockedGlobal,
     bool isStudio,
   ) {
+    final rackWidth = context.isTabletLandscape ? 300.0 : 270.0;
     return Column(
       children: [
         _buildTopBar(context, cubit, state, p, dspBlockedGlobal),
@@ -416,7 +417,7 @@ extension _EqSheetShell on _EqualizerSheetState {
             children: [
               // Left control rack
               SizedBox(
-                width: 270,
+                width: rackWidth,
                 child: SingleChildScrollView(
                   physics: const BouncingScrollPhysics(),
                   padding: const EdgeInsetsDirectional.fromSTEB(

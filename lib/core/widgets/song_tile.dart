@@ -160,13 +160,16 @@ class _SongTileState extends State<SongTile> {
                       : (isTileUltraNarrow ? 6.0 : (isCompact ? 8.0 : 12.0));
                   final double artRadius = effectiveArtwork > 36 ? 12.0 : 8.0;
 
+                  final vPad = widget.dense ? AppSpacing.s2 : AppSpacing.s6;
                   return Container(
                     constraints: BoxConstraints(
                         minHeight:
                             widget.dense ? 44 : (isTileNarrow ? 48 : 58)),
-                    padding: EdgeInsets.symmetric(
-                      horizontal: padH,
-                      vertical: widget.dense ? AppSpacing.s2 : AppSpacing.s6,
+                    padding: EdgeInsetsDirectional.fromSTEB(
+                      padH,
+                      vPad,
+                      showTrailingInTile ? AppSpacing.xxs : padH,
+                      vPad,
                     ),
                     child: ClipRect(
                       child: Row(
@@ -294,6 +297,13 @@ class _SongTileState extends State<SongTile> {
                                     Expanded(
                                       child: LayoutBuilder(
                                         builder: (context, textConstraints) {
+                                          final textScale =
+                                              MediaQuery.textScalerOf(context)
+                                                  .scale(1.0);
+                                          final titleFontSize =
+                                              isCompact || isTileNarrow
+                                                  ? AppFontSize.bodySmall
+                                                  : AppFontSize.body;
                                           final content = SizedBox(
                                             width: textConstraints.maxWidth,
                                             child: Column(
@@ -305,62 +315,106 @@ class _SongTileState extends State<SongTile> {
                                                   displayInfo.title,
                                                   maxLines: 1,
                                                   overflow: TextOverflow.ellipsis,
-                                              style: TextStyle(
-                                                color:
-                                                    isActive ? p.accent : p.textPrimary,
-                                                fontWeight: isActive
-                                                    ? FontWeight.w800
-                                                    : FontWeight.w600,
-                                                letterSpacing: AppTracking.title,
-                                                fontSize: isCompact || isTileNarrow
-                                                    ? AppFontSize.bodySmall
-                                                    : AppFontSize.body,
-                                              ),
-                                            ),
-                                            const SizedBox(height: AppSpacing.s2),
-                                            Row(
-                                              children: [
-                                                if (isDownloadedTrack) ...[
-                                                  Icon(
-                                                    Icons.download_done_rounded,
-                                                    size: isCompact ? 12 : 13,
-                                                    color: p.accent,
-                                                  ),
-                                                  const SizedBox(width: AppSpacing.xxs),
-                                                ],
-                                                Expanded(
-                                                  child: Text(
-                                                    widget.subtitleOverride ??
-                                                        displayInfo.artist,
-                                                    maxLines: 1,
-                                                    overflow: TextOverflow.ellipsis,
-                                                    style: TextStyle(
-                                                      color: isActive
-                                                          ? p.textPrimary
-                                                              .withValues(alpha: 0.78)
-                                                          : p.textSecondary,
-                                                      fontWeight: FontWeight.w500,
-                                                      fontSize: AppFontSize.label,
-                                                    ),
+                                                  style: TextStyle(
+                                                    color: isActive
+                                                        ? p.accent
+                                                        : p.textPrimary,
+                                                    fontWeight: isActive
+                                                        ? FontWeight.w800
+                                                        : FontWeight.w600,
+                                                    letterSpacing:
+                                                        AppTracking.title,
+                                                    fontSize: titleFontSize,
+                                                    height: 1.25,
                                                   ),
                                                 ),
-                                              ],
-                                            ),
+                                                const SizedBox(
+                                                    height: AppSpacing.s2),
+                                                Row(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.center,
+                                                  children: [
+                                                    if (isDownloadedTrack) ...[
+                                                      Container(
+                                                        width:
+                                                            isCompact ? 14 : 15,
+                                                        height:
+                                                            isCompact ? 14 : 15,
+                                                        decoration:
+                                                            BoxDecoration(
+                                                          color: p.accent
+                                                              .withValues(
+                                                            alpha: p.isDark
+                                                                ? 0.16
+                                                                : 0.14,
+                                                          ),
+                                                          shape:
+                                                              BoxShape.circle,
+                                                        ),
+                                                        child: Icon(
+                                                          Icons
+                                                              .arrow_downward_rounded,
+                                                          size: isCompact
+                                                              ? 9.5
+                                                              : 10.5,
+                                                          color: p.accent,
+                                                        ),
+                                                      ),
+                                                      const SizedBox(
+                                                          width: AppSpacing.s6),
+                                                    ],
+                                                    Expanded(
+                                                      child: Text(
+                                                        widget.subtitleOverride ??
+                                                            displayInfo.artist,
+                                                        maxLines: 1,
+                                                        overflow: TextOverflow
+                                                            .ellipsis,
+                                                        style: TextStyle(
+                                                          color: isActive
+                                                              ? p.textPrimary
+                                                                  .withValues(
+                                                                      alpha:
+                                                                          0.78)
+                                                              : p.textSecondary,
+                                                          fontWeight:
+                                                              FontWeight.w500,
+                                                          fontSize:
+                                                              AppFontSize.label,
+                                                          height: 1.25,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
                                               ],
                                             ),
                                           );
                                           // FittedBox cancels the user's text-size
-                                          // setting by shrinking the row back down. Above
-                                          // 1.3x let the text lay out at its real size and
-                                          // ellipsize instead.
-                                          return MediaQuery.textScalerOf(context)
-                                                      .scale(1) >
-                                                  1.3
+                                          // setting by shrinking the row back down.
+                                          // Above 1.3x let text lay out at its real
+                                          // size unless a fixed-height parent
+                                          // constrains height tighter than the text.
+                                          final estimatedHeight =
+                                              (titleFontSize +
+                                                          AppFontSize.label) *
+                                                      textScale *
+                                                      1.35 +
+                                                  AppSpacing.s2;
+                                          final overflowsBound =
+                                              textConstraints.hasBoundedHeight &&
+                                                  textConstraints.maxHeight >
+                                                      0 &&
+                                                  estimatedHeight >
+                                                      textConstraints.maxHeight;
+                                          return textScale > 1.3 &&
+                                                  !overflowsBound
                                               ? content
                                               : FittedBox(
                                                   fit: BoxFit.scaleDown,
                                                   alignment:
-                                                      AlignmentDirectional.centerStart,
+                                                      AlignmentDirectional
+                                                          .centerStart,
                                                   child: content,
                                                 );
                                         },

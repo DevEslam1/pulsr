@@ -1,14 +1,18 @@
 // lib/core/widgets/mesh_gradient_placeholder.dart
 import 'dart:math' as math;
+import 'dart:ui' show ImageFilter;
 import 'package:material_ui/material_ui.dart';
+import '../constants/app_blur.dart';
+import '../constants/app_colors.dart';
 import '../constants/app_radii.dart';
+import '../constants/app_typography.dart';
 
 /// {@category DesignSystem}
-/// Dynamic, deterministic, tasteful seeded mesh-gradient artwork placeholder.
+/// Dynamic, deterministic, editorial seeded mesh-gradient artwork placeholder.
 ///
-/// Incorporates subtle track initials or category glyph, seeded by song
-/// title/artist/id, providing vibrant and unique artwork placeholders even
-/// before album art is cached or backfilled.
+/// Incorporates a frosted luminous monogram medallion or category glyph,
+/// seeded by song title/artist/id, providing vibrant and deliberate artwork
+/// placeholders even before album art is cached or backfilled.
 class MeshGradientPlaceholder extends StatelessWidget {
   final double size;
   final double borderRadius;
@@ -88,119 +92,128 @@ class MeshGradientPlaceholder extends StatelessWidget {
     }
   }
 
-  static const List<_MeshPalette> _palettes = [
+  static final RegExp _arabicChars = RegExp(r'[\u0600-\u06FF]');
+
+  /// Curated HSL palette specifications (zero raw hex literals).
+  /// Each entry defines (background, primary, secondary, tertiary) as
+  /// (hue, saturation, lightness) triples matching Pulsr's dark editorial mesh.
+  static const List<_MeshPaletteSpec> _paletteSpecs = [
     // 0: Deep Indigo & Cyan
-    _MeshPalette(
-      background: Color(0xFF0F172A),
-      primary: Color(0xFF4338CA),
-      secondary: Color(0xFF06B6D4),
-      tertiary: Color(0xFF818CF8),
+    _MeshPaletteSpec(
+      bg: (222, 0.47, 0.11),
+      primary: (245, 0.58, 0.51),
+      secondary: (189, 0.94, 0.43),
+      tertiary: (234, 0.89, 0.74),
     ),
     // 1: Midnight Violet & Magenta
-    _MeshPalette(
-      background: Color(0xFF1E0B2B),
-      primary: Color(0xFF7E22CE),
-      secondary: Color(0xFFE11D48),
-      tertiary: Color(0xFFC084FC),
+    _MeshPaletteSpec(
+      bg: (276, 0.59, 0.11),
+      primary: (273, 0.72, 0.47),
+      secondary: (347, 0.77, 0.50),
+      tertiary: (270, 0.95, 0.75),
     ),
     // 2: Oceanic Emerald & Mint
-    _MeshPalette(
-      background: Color(0xFF022C22),
-      primary: Color(0xFF059669),
-      secondary: Color(0xFF14B8A6),
-      tertiary: Color(0xFF34D399),
+    _MeshPaletteSpec(
+      bg: (166, 0.91, 0.09),
+      primary: (161, 0.94, 0.30),
+      secondary: (173, 0.80, 0.40),
+      tertiary: (158, 0.64, 0.52),
     ),
     // 3: Dark Amber & Tangerine
-    _MeshPalette(
-      background: Color(0xFF271305),
-      primary: Color(0xFFB45309),
-      secondary: Color(0xFFEA580C),
-      tertiary: Color(0xFFFBBF24),
+    _MeshPaletteSpec(
+      bg: (25, 0.77, 0.09),
+      primary: (26, 0.90, 0.37),
+      secondary: (21, 0.90, 0.48),
+      tertiary: (43, 0.96, 0.56),
     ),
     // 4: Royal Blue & Electric Purple
-    _MeshPalette(
-      background: Color(0xFF0B192C),
-      primary: Color(0xFF1D4ED8),
-      secondary: Color(0xFF7C3AED),
-      tertiary: Color(0xFF60A5FA),
+    _MeshPaletteSpec(
+      bg: (215, 0.60, 0.11),
+      primary: (224, 0.76, 0.48),
+      secondary: (262, 0.83, 0.58),
+      tertiary: (213, 0.94, 0.68),
     ),
     // 5: Crimson Noir & Rose
-    _MeshPalette(
-      background: Color(0xFF23070E),
-      primary: Color(0xFF9F1239),
-      secondary: Color(0xFFF43F5E),
-      tertiary: Color(0xFFFDA4AF),
+    _MeshPaletteSpec(
+      bg: (345, 0.67, 0.08),
+      primary: (343, 0.80, 0.35),
+      secondary: (350, 0.89, 0.60),
+      tertiary: (351, 0.95, 0.82),
     ),
     // 6: Deep Teal & Lime
-    _MeshPalette(
-      background: Color(0xFF042F2E),
-      primary: Color(0xFF0F766E),
-      secondary: Color(0xFF84CC16),
-      tertiary: Color(0xFF2DD4BF),
+    _MeshPaletteSpec(
+      bg: (179, 0.84, 0.10),
+      primary: (175, 0.77, 0.26),
+      secondary: (84, 0.81, 0.44),
+      tertiary: (171, 0.66, 0.52),
     ),
     // 7: Plum & Bubblegum
-    _MeshPalette(
-      background: Color(0xFF240A28),
-      primary: Color(0xFF86198F),
-      secondary: Color(0xFFD946EF),
-      tertiary: Color(0xFFF0ABFC),
+    _MeshPaletteSpec(
+      bg: (292, 0.60, 0.10),
+      primary: (295, 0.70, 0.33),
+      secondary: (292, 0.84, 0.61),
+      tertiary: (291, 0.93, 0.83),
     ),
     // 8: Obsidian & Ice Azure
-    _MeshPalette(
-      background: Color(0xFF0A1120),
-      primary: Color(0xFF0369A1),
-      secondary: Color(0xFF38BDF8),
-      tertiary: Color(0xFF7DD3FC),
+    _MeshPaletteSpec(
+      bg: (221, 0.52, 0.08),
+      primary: (201, 0.96, 0.32),
+      secondary: (198, 0.93, 0.60),
+      tertiary: (199, 0.95, 0.74),
     ),
     // 9: Blackberry & Gold
-    _MeshPalette(
-      background: Color(0xFF1A0B2E),
-      primary: Color(0xFF5B21B6),
-      secondary: Color(0xFFD97706),
-      tertiary: Color(0xFFFDE68A),
+    _MeshPaletteSpec(
+      bg: (266, 0.61, 0.11),
+      primary: (263, 0.69, 0.42),
+      secondary: (32, 0.95, 0.44),
+      tertiary: (48, 0.97, 0.77),
     ),
     // 10: Forest & Chartreuse
-    _MeshPalette(
-      background: Color(0xFF062816),
-      primary: Color(0xFF15803D),
-      secondary: Color(0xFF65A30D),
-      tertiary: Color(0xFF4ADE80),
+    _MeshPaletteSpec(
+      bg: (148, 0.74, 0.09),
+      primary: (142, 0.72, 0.29),
+      secondary: (85, 0.85, 0.35),
+      tertiary: (142, 0.69, 0.58),
     ),
     // 11: Amethyst & Peach
-    _MeshPalette(
-      background: Color(0xFF1F1135),
-      primary: Color(0xFF7E22CE),
-      secondary: Color(0xFFFB923C),
-      tertiary: Color(0xFFA855F7),
+    _MeshPaletteSpec(
+      bg: (263, 0.51, 0.14),
+      primary: (273, 0.72, 0.47),
+      secondary: (27, 0.96, 0.61),
+      tertiary: (271, 0.91, 0.65),
     ),
     // 12: Steel Blue & Neon Pink
-    _MeshPalette(
-      background: Color(0xFF0E1A2B),
-      primary: Color(0xFF2563EB),
-      secondary: Color(0xFFEC4899),
-      tertiary: Color(0xFF93C5FD),
+    _MeshPaletteSpec(
+      bg: (215, 0.51, 0.11),
+      primary: (221, 0.83, 0.53),
+      secondary: (330, 0.81, 0.60),
+      tertiary: (212, 0.96, 0.78),
     ),
     // 13: Copper & Ruby
-    _MeshPalette(
-      background: Color(0xFF240E06),
-      primary: Color(0xFFC2410C),
-      secondary: Color(0xFFBE123C),
-      tertiary: Color(0xFFFB7185),
+    _MeshPaletteSpec(
+      bg: (16, 0.71, 0.08),
+      primary: (17, 0.88, 0.40),
+      secondary: (345, 0.83, 0.41),
+      tertiary: (351, 0.95, 0.71),
     ),
     // 14: Dark Sapphire & Electric Cyan
-    _MeshPalette(
-      background: Color(0xFF081B33),
-      primary: Color(0xFF0284C7),
-      secondary: Color(0xFF00E5FF),
-      tertiary: Color(0xFF38BDF8),
+    _MeshPaletteSpec(
+      bg: (213, 0.73, 0.12),
+      primary: (200, 0.98, 0.39),
+      secondary: (186, 1.00, 0.50),
+      tertiary: (198, 0.93, 0.60),
     ),
     // 15: Deep Wine & Rose Quartz
-    _MeshPalette(
-      background: Color(0xFF220914),
-      primary: Color(0xFF881337),
-      secondary: Color(0xFFFB7185),
-      tertiary: Color(0xFFFFD1DC),
+    _MeshPaletteSpec(
+      bg: (334, 0.58, 0.08),
+      primary: (342, 0.75, 0.30),
+      secondary: (351, 0.95, 0.71),
+      tertiary: (346, 1.00, 0.91),
     ),
+  ];
+
+  static final List<_MeshPalette> _palettes = [
+    for (final spec in _paletteSpecs) spec.resolve(),
   ];
 
   static const List<IconData> _categoryGlyphs = [
@@ -250,31 +263,35 @@ class MeshGradientPlaceholder extends StatelessWidget {
         final initials = extractInitials(title: title, artist: artist);
         final bool showInitials = icon == null && initials.isNotEmpty;
 
-        final discSize = (effectiveSize * 0.48).clamp(20.0, 72.0);
-        final iconSize = (discSize * 0.58).clamp(12.0, 36.0);
-        final fontSize = (discSize * 0.44).clamp(10.0, 30.0);
+        final discSize = (effectiveSize * 0.46).clamp(22.0, 68.0);
+        final iconSize = (discSize * 0.54).clamp(12.0, 34.0);
+        final computedFontSize = (discSize * 0.42).clamp(10.0, 28.0);
+        final isArabic = _arabicChars.hasMatch(initials);
+        final bool isCardSize = effectiveSize >= 72.0;
+        final bool useBlur = isCardSize && AppBlur.canBlur(context);
+        final double blurSigma = AppBlur.clampSigma(AppBlur.chip);
 
         Widget centerContent;
         if (icon != null) {
           centerContent = Icon(
             icon,
-            color: Colors.white.withValues(alpha: 0.92),
+            color: AppColors.specularAt(0.94),
             size: iconSize,
           );
         } else if (showInitials) {
           centerContent = Text(
             initials,
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.94),
-              fontSize: fontSize,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0.5,
+              color: AppColors.specularAt(0.96),
+              fontSize: computedFontSize,
+              fontWeight: FontWeight.w700,
+              letterSpacing: isArabic ? AppTracking.none : AppTracking.overline,
               height: 1.0,
               shadows: [
                 Shadow(
-                  color: Colors.black.withValues(alpha: 0.45),
-                  blurRadius: 4,
-                  offset: const Offset(0, 1),
+                  color: AppColors.scrimAt(0.42),
+                  blurRadius: 6,
+                  offset: const Offset(0, 1.5),
                 ),
               ],
             ),
@@ -284,8 +301,60 @@ class MeshGradientPlaceholder extends StatelessWidget {
               _categoryGlyphs[effectiveSeed % _categoryGlyphs.length];
           centerContent = Icon(
             glyph,
-            color: Colors.white.withValues(alpha: 0.88),
+            color: AppColors.specularAt(0.90),
             size: iconSize,
+          );
+        }
+
+        Widget medallionCore = Container(
+          width: discSize,
+          height: discSize,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Color.alphaBlend(
+                  palette.tertiary.withValues(alpha: 0.16),
+                  AppColors.specularAt(useBlur ? 0.20 : 0.16),
+                ),
+                AppColors.scrimAt(useBlur ? 0.22 : 0.34),
+                AppColors.scrimAt(useBlur ? 0.38 : 0.48),
+              ],
+              stops: const [0.0, 0.52, 1.0],
+            ),
+            border: Border.all(
+              color: AppColors.specularAt(0.32),
+              width: isCardSize ? 1.2 : 0.9,
+            ),
+          ),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              // Delicate luminous inner ring for editorial medallion depth
+              if (discSize >= 36.0)
+                Padding(
+                  padding: const EdgeInsets.all(2.5),
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: AppColors.specularAt(0.14),
+                        width: 0.75,
+                      ),
+                    ),
+                  ),
+                ),
+              Center(child: centerContent),
+            ],
+          ),
+        );
+
+        if (useBlur && blurSigma > 0) {
+          medallionCore = BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma),
+            child: medallionCore,
           );
         }
 
@@ -301,38 +370,39 @@ class MeshGradientPlaceholder extends StatelessWidget {
                   painter: _MeshGradientPainter(
                     palette: palette,
                     seed: effectiveSeed,
+                    showEditorialRings: isCardSize,
                   ),
                 ),
                 Center(
                   child: ExcludeSemantics(
-                    child: Container(
-                      width: discSize,
-                      height: discSize,
+                    child: DecoratedBox(
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: Colors.black.withValues(alpha: 0.28),
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.18),
-                          width: 1.0,
-                        ),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.25),
-                            blurRadius: 8,
+                            color: AppColors.scrimAt(0.30),
+                            blurRadius: isCardSize ? 14 : 6,
                             spreadRadius: -1,
+                            offset: Offset(0, isCardSize ? 4 : 1.5),
                           ),
+                          if (isCardSize)
+                            BoxShadow(
+                              color: palette.tertiary.withValues(alpha: 0.16),
+                              blurRadius: 16,
+                              spreadRadius: -2,
+                            ),
                         ],
                       ),
-                      child: Center(child: centerContent),
+                      child: ClipOval(child: medallionCore),
                     ),
                   ),
                 ),
-                // Subtle 1px hairline border around the container
+                // Subtle 1px specular hairline border around the artwork tile
                 DecoratedBox(
                   decoration: BoxDecoration(
                     borderRadius: AppRadii.circular(effectiveRadius),
                     border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.12),
+                      color: AppColors.specularAt(0.14),
                       width: 1.0,
                     ),
                   ),
@@ -344,6 +414,30 @@ class MeshGradientPlaceholder extends StatelessWidget {
       },
     );
   }
+}
+
+class _MeshPaletteSpec {
+  final (double, double, double) bg;
+  final (double, double, double) primary;
+  final (double, double, double) secondary;
+  final (double, double, double) tertiary;
+
+  const _MeshPaletteSpec({
+    required this.bg,
+    required this.primary,
+    required this.secondary,
+    required this.tertiary,
+  });
+
+  static Color _hsl((double, double, double) t) =>
+      HSLColor.fromAHSL(1.0, t.$1, t.$2, t.$3).toColor();
+
+  _MeshPalette resolve() => _MeshPalette(
+        background: _hsl(bg),
+        primary: _hsl(primary),
+        secondary: _hsl(secondary),
+        tertiary: _hsl(tertiary),
+      );
 }
 
 class _MeshPalette {
@@ -363,10 +457,12 @@ class _MeshPalette {
 class _MeshGradientPainter extends CustomPainter {
   final _MeshPalette palette;
   final int seed;
+  final bool showEditorialRings;
 
   _MeshGradientPainter({
     required this.palette,
     required this.seed,
+    required this.showEditorialRings,
   });
 
   @override
@@ -386,7 +482,7 @@ class _MeshGradientPainter extends CustomPainter {
         end: Alignment.bottomRight,
         colors: [
           palette.background,
-          palette.primary.withValues(alpha: 0.35),
+          palette.primary.withValues(alpha: 0.38),
         ],
       ).createShader(rect);
     canvas.drawRect(rect, linearPaint);
@@ -416,7 +512,7 @@ class _MeshGradientPainter extends CustomPainter {
         ),
         radius: r1 / w,
         colors: [
-          palette.primary.withValues(alpha: 0.80),
+          palette.primary.withValues(alpha: 0.82),
           palette.primary.withValues(alpha: 0.0),
         ],
       ).createShader(rect);
@@ -432,7 +528,7 @@ class _MeshGradientPainter extends CustomPainter {
         ),
         radius: r2 / w,
         colors: [
-          palette.secondary.withValues(alpha: 0.70),
+          palette.secondary.withValues(alpha: 0.72),
           palette.secondary.withValues(alpha: 0.0),
         ],
       ).createShader(rect);
@@ -448,28 +544,51 @@ class _MeshGradientPainter extends CustomPainter {
         ),
         radius: r3 / w,
         colors: [
-          palette.tertiary.withValues(alpha: 0.45),
+          palette.tertiary.withValues(alpha: 0.48),
           palette.tertiary.withValues(alpha: 0.0),
         ],
       ).createShader(rect);
     canvas.drawRect(rect, blob3);
 
-    // 4. Subtle top-down specular sheen overlay
-    final sheenPaint = Paint()
+    // 4. Crisp subtle diagonal editorial sheen + soft bottom grounding
+    final diagonalSheen = Paint()
       ..shader = LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
         colors: [
-          Colors.white.withValues(alpha: 0.12),
-          Colors.transparent,
-          Colors.black.withValues(alpha: 0.20),
+          AppColors.specularAt(0.16),
+          AppColors.specularAt(0.05),
+          AppColors.fadeStopTransparent,
+          AppColors.scrimAt(0.24),
         ],
+        stops: const [0.0, 0.28, 0.58, 1.0],
       ).createShader(rect);
-    canvas.drawRect(rect, sheenPaint);
+    canvas.drawRect(rect, diagonalSheen);
+
+    // 5. Delicate concentric editorial halo ring on card-sized placeholders
+    if (showEditorialRings) {
+      final center = Offset(w * 0.5, h * 0.5);
+      final minDim = math.min(w, h);
+      final haloPaint = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 0.9
+        ..shader = LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AppColors.specularAt(0.20),
+            AppColors.specularAt(0.04),
+            AppColors.specularAt(0.14),
+          ],
+        ).createShader(rect);
+      canvas.drawCircle(center, minDim * 0.34, haloPaint);
+    }
   }
 
   @override
   bool shouldRepaint(covariant _MeshGradientPainter oldDelegate) {
-    return oldDelegate.seed != seed || oldDelegate.palette != palette;
+    return oldDelegate.seed != seed ||
+        oldDelegate.palette != palette ||
+        oldDelegate.showEditorialRings != showEditorialRings;
   }
 }

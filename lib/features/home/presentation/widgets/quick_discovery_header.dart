@@ -158,6 +158,20 @@ class ActiveAudioOutputPill extends StatelessWidget {
             : null);
 
     final details = resolveOutputDetails(context, info);
+    final accent = details.accentColor;
+    final restGradient = LinearGradient(
+      begin: AlignmentDirectional.topCenter,
+      end: AlignmentDirectional.bottomCenter,
+      colors: accent != null
+          ? [
+              accent.withValues(alpha: p.isDark ? 0.16 : 0.11),
+              accent.withValues(alpha: p.isDark ? 0.08 : 0.05),
+            ]
+          : [
+              p.surfaceElevated,
+              p.surfaceContainer,
+            ],
+    );
 
     return Semantics(
       button: true,
@@ -165,29 +179,28 @@ class ActiveAudioOutputPill extends StatelessWidget {
       child: PulsrPressable(
         key: const ValueKey('active_audio_output_pill'),
         enableHaptics: false,
+        focusBorderRadius: AppRadii.full,
         onTap: () => _handleTap(context),
         child: AnimatedContainer(
           duration: context.motion(PulsrDurations.state),
           curve: context.motionCurve(Curves.easeOutCubic),
           constraints: const BoxConstraints(
-            minHeight: 34.0,
-            maxHeight: 38.0,
+            minHeight: 36.0,
           ),
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.s10,
+          padding: const EdgeInsetsDirectional.symmetric(
+            horizontal: AppSpacing.s12,
             vertical: AppSpacing.s6,
           ),
           decoration: BoxDecoration(
-            color: details.accentColor != null
-                ? details.accentColor!.withValues(alpha: 0.12)
-                : p.surfaceContainerHigh,
+            gradient: restGradient,
             borderRadius: AppRadii.full,
             border: Border.all(
-              color: details.accentColor != null
-                  ? details.accentColor!.withValues(alpha: 0.38)
-                  : p.hairline,
+              color: accent != null
+                  ? accent.withValues(alpha: 0.34)
+                  : p.borderSubtle,
               width: 1.0,
             ),
+            boxShadow: p.isCalmDensity ? null : PulsrElevation.level1(p),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -195,7 +208,7 @@ class ActiveAudioOutputPill extends StatelessWidget {
               Icon(
                 details.icon,
                 size: 15,
-                color: details.accentColor ?? p.textSecondary,
+                color: accent ?? p.textSecondary,
               ),
               const SizedBox(width: AppSpacing.s6),
               ConstrainedBox(
@@ -207,17 +220,27 @@ class ActiveAudioOutputPill extends StatelessWidget {
                   style: TextStyle(
                     fontSize: AppFontSize.caption,
                     fontWeight: FontWeight.w700,
-                    color: details.accentColor ?? p.textPrimary,
+                    color: accent ?? p.textPrimary,
                     letterSpacing: -0.2,
                   ),
                 ),
               ),
+              if (details.isHiRes) ...[
+                const SizedBox(width: AppSpacing.s4),
+                Container(
+                  width: 5,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: accent ?? p.accent,
+                  ),
+                ),
+              ],
               const SizedBox(width: AppSpacing.xs),
               Icon(
                 Icons.expand_more_rounded,
                 size: 14,
-                color: (details.accentColor ?? p.textSecondary)
-                    .withValues(alpha: 0.7),
+                color: (accent ?? p.textSecondary).withValues(alpha: 0.72),
               ),
             ],
           ),
@@ -227,11 +250,16 @@ class ActiveAudioOutputPill extends StatelessWidget {
   }
 }
 
-/// Compact segmented `Local / Online` switcher aligned cleanly near the header.
+/// Responsive segmented `Local / Online` switcher aligned with Home content.
 ///
-/// Replaces the oversized full-width toggle with a sleek, space-efficient pill.
-/// Persists scope selection to [SharedPreferences] matching [SourceScopeSwitcher].
+/// Spans full content width as an equal 50/50 segmented control on mobile,
+/// constrains cleanly to `maxWidth: 400` on tablet/wide viewports, and falls
+/// back gracefully inside unbounded horizontal constraints. Persists scope
+/// selection to [SharedPreferences] matching [SourceScopeSwitcher].
 class CompactSourceScopeSwitcher extends StatelessWidget {
+  static const double _wideBreakpoint = 600.0;
+  static const double _wideMaxWidth = 400.0;
+
   final SourceScope selectedScope;
   final ValueChanged<SourceScope> onChanged;
   final String persistKey;
@@ -253,55 +281,194 @@ class CompactSourceScopeSwitcher extends StatelessWidget {
     } catch (_) {}
   }
 
+  void _selectScope(SourceScope next) {
+    if (next == selectedScope) return;
+    PulsrHaptics.selectionClick();
+    unawaited(_persistScope(next));
+    onChanged(next);
+  }
+
+  BoxDecoration _activePillDecoration(
+    PulsrPalette p, {
+    required bool isHighContrast,
+  }) {
+    final flat = p.isCalmDensity || isHighContrast;
+    return BoxDecoration(
+      color: p.accent,
+      borderRadius: AppRadii.full,
+      gradient: flat
+          ? null
+          : LinearGradient(
+              begin: AlignmentDirectional.topCenter,
+              end: AlignmentDirectional.bottomCenter,
+              colors: [
+                Color.lerp(p.accent, Colors.white, p.isDark ? 0.10 : 0.12)!,
+                p.accent,
+              ],
+            ),
+      border: flat
+          ? null
+          : Border.all(
+              color: Colors.white.withValues(
+                alpha: (p.isDark ? 0.22 : 0.28) * p.specularScale,
+              ),
+              width: 1.0,
+            ),
+      boxShadow: flat
+          ? null
+          : [
+              BoxShadow(
+                color: p.accent.withValues(
+                  alpha: (p.isDark ? 0.30 : 0.22) * p.chromeGlowScale,
+                ),
+                blurRadius: 10,
+                offset: const Offset(0, 2),
+              ),
+            ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
     final isOnline = selectedScope == SourceScope.online;
+    final isHighContrast = MediaQuery.maybeHighContrastOf(context) ?? false;
+    final isWide = Adaptive.widthOf(context) >= _wideBreakpoint;
+
+    final trackDecoration = BoxDecoration(
+      color: p.isDark ? p.surfaceContainer : p.surfaceContainerHigh,
+      borderRadius: AppRadii.full,
+      boxShadow: (p.isCalmDensity || isHighContrast)
+          ? null
+          : PulsrElevation.level1(p),
+    );
+    final trackBorder = BoxDecoration(
+      borderRadius: AppRadii.full,
+      border: Border.all(
+        color: isHighContrast ? p.borderStrong : p.borderSubtle,
+        width: 1.0,
+      ),
+    );
 
     return Semantics(
       container: true,
       label: isOnline ? context.l10n.online : context.l10n.local,
-      child: Container(
-        key: const ValueKey('compact_source_scope_switcher'),
-        height: 34.0,
-        decoration: BoxDecoration(
-          color: p.surfaceContainerHigh,
-          borderRadius: AppRadii.full,
-          border: Border.all(color: p.hairline),
-        ),
-        padding: const EdgeInsets.all(3.0),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _CompactScopeSegment(
-              key: const ValueKey('scope_segment_local'),
-              label: context.l10n.local,
-              icon: Icons.folder_rounded,
-              isSelected: !isOnline,
-              onTap: () {
-                if (isOnline) {
-                  PulsrHaptics.selectionClick();
-                  unawaited(_persistScope(SourceScope.local));
-                  onChanged(SourceScope.local);
-                }
-              },
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final hasBoundedWidth =
+              constraints.hasBoundedWidth && constraints.maxWidth.isFinite;
+
+          if (!hasBoundedWidth) {
+            return Container(
+              key: const ValueKey('compact_source_scope_switcher'),
+              constraints: const BoxConstraints(
+                minHeight: AppSpacing.minTouchTarget,
+              ),
+              decoration: trackDecoration,
+              foregroundDecoration: trackBorder,
+              padding: const EdgeInsets.all(AppSpacing.s4),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _CompactScopeSegment(
+                    key: const ValueKey('scope_segment_local'),
+                    label: context.l10n.local,
+                    icon: Icons.folder_rounded,
+                    isSelected: !isOnline,
+                    expanded: false,
+                    pillDecoration: !isOnline
+                        ? _activePillDecoration(p,
+                            isHighContrast: isHighContrast)
+                        : null,
+                    onTap: () => _selectScope(SourceScope.local),
+                  ),
+                  const SizedBox(width: AppSpacing.s4),
+                  _CompactScopeSegment(
+                    key: const ValueKey('scope_segment_online'),
+                    label: context.l10n.online,
+                    icon: Icons.cloud_rounded,
+                    isSelected: isOnline,
+                    expanded: false,
+                    pillDecoration: isOnline
+                        ? _activePillDecoration(p,
+                            isHighContrast: isHighContrast)
+                        : null,
+                    onTap: () => _selectScope(SourceScope.online),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          final targetWidth = isWide
+              ? math.min(constraints.maxWidth, _wideMaxWidth)
+              : constraints.maxWidth;
+          final pillWidth =
+              math.max(0.0, (targetWidth - AppSpacing.s4 * 2) / 2.0);
+          final pillStart =
+              isOnline ? AppSpacing.s4 + pillWidth : AppSpacing.s4;
+
+          return Align(
+            alignment: AlignmentDirectional.centerStart,
+            widthFactor: 1.0,
+            child: SizedBox(
+              width: targetWidth,
+              child: Container(
+                key: const ValueKey('compact_source_scope_switcher'),
+                constraints: const BoxConstraints(
+                  minHeight: AppSpacing.minTouchTarget,
+                ),
+                decoration: trackDecoration,
+                foregroundDecoration: trackBorder,
+                child: Stack(
+                  alignment: AlignmentDirectional.center,
+                  children: [
+                    AnimatedPositionedDirectional(
+                      duration: context.motion(PulsrDurations.layout),
+                      curve: context.motionCurve(PulsrMotion.enter),
+                      start: pillStart,
+                      top: AppSpacing.s4,
+                      bottom: AppSpacing.s4,
+                      width: pillWidth,
+                      child: IgnorePointer(
+                        child: DecoratedBox(
+                          decoration: _activePillDecoration(
+                            p,
+                            isHighContrast: isHighContrast,
+                          ),
+                        ),
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _CompactScopeSegment(
+                            key: const ValueKey('scope_segment_local'),
+                            label: context.l10n.local,
+                            icon: Icons.folder_rounded,
+                            isSelected: !isOnline,
+                            expanded: true,
+                            onTap: () => _selectScope(SourceScope.local),
+                          ),
+                        ),
+                        Expanded(
+                          child: _CompactScopeSegment(
+                            key: const ValueKey('scope_segment_online'),
+                            label: context.l10n.online,
+                            icon: Icons.cloud_rounded,
+                            isSelected: isOnline,
+                            expanded: true,
+                            onTap: () => _selectScope(SourceScope.online),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
             ),
-            const SizedBox(width: AppSpacing.xxs),
-            _CompactScopeSegment(
-              key: const ValueKey('scope_segment_online'),
-              label: context.l10n.online,
-              icon: Icons.cloud_rounded,
-              isSelected: isOnline,
-              onTap: () {
-                if (!isOnline) {
-                  PulsrHaptics.selectionClick();
-                  unawaited(_persistScope(SourceScope.online));
-                  onChanged(SourceScope.online);
-                }
-              },
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
@@ -311,6 +478,8 @@ class _CompactScopeSegment extends StatelessWidget {
   final String label;
   final IconData icon;
   final bool isSelected;
+  final bool expanded;
+  final BoxDecoration? pillDecoration;
   final VoidCallback onTap;
 
   const _CompactScopeSegment({
@@ -318,48 +487,89 @@ class _CompactScopeSegment extends StatelessWidget {
     required this.label,
     required this.icon,
     required this.isSelected,
+    required this.expanded,
+    this.pillDecoration,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
+    final foregroundColor = isSelected ? p.onAccent : p.textSecondary;
+    final horizontalPad = expanded ? AppSpacing.s12 : AppSpacing.md;
+    final minSegmentHeight =
+        expanded ? AppSpacing.minTouchTarget : AppSpacing.s40;
 
-    return PulsrPressable(
-      pressedScale: 0.96,
-      enableHaptics: false,
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: context.motion(PulsrDurations.state),
-        curve: context.motionCurve(Curves.easeOutCubic),
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.s10,
-          vertical: AppSpacing.s4,
+    final labelRow = Row(
+      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(
+          icon,
+          size: 18,
+          color: foregroundColor,
         ),
-        decoration: BoxDecoration(
-          color: isSelected ? p.accent : Colors.transparent,
-          borderRadius: AppRadii.full,
+        const SizedBox(width: AppSpacing.s8),
+        AnimatedDefaultTextStyle(
+          duration: context.motion(PulsrDurations.state),
+          curve: context.motionCurve(PulsrMotion.enter),
+          style: TextStyle(
+            fontFamily: fontFamily,
+            fontFamilyFallback: fontFallbacks,
+            fontSize: AppFontSize.bodySmall,
+            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+            color: foregroundColor,
+            letterSpacing: AppTracking.none,
+          ),
+          child: Text(
+            label,
+            maxLines: 1,
+            softWrap: false,
+          ),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              size: 14,
-              color: isSelected ? p.onAccent : p.textSecondary,
-            ),
-            const SizedBox(width: AppSpacing.s4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: AppFontSize.caption,
-                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
-                color: isSelected ? p.onAccent : p.textSecondary,
+      ],
+    );
+
+    final segmentBody = ConstrainedBox(
+      constraints: BoxConstraints(minHeight: minSegmentHeight),
+      child: Padding(
+        padding: EdgeInsetsDirectional.symmetric(
+          horizontal: horizontalPad,
+          vertical: AppSpacing.s8,
+        ),
+        child: Center(
+          widthFactor: expanded ? null : 1.0,
+          child: expanded
+              ? FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: labelRow,
+                )
+              : labelRow,
+        ),
+      ),
+    );
+
+    return Semantics(
+      selected: isSelected,
+      inMutuallyExclusiveGroup: true,
+      child: PulsrPressable(
+        pressedScale: 0.97,
+        enableHaptics: false,
+        focusBorderRadius: AppRadii.full,
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: expanded
+            ? segmentBody
+            : AnimatedContainer(
+                duration: context.motion(PulsrDurations.state),
+                curve: context.motionCurve(PulsrMotion.enter),
+                decoration: pillDecoration ??
+                    const BoxDecoration(
+                      color: Colors.transparent,
+                      borderRadius: AppRadii.full,
+                    ),
+                child: segmentBody,
               ),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -473,7 +683,7 @@ class QuickDiscoveryHeader extends StatelessWidget {
     ];
 
     final textScale =
-        MediaQuery.textScalerOf(context).scale(1.0).clamp(1.0, 1.6);
+        MediaQuery.textScalerOf(context).scale(1.0).clamp(1.0, 2.0);
     final railHeight = math.max(48.0, (48.0 * textScale).roundToDouble());
 
     return Column(
@@ -573,7 +783,7 @@ class QuickDiscoveryHeader extends StatelessWidget {
           Padding(
             padding: EdgeInsetsDirectional.fromSTEB(
               Adaptive.pagePadding(context),
-              AppSpacing.sm,
+              AppSpacing.md,
               Adaptive.pagePadding(context),
               0,
             ),
@@ -592,6 +802,7 @@ class QuickDiscoveryHeader extends StatelessWidget {
               children: [
                 Expanded(
                   child: PulsrScrollEdgeFade(
+                    extent: 44,
                     child: ListView.separated(
                       scrollDirection: Axis.horizontal,
                       physics: const BouncingScrollPhysics(),

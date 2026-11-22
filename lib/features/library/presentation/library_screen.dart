@@ -612,9 +612,9 @@ class _LibraryScreenState extends State<LibraryScreen>
     const topPadding = AppSpacing.xs;
     final double target;
     if (trackCols > 1) {
-      // Grid rows are fixed mainAxisExtent 72 + 4 spacing.
+      // Grid rows scale with text size to avoid clipping at large text scales.
       final row = index ~/ trackCols;
-      target = topPadding + row * 76.0;
+      target = topPadding + row * (_songGridTileExtent(context) + 4.0);
     } else {
       final maxScroll = _songsScrollController.position.maxScrollExtent;
       target =
@@ -711,8 +711,13 @@ class _LibraryScreenState extends State<LibraryScreen>
         final losslessCount = state.songs.where(isLosslessSong).length;
         final p = context.palette;
         final screenWidth = MediaQuery.sizeOf(context).width;
+        final pagePad = Adaptive.pagePadding(context);
         final headerTextScale =
             MediaQuery.textScalerOf(context).scale(1.0).clamp(1.0, 1.35);
+        final controlBarHeight = (44.0 * headerTextScale)
+            .roundToDouble()
+            .clamp(AppSpacing.minTouchTarget, 58.0);
+        final tabBarHeight = PulsrLayoutMetrics.fieldHeight(context);
 
         return Scaffold(
           backgroundColor: p.bg,
@@ -786,8 +791,8 @@ class _LibraryScreenState extends State<LibraryScreen>
                   backgroundColor: p.bg,
                   elevation: 0,
                   scrolledUnderElevation: 0,
-                  toolbarHeight: (72.0 * headerTextScale).roundToDouble(),
-                  titleSpacing: Adaptive.pagePadding(context),
+                  toolbarHeight: (68.0 * headerTextScale).roundToDouble(),
+                  titleSpacing: pagePad,
                   title: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
@@ -801,9 +806,10 @@ class _LibraryScreenState extends State<LibraryScreen>
                           fontSize: AppFontSize.titleXL,
                           fontWeight: FontWeight.w800,
                           letterSpacing: AppTracking.heading,
+                          height: 1.15,
                         ),
                       ),
-                      const SizedBox(height: AppSpacing.s2),
+                      const SizedBox(height: AppSpacing.s4),
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -825,12 +831,15 @@ class _LibraryScreenState extends State<LibraryScreen>
                             Flexible(
                               child: Container(
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 6,
-                                  vertical: 1,
+                                  horizontal: AppSpacing.s6,
+                                  vertical: AppSpacing.s2,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: p.info.withValues(alpha: 0.15),
-                                  borderRadius: AppRadii.r4All,
+                                  color: p.info.withValues(alpha: 0.14),
+                                  borderRadius: AppRadii.r6All,
+                                  border: Border.all(
+                                    color: p.info.withValues(alpha: 0.24),
+                                  ),
                                 ),
                                 child: Text(
                                   context.l10n
@@ -851,87 +860,34 @@ class _LibraryScreenState extends State<LibraryScreen>
                     ],
                   ),
                   actions: [
-                    IconButton(
-                      key: const ValueKey('library_search_action'),
-                      constraints: const BoxConstraints(
-                        minWidth: AppSpacing.minTouchTarget,
-                        minHeight: AppSpacing.minTouchTarget,
-                      ),
-                      icon: const Icon(Icons.search_rounded),
-                      color: p.textSecondary,
-                      tooltip: context.l10n.search,
-                      onPressed: () => context.push('/search'),
-                    ),
                     Semantics(
                       button: true,
-                      label: '${context.l10n.sortBy}: $sortLabel',
+                      label: context.l10n.moreOptions,
                       child: Tooltip(
-                        message: '${context.l10n.sortBy}: $sortLabel',
+                        message: context.l10n.moreOptions,
                         child: Material(
                           color: AppColors.fadeStopTransparent,
                           child: InkWell(
-                            key: const ValueKey('library_sort_filter_pill'),
-                            borderRadius: AppRadii.full,
+                            key: const ValueKey('library_overflow_menu'),
+                            customBorder: const CircleBorder(),
                             onTap: () =>
                                 _showSortAndViewSheet(context, state, cubit),
-                            child: ConstrainedBox(
-                              constraints: BoxConstraints(
-                                minWidth: AppSpacing.minTouchTarget,
-                                minHeight: AppSpacing.minTouchTarget,
-                                maxWidth: screenWidth < 360 ? 48 : 112,
-                              ),
+                            child: SizedBox(
+                              width: AppSpacing.minTouchTarget,
+                              height: AppSpacing.minTouchTarget,
                               child: Center(
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: AppSpacing.s10,
-                                    vertical: AppSpacing.s6,
-                                  ),
+                                  width: AppSpacing.s40,
+                                  height: AppSpacing.s40,
                                   decoration: BoxDecoration(
-                                    color: isSortedCustom
-                                        ? p.accent.withValues(alpha: 0.14)
-                                        : p.surfaceContainer,
-                                    borderRadius: AppRadii.full,
-                                    border: Border.all(
-                                      color: isSortedCustom
-                                          ? p.accent.withValues(alpha: 0.35)
-                                          : p.hairline,
-                                    ),
+                                    color: p.surfaceContainer,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: p.hairline),
                                   ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        Icons.sort_rounded,
-                                        size: 16,
-                                        color: isSortedCustom
-                                            ? p.accent
-                                            : p.textSecondary,
-                                      ),
-                                      if (screenWidth >= 360) ...[
-                                        const SizedBox(width: AppSpacing.xxs),
-                                        Flexible(
-                                          child: Text(
-                                            sortLabel,
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            textScaler: TextScaler.linear(
-                                              MediaQuery.textScalerOf(context)
-                                                  .scale(1.0)
-                                                  .clamp(1.0, 1.25),
-                                            ),
-                                            style: TextStyle(
-                                              color: isSortedCustom
-                                                  ? p.accent
-                                                  : p.textSecondary,
-                                              fontSize: AppFontSize.caption,
-                                              fontWeight: isSortedCustom
-                                                  ? FontWeight.w700
-                                                  : FontWeight.w600,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ],
+                                  child: Icon(
+                                    Icons.more_vert_rounded,
+                                    size: 20,
+                                    color: p.textSecondary,
                                   ),
                                 ),
                               ),
@@ -940,52 +896,235 @@ class _LibraryScreenState extends State<LibraryScreen>
                         ),
                       ),
                     ),
-                    IconButton(
-                      key: const ValueKey('library_overflow_menu'),
-                      constraints: const BoxConstraints(
-                        minWidth: AppSpacing.minTouchTarget,
-                        minHeight: AppSpacing.minTouchTarget,
-                      ),
-                      icon: const Icon(Icons.more_vert_rounded),
-                      color: p.textSecondary,
-                      tooltip: context.l10n.moreOptions,
-                      onPressed: () =>
-                          _showSortAndViewSheet(context, state, cubit),
+                    SizedBox(
+                      width: (pagePad - AppSpacing.xxs)
+                          .clamp(0.0, double.infinity),
                     ),
-                    const SizedBox(width: AppSpacing.xxs),
                   ],
                   bottom: PreferredSize(
                     preferredSize: Size.fromHeight(
-                      PulsrLayoutMetrics.fieldHeight(context) + AppSpacing.xs,
+                      AppSpacing.xs +
+                          controlBarHeight +
+                          AppSpacing.sm +
+                          tabBarHeight +
+                          AppSpacing.xxs,
                     ),
-                    child: Padding(
-                      padding: EdgeInsetsDirectional.fromSTEB(
-                        Adaptive.pagePadding(context),
-                        0,
-                        Adaptive.pagePadding(context),
-                        AppSpacing.xs,
-                      ),
-                      child: LayoutBuilder(
-                        builder: (context, constraints) {
-                          final isScrollable = _needsScrollableTabs(
-                            context,
-                            state,
-                            constraints.maxWidth,
-                          );
-                          return PulsrPillTabBar(
-                            tabBarKey: ValueKey(
-                              'library_tab_bar_${isScrollable}_${_activeTabs.map((t) => t.name).join('_')}',
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: Adaptive.contentConstraints(context),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Padding(
+                              padding: EdgeInsetsDirectional.fromSTEB(
+                                pagePad,
+                                AppSpacing.xs,
+                                pagePad,
+                                AppSpacing.sm,
+                              ),
+                              child: SizedBox(
+                                height: controlBarHeight,
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Semantics(
+                                        button: true,
+                                        label: context.l10n.search,
+                                        child: Material(
+                                          color: p.surfaceContainer,
+                                          borderRadius: AppRadii.r20All,
+                                          clipBehavior: Clip.antiAlias,
+                                          child: InkWell(
+                                            key: const ValueKey(
+                                              'library_search_action',
+                                            ),
+                                            borderRadius: AppRadii.r20All,
+                                            onTap: () => context.push('/search'),
+                                            child: Container(
+                                              height: controlBarHeight,
+                                              padding:
+                                                  const EdgeInsetsDirectional
+                                                      .only(
+                                                start: AppSpacing.s14,
+                                                end: AppSpacing.sm,
+                                              ),
+                                              decoration: BoxDecoration(
+                                                borderRadius: AppRadii.r20All,
+                                                border: Border.all(
+                                                  color: p.hairline,
+                                                ),
+                                              ),
+                                              child: Row(
+                                                children: [
+                                                  Icon(
+                                                    Icons.search_rounded,
+                                                    size: 19,
+                                                    color: p.textSecondary,
+                                                  ),
+                                                  const SizedBox(
+                                                    width: AppSpacing.xs,
+                                                  ),
+                                                  Expanded(
+                                                    child: Text(
+                                                      context.l10n
+                                                          .searchPlaceholder,
+                                                      maxLines: 1,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                      style: TextStyle(
+                                                        color: p.textTertiary,
+                                                        fontSize: AppFontSize
+                                                            .bodySmall,
+                                                        fontWeight:
+                                                            FontWeight.w500,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: AppSpacing.xs),
+                                    Semantics(
+                                      button: true,
+                                      label:
+                                          '${context.l10n.sortBy}: $sortLabel',
+                                      child: Tooltip(
+                                        message:
+                                            '${context.l10n.sortBy}: $sortLabel',
+                                        child: Material(
+                                          color: isSortedCustom
+                                              ? p.accent.withValues(alpha: 0.14)
+                                              : p.surfaceContainer,
+                                          borderRadius: AppRadii.r20All,
+                                          clipBehavior: Clip.antiAlias,
+                                          child: InkWell(
+                                            key: const ValueKey(
+                                              'library_sort_filter_pill',
+                                            ),
+                                            borderRadius: AppRadii.r20All,
+                                            onTap: () => _showSortAndViewSheet(
+                                              context,
+                                              state,
+                                              cubit,
+                                            ),
+                                            child: ConstrainedBox(
+                                              constraints: BoxConstraints(
+                                                minWidth:
+                                                    AppSpacing.minTouchTarget,
+                                                minHeight: controlBarHeight,
+                                                maxWidth: screenWidth < 360
+                                                    ? 116
+                                                    : 148,
+                                              ),
+                                              child: Container(
+                                                height: controlBarHeight,
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                  horizontal: AppSpacing.sm,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  borderRadius: AppRadii.r20All,
+                                                  border: Border.all(
+                                                    color: isSortedCustom
+                                                        ? p.accent.withValues(
+                                                            alpha: 0.35,
+                                                          )
+                                                        : p.hairline,
+                                                  ),
+                                                ),
+                                                child: Row(
+                                                  mainAxisSize:
+                                                      MainAxisSize.min,
+                                                  children: [
+                                                    Icon(
+                                                      Icons.sort_rounded,
+                                                      size: 17,
+                                                      color: isSortedCustom
+                                                          ? p.accent
+                                                          : p.textPrimary,
+                                                    ),
+                                                    const SizedBox(
+                                                      width: AppSpacing.s6,
+                                                    ),
+                                                    Flexible(
+                                                      child: Text(
+                                                        sortLabel,
+                                                        maxLines: 1,
+                                                        overflow: TextOverflow
+                                                            .ellipsis,
+                                                        style: TextStyle(
+                                                          color: isSortedCustom
+                                                              ? p.accent
+                                                              : p.textPrimary,
+                                                          fontSize:
+                                                              AppFontSize.label,
+                                                          fontWeight:
+                                                              FontWeight.w700,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    const SizedBox(
+                                                      width: AppSpacing.xxs,
+                                                    ),
+                                                    Icon(
+                                                      activeSort.ascending
+                                                          ? Icons
+                                                              .arrow_upward_rounded
+                                                          : Icons
+                                                              .arrow_downward_rounded,
+                                                      size: 14,
+                                                      color: isSortedCustom
+                                                          ? p.accent
+                                                          : p.textSecondary,
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ),
-                            controller: _tabController,
-                            isScrollable: isScrollable,
-                            scrollEdgeFade: isScrollable,
-                            physics: const BouncingScrollPhysics(),
-                            tabs: _activeTabs
-                                .map((tab) =>
-                                    _buildTabItem(context, tab, state, p))
-                                .toList(),
-                          );
-                        },
+                            Padding(
+                              padding: EdgeInsetsDirectional.fromSTEB(
+                                pagePad,
+                                0,
+                                pagePad,
+                                AppSpacing.xxs,
+                              ),
+                              child: LayoutBuilder(
+                                builder: (context, constraints) {
+                                  final isScrollable = _needsScrollableTabs(
+                                    context,
+                                    state,
+                                    constraints.maxWidth,
+                                  );
+                                  return PulsrPillTabBar(
+                                    tabBarKey: ValueKey(
+                                      'library_tab_bar_${isScrollable}_${_activeTabs.map((t) => t.name).join('_')}',
+                                    ),
+                                    controller: _tabController,
+                                    isScrollable: isScrollable,
+                                    scrollEdgeFade: isScrollable,
+                                    physics: const BouncingScrollPhysics(),
+                                    tabs: _activeTabs
+                                        .map((tab) => _buildTabItem(
+                                            context, tab, state, p))
+                                        .toList(),
+                                  );
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),

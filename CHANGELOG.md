@@ -1,5 +1,44 @@
 # Pulsr Hardening & Delivery Changelog
 
+## [2.0.0] — 2026-11-22
+
+Major release elevating Pulsr Music with a decoupled Now Playing theme architecture, 8 distinctive full-screen themes, comprehensive HomeScreen & LibraryScreen visual and layout enhancements, and v2.0.0 modernization.
+
+### Player Themes Architecture (11 → 8 Distinct Themes)
+- **Decoupled Full-Screen Theme Contract**: Replaced the rigid shared `PlayerThemeScaffold` template with `PlayerSurfaceShell`, allowing each theme to fully own its background surface, typography alignment, scrubber style, transport styling, and control density.
+- **Pruned Redundant Themes**:
+  - Pruned `classic_player_theme.dart` (migrated to `clean`).
+  - Pruned `circle_player_theme.dart` (migrated to `vinyl`).
+  - Pruned `minimal_player_theme.dart` (migrated to `waveform`).
+- **Crash-Proof Legacy Migration**: Added `PlayerThemeMode.fromName(raw)` with automatic self-healing on disk in `SharedPreferences`, backup export/import normalization, and settings profile migration.
+- **8 Distinct Themes Elevated**:
+  1. **Clean Modern Flow** (`clean_player_theme.dart`): Full-bleed smooth mesh/blurred album-art gradient background, rounded artwork with play/pause scale animation, left-aligned bold title/artist, knobless thick translucent capsule scrubber, and clean borderless transport.
+  2. **Card Glass Overlay** (`card_player_theme.dart`): Full-viewport live blurred canvas, interactive swipeable stacked album card deck with peeking previous/next track cards, and floating frosted-glass (`BackdropFilter`) bottom control card with specular top border.
+  3. **Vinyl Turntable Studio** (`vinyl_player_theme.dart`): Warm dark brushed-aluminum/walnut chassis, grooved rotating vinyl with tonearm drop/lift animation, glowing `33⅓ RPM` / `STANDBY` LED indicator, warm analog progress slider, and metallic/amber rotary-inspired transport bar.
+  4. **CD Turntable** (`cd_player_theme.dart`): Cool-silver/titanium Discman faceplate, realistic translucent acrylic jewel case with ribbed left spine, backlit monospace dot-matrix LCD (`TRK XX · 01:48 / 03:56`), and rectangular brushed-metal transport keys.
+  5. **Retro Cassette Deck** (`cassette_player_theme.dart`): Full-screen anodized deck chassis with recessed cassette bay framing spinning tape spools, twin 16-segment glowing LED VU meters reacting to playback, and physical rectangular mechanical deck keys (`<<`, `▶`, `❚❚`, `>>`).
+  6. **Studio Waveform** (`waveform_player_theme.dart`): Compact corner artwork thumbnail, bold monospace audio telemetry strip (`FLAC · 24-bit / 96 kHz · USB DAC`), large interactive seekable audio waveform centerpiece backed by `WaveformService`, and precision minimal transport controls.
+  7. **Karaoke Lyrics Immersion** (`lyrics_player_theme.dart`): Lyrics-first stage occupying ~70% of the viewport with magnified glowing active line, tap-to-seek, compact top bar, and ultra-slim floating translucent progress/transport pill.
+  8. **Milkdrop Visualizer** (`milkdrop_player_theme.dart`): Edge-to-edge full-screen `shaders/milkdrop.frag` GPU canvas via `MilkdropRenderer` with automatic `MilkdropCanvasPainter` fallback under GPU Saver, live preset cycling, and tap-to-immerse auto-dim mode.
+- **Expandable Secondary Tools Sheet** (`PlayerToolsSheet`): Tucks A/B Loop controls and the 7 secondary dock actions into an adaptive sheet/dialog, with an active badge indicator on compact themes (`PlayerToolsTriggerButton`).
+- **Theme Studio & Picker Compatibility**: Updated `custom_theme_builder_screen.dart` and `settings_theme_pickers.dart` with live mini-previews matching each theme's unique layout.
+
+### HomeScreen UI/UX Enhancement
+- **Atmospheric Top Depth**: Added a subtle accent-tinted top radial ambient glow (automatically disabled on pure-black AMOLED, High Contrast, and Calm density).
+- **Responsive 50/50 Local | Online Tab Bar**: Rebuilt `CompactSourceScopeSwitcher` to span the full width on mobile as a thumb-friendly 48dp 50/50 sliding pill (constrained to `maxWidth: 400` on tablet), overflow-safe at 360dp Arabic RTL @ 2.0x text scale.
+- **Hero Carousel Polish**: Fixed harsh silver wireframe card borders, replaced clipping single-line title with a 2-line editorial layout, and seamlessly blended the arched Mecca artwork with a directional gradient fade.
+- **Tonal Bento Cards**: Upgraded `Favorites` and `Focus Flow` into tactile `PulsrPressable` Bento cards with distinct harmonized accent colors.
+- **Lightweight Section Headers**: Replaced repetitive heavy dark-maroon `"See All >"` pill boxes with lightweight editorial accent text + chevron actions.
+- **Recently Played & Media Cards**: Clean 2-tier Title + Artist hierarchy, `AppBlur`-gated frosted corner play badges (with animated 3-bar equalizer on the active track), and smooth horizontal edge fade (`PulsrScrollEdgeFade`).
+- **Editorial Artwork Placeholders**: Refined `MeshGradientPlaceholder` with frosted glass monogram medallions and eliminated raw color literals.
+
+### LibraryScreen UI/UX Enhancement
+- **Aligned Action Bar**: Replaced mismatched ~36dp grey `Play All` pill + ~48dp rounded-square `Shuffle` button with a flush-aligned, equal-width twin-pill action bar (`48dp` `StadiumBorder`).
+- **Eliminated Duplicate Stats**: Removed redundant track count and lossless badges stacked directly below the tab bar.
+- **Clean Search + Sort Row**: Dedicated full-width Search Bar pill + directional Sort pill (`≡ Title ↑/↓`).
+- **Offline Download Badge & Overflow Guard**: Replaced cramped subtitle checkmark with a centered circular badge, and added bound-overflow protection preventing `SongTile` `RenderFlex` overflow on Tablet @ 2.0x text scale.
+- **Vertical Rhythm**: Balanced breathing room between title/stats, search/sort, tab bar, and collection cards.
+
 ## Section 8 Audiophile Architecture & Remediation Program (10/10) — 2026-11-20
 
 Completed the complete phased remediation plan (`plan_new.md`), achieving 10/10 across all 11 architectural domains with zero regressions, zero audio render-thread allocations, and 100% bidirectional bridge parity.

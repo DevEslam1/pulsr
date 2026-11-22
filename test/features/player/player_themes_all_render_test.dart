@@ -5,8 +5,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/features/player/cubit/player_cubit.dart';
 import 'package:pulsr/features/player/cubit/player_state.dart';
+import 'package:pulsr/features/player/presentation/themes/player_surface_shell.dart';
 import 'package:pulsr/features/player/presentation/themes/player_theme.dart';
-import 'package:pulsr/features/player/presentation/themes/player_theme_scaffold.dart';
 import 'package:pulsr/features/player/presentation/themes/theme_registry.dart';
 import 'package:pulsr/features/settings/cubit/settings_cubit.dart';
 import 'package:pulsr/features/settings/cubit/settings_state.dart';
@@ -81,22 +81,8 @@ void main() {
     );
   }
 
-  const scaffoldThemes = [
-    PlayerThemeMode.classic,
-    PlayerThemeMode.card,
-    PlayerThemeMode.circle,
-    PlayerThemeMode.minimal,
-    PlayerThemeMode.vinyl,
-    PlayerThemeMode.cd,
-    PlayerThemeMode.cassette,
-    PlayerThemeMode.waveform,
-    PlayerThemeMode.lyricsFocus,
-    PlayerThemeMode.milkdrop,
-  ];
-
-  group('All 10 PlayerThemeScaffold Themes Multi-Form-Factor Rendering Tests',
-      () {
-    for (final themeMode in scaffoldThemes) {
+  group('All 8 PlayerSurfaceShell Themes Multi-Form-Factor Rendering Tests', () {
+    for (final themeMode in PlayerThemeMode.values) {
       testWidgets('$themeMode renders without exception in Portrait (390x844)',
           (tester) async {
         final props = PlayerThemeProps(
@@ -115,7 +101,7 @@ void main() {
         await tester.pump();
 
         expect(tester.takeException(), isNull);
-        expect(find.byType(PlayerThemeScaffold), findsOneWidget);
+        expect(find.byType(PlayerSurfaceShell), findsOneWidget);
       });
 
       testWidgets('$themeMode renders without exception in Landscape (844x390)',
@@ -136,7 +122,7 @@ void main() {
         await tester.pump();
 
         expect(tester.takeException(), isNull);
-        expect(find.byType(PlayerThemeScaffold), findsOneWidget);
+        expect(find.byType(PlayerSurfaceShell), findsOneWidget);
       });
 
       testWidgets(
@@ -158,7 +144,7 @@ void main() {
         await tester.pump();
 
         expect(tester.takeException(), isNull);
-        expect(find.byType(PlayerThemeScaffold), findsOneWidget);
+        expect(find.byType(PlayerSurfaceShell), findsOneWidget);
       });
 
       testWidgets('$themeMode renders without exception in Split-View',
@@ -180,7 +166,7 @@ void main() {
         await tester.pump();
 
         expect(tester.takeException(), isNull);
-        expect(find.byType(PlayerThemeScaffold), findsOneWidget);
+        expect(find.byType(PlayerSurfaceShell), findsOneWidget);
       });
     }
   });

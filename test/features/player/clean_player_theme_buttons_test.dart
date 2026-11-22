@@ -138,14 +138,13 @@ void main() {
       expect(find.byIcon(Icons.keyboard_arrow_down_rounded), findsNothing);
       expect(find.byType(PlayerPlayHandle), findsOneWidget);
 
-      // 2. Track Header: Title is start-aligned with Artist, plus Add to Playlist, Favorite (Star), More / Song Options (...)
+      // 2. Track Header: Title is start-aligned with Artist, plus Favorite & More (...)
       final titleMarquee = tester.widget<MarqueeText>(find.byType(MarqueeText));
       expect(titleMarquee.textAlign, TextAlign.start);
       final titleRect = tester.getRect(find.text('Test Song Title'));
       final artistRect = tester.getRect(find.text('Test Artist'));
       expect(titleRect.left, closeTo(artistRect.left, 1.0));
-      expect(find.byIcon(Icons.playlist_add_rounded), findsOneWidget);
-      expect(find.byIcon(Icons.star_outline_rounded), findsOneWidget);
+      expect(find.byIcon(Icons.favorite_border_rounded), findsOneWidget);
       expect(find.byIcon(Icons.more_horiz_rounded), findsOneWidget);
 
       // 3. Transport Controls: Shuffle, Previous, Play/Pause, Next, Repeat
@@ -155,15 +154,20 @@ void main() {
       expect(find.byIcon(Icons.fast_forward_rounded), findsOneWidget);
       expect(find.byIcon(Icons.repeat_rounded), findsOneWidget);
 
-      // 4. Bottom Action Dock: Lyrics, EQ, Speed, Output, Quran, Ambient, Timer, Queue
+      // 4. Minimal 4-item Bottom Row: Lyrics, Output, Queue, and Tools trigger
       expect(find.byIcon(Icons.chat_bubble_outline_rounded), findsOneWidget);
-      expect(find.byIcon(Icons.tune_rounded), findsOneWidget);
-      expect(find.byIcon(Icons.speed_rounded), findsOneWidget);
       expect(find.byIcon(Icons.speaker_rounded), findsOneWidget);
+      expect(find.byIcon(Icons.format_list_bulleted_rounded), findsOneWidget);
+      expect(find.byType(PlayerToolsTriggerButton), findsOneWidget);
+
+      // Tapping Tools trigger opens PlayerToolsSheet with secondary actions
+      await tester.tap(find.byType(PlayerToolsTriggerButton));
+      await tester.pumpAndSettle();
+      expect(find.byType(PlayerToolsSheet), findsOneWidget);
+      expect(find.byIcon(Icons.speed_rounded), findsOneWidget);
       expect(find.byIcon(Icons.auto_stories_rounded), findsOneWidget);
       expect(find.byIcon(Icons.water_drop_rounded), findsOneWidget);
       expect(find.byIcon(Icons.timer_outlined), findsOneWidget);
-      expect(find.byIcon(Icons.format_list_bulleted_rounded), findsOneWidget);
     });
 
     testWidgets('taps trigger expected cubit callbacks', (tester) async {
@@ -380,7 +384,7 @@ void main() {
     });
 
     testWidgets(
-        'landscape fills left half edge-to-edge into camera/corners and centers play handle',
+        'landscape places artwork stage cleanly in left half and centers play handle',
         (tester) async {
       tester.view.physicalSize = const Size(994, 456);
       tester.view.devicePixelRatio = 1.0;
@@ -391,22 +395,33 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(tester.takeException(), isNull);
-      final artRect = tester.getRect(find.byType(CachedArtwork));
-      final placeholderRect = tester.getRect(find.byType(ArtworkPlaceholder));
+      final stageArtwork = find.descendant(
+        of: find.byType(Hero),
+        matching: find.byType(CachedArtwork),
+      );
+      expect(stageArtwork, findsOneWidget);
+      final artRect = tester.getRect(stageArtwork);
+      final placeholderRect = tester.getRect(
+        find.descendant(
+          of: stageArtwork,
+          matching: find.byType(ArtworkPlaceholder),
+        ),
+      );
       final handleRect = tester.getRect(find.byType(PlayerPlayHandle));
 
-      // Artwork stage fills the full left half (into camera cutout & corners).
-      expect(artRect.left, closeTo(0.0, 0.5));
-      expect(artRect.top, closeTo(0.0, 0.5));
-      expect(artRect.right, closeTo(497.0, 1.0));
-      expect(artRect.bottom, closeTo(456.0, 0.5));
+      // Artwork stage stays inside the safe left half without overflowing.
+      expect(artRect.left, greaterThanOrEqualTo(48.0));
+      expect(artRect.top, greaterThanOrEqualTo(0.0));
+      expect(artRect.right, lessThanOrEqualTo(521.0));
+      expect(artRect.bottom, lessThanOrEqualTo(456.0));
 
-      // Inner artwork child stretches to match the full stage without shrinking.
-      expect(placeholderRect.width, closeTo(497.0, 1.0));
-      expect(placeholderRect.height, closeTo(456.0, 1.0));
+      // Inner placeholder matches the artwork bounds cleanly.
+      expect(placeholderRect.width, closeTo(artRect.width, 1.0));
+      expect(placeholderRect.height, closeTo(artRect.height, 1.0));
 
-      // Top grab handle remains horizontally centered on the display.
-      expect(handleRect.center.dx, closeTo(497.0, 1.0));
+      // Top grab handle remains horizontally centered within the safe display area
+      // (left cutout 48dp -> safe span [48, 994], center = 521.0).
+      expect(handleRect.center.dx, closeTo(521.0, 1.0));
     });
   });
 }

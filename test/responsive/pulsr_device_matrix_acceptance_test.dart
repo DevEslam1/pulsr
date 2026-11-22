@@ -14,7 +14,7 @@ import 'package:pulsr/core/widgets/pulsr_dialog.dart';
 import 'package:pulsr/features/player/cubit/player_cubit.dart';
 import 'package:pulsr/features/player/cubit/player_state.dart';
 import 'package:pulsr/features/player/presentation/responsive_player_layout.dart';
-import 'package:pulsr/features/player/presentation/themes/classic_player_theme.dart';
+import 'package:pulsr/features/player/presentation/themes/clean_player_theme.dart';
 import 'package:pulsr/features/player/presentation/themes/player_theme.dart';
 import 'package:pulsr/features/settings/cubit/settings_cubit.dart';
 import 'package:pulsr/features/settings/cubit/settings_state.dart';
@@ -104,7 +104,7 @@ void main() {
                 ResponsivePlayerLayout(
                   state: player.state,
                   cubit: player,
-                  themeWidget: ClassicPlayerTheme(props: props),
+                  themeWidget: CleanPlayerTheme(props: props),
                   activeColor: activeColor,
                   bgColor: bgColor,
                 ),

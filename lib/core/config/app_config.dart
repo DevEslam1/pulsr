@@ -21,7 +21,7 @@ class AppConfig {
       bool.fromEnvironment('PULSR_DB_ENCRYPTION', defaultValue: true);
   static const String _buildTimeVersion =
       String.fromEnvironment('APP_VERSION', defaultValue: '');
-  static String _installedVersion = '1.0.0';
+  static String _installedVersion = '2.0.0';
 
   /// Installed package version. Resolved from the platform manifest at
   /// startup so release builds do not compare against a stale constant (the

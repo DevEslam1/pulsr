@@ -274,7 +274,8 @@ extension _EqParametricToolbar on _EqualizerSheetState {
           final frequencies = _activeFrequencies(state);
           const minBandWidth = AppSpacing.minTouchTarget;
           final fitsWithoutScroll = bandCount <= 10 &&
-              constraints.maxWidth >= bandCount * minBandWidth;
+              (context.isTabletLandscape ||
+                  constraints.maxWidth >= bandCount * minBandWidth);
 
           Widget buildSliders() {
             return Row(

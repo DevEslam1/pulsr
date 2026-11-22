@@ -75,6 +75,34 @@ void main() {
       final p = SettingsProfile.fromJson(<String, dynamic>{});
       expect(p.id, '');
       expect(p.name, 'Custom Profile');
+      expect(p.playerTheme, 'clean');
+    });
+
+    test('SettingsProfile.fromJson migrates legacy removed player themes', () {
+      final cases = <String?, String>{
+        'classic': 'clean',
+        'circle': 'vinyl',
+        'minimal': 'waveform',
+        'PlayerThemeMode.classic': 'clean',
+        'PlayerThemeMode.circle': 'vinyl',
+        'PlayerThemeMode.minimal': 'waveform',
+        'lyricsfocus': 'lyricsFocus',
+        'bogus': 'clean',
+        null: 'clean',
+      };
+      for (final entry in cases.entries) {
+        final p = SettingsProfile.fromJson(<String, dynamic>{
+          'id': 'legacy_${entry.key}',
+          'name': 'Legacy',
+          'playerTheme': entry.key,
+        });
+        expect(
+          p.playerTheme,
+          entry.value,
+          reason: 'Profile playerTheme "${entry.key}" should migrate to '
+              '"${entry.value}"',
+        );
+      }
     });
 
     test('SettingsProfile copyWith, ==, hashCode works properly', () {

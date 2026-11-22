@@ -239,7 +239,7 @@ void main() {
                     state: state,
                     cubit: themeCubit,
                     themeWidget: ThemeRegistry.build(
-                      PlayerThemeMode.classic,
+                      PlayerThemeMode.clean,
                       PlayerThemeProps(
                         state: state,
                         cubit: themeCubit,

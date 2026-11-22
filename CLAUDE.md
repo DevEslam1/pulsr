@@ -2,7 +2,7 @@
 
 > **Target Audience:** AI Models (Claude, Gemini, Cursor, Copilot) & Human Engineers  
 > **Repository:** `pulsr` — Premium Offline-First Audiophile Music Player  
-> **Package Metadata:** Root package `pulsr` (`pubspec.yaml`, version `1.0.0+1`, Flutter `>=3.47.0`). The Flutter floor is the binding entry requirement: `material_ui` 1.11.x and `cupertino_ui` 1.1.x both declare `flutter: ">=3.47.0"` and `sdk: ^3.13.0`, and Flutter 3.47 ships Dart 3.13. The `environment.sdk` lower bound is deliberately kept at `>=3.0.0` because it selects the package *language version*: raising it to `^3.13.0` switches the whole repo to the Dart 3.7+ tall formatter and un-suppresses ~344 lint diagnostics, which is tracked as a separate migration. Note: Root package takes precedence over vendored packages such as `third_party/just_audio`; that fork's Dart `^3.6.0` requirement is not the binding constraint.  
+> **Package Metadata:** Root package `pulsr` (`pubspec.yaml`, version `2.0.0+1`, Flutter `>=3.47.0`). The Flutter floor is the binding entry requirement: `material_ui` 1.11.x and `cupertino_ui` 1.1.x both declare `flutter: ">=3.47.0"` and `sdk: ^3.13.0`, and Flutter 3.47 ships Dart 3.13. The `environment.sdk` lower bound is deliberately kept at `>=3.0.0` because it selects the package *language version*: raising it to `^3.13.0` switches the whole repo to the Dart 3.7+ tall formatter and un-suppresses ~344 lint diagnostics, which is tracked as a separate migration. Note: Root package takes precedence over vendored packages such as `third_party/just_audio`; that fork's Dart `^3.6.0` requirement is not the binding constraint.  
 > **Frameworks & Languages:** Flutter 3.47+ (Dart 3.13 runtime; language version pinned at 3.0 in `pubspec.yaml` pending the tall-formatter migration), C++20 (Native DSP Engine), Kotlin (Android Platform Channels), Go 1.22+ (Party Sync Server), GLSL (Custom Shaders).
 
 ---
@@ -14,7 +14,7 @@
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                            PRESENTATION LAYER                               │
-│  GoRouter · AppShell · MiniPlayer · NowPlayingScreen (11 Themes)            │
+│  GoRouter · AppShell · MiniPlayer · NowPlayingScreen (8 Themes)             │
 │  BLoC / Cubits: PlayerCubit, LibraryCubit, SettingsCubit, DownloadsCubit... │
 └──────────────────────────────────────┬──────────────────────────────────────┘
                                        │
@@ -64,7 +64,7 @@
 | **Native C++ DSP Engine** | 10-band graphic & arbitrary frequency EQ, 64-band parametric EQ (`MAX_NATIVE_EQ_BANDS`), multichannel Channel Manager (2–8 channels, per-channel trim and delay), DSD512 decoder (to 768 kHz PCM), convolution reverb (IR files), lookahead peak limiter, 4-band multiband compressor, dynamic bass boost, loudness contour, spatial panner, stereo widener, ViPER-DDC presets, and LiveProg JSFX scripting. *(Sinc resampler is delegated/unsupported in `AudioEffectsPlugin`: `hasSincResampler = false`, enabling returns `DSP_UNSUPPORTED`.)* | `android/app/src/main/cpp/`, `lib/features/player/cubit/controllers/` |
 | **Local Music Library** | Complete MediaStore & filesystem scanner, metadata enrichment, embedded ID3 tag editor with artwork extraction, album/artist/genre/folder/year indexer, duplicate audio finder, and library statistics. | `lib/data/scanner/`, `lib/features/library/`, `lib/features/tag_editor/` |
 | **YouTube Music Integration** | InnerTube catalog search, stream pre-resolution, modern Rhino JS signature transform (`solveSig`) + `n`-throttling solver (`solveN`), authenticated `WEB` client fallback for age-restricted (+18) tracks, chunked background audio downloader with resumable storage, rate limiting, circuit breaker, OAuth / WebView session login, and geo-block recovery. | `lib/core/services/ytm_*`, `lib/core/services/yt_download_*`, `lib/features/ytm_search/` |
-| **Player Themes** | 11 distinct Now Playing designs: Classic, Card, Circle, Minimal, Vinyl Turntable, CD Turntable, Cassette Deck, Full-Bleed Waveform, Karaoke Lyrics, Clean Modern Flow, and Milkdrop Visualizer. Custom Theme Studio included. | `lib/features/player/presentation/themes/` |
+| **Player Themes** | 8 distinct Now Playing designs: Clean Modern Flow, Card Glass Overlay, Vinyl Turntable Studio, CD Turntable, Retro Cassette Deck, Studio Waveform, Karaoke Lyrics Immersion, and Milkdrop Visualizer. Custom Theme Studio included. | `lib/features/player/presentation/themes/` |
 | **Synchronized Lyrics & Karaoke** | Real-time synchronized LRC parser, LRCLIB API client, millisecond offset manual editor, multi-language lyrics translation, lyric card sharing, and Karaoke mode screen. | `lib/data/lyrics/`, `lib/features/player/presentation/widgets/lyrics*` |
 | **Pulsr Party (Listen Together)** | WebSocket group listening with protocol v1 (13 frame types, 15 actions, 12 host-gated); 2–10 members (default 5), six-character room codes, host-only or democratic queue, 12-sample NTP-style offset and 10 s ping loop. | `server/pulsr_party/`, `lib/data/party/`, `lib/features/party/` |
 | **Visualizers & Shaders** | Real-time audio reactive Milkdrop visualizer powered by a custom OpenGL fragment shader (`shaders/milkdrop.frag`) and platform audio visualizer taps. | `shaders/milkdrop.frag`, `lib/features/player/presentation/widgets/visualizer/` |
@@ -239,19 +239,19 @@ pulsr/
 - **`features/player/cubit/controllers/`**: Granular controllers handling specific player sub-tasks (`player_dsp_controller.dart`, `player_queue_controller.dart`, `player_lyrics_manager.dart`, `player_sponsorblock_manager.dart`, `player_quran_manager.dart`).
 - **`features/player/presentation/now_playing_screen.dart`**: Main player screen supporting swipe-down dismissal, lyrics view, queue overlay, and responsive layouts.
 - **`features/player/presentation/mini_player.dart`**: Persistent bottom mini player widget with progress bar, play/pause, and swipe to skip.
-- **`features/player/presentation/themes/` (The 11 Player Themes)**:
-  - `clean_player_theme.dart`: Modern borderless design with edge-to-edge album artwork.
-  - `vinyl_player_theme.dart`: Realistic rotating vinyl record on turntable deck.
-  - `cassette_player_theme.dart`: Retro cassette tape with spinning spools and magnetic tape rendering.
-  - `cd_player_theme.dart`: Compact disc with iridescent rainbow reflection.
-  - `circle_player_theme.dart`: Modern circular artwork layout with radial progress indicator.
-  - `classic_player_theme.dart`: Standard high-density card and cover art view.
-  - `minimal_player_theme.dart`: Clean, typography-first interface with discreet controls.
-  - `card_player_theme.dart`: Elevated floating cover art card.
-  - `lyrics_player_theme.dart`: Fullscreen scrolling lyrics with playback controls anchored at bottom.
-  - `waveform_player_theme.dart`: Dynamic audio waveform track visualization.
-  - `milkdrop_player_theme.dart`: Full-screen GPU Milkdrop visualizer surface with Canvas fallback.
+- **`features/player/presentation/themes/` (The 8 Player Themes)**:
+  - `clean_player_theme.dart`: Apple Music-inspired modern borderless design with edge-to-edge artwork.
+  - `card_player_theme.dart`: Spatial frosted-glass sheet with interactive swipeable stacked album card deck.
+  - `vinyl_player_theme.dart`: Realistic rotating vinyl record on turntable deck with tonearm animation and rotary transport.
+  - `cd_player_theme.dart`: Compact disc with iridescent rainbow reflection, Y2K jewel case, and dot-matrix LCD.
+  - `cassette_player_theme.dart`: Retro Walkman cassette tape with spinning spools, LED VU meters, and mechanical keys.
+  - `waveform_player_theme.dart`: Dynamic audio waveform track visualization and studio telemetry strip.
+  - `lyrics_player_theme.dart`: Fullscreen scrolling lyrics-first stage with playback controls anchored at bottom.
+  - `milkdrop_player_theme.dart`: Full-screen GPU Milkdrop visualizer surface with Canvas fallback under GPU Saver.
   - `custom_theme_builder_screen.dart`: Visual tool allowing users to customize player palette, radius, glow and layout.
+  - `player_surface_shell.dart`: Lightweight decoupled full-screen theme shell handling metrics, split view, preview scope, and overlay transitions.
+  - `player_tools_sheet.dart`: Expandable secondary tools sheet/dialog housing A/B Loop and 7 secondary dock actions.
+  - `player_theme_helpers.dart`: Zero-I/O queue neighbors resolver, decoded-header audio telemetry formatter, and compact top bar primitives.
 - **`features/player/presentation/widgets/`**:
   - `equalizer_sheet.dart` & `arbitrary_eq_sheet.dart`: Interactive 10-band & parametric EQ sliders with frequency curve preview (`eq_curve_visualizer.dart`).
   - `autoeq_search_sheet.dart`: Headphone search sheet to import AutoEq frequency profiles.

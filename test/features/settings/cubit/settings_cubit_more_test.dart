@@ -98,7 +98,7 @@ void main() {
       await cubit.preferencesReady;
 
       expect(cubit.state.themeMode, AppThemeMode.dark);
-      expect(cubit.state.playerThemeMode, PlayerThemeMode.classic);
+      expect(cubit.state.playerThemeMode, PlayerThemeMode.clean);
       expect(cubit.state.visualizerStyle, VisualizerStyle.off);
       expect(cubit.state.miniPlayerSwipeLeft, MiniPlayerSwipeAction.next);
       expect(cubit.state.miniPlayerSwipeRight, MiniPlayerSwipeAction.prev);
@@ -106,6 +106,38 @@ void main() {
           NowPlayingDoubleTapAction.toggleFavorite);
       expect(cubit.state.nowPlayingArtworkSwipe,
           NowPlayingArtworkSwipeAction.nextPrev);
+    });
+
+    test('legacy removed player theme names migrate and self-heal on disk',
+        () async {
+      final cases = <String, PlayerThemeMode>{
+        'classic': PlayerThemeMode.clean,
+        'circle': PlayerThemeMode.vinyl,
+        'minimal': PlayerThemeMode.waveform,
+        'PlayerThemeMode.classic': PlayerThemeMode.clean,
+        'PlayerThemeMode.circle': PlayerThemeMode.vinyl,
+        'PlayerThemeMode.minimal': PlayerThemeMode.waveform,
+        'unknown_theme': PlayerThemeMode.clean,
+      };
+      for (final entry in cases.entries) {
+        SharedPreferences.setMockInitialValues({
+          'setting_player_theme_mode': entry.key,
+        });
+        final cubit = make();
+        await cubit.preferencesReady;
+        expect(
+          cubit.state.playerThemeMode,
+          entry.value,
+          reason: 'Saved "${entry.key}" must load as ${entry.value}',
+        );
+        final prefs = await SharedPreferences.getInstance();
+        expect(
+          prefs.getString('setting_player_theme_mode'),
+          entry.value.name,
+          reason: 'Saved "${entry.key}" must self-heal to "${entry.value.name}"',
+        );
+        await cubit.close();
+      }
     });
 
     test('legacy dynamic-theme bool maps to color source when source absent',
@@ -258,7 +290,7 @@ void main() {
       await prefs.setString(PrefsKeys.languageCode, 'de');
       await prefs.setDouble('setting_custom_theme_radius', 40);
       await prefs.setBool('setting_custom_theme_glow', true);
-      await prefs.setString('setting_player_theme_mode', 'classic');
+      await prefs.setString('setting_player_theme_mode', 'clean');
       await prefs.setString('setting_visualizer_style', 'bar');
       await prefs.setString('setting_mini_player_swipe_left', 'next');
       await prefs.setString('setting_mini_player_swipe_right', 'prev');

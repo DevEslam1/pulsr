@@ -2,8 +2,10 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_localizations/flutter_localizations.dart'
     hide GlobalMaterialLocalizations, GlobalCupertinoLocalizations;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 import 'package:pulsr/core/theme/aura_theme.dart';
 import 'package:pulsr/data/db/app_database.dart';
+import 'package:pulsr/features/home/presentation/widgets/home_card_metrics.dart';
 import 'package:pulsr/features/home/presentation/widgets/trending_card.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -39,16 +41,45 @@ void main() {
           GlobalWidgetsLocalizations.delegate,
         ],
         supportedLocales: AppLocalizations.supportedLocales,
-        home: Scaffold(body: Center(child: child)),
+        home: MediaQuery(
+          data: const MediaQueryData(disableAnimations: true),
+          child: Scaffold(body: Center(child: child)),
+        ),
       );
 
   group('TrendingCard', () {
-    testWidgets('renders the song title and artist', (tester) async {
+    testWidgets('renders harmonized 2-tier title, artist, frame, and play badge',
+        (tester) async {
       await tester.pumpWidget(app(TrendingCard(song: _song, onTap: () {})));
       await tester.pump();
 
-      expect(find.text(_song.title), findsOneWidget);
-      expect(find.text(_song.artist), findsOneWidget);
+      final titleText = tester.widget<Text>(find.text(_song.title));
+      expect(titleText.maxLines, 1);
+      expect(titleText.style?.fontSize, AppFontSize.bodySmall);
+      expect(titleText.style?.fontWeight, FontWeight.w700);
+
+      final artistText = tester.widget<Text>(find.text(_song.artist));
+      expect(artistText.maxLines, 1);
+      expect(artistText.style?.fontSize, AppFontSize.caption);
+
+      expect(find.byType(HomeCardArtworkFrame), findsOneWidget);
+      expect(find.byType(HomeCardPlayBadge), findsOneWidget);
+    });
+
+    testWidgets('shows equalizer badge when active and playing', (tester) async {
+      await tester.pumpWidget(
+        app(
+          TrendingCard(
+            song: _song,
+            onTap: () {},
+            isCurrent: true,
+            isPlaying: true,
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.byKey(const ValueKey('eq')), findsOneWidget);
     });
 
     testWidgets('fires onTap when tapped', (tester) async {

@@ -10,12 +10,9 @@ import 'package:pulsr/features/player/cubit/player_state.dart';
 import 'package:pulsr/features/player/presentation/themes/card_player_theme.dart';
 import 'package:pulsr/features/player/presentation/themes/cassette_player_theme.dart';
 import 'package:pulsr/features/player/presentation/themes/cd_player_theme.dart';
-import 'package:pulsr/features/player/presentation/themes/circle_player_theme.dart';
 import 'package:pulsr/features/player/presentation/themes/clean_player_theme.dart';
-import 'package:pulsr/features/player/presentation/themes/classic_player_theme.dart';
 import 'package:pulsr/features/player/presentation/themes/lyrics_player_theme.dart';
 import 'package:pulsr/features/player/presentation/themes/milkdrop_player_theme.dart';
-import 'package:pulsr/features/player/presentation/themes/minimal_player_theme.dart';
 import 'package:pulsr/features/player/presentation/themes/player_theme.dart';
 import 'package:pulsr/features/player/presentation/themes/player_theme_chrome.dart';
 import 'package:pulsr/features/player/presentation/themes/theme_registry.dart';
@@ -63,7 +60,7 @@ void main() {
     test('preview() wraps built theme with IgnorePointer and 360x640 bounds',
         () {
       final previewWidget = ThemeRegistry.preview(
-        PlayerThemeMode.classic,
+        PlayerThemeMode.clean,
         dummyProps,
         scale: 0.5,
       );
@@ -81,12 +78,12 @@ void main() {
       expect(sizedBox.height, 640);
       expect(sizedBox.child, isA<PlayerThemePreviewHost>());
       final host = sizedBox.child! as PlayerThemePreviewHost;
-      expect(host.child, isA<ClassicPlayerTheme>());
+      expect(host.child, isA<CleanPlayerTheme>());
     });
 
     test('preview() with isPreview: false exposes raw theme directly', () {
       final previewWidget = ThemeRegistry.preview(
-        PlayerThemeMode.classic,
+        PlayerThemeMode.clean,
         dummyProps,
         scale: 0.5,
         isPreview: false,
@@ -95,21 +92,18 @@ void main() {
       final bounds = previewWidget.child! as SizedBox;
       final fitted = bounds.child! as FittedBox;
       final sizedBox = fitted.child! as SizedBox;
-      expect(sizedBox.child, isA<ClassicPlayerTheme>());
+      expect(sizedBox.child, isA<CleanPlayerTheme>());
     });
 
-    test('preview() correctly builds all 11 theme modes', () {
+    test('preview() correctly builds all 8 theme modes', () {
       final modes = <PlayerThemeMode, Type>{
-        PlayerThemeMode.classic: ClassicPlayerTheme,
+        PlayerThemeMode.clean: CleanPlayerTheme,
         PlayerThemeMode.card: CardPlayerTheme,
-        PlayerThemeMode.circle: CirclePlayerTheme,
-        PlayerThemeMode.minimal: MinimalPlayerTheme,
         PlayerThemeMode.vinyl: VinylPlayerTheme,
         PlayerThemeMode.cd: CdPlayerTheme,
         PlayerThemeMode.cassette: CassettePlayerTheme,
         PlayerThemeMode.waveform: WaveformPlayerTheme,
         PlayerThemeMode.lyricsFocus: LyricsPlayerTheme,
-        PlayerThemeMode.clean: CleanPlayerTheme,
         PlayerThemeMode.milkdrop: MilkdropPlayerTheme,
       };
 
@@ -134,7 +128,8 @@ void main() {
 
     test('preview() scale sets layout dimensions as well as visual size', () {
       const targetScale = 0.35;
-      final preview = ThemeRegistry.preview(PlayerThemeMode.minimal, dummyProps,
+      final preview = ThemeRegistry.preview(
+          PlayerThemeMode.waveform, dummyProps,
           scale: targetScale) as IgnorePointer;
       final bounds = preview.child! as SizedBox;
       expect(bounds.width, closeTo(360 * targetScale, 0.001));
@@ -146,7 +141,7 @@ void main() {
       const canvas = Size(392, 872);
       const targetScale = 0.125;
       final preview = ThemeRegistry.preview(
-        PlayerThemeMode.classic,
+        PlayerThemeMode.clean,
         dummyProps,
         scale: targetScale,
         canvasSize: canvas,
@@ -162,7 +157,7 @@ void main() {
     });
   });
 
-  group('ThemeRegistry.preview(isPreview: true) layout across all 11 themes',
+  group('ThemeRegistry.preview(isPreview: true) layout across all 8 themes',
       () {
     late _MockPlayerCubit playerCubit;
     late _MockSettingsCubit settingsCubit;
@@ -210,7 +205,7 @@ void main() {
 
     for (final surfaceEntry in surfaceModes.entries) {
       testWidgets(
-        'renders all 11 themes cleanly with zero overflow in ${surfaceEntry.key} mode',
+        'renders all 8 themes cleanly with zero overflow in ${surfaceEntry.key} mode',
         (tester) async {
           tester.view.physicalSize = const Size(390, 844);
           tester.view.devicePixelRatio = 1.0;

@@ -2625,19 +2625,33 @@ class UsbExclusivePlugin(
             Log.w(TAG, "Step quirk: strict mode refuses an unprogrammed UAC2 clock")
             return startFailure("clock_not_verified")
         }
-        val selected = UsbAudioProtocol.selectFormat(
+        var selected = UsbAudioProtocol.selectFormat(
             parsed, effectiveRate, effectiveDepth, effectiveChannels,
-        ) ?: run {
+        ) ?: (if (effectiveChannels == 1) {
+            UsbAudioProtocol.selectFormat(parsed, effectiveRate, effectiveDepth, 2)
+        } else null)
+        if (selected == null && !strict && effectiveDepth > 24) {
+            selected = UsbAudioProtocol.selectFormat(
+                parsed, effectiveRate, 24, effectiveChannels,
+            ) ?: (if (effectiveChannels == 1) {
+                UsbAudioProtocol.selectFormat(parsed, effectiveRate, 24, 2)
+            } else null) ?: UsbAudioProtocol.selectFormat(
+                parsed, effectiveRate, 16, effectiveChannels,
+            ) ?: (if (effectiveChannels == 1) {
+                UsbAudioProtocol.selectFormat(parsed, effectiveRate, 16, 2)
+            } else null)
+        }
+        val finalSelected = selected ?: run {
             lastStreamResultCode = 3
             Log.w(TAG, "Step selectFormat: format unsupported: rate=$effectiveRate, " +
                 "depth=$effectiveDepth, channels=$effectiveChannels")
             return startFailure("format_unsupported")
         }
-        val epAddress = selected.endpointAddress
-        val epInterface = selected.interfaceNumber
-        val epAlt = selected.altSetting
-        val streamBytes = selected.subslotSize
-        val wireChannels = selected.channels.takeIf { it > 0 } ?: effectiveChannels
+        val epAddress = finalSelected.endpointAddress
+        val epInterface = finalSelected.interfaceNumber
+        val epAlt = finalSelected.altSetting
+        val streamBytes = finalSelected.subslotSize
+        val wireChannels = finalSelected.channels.takeIf { it > 0 } ?: effectiveChannels
 
         var iface: UsbInterface? = null
         for (i in 0 until device.interfaceCount) {

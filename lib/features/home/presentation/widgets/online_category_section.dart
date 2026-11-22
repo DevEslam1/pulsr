@@ -7,6 +7,7 @@ import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/async_state_builder.dart';
+import '../../../../core/widgets/pulsr_scroll_edge_fade.dart';
 import '../../../../core/widgets/pulsr_static_grid.dart';
 import '../../../../core/widgets/pulsr_section_header.dart';
 import '../../../../core/widgets/shimmer_skeleton.dart';
@@ -14,6 +15,7 @@ import '../../../../core/widgets/song_tile.dart';
 import '../../../../core/widgets/staggered_reveal.dart';
 import '../../../../domain/models/ytm_track.dart';
 import '../../../player/cubit/player_cubit.dart';
+import '../../../player/cubit/player_state.dart';
 import '../../../sheets/song_options_sheet.dart';
 import '../../../ytm_search/cubit/ytm_download_cubit.dart';
 import '../../../ytm_search/presentation/widgets/ytm_download_button.dart';
@@ -98,32 +100,40 @@ class _OnlineCategorySectionState extends State<OnlineCategorySection> {
               PulsrSectionHeader(title: widget.title),
               SizedBox(
                 height: scaledCarouselHeight(context, isTablet),
-                child: SkeletonShimmer(
-                  child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    physics: const NeverScrollableScrollPhysics(),
-                    addAutomaticKeepAlives: false,
-                    addRepaintBoundaries: true,
-                    padding: EdgeInsets.symmetric(
-                        horizontal: Adaptive.pagePadding(context)),
-                    itemCount: 4,
-                    itemBuilder: (context, index) => Padding(
-                      padding:
-                          const EdgeInsetsDirectional.only(end: AppSpacing.s14),
-                      child: SizedBox(
-                        width: size,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            SkeletonBox(
+                child: PulsrScrollEdgeFade(
+                  extent: 40,
+                  child: SkeletonShimmer(
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      physics: const NeverScrollableScrollPhysics(),
+                      addAutomaticKeepAlives: false,
+                      addRepaintBoundaries: true,
+                      padding: EdgeInsetsDirectional.fromSTEB(
+                        Adaptive.pagePadding(context),
+                        AppSpacing.s2,
+                        Adaptive.pagePadding(context),
+                        0,
+                      ),
+                      itemCount: 4,
+                      itemBuilder: (context, index) => Padding(
+                        padding: const EdgeInsetsDirectional.only(
+                            end: AppSpacing.s14),
+                        child: SizedBox(
+                          width: size,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              SkeletonBox(
                                 width: size,
                                 height: size,
-                                radius: AppRadii.r18),
-                            const SizedBox(height: AppSpacing.xs),
-                            SkeletonLine(width: size * 0.75, height: 12),
-                            const SizedBox(height: AppSpacing.s6),
-                            SkeletonLine(width: size * 0.45, height: 10),
-                          ],
+                                radius: AppRadii.r18,
+                              ),
+                              const SizedBox(height: AppSpacing.xs),
+                              SkeletonLine(width: size * 0.78, height: 13),
+                              const SizedBox(height: AppSpacing.s4),
+                              SkeletonLine(width: size * 0.48, height: 11),
+                            ],
+                          ),
                         ),
                       ),
                     ),
@@ -154,29 +164,55 @@ class _OnlineCategorySectionState extends State<OnlineCategorySection> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 PulsrSectionHeader(title: widget.title),
-                SizedBox(
-                  height: scaledCarouselHeight(context, isTablet),
-                  child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    addAutomaticKeepAlives: false,
-                    addRepaintBoundaries: true,
-                    padding: EdgeInsets.symmetric(
-                        horizontal: Adaptive.pagePadding(context)),
-                    itemCount: songs.length,
-                    itemBuilder: (context, index) {
-                      final song = songs[index];
-                      return StaggeredReveal(
-                        index: index,
-                        horizontal: true,
-                        groupKey: songs.isEmpty ? '' : '${songs.first.id}',
-                        child: TrendingCard(
-                          song: song,
-                          onTap: () =>
-                              widget.playerCubit.playSong(song, queue: songs),
-                        ),
-                      );
-                    },
+                BlocSelector<PlayerCubit, PlayerState,
+                    ({int? songId, String? remoteId, bool isPlaying})>(
+                  bloc: widget.playerCubit,
+                  selector: (state) => (
+                    songId: state.currentSong?.id,
+                    remoteId: state.currentSong?.remoteId,
+                    isPlaying: state.isPlaying,
                   ),
+                  builder: (context, playback) {
+                    return SizedBox(
+                      height: scaledCarouselHeight(context, isTablet),
+                      child: PulsrScrollEdgeFade(
+                        extent: 40,
+                        child: ListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          physics: const BouncingScrollPhysics(),
+                          addAutomaticKeepAlives: false,
+                          addRepaintBoundaries: true,
+                          padding: EdgeInsetsDirectional.fromSTEB(
+                            Adaptive.pagePadding(context),
+                            AppSpacing.s2,
+                            Adaptive.pagePadding(context),
+                            0,
+                          ),
+                          itemCount: songs.length,
+                          itemBuilder: (context, index) {
+                            final song = songs[index];
+                            final isCurrent = (song.remoteId != null &&
+                                    song.remoteId!.isNotEmpty &&
+                                    playback.remoteId == song.remoteId) ||
+                                (playback.songId != null &&
+                                    playback.songId == song.id);
+                            return StaggeredReveal(
+                              index: index,
+                              horizontal: true,
+                              groupKey: songs.isEmpty ? '' : '${songs.first.id}',
+                              child: TrendingCard(
+                                song: song,
+                                isCurrent: isCurrent,
+                                isPlaying: playback.isPlaying,
+                                onTap: () => widget.playerCubit
+                                    .playSong(song, queue: songs),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    );
+                  },
                 ),
                 const SizedBox(height: AppSpacing.md),
                 PulsrSectionHeader(

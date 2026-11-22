@@ -52,7 +52,7 @@ class PulsrEmptyState extends StatelessWidget {
       builder: (context, constraints) {
         final double minH = constraints.maxHeight.isFinite
             ? constraints.maxHeight * 0.6
-            : 280.0;
+            : 0.0;
         return Center(
           child: ConstrainedBox(
             constraints: BoxConstraints(minHeight: minH),
@@ -149,16 +149,21 @@ class PulsrEmptyState extends StatelessWidget {
                       fontWeight: FontWeight.w700,
                     ),
                   ),
-                  const SizedBox(height: AppSpacing.sm),
-                  Text(
-                    subtitle,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: p.textSecondary,
-                      fontSize: AppFontSize.bodySmall,
-                      height: 1.4,
+                  if (subtitle.isNotEmpty) ...[
+                    const SizedBox(height: AppSpacing.xs),
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 264),
+                      child: Text(
+                        subtitle,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: p.textSecondary,
+                          fontSize: AppFontSize.bodySmall,
+                          height: 1.45,
+                        ),
+                      ),
                     ),
-                  ),
+                  ],
                   if (primaryActionLabel != null &&
                       onPrimaryAction != null) ...[
                     const SizedBox(height: AppSpacing.lg),

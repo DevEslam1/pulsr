@@ -31,37 +31,70 @@ class DiscoveryChip extends StatelessWidget {
     final p = context.palette;
     final isCapsule = context.isCapsuleButtons;
     final chipRadius = context.buttonRadius(rectRadius: 6.0);
+    final tintedSurface = Color.alphaBlend(
+      iconColor.withValues(alpha: p.isDark ? 0.045 : 0.035),
+      p.surfaceContainerHigh,
+    );
     return PulsrPressable(
       onTap: onTap,
-      pressedScale: 0.97,
+      pressedScale: 0.96,
       hapticStyle: PulsrHapticStyle.selection,
       focusBorderRadius: isCapsule ? chipRadius : AppRadii.full,
-      // 40dp+ touch target styled as a clean borderless tinted pill
-      // (surfaceContainerHigh) with comfortable horizontal padding.
       child: Container(
         constraints: const BoxConstraints(minHeight: 40.0),
-        padding: EdgeInsets.symmetric(
-            horizontal: compact
-                ? (isCapsule ? 10.0 : AppSpacing.s10)
-                : (isCapsule ? 14.0 : AppSpacing.s12),
-            vertical: isCapsule ? 6.0 : AppSpacing.s8),
+        padding: isCapsule
+            ? EdgeInsetsDirectional.symmetric(
+                horizontal: compact ? AppSpacing.s10 : AppSpacing.s14,
+                vertical: AppSpacing.s6,
+              )
+            : (compact
+                ? const EdgeInsetsDirectional.symmetric(
+                    horizontal: AppSpacing.s10,
+                    vertical: AppSpacing.s6,
+                  )
+                : const EdgeInsetsDirectional.fromSTEB(
+                    AppSpacing.s8,
+                    AppSpacing.s6,
+                    AppSpacing.s14,
+                    AppSpacing.s6,
+                  )),
         decoration: isCapsule
             ? PulsrCapsuleStyle.decoration(p, borderRadius: chipRadius)
             : BoxDecoration(
-                color: p.surfaceContainerHigh,
+                color: tintedSurface,
                 borderRadius: AppRadii.full,
+                border: Border.all(
+                  color: p.borderSubtle,
+                  width: 1.0,
+                ),
+                boxShadow: p.isCalmDensity ? null : PulsrElevation.level1(p),
               ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              icon,
-              size: compact ? 14 : 15,
-              color: isCapsule
-                  ? PulsrCapsuleStyle.foregroundColor(p)
-                  : iconColor,
-            ),
+            if (!isCapsule && !compact)
+              Container(
+                width: 24,
+                height: 24,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: iconColor.withValues(alpha: p.isDark ? 0.16 : 0.12),
+                ),
+                child: Icon(
+                  icon,
+                  size: 14,
+                  color: iconColor,
+                ),
+              )
+            else
+              Icon(
+                icon,
+                size: compact ? 14 : 15,
+                color: isCapsule
+                    ? PulsrCapsuleStyle.foregroundColor(p)
+                    : iconColor,
+              ),
             SizedBox(width: compact ? AppSpacing.xs : AppSpacing.s8),
             Text(
               label,
@@ -69,9 +102,7 @@ class DiscoveryChip extends StatelessWidget {
                 color: isCapsule
                     ? PulsrCapsuleStyle.foregroundColor(p)
                     : p.textPrimary,
-                fontSize: compact
-                    ? AppFontSize.caption
-                    : (isCapsule ? 12.0 : AppFontSize.label),
+                fontSize: compact ? AppFontSize.caption : AppFontSize.label,
                 fontWeight: isCapsule ? FontWeight.w700 : FontWeight.w600,
                 letterSpacing: isCapsule ? 0.2 : null,
               ),

@@ -106,10 +106,13 @@ class PulsrSegmentedControl extends StatelessWidget {
                     width: fitLabels
                         ? (weights[clampedIndex] / totalWeight) * innerWidth
                         : segmentWidth,
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: p.accent,
-                        borderRadius: AppRadii.r20All,
+                    child: Padding(
+                      padding: const EdgeInsets.all(AppSpacing.s4),
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: p.accent,
+                          borderRadius: AppRadii.r16All,
+                        ),
                       ),
                     ),
                   ),
@@ -344,42 +347,47 @@ class _SegmentButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    final content = AnimatedContainer(
+    final content = ConstrainedBox(
       constraints: const BoxConstraints(minHeight: AppSpacing.minTouchTarget),
-      duration: context.motionMs(200),
-      curve: context.motionCurve(Curves.easeOutCubic),
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.sm,
-        vertical: AppSpacing.s10,
-      ),
-      decoration: BoxDecoration(
-        color: isSelected ? p.accent : Colors.transparent,
-        borderRadius: AppRadii.r20All,
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            segment.icon,
-            size: 16,
-            color: isSelected ? p.onAccent : p.textSecondary,
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.s4),
+        child: AnimatedContainer(
+          duration: context.motionMs(200),
+          curve: context.motionCurve(Curves.easeOutCubic),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.sm,
+            vertical: AppSpacing.s6,
           ),
-          const SizedBox(width: AppSpacing.s6),
-          Flexible(
-            child: Text(
-              segment.count != null
-                  ? '${segment.label} (${segment.count})'
-                  : segment.label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: AppFontSize.label,
-                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+          decoration: BoxDecoration(
+            color: isSelected ? p.accent : Colors.transparent,
+            borderRadius: AppRadii.r16All,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                segment.icon,
+                size: 16,
                 color: isSelected ? p.onAccent : p.textSecondary,
               ),
-            ),
+              const SizedBox(width: AppSpacing.s6),
+              Flexible(
+                child: Text(
+                  segment.count != null
+                      ? '${segment.label} (${segment.count})'
+                      : segment.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: AppFontSize.label,
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+                    color: isSelected ? p.onAccent : p.textSecondary,
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
 

@@ -52,6 +52,17 @@ mixin LibrarySongsTab on State<LibraryScreen> {
     });
   }
 
+  /// Computes the tablet multi-column [SongTile] row height so 1.0x stays
+  /// compact (72dp) while large accessibility text scales (up to 2.0x) grow
+  /// cleanly instead of clipping or overflowing vertically.
+  double _songGridTileExtent(BuildContext context) {
+    final textScale = MediaQuery.textScalerOf(context).scale(1.0);
+    if (textScale <= 1.0) return 72.0;
+    final scaledTextHeight =
+        (AppFontSize.body + AppFontSize.label) * textScale * 1.45;
+    return (scaledTextHeight + 28.0).ceilToDouble().clamp(72.0, double.infinity);
+  }
+
   // ================= SONGS =================
   Widget _buildSongsTab(
     BuildContext context,
@@ -70,7 +81,7 @@ mixin LibrarySongsTab on State<LibraryScreen> {
         return SkeletonList(
           padding: EdgeInsetsDirectional.fromSTEB(
             Adaptive.pagePadding(context),
-            AppSpacing.md,
+            AppSpacing.sm,
             Adaptive.pagePadding(context),
             PulsrLayoutMetrics.scrollBottom(context),
           ),
@@ -86,7 +97,9 @@ mixin LibrarySongsTab on State<LibraryScreen> {
 
     final isGrid = state.viewMode == LibraryViewMode.grid;
     final hasMore = cubit.hasMoreSongs;
-    final losslessCount = songs.where(isLosslessSong).length;
+    final pagePad = Adaptive.pagePadding(context);
+    final listEdgeInset =
+        (pagePad - AppSpacing.xs - AppSpacing.s10).clamp(0.0, double.infinity);
 
     Widget buildLoadMoreTile() {
       if (!state.isLoadingMore) return const SizedBox.shrink();
@@ -98,88 +111,74 @@ mixin LibrarySongsTab on State<LibraryScreen> {
     Widget buildQuickActionBar() {
       return Padding(
         padding: EdgeInsetsDirectional.fromSTEB(
-          Adaptive.pagePadding(context),
+          pagePad,
+          AppSpacing.sm,
+          pagePad,
           AppSpacing.xs,
-          Adaptive.pagePadding(context),
-          AppSpacing.xxs,
         ),
         child: Row(
           children: [
-            // The count and badge share whatever the actions leave behind;
-            // without this they overflow at 200% text scale on narrow phones.
             Expanded(
-              child: Row(
-                children: [
-                  Flexible(
-                    child: Text(
-                      context.l10n.tracksCount(songs.length),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: p.textSecondary,
-                        fontSize: AppFontSize.label,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                  if (losslessCount > 0) ...[
-                    const SizedBox(width: AppSpacing.xs),
-                    Flexible(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 1,
-                        ),
-                        decoration: BoxDecoration(
-                          color: p.info.withValues(alpha: 0.15),
-                          borderRadius: AppRadii.r4All,
-                        ),
-                        child: Text(
-                          context.l10n.losslessCountLabel(losslessCount),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: AppFontSize.caption,
-                            fontWeight: FontWeight.w800,
-                            color: p.info,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            Flexible(
-              child: FilledButton.tonalIcon(
+              child: FilledButton.icon(
+                key: const ValueKey('library_songs_play_all'),
                 onPressed: () =>
                     playerCubit.playSong(songs.first, queue: songs),
-                icon: const Icon(Icons.play_arrow_rounded, size: 18),
-                label: Text(context.l10n.playAll,
-                    maxLines: 1, overflow: TextOverflow.ellipsis),
+                icon: const Icon(Icons.play_arrow_rounded, size: 20),
+                label: Text(
+                  context.l10n.playAll,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
                 style: FilledButton.styleFrom(
-                  visualDensity: VisualDensity.compact,
-                  backgroundColor: p.accent.withValues(alpha: 0.15),
-                  foregroundColor: p.accent,
+                  minimumSize: const Size(0, AppSpacing.minTouchTarget),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.md,
+                    vertical: AppSpacing.s10,
+                  ),
+                  backgroundColor: p.accent,
+                  foregroundColor: p.onAccent,
+                  elevation: 0,
+                  shape: const StadiumBorder(),
+                  textStyle: const TextStyle(
+                    fontSize: AppFontSize.body,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: AppTracking.title,
+                  ),
                 ),
               ),
             ),
-            const SizedBox(width: AppSpacing.xxs),
-            IconButton.filledTonal(
-              onPressed: () {
-                final shuffled = List<SongsTableData>.from(songs)..shuffle();
-                playerCubit.playSong(shuffled.first, queue: shuffled);
-              },
-              icon: const Icon(Icons.shuffle_rounded, size: 18),
-              style: IconButton.styleFrom(
-                minimumSize: const Size(
-                  AppSpacing.minTouchTarget,
-                  AppSpacing.minTouchTarget,
+            const SizedBox(width: AppSpacing.s10),
+            Expanded(
+              child: FilledButton.tonalIcon(
+                key: const ValueKey('library_songs_shuffle'),
+                onPressed: () {
+                  final shuffled = List<SongsTableData>.from(songs)..shuffle();
+                  playerCubit.playSong(shuffled.first, queue: shuffled);
+                },
+                icon: const Icon(Icons.shuffle_rounded, size: 18),
+                label: Text(
+                  context.l10n.shuffle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                backgroundColor: p.surfaceContainerHigh,
-                foregroundColor: p.textPrimary,
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(0, AppSpacing.minTouchTarget),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.md,
+                    vertical: AppSpacing.s10,
+                  ),
+                  backgroundColor: p.surfaceContainer,
+                  foregroundColor: p.textPrimary,
+                  elevation: 0,
+                  side: BorderSide(color: p.hairline),
+                  shape: const StadiumBorder(),
+                  textStyle: const TextStyle(
+                    fontSize: AppFontSize.body,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: AppTracking.title,
+                  ),
+                ),
               ),
-              tooltip: context.l10n.shuffle,
             ),
           ],
         ),
@@ -253,9 +252,7 @@ mixin LibrarySongsTab on State<LibraryScreen> {
                           decoration: BoxDecoration(
                             borderRadius: AppRadii.r18All,
                             border: Border.all(
-                              color: isSelected
-                                  ? p.accent
-                                  : p.hairline.withValues(alpha: 0.5),
+                              color: isSelected ? p.accent : p.hairline,
                               width: isSelected ? 1.5 : 1.0,
                             ),
                           ),
@@ -470,14 +467,14 @@ mixin LibrarySongsTab on State<LibraryScreen> {
                             addRepaintBoundaries: true,
                             padding: EdgeInsetsDirectional.only(
                               bottom: PulsrLayoutMetrics.scrollBottom(context),
-                              top: AppSpacing.xs,
-                              start: AppSpacing.s6,
-                              end: AppSpacing.s6,
+                              top: AppSpacing.xxs,
+                              start: listEdgeInset,
+                              end: listEdgeInset,
                             ),
                             gridDelegate:
                                 SliverGridDelegateWithFixedCrossAxisCount(
                               crossAxisCount: trackCols,
-                              mainAxisExtent: 72,
+                              mainAxisExtent: _songGridTileExtent(context),
                               crossAxisSpacing: 10,
                               mainAxisSpacing: 4,
                             ),
@@ -502,9 +499,9 @@ mixin LibrarySongsTab on State<LibraryScreen> {
                             addRepaintBoundaries: true,
                             padding: EdgeInsetsDirectional.only(
                               bottom: PulsrLayoutMetrics.scrollBottom(context),
-                              top: AppSpacing.xs,
-                              start: AppSpacing.xxs,
-                              end: AppSpacing.xxs,
+                              top: AppSpacing.xxs,
+                              start: listEdgeInset,
+                              end: listEdgeInset,
                             ),
                             itemCount: songs.length + (hasMore ? 1 : 0),
                             itemBuilder: (context, index) {
@@ -592,15 +589,9 @@ mixin LibrarySongsTab on State<LibraryScreen> {
                 vertical: AppSpacing.sm,
               ),
               decoration: BoxDecoration(
-                color: p.isDark
-                    ? AppColors.specularAt(0.05)
-                    : AppColors.scrimAt(0.05),
+                color: p.surfaceCard,
                 borderRadius: AppRadii.r18All,
-                border: Border.all(
-                  color: p.isDark
-                      ? AppColors.specularAt(0.08)
-                      : AppColors.scrimAt(0.08),
-                ),
+                border: Border.all(color: p.hairline),
               ),
               child: Row(
                 children: [
@@ -642,14 +633,15 @@ mixin LibrarySongsTab on State<LibraryScreen> {
                       ],
                     ),
                   ),
-                  IconButton.filledTonal(
+                  IconButton.filled(
                     constraints: const BoxConstraints(
                       minWidth: AppSpacing.minTouchTarget,
                       minHeight: AppSpacing.minTouchTarget,
                     ),
                     style: IconButton.styleFrom(
-                      backgroundColor: p.accent.withValues(alpha: 0.15),
-                      foregroundColor: p.accent,
+                      backgroundColor: p.accent,
+                      foregroundColor: p.onAccent,
+                      shape: const CircleBorder(),
                     ),
                     icon: const Icon(Icons.play_arrow_rounded, size: 22),
                     tooltip: context.l10n.playAll,
@@ -658,7 +650,7 @@ mixin LibrarySongsTab on State<LibraryScreen> {
                       queue: downloaded,
                     ),
                   ),
-                  const SizedBox(width: AppSpacing.xxs),
+                  const SizedBox(width: AppSpacing.xs),
                   IconButton.filledTonal(
                     constraints: const BoxConstraints(
                       minWidth: AppSpacing.minTouchTarget,
@@ -667,6 +659,9 @@ mixin LibrarySongsTab on State<LibraryScreen> {
                     style: IconButton.styleFrom(
                       backgroundColor: p.surfaceContainerHigh,
                       foregroundColor: p.textPrimary,
+                      shape: CircleBorder(
+                        side: BorderSide(color: p.hairline),
+                      ),
                     ),
                     icon: const Icon(Icons.shuffle_rounded, size: 18),
                     tooltip: context.l10n.shuffle,
@@ -693,12 +688,18 @@ mixin LibrarySongsTab on State<LibraryScreen> {
                     padding: EdgeInsetsDirectional.only(
                       bottom: PulsrLayoutMetrics.scrollBottom(context),
                       top: AppSpacing.xxs,
-                      start: AppSpacing.s6,
-                      end: AppSpacing.s6,
+                      start: (Adaptive.pagePadding(context) -
+                              AppSpacing.xs -
+                              AppSpacing.s10)
+                          .clamp(0.0, double.infinity),
+                      end: (Adaptive.pagePadding(context) -
+                              AppSpacing.xs -
+                              AppSpacing.s10)
+                          .clamp(0.0, double.infinity),
                     ),
                     gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: trackCols,
-                      mainAxisExtent: 72,
+                      mainAxisExtent: _songGridTileExtent(context),
                       crossAxisSpacing: 10,
                       mainAxisSpacing: 4,
                     ),

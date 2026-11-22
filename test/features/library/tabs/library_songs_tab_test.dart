@@ -6,6 +6,7 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:pulsr/core/widgets/pulsr_pill_tab_bar.dart';
 import 'package:pulsr/core/widgets/shimmer_skeleton.dart';
 import 'package:pulsr/core/widgets/song_tile.dart';
 import 'package:pulsr/features/library/cubit/library_state.dart';
@@ -260,5 +261,73 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('No Downloads Yet'), findsOneWidget);
+  });
+
+  testWidgets(
+      'songs quick action bar aligns Play All and Shuffle at equal >=48dp height without duplicating header counts',
+      (tester) async {
+    disableAnimations(tester);
+    setSurface(tester, size: const Size(390, 844));
+    final player = stubPlayerCubit();
+    final cubit = stubLibraryCubit(LibraryState(songs: [
+      testSong(id: 1, title: 'Arkab Eldababa', path: '/music/a.flac'),
+      testSong(id: 2, title: 'El Hazz', path: '/music/b.mp3'),
+      testSong(id: 3, title: 'Shoft Kalam', path: '/music/c.mp3'),
+    ]));
+
+    await tester.pumpWidget(libraryHarness(
+      libraryCubit: cubit,
+      playerCubit: player,
+      child: const LibraryScreen(),
+    ));
+    await tester.pumpAndSettle();
+
+    final playAllFinder = find.byKey(const ValueKey('library_songs_play_all'));
+    final shuffleFinder = find.byKey(const ValueKey('library_songs_shuffle'));
+    final searchFinder = find.byKey(const ValueKey('library_search_action'));
+    final sortFinder = find.byKey(const ValueKey('library_sort_filter_pill'));
+    final tabBarFinder = find.byType(PulsrPillTabBar);
+
+    expect(playAllFinder, findsOneWidget);
+    expect(shuffleFinder, findsOneWidget);
+    expect(searchFinder, findsOneWidget);
+    expect(sortFinder, findsOneWidget);
+
+    final playAllRect = tester.getRect(playAllFinder);
+    final shuffleRect = tester.getRect(shuffleFinder);
+    final searchRect = tester.getRect(searchFinder);
+    final sortRect = tester.getRect(sortFinder);
+    final tabBarRect = tester.getRect(tabBarFinder);
+
+    // Search + Sort top bar: matching >=48dp height and flush with tab bar
+    expect(searchRect.height, greaterThanOrEqualTo(48.0));
+    expect(sortRect.height, greaterThanOrEqualTo(48.0));
+    expect(searchRect.height, closeTo(sortRect.height, 0.5));
+    expect(searchRect.left, closeTo(tabBarRect.left, 0.5));
+    expect(sortRect.right, closeTo(tabBarRect.right, 0.5));
+    expect(find.byIcon(Icons.arrow_upward_rounded), findsOneWidget);
+
+    // Play All + Shuffle: matching height (>= 48dp hit target) and vertical alignment
+    expect(playAllRect.height, greaterThanOrEqualTo(48.0));
+    expect(shuffleRect.height, greaterThanOrEqualTo(48.0));
+    expect(playAllRect.height, closeTo(shuffleRect.height, 0.5));
+    expect(playAllRect.top, closeTo(shuffleRect.top, 0.5));
+
+    // Flush start & end alignment with the segmented tab bar above
+    expect(playAllRect.left, closeTo(tabBarRect.left, 0.5));
+    expect(shuffleRect.right, closeTo(tabBarRect.right, 0.5));
+
+    // Header keeps library-wide summary; action bar does not repeat it
+    expect(find.textContaining('3 songs'), findsOneWidget);
+    expect(find.text('1 FLAC/Hi-Res'), findsOneWidget);
+    expect(find.text('3 tracks'), findsNothing);
+    expect(find.text('1 Lossless'), findsNothing);
+
+    await tester.tap(playAllFinder);
+    await tester.pump();
+    await tester.tap(shuffleFinder);
+    await tester.pump();
+
+    verify(() => player.playSong(any(), queue: any(named: 'queue'))).called(2);
   });
 }
