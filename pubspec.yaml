@@ -78,6 +78,8 @@ dependencies:
 # Vendored fork: adds NativeDspAudioProcessor to the ExoPlayer audio sink so
 # libpulsr_dsp receives the decoded PCM stream. Nothing else is changed.
 dependency_overrides:
+  home_widget:
+    path: third_party/home_widget
   just_audio:
     path: third_party/just_audio
   on_audio_query_android:
