@@ -407,7 +407,7 @@ class _LyricLineWidget extends StatelessWidget {
                   ? palette.textPrimary.withValues(alpha: 0.46)
                   : palette.textSecondary.withValues(alpha: 0.45))
               : palette.textSecondary.withValues(alpha: 0.65)),
-      shadows: isActive
+      shadows: (isActive && !palette.isCalmDensity)
           ? [
               Shadow(
                 color: activeColor.withValues(alpha: 0.55),

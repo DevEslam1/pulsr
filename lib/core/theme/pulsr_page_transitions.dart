@@ -105,15 +105,15 @@ class PulsrNowPlayingPage<T> extends Page<T> {
         if (!context.motionEnabled) return child;
         final curved = CurvedAnimation(
           parent: animation,
-          curve: Curves.easeOutCubic,
-          reverseCurve: Curves.easeOutCubic,
+          curve: PulsrMotion.enter,
+          reverseCurve: PulsrMotion.exit,
         );
-        return FadeTransition(
-          opacity: curved,
-          child: ScaleTransition(
-            scale: Tween<double>(begin: 0.96, end: 1.0).animate(curved),
-            child: child,
-          ),
+        return SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(0.0, 1.0),
+            end: Offset.zero,
+          ).animate(curved),
+          child: child,
         );
       },
     );

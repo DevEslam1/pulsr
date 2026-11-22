@@ -199,17 +199,10 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
           },
           child: Scaffold(
             backgroundColor: Colors.transparent,
-            body: AnimatedContainer(
-              duration: context.motionMs(320),
-              curve: context.motionCurve(Curves.easeOutCubic),
-              // Transparent stage: the route is non-opaque, so a drag reveals
-              // the library and mini player instead of a flat colour panel.
-              // Each theme paints its own background inside the transform.
-              color: Colors.transparent,
-              child: _SwipeDownToDismiss(
-                activeColor: activeColor,
-                onDismiss: () => _safePop(context),
-                child: Stack(
+            body: _SwipeDownToDismiss(
+              activeColor: activeColor,
+              onDismiss: () => _safePop(context),
+              child: Stack(
                   fit: StackFit.expand,
                   children: [
                     // Surface colour lives inside the dismiss transform so it
@@ -262,9 +255,9 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
                       state: state,
                       cubit: cubit,
                       themeWidget: AnimatedSwitcher(
-                        duration: context.motionMs(320),
-                        switchInCurve: context.motionCurve(Curves.easeOutCubic),
-                        switchOutCurve: context.motionCurve(Curves.easeInCubic),
+                        duration: context.motion(PulsrMotion.page),
+                        switchInCurve: context.motionCurve(PulsrMotion.enter),
+                        switchOutCurve: context.motionCurve(PulsrMotion.exit),
                         transitionBuilder: (child, animation) {
                           if (!PulsrMotion.shouldAnimate(context)) {
                             return child;
@@ -295,10 +288,9 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
                 ),
               ),
             ),
-          ),
-        );
-      },
-    );
+          );
+        },
+      );
   }
 }
 
@@ -343,7 +335,7 @@ class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
     );
     _curvedAnimation = CurvedAnimation(
       parent: _animController,
-      curve: Curves.easeOutCubic,
+      curve: PulsrMotion.enter,
     );
     _tween = Tween<double>(begin: 0.0, end: 0.0);
     _anim = _tween.animate(_curvedAnimation);
@@ -362,7 +354,7 @@ class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _animController.duration = context.motionMs(260);
+    _animController.duration = context.motion(PulsrDurations.layout);
   }
 
   @override
@@ -430,6 +422,10 @@ class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
     final velocity = details.primaryVelocity ?? 0;
     if (_dragOffset > _dismissThreshold || velocity > _dismissVelocity) {
       PulsrHaptics.lightImpact();
+      setState(() {
+        _dragOffset = 0.0;
+        _crossedThreshold = false;
+      });
       widget.onDismiss();
     } else {
       _snapBack();

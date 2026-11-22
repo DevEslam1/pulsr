@@ -227,7 +227,7 @@ void main() {
     await tester.longPress(find.byType(DownloadTile).first);
     await tester.pump();
     await tester.tap(find.byIcon(Icons.select_all_rounded));
-    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
 
     await tester.tap(find.text(l10n.delete));
     await tester.pump();

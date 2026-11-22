@@ -1337,7 +1337,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
     final screenWidth = MediaQuery.sizeOf(context).width;
     final isLandscape = PulsrBreakpoint.isLandscape(context);
     final isTablet = Adaptive.isTablet(context);
-    final isWide = screenWidth >= 800;
+    final isWide = screenWidth >= PulsrLayoutMetrics.splitViewBreakpoint;
 
     final shouldSplit = isLandscape || (isTablet && isWide);
 

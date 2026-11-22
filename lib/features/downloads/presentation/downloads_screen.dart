@@ -296,9 +296,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
                         ),
                       ],
               ),
-              bottomNavigationBar: _isSelectionMode
-                  ? _buildBulkActionsBar(context, allTasks)
-                  : null,
+              bottomNavigationBar: _buildBulkActionsBar(context, allTasks),
               body: BlocListener<DownloadsCubit, DownloadsState>(
                 listenWhen: (prev, curr) =>
                     curr.errorMessage != null &&
@@ -831,10 +829,19 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
         child: Row(
           children: [
             AnimatedSize(
-              duration: context.motionMs(200),
-              curve: context.motionCurve(Curves.easeOutCubic),
+              duration: PulsrMotion.shouldAnimate(context)
+                  ? context.motion(PulsrMotion.state)
+                  : Duration.zero,
+              curve: context.motionCurve(PulsrMotion.enter),
               child: AnimatedSwitcher(
-                duration: context.motionMs(200),
+                duration: PulsrMotion.shouldAnimate(context)
+                    ? context.motion(PulsrMotion.state)
+                    : Duration.zero,
+                reverseDuration: PulsrMotion.shouldAnimate(context)
+                    ? context.motion(PulsrMotion.state)
+                    : Duration.zero,
+                switchInCurve: context.motionCurve(PulsrMotion.enter),
+                switchOutCurve: context.motionCurve(PulsrMotion.exit),
                 transitionBuilder: (child, animation) => FadeTransition(
                   opacity: animation,
                   child: SizeTransition(
@@ -887,8 +894,10 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
   Widget _buildBulkActionsBar(BuildContext context, List<DownloadTask> tasks) {
     final p = context.palette;
     final l10n = AppLocalizations.of(context)!;
-    final selectedTasks =
-        tasks.where((t) => _selectedVideoIds.contains(t.videoId)).toList();
+    final isVisible = _isSelectionMode;
+    final selectedTasks = isVisible
+        ? tasks.where((t) => _selectedVideoIds.contains(t.videoId)).toList()
+        : const <DownloadTask>[];
     final hasFailed =
         selectedTasks.any((t) => t.status == DownloadStatus.failed);
     final completedWithSong = selectedTasks
@@ -896,11 +905,17 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
             (t) => t.status == DownloadStatus.complete && t.localSongId != null)
         .toList();
 
+    final shouldAnimate = PulsrMotion.shouldAnimate(context);
+
     return AnimatedSwitcher(
-      duration: context.motion(PulsrDurations.layout),
-      reverseDuration: context.motion(PulsrDurations.layout),
-      switchInCurve: context.motionCurve(Curves.easeOutCubic),
-      switchOutCurve: context.motionCurve(Curves.easeInCubic),
+      duration: shouldAnimate
+          ? context.motion(PulsrDurations.layout)
+          : Duration.zero,
+      reverseDuration: shouldAnimate
+          ? context.motion(PulsrDurations.layout)
+          : Duration.zero,
+      switchInCurve: context.motionCurve(PulsrMotion.enter),
+      switchOutCurve: context.motionCurve(PulsrMotion.exit),
       transitionBuilder: (child, animation) {
         return SizeTransition(
           sizeFactor: animation,
@@ -916,57 +931,61 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
           ),
         );
       },
-      child: SafeArea(
-        key: const ValueKey('downloads_bulk_actions_bar'),
-        child: Container(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.md,
-            vertical: AppSpacing.sm,
-          ),
-          decoration: BoxDecoration(
-            color: p.surfaceContainer,
-            border: Border(top: BorderSide(color: p.hairline)),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.scrimAt(0.1),
-                blurRadius: 8,
-                offset: const Offset(0, -2),
-              ),
-            ],
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              TextButton.icon(
-                style: TextButton.styleFrom(foregroundColor: p.error),
-                icon: const Icon(Icons.delete_outline_rounded, size: 20),
-                label: Text(l10n.delete),
-                onPressed: selectedTasks.isEmpty
-                    ? null
-                    : () =>
-                        _confirmDeleteSelected(context, selectedTasks),
-              ),
-              if (hasFailed)
-                TextButton.icon(
-                  style: TextButton.styleFrom(foregroundColor: p.accent),
-                  icon: const Icon(Icons.refresh_rounded, size: 20),
-                  label: Text(l10n.retry),
-                  onPressed: () =>
-                      _retrySelectedFailed(context, selectedTasks),
+      child: isVisible
+          ? SafeArea(
+              key: const ValueKey('downloads_bulk_actions_bar'),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md,
+                  vertical: AppSpacing.sm,
                 ),
-              if (completedWithSong.isNotEmpty)
-                TextButton.icon(
-                  style:
-                      TextButton.styleFrom(foregroundColor: p.textPrimary),
-                  icon: const Icon(Icons.playlist_add_rounded, size: 20),
-                  label: Text(l10n.addToPlaylist),
-                  onPressed: () =>
-                      _addSelectedToPlaylist(context, completedWithSong),
+                decoration: BoxDecoration(
+                  color: p.surfaceContainer,
+                  border: Border(top: BorderSide(color: p.hairline)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.scrimAt(0.1),
+                      blurRadius: 8,
+                      offset: const Offset(0, -2),
+                    ),
+                  ],
                 ),
-            ],
-          ),
-        ),
-      ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    TextButton.icon(
+                      style: TextButton.styleFrom(foregroundColor: p.error),
+                      icon: const Icon(Icons.delete_outline_rounded, size: 20),
+                      label: Text(l10n.delete),
+                      onPressed: selectedTasks.isEmpty
+                          ? null
+                          : () =>
+                              _confirmDeleteSelected(context, selectedTasks),
+                    ),
+                    if (hasFailed)
+                      TextButton.icon(
+                        style: TextButton.styleFrom(foregroundColor: p.accent),
+                        icon: const Icon(Icons.refresh_rounded, size: 20),
+                        label: Text(l10n.retry),
+                        onPressed: () =>
+                            _retrySelectedFailed(context, selectedTasks),
+                      ),
+                    if (completedWithSong.isNotEmpty)
+                      TextButton.icon(
+                        style:
+                            TextButton.styleFrom(foregroundColor: p.textPrimary),
+                        icon: const Icon(Icons.playlist_add_rounded, size: 20),
+                        label: Text(l10n.addToPlaylist),
+                        onPressed: () =>
+                            _addSelectedToPlaylist(context, completedWithSong),
+                      ),
+                  ],
+                ),
+              ),
+            )
+          : const SizedBox.shrink(
+              key: ValueKey('downloads_bulk_actions_bar_empty'),
+            ),
     );
   }
 

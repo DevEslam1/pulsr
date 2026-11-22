@@ -1122,7 +1122,7 @@ class _VinylRotaryPlayDial extends StatelessWidget {
       excludeSemantics: true,
       child: AnimatedContainer(
         duration: context.motionMs(260),
-        curve: context.motionCurve(Curves.easeOutCubic),
+        curve: context.motionCurve(PulsrMotion.enter),
         width: dialDiameter,
         height: dialDiameter,
         decoration: BoxDecoration(

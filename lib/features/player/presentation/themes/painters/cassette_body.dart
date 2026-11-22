@@ -1060,6 +1060,14 @@ class _CassetteStereoVuMeterState extends State<_CassetteStereoVuMeter>
 }
 
 class _CassetteStereoVuMeterPainter extends CustomPainter {
+  static final Paint _bgPaint = Paint()..style = PaintingStyle.fill;
+  static final Paint _borderPaint = Paint()
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 0.6;
+  static final Paint _shadowPaint = Paint()
+    ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.5);
+  static final Paint _segPaint = Paint()..style = PaintingStyle.fill;
+
   final AnimationController controller;
   final bool isPlaying;
   final bool allowMotion;
@@ -1116,13 +1124,8 @@ class _CassetteStereoVuMeterPainter extends CustomPainter {
       Rect.fromLTWH(0, top, barWidth, barHeight),
       const Radius.circular(2),
     );
-    final bgPaint = Paint()
-      ..color = surface.tapeWindow
-      ..style = PaintingStyle.fill;
-    final borderPaint = Paint()
-      ..color = surface.specularAt(0.12)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 0.6;
+    final bgPaint = _bgPaint..color = surface.tapeWindow;
+    final borderPaint = _borderPaint..color = surface.specularAt(0.12);
     canvas.drawRRect(bgRect, bgPaint);
     canvas.drawRRect(bgRect, borderPaint);
 
@@ -1153,16 +1156,13 @@ class _CassetteStereoVuMeterPainter extends CustomPainter {
         const Radius.circular(0.8),
       );
 
-      if (isLit || isPeak) {
-        final shadowPaint = Paint()
-          ..color = baseColor.withValues(alpha: 0.65)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.5);
+      if ((isLit || isPeak) && !GpuBudget.isGpuSaverActive) {
+        final shadowPaint = _shadowPaint
+          ..color = baseColor.withValues(alpha: 0.65);
         canvas.drawRRect(segRect, shadowPaint);
       }
 
-      final segPaint = Paint()
-        ..color = segColor
-        ..style = PaintingStyle.fill;
+      final segPaint = _segPaint..color = segColor;
       canvas.drawRRect(segRect, segPaint);
     }
   }

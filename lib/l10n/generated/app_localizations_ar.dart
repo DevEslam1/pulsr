@@ -6666,6 +6666,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get browseDisc => 'قرص';
 
   @override
+  String get browseDiscUnnumbered => 'غير مرقم';
+
+  @override
   String get browseDiscNumber => 'رقم القرص';
 
   @override
@@ -9952,6 +9955,9 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get badgeLossless => 'بدون فقدان';
+
+  @override
+  String get badgeHiRes => 'Hi-Res';
 
   @override
   String get badgeHiResLossless => 'Hi-Res بدون فقدان';

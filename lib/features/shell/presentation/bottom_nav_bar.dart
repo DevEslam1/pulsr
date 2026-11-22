@@ -326,12 +326,15 @@ class _PulsrBottomNavBarState extends State<PulsrBottomNavBar> {
                           // Isolate the filter layer so the drag transform
                           // does not force a re-raster of the backdrop.
                           return RepaintBoundary(
-                            child: BackdropFilter(
-                              filter: ImageFilter.blur(
-                                sigmaX: AppBlur.clampSigma(AppBlur.nav),
-                                sigmaY: AppBlur.clampSigma(AppBlur.nav),
+                            child: ClipRRect(
+                              borderRadius: navRadius,
+                              child: BackdropFilter(
+                                filter: ImageFilter.blur(
+                                  sigmaX: AppBlur.clampSigma(AppBlur.nav),
+                                  sigmaY: AppBlur.clampSigma(AppBlur.nav),
+                                ),
+                                child: navContainer,
                               ),
-                              child: navContainer,
                             ),
                           );
                         },

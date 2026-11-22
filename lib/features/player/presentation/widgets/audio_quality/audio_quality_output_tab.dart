@@ -67,16 +67,21 @@ extension _AudioQualityOutputTab on AudioQualitySheet {
       Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            context.l10n.hwOutputRouting,
-            style: TextStyle(
-              fontSize: AppFontSize.caption,
-              letterSpacing: AppTracking.wide,
-              fontWeight: FontWeight.w800,
-              color: p.textSecondary,
+          Expanded(
+            child: Text(
+              context.l10n.hwOutputRouting,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: AppFontSize.caption,
+                letterSpacing: AppTracking.wide,
+                fontWeight: FontWeight.w800,
+                color: p.textSecondary,
+              ),
             ),
           ),
-          if (outputDevice?.isUsbDac == true)
+          if (outputDevice?.isUsbDac == true) ...[
+            const SizedBox(width: AppSpacing.xs),
             Container(
               padding: const EdgeInsets.symmetric(
                 horizontal: AppSpacing.s6,
@@ -95,6 +100,7 @@ extension _AudioQualityOutputTab on AudioQualitySheet {
                 ),
               ),
             ),
+          ],
         ],
       ),
       const SizedBox(height: AppSpacing.s10),

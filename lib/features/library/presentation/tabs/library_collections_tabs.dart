@@ -39,8 +39,8 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
       onRefresh: () => _handleRefresh(context),
       child: AnimatedSwitcher(
         duration: context.motion(const Duration(milliseconds: 240)),
-        switchInCurve: context.motionCurve(Curves.easeOutCubic),
-        switchOutCurve: context.motionCurve(Curves.easeInCubic),
+        switchInCurve: context.motionCurve(PulsrMotion.enter),
+        switchOutCurve: context.motionCurve(PulsrMotion.exit),
         transitionBuilder: (child, animation) => FadeTransition(
           opacity: animation,
           child: child,
@@ -291,8 +291,8 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
       onRefresh: () => _handleRefresh(context),
       child: AnimatedSwitcher(
         duration: context.motion(const Duration(milliseconds: 240)),
-        switchInCurve: context.motionCurve(Curves.easeOutCubic),
-        switchOutCurve: context.motionCurve(Curves.easeInCubic),
+        switchInCurve: context.motionCurve(PulsrMotion.enter),
+        switchOutCurve: context.motionCurve(PulsrMotion.exit),
         transitionBuilder: (child, animation) => FadeTransition(
           opacity: animation,
           child: child,
@@ -347,12 +347,15 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
                           child: Column(
                             children: [
                               Expanded(
-                                child: CachedArtwork(
-                                  id: artist.id,
-                                  type: ArtworkType.ARTIST,
-                                  size: double.infinity,
-                                  borderRadius: 999,
-                                  fallbackIcon: Icons.person_rounded,
+                                child: Hero(
+                                  tag: 'artist_${artist.id}',
+                                  child: CachedArtwork(
+                                    id: artist.id,
+                                    type: ArtworkType.ARTIST,
+                                    size: double.infinity,
+                                    borderRadius: 999,
+                                    fallbackIcon: Icons.person_rounded,
+                                  ),
                                 ),
                               ),
                               const SizedBox(height: AppSpacing.xs),
@@ -417,12 +420,15 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
                           shape: RoundedRectangleBorder(
                             borderRadius: AppRadii.r16All,
                           ),
-                          leading: CachedArtwork(
-                            id: artist.id,
-                            type: ArtworkType.ARTIST,
-                            size: 48,
-                            borderRadius: 999,
-                            fallbackIcon: Icons.person_rounded,
+                          leading: Hero(
+                            tag: 'artist_${artist.id}',
+                            child: CachedArtwork(
+                              id: artist.id,
+                              type: ArtworkType.ARTIST,
+                              size: 48,
+                              borderRadius: 999,
+                              fallbackIcon: Icons.person_rounded,
+                            ),
                           ),
                           title: Text(
                             artist.name,

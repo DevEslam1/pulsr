@@ -350,6 +350,24 @@ class _PitchPoint {
 }
 
 class _PitchHighwayPainter extends CustomPainter {
+  static final Paint _linePaint = Paint()
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 0.8;
+  static final Paint _hitLinePaint = Paint()..strokeWidth = 1.2;
+  static final Paint _targetBarPaint = Paint()..style = PaintingStyle.fill;
+  static final Path _trailPath = Path();
+  static final Paint _trailPaint = Paint()
+    ..style = PaintingStyle.stroke
+    ..strokeCap = StrokeCap.round
+    ..strokeWidth = 2.2;
+  static final Paint _haloPaint = Paint()
+    ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
+  static final Paint _accuracyPaint = Paint()
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 1.5;
+  static final Paint _corePaint = Paint()..style = PaintingStyle.fill;
+  static final Paint _specularPaint = Paint()..style = PaintingStyle.fill;
+
   final ValueNotifier<PitchResult> pitchNotifier;
   final List<_PitchPoint> trail;
   final Color accentColor;
@@ -377,10 +395,8 @@ class _PitchHighwayPainter extends CustomPainter {
     if (w <= 0 || h <= 0) return;
 
     // 1. Draw Pitch Guide Lanes (C3, E3, G3, C4, E4, G4, C5)
-    final linePaint = Paint()
-      ..color = hairlineColor.withValues(alpha: 0.35)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 0.8;
+    final linePaint = _linePaint
+      ..color = hairlineColor.withValues(alpha: 0.35);
 
     const guideNotes = [48, 52, 55, 60, 64, 67, 72];
     for (final note in guideNotes) {
@@ -390,9 +406,8 @@ class _PitchHighwayPainter extends CustomPainter {
 
     // 2. Target Hit Line (Cursor X anchor at 25% width)
     final targetX = w * 0.25;
-    final hitLinePaint = Paint()
-      ..color = accentColor.withValues(alpha: 0.25)
-      ..strokeWidth = 1.2;
+    final hitLinePaint = _hitLinePaint
+      ..color = accentColor.withValues(alpha: 0.25);
     canvas.drawLine(Offset(targetX, 0), Offset(targetX, h), hitLinePaint);
 
     // 3. Simulated Pitch Target Bar on the Highway
@@ -406,15 +421,14 @@ class _PitchHighwayPainter extends CustomPainter {
         ),
         const Radius.circular(3.5),
       );
-      final targetBarPaint = Paint()
-        ..color = accentColor.withValues(alpha: 0.28)
-        ..style = PaintingStyle.fill;
+      final targetBarPaint = _targetBarPaint
+        ..color = accentColor.withValues(alpha: 0.28);
       canvas.drawRRect(targetBarRect, targetBarPaint);
     }
 
     // 4. Vocal Pitch Comet Trail
     if (trail.length >= 2) {
-      final trailPath = Path();
+      final trailPath = _trailPath..reset();
       for (int i = 0; i < trail.length; i++) {
         final pt = trail[i];
         final fraction = i / (trail.length - 1);
@@ -427,11 +441,8 @@ class _PitchHighwayPainter extends CustomPainter {
         }
       }
 
-      final trailPaint = Paint()
-        ..color = accentColor.withValues(alpha: 0.45)
-        ..style = PaintingStyle.stroke
-        ..strokeCap = StrokeCap.round
-        ..strokeWidth = 2.2;
+      final trailPaint = _trailPaint
+        ..color = accentColor.withValues(alpha: 0.45);
       canvas.drawPath(trailPath, trailPaint);
     }
 
@@ -442,9 +453,8 @@ class _PitchHighwayPainter extends CustomPainter {
 
       // Outer Glow Halo
       if (!gpuSaver) {
-        final haloPaint = Paint()
-          ..color = accentColor.withValues(alpha: 0.35)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
+        final haloPaint = _haloPaint
+          ..color = accentColor.withValues(alpha: 0.35);
         canvas.drawCircle(cursorCenter, 8.0, haloPaint);
       }
 
@@ -452,23 +462,18 @@ class _PitchHighwayPainter extends CustomPainter {
       final semitoneError =
           (smoothedResult.midiNote - smoothedResult.midiNote.round()).abs();
       if (semitoneError < 0.35) {
-        final accuracyPaint = Paint()
-          ..color = Colors.amber.withValues(alpha: 0.8)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.5;
+        final accuracyPaint = _accuracyPaint
+          ..color = AppColors.warning.withValues(alpha: 0.8);
         canvas.drawCircle(cursorCenter, 7.0, accuracyPaint);
       }
 
       // Core Bead
-      final corePaint = Paint()
-        ..color = accentColor
-        ..style = PaintingStyle.fill;
+      final corePaint = _corePaint..color = accentColor;
       canvas.drawCircle(cursorCenter, 4.5, corePaint);
 
       // Specular highlight
-      final specularPaint = Paint()
-        ..color = AppColors.specularAt(0.9)
-        ..style = PaintingStyle.fill;
+      final specularPaint = _specularPaint
+        ..color = AppColors.specularAt(0.9);
       canvas.drawCircle(
           cursorCenter - const Offset(1.2, 1.2), 1.5, specularPaint);
     }

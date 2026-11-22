@@ -4657,6 +4657,10 @@
   "browseCurrentIdentity": "Current identity",
   "browseDeselect": "Deselect",
   "browseDisc": "Disc",
+  "browseDiscUnnumbered": "Unnumbered",
+  "@browseDiscUnnumbered": {
+    "description": "Header for tracks without a disc number in a multi-disc album"
+  },
   "browseDiscNumber": "Disc Number",
   "browseDiskStorage": "Disk Storage",
   "browseDontHaveAccount": "Don't have an account? Sign Up",
@@ -7618,6 +7622,10 @@
   "badgeLossless": "Lossless",
   "@badgeLossless": {
     "description": "Lossless audio quality badge label"
+  },
+  "badgeHiRes": "Hi-Res",
+  "@badgeHiRes": {
+    "description": "Hi-Res audio quality badge label"
   },
   "badgeHiResLossless": "Hi-Res Lossless",
   "@badgeHiResLossless": {

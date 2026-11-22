@@ -12053,6 +12053,12 @@ abstract class AppLocalizations {
   /// **'Disc'**
   String get browseDisc;
 
+  /// Header for tracks without a disc number in a multi-disc album
+  ///
+  /// In en, this message translates to:
+  /// **'Unnumbered'**
+  String get browseDiscUnnumbered;
+
   /// No description provided for @browseDiscNumber.
   ///
   /// In en, this message translates to:
@@ -17730,6 +17736,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Lossless'**
   String get badgeLossless;
+
+  /// Hi-Res audio quality badge label
+  ///
+  /// In en, this message translates to:
+  /// **'Hi-Res'**
+  String get badgeHiRes;
 
   /// Hi-Res Lossless audio quality badge label
   ///

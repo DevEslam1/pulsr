@@ -89,7 +89,7 @@ class _CdPlayerThemeState extends State<CdPlayerTheme>
 
     _pickupAnimation = CurvedAnimation(
       parent: _pickupController,
-      curve: Curves.easeInOutBack,
+      curve: PulsrMotion.spring,
     );
 
     // The lid highlight parks past the case (value 1) so nothing sweeps across
@@ -147,7 +147,7 @@ class _CdPlayerThemeState extends State<CdPlayerTheme>
       _velocityController.animateTo(
         1.0,
         duration: context.motionMs(650),
-        curve: Curves.easeOutCubic,
+        curve: context.motionCurve(PulsrMotion.enter),
       );
     } else {
       if (!allowMotion) {
@@ -166,7 +166,7 @@ class _CdPlayerThemeState extends State<CdPlayerTheme>
             .animateTo(
           0.0,
           duration: context.motionMs(650),
-          curve: Curves.decelerate,
+          curve: context.motionCurve(PulsrMotion.decelerate),
         )
             .whenComplete(() {
           if (mounted &&

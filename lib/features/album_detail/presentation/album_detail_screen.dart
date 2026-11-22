@@ -258,14 +258,15 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
     ];
   }
 
-  /// Localized header for [group]. Numbered discs keep the existing
-  /// `Disc <n>` l10n; the helper's `Unnumbered` label has no l10n key yet.
+  /// Localized header for [group].
   String _discHeader(
     BuildContext context,
     AlbumDiscGroup<SongsTableData> group,
   ) {
     final disc = group.discNumber;
-    return disc == null ? group.label : '${context.l10n.browseDisc} $disc';
+    return disc == null
+        ? context.l10n.browseDiscUnnumbered
+        : '${context.l10n.browseDisc} $disc';
   }
 
   @override
@@ -309,9 +310,8 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
           if (shouldSplit) {
             return DetailScaffold(
               titleText: album.title,
-              bottomNavigationBar: _selectedIds.isNotEmpty
-                  ? _buildBulkActionsBar(context, orderedSongs)
-                  : null,
+              bottomNavigationBar:
+                  _buildBulkActionsBar(context, orderedSongs),
               onRefresh: () async {
                 if (mounted) setState(() {});
               },
@@ -337,9 +337,8 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                 : null,
             child: Scaffold(
               backgroundColor: p.bg,
-              bottomNavigationBar: _selectedIds.isNotEmpty
-                  ? _buildBulkActionsBar(context, orderedSongs)
-                  : null,
+              bottomNavigationBar:
+                  _buildBulkActionsBar(context, orderedSongs),
               body: Center(
                 child: ConstrainedBox(
                   constraints: PulsrLayoutMetrics.contentConstraints(context),
@@ -652,7 +651,9 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
               ),
             ),
             child: Text(
-              hasHiRes ? 'HI-RES' : 'LOSSLESS',
+              hasHiRes
+                  ? context.l10n.badgeHiRes.toUpperCase()
+                  : context.l10n.badgeLossless.toUpperCase(),
               style: TextStyle(
                 color: p.info,
                 fontSize: AppFontSize.caption,
@@ -959,14 +960,22 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
   ) {
     final p = context.palette;
     final l10n = context.l10n;
-    final selectedSongs =
-        allSongs.where((s) => _selectedIds.contains(s.id)).toList();
+    final isVisible = _selectedIds.isNotEmpty;
+    final selectedSongs = isVisible
+        ? allSongs.where((s) => _selectedIds.contains(s.id)).toList()
+        : const <SongsTableData>[];
+
+    final shouldAnimate = PulsrMotion.shouldAnimate(context);
 
     return AnimatedSwitcher(
-      duration: context.motion(PulsrDurations.layout),
-      reverseDuration: context.motion(PulsrDurations.layout),
-      switchInCurve: context.motionCurve(Curves.easeOutCubic),
-      switchOutCurve: context.motionCurve(Curves.easeInCubic),
+      duration: shouldAnimate
+          ? context.motion(PulsrDurations.layout)
+          : Duration.zero,
+      reverseDuration: shouldAnimate
+          ? context.motion(PulsrDurations.layout)
+          : Duration.zero,
+      switchInCurve: context.motionCurve(PulsrMotion.enter),
+      switchOutCurve: context.motionCurve(PulsrMotion.exit),
       transitionBuilder: (child, animation) {
         return SizeTransition(
           sizeFactor: animation,
@@ -982,8 +991,9 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
           ),
         );
       },
-      child: SafeArea(
-        key: const ValueKey('album_bulk_actions_bar'),
+      child: isVisible
+          ? SafeArea(
+              key: const ValueKey('album_bulk_actions_bar'),
         child: Container(
           padding: const EdgeInsets.symmetric(
             horizontal: AppSpacing.md,
@@ -1067,8 +1077,11 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
             ],
           ),
         ),
+      )
+    : const SizedBox.shrink(
+        key: ValueKey('album_bulk_actions_bar_empty'),
       ),
-    );
+  );
   }
 
   Widget _buildSongItem(

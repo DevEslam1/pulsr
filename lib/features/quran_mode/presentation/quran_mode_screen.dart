@@ -2,6 +2,7 @@
 import 'package:material_ui/material_ui.dart';
 import '../../../core/utils/l10n_extensions.dart';
 
+import '../../../core/responsive/pulsr_layout_metrics.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/widgets/pulsr_page_pop_scope.dart';
 import '../../player/presentation/widgets/quran_mode_sheet.dart';
@@ -27,7 +28,8 @@ class QuranModeScreen extends StatelessWidget {
         ),
         body: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 680),
+            constraints: const BoxConstraints(
+                maxWidth: PulsrLayoutMetrics.compactDialogMaxWidth),
             child: const SingleChildScrollView(
               padding:
                   EdgeInsets.only(top: AppSpacing.xxs, bottom: AppSpacing.xl),

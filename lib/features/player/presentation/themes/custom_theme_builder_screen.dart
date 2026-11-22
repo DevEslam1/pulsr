@@ -242,7 +242,8 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
         ),
         body: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 760),
+            constraints: const BoxConstraints(
+                maxWidth: PulsrLayoutMetrics.detailDialogMaxWidth),
             child: ListView(
               padding: EdgeInsetsDirectional.fromSTEB(
                   AppSpacing.s20,
@@ -356,7 +357,7 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
                         width: 1.5,
                       ),
                       boxShadow: [
-                        if (_glowEnabled)
+                        if (_glowEnabled && !p.isCalmDensity)
                           BoxShadow(
                             color: Color(_accentColor).withValues(alpha: 0.25),
                             blurRadius: 30,
@@ -405,7 +406,7 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
                           color: Color(_accentColor).withValues(alpha: 0.4),
                           width: 1.5),
                       boxShadow: [
-                        if (_glowEnabled)
+                        if (_glowEnabled && !p.isCalmDensity)
                           BoxShadow(
                             color: Color(_accentColor).withValues(alpha: 0.25),
                             blurRadius: 30,

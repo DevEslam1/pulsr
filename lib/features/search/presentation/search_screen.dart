@@ -1548,7 +1548,8 @@ class _UnifiedSearchResultsState extends State<_UnifiedSearchResults> {
               await context.read<SearchCubit>().refresh();
             }
 
-            final isSplit = PulsrLayoutMetrics.isSplitView(context);
+            final isSplit = PulsrLayoutMetrics.isSplitView(context) ||
+                Adaptive.isTabletLandscape(context);
 
             if (isSplit) {
               return RefreshIndicator(

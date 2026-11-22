@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/di/injection.dart';
+import '../../../core/responsive/pulsr_layout_metrics.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/error_logger.dart';
@@ -206,7 +207,8 @@ class HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
             ),
             body: Center(
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 760),
+                constraints: const BoxConstraints(
+                    maxWidth: PulsrLayoutMetrics.detailDialogMaxWidth),
                 child: ListView(
                   padding: EdgeInsetsDirectional.only(
                     bottom: 40,

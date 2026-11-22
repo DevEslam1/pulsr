@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../constants/app_radii.dart';
 import '../theme/aura_theme.dart';
+import 'pulsr_motion.dart';
 
 /// The single Hero tag for the Now Playing *surface* (not the artwork).
 ///
@@ -26,8 +27,8 @@ Widget nowPlayingSurfaceFlightShuttleBuilder(
 ) {
   final curved = CurvedAnimation(
     parent: animation,
-    curve: Curves.easeOutCubic,
-    reverseCurve: Curves.easeOutCubic,
+    curve: PulsrMotion.enter,
+    reverseCurve: PulsrMotion.enter,
   );
   return AnimatedBuilder(
     animation: curved,

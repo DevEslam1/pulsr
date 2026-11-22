@@ -240,7 +240,7 @@ class _PlayerControlsState extends State<PlayerControls> {
                   child: TweenAnimationBuilder<double>(
                     tween: Tween<double>(begin: 0, end: _prevNudgeX),
                     duration: context.motionMs(200),
-                    curve: context.motionCurve(Curves.easeOutBack),
+                    curve: context.motionCurve(PulsrMotion.spring),
                     builder: (context, dx, child) => Transform.translate(
                       offset: Offset(dx, 0),
                       child: child,
@@ -328,8 +328,8 @@ class _PlayerControlsState extends State<PlayerControls> {
                           scale: _isPlayPressed ? 0.92 : 1.0,
                           duration: context.motionMs(_isPlayPressed ? 90 : 280),
                           curve: _isPlayPressed
-                              ? context.motionCurve(Curves.easeOutCubic)
-                              : context.motionCurve(Curves.easeOutBack),
+                              ? context.motionCurve(PulsrMotion.enter)
+                              : context.motionCurve(PulsrMotion.spring),
                           child: AnimatedContainer(
                             duration: context.motionMs(200),
                             width: widget.mainButtonSize,
@@ -372,7 +372,7 @@ class _PlayerControlsState extends State<PlayerControls> {
                                 duration: context.motionMs(260),
                                 transitionBuilder: (child, anim) {
                                   final curve = CurveTween(
-                                    curve: context.motionCurve(Curves.easeOutBack),
+                                    curve: context.motionCurve(PulsrMotion.spring),
                                   );
                                   return FadeTransition(
                                     opacity: anim,
@@ -429,7 +429,7 @@ class _PlayerControlsState extends State<PlayerControls> {
                   child: TweenAnimationBuilder<double>(
                     tween: Tween<double>(begin: 0, end: _nextNudgeX),
                     duration: context.motionMs(200),
-                    curve: context.motionCurve(Curves.easeOutBack),
+                    curve: context.motionCurve(PulsrMotion.spring),
                     builder: (context, dx, child) => Transform.translate(
                       offset: Offset(dx, 0),
                       child: child,
@@ -715,7 +715,7 @@ class _ControlButton extends StatelessWidget {
                     child: AnimatedScale(
                       scale: isActive ? 1.0 : 0.0,
                       duration: context.motionMs(200),
-                      curve: context.motionCurve(Curves.easeOutBack),
+                      curve: context.motionCurve(PulsrMotion.spring),
                       child: Container(
                         width: 6,
                         height: 6,

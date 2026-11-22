@@ -244,12 +244,19 @@ class _AudioQualityTabbedScaffoldState
                     ),
                     child: AnimatedSwitcher(
                       duration: context.motion(PulsrMotion.state),
-                      switchInCurve: context.motionCurve(Curves.easeOutCubic),
-                      switchOutCurve: context.motionCurve(Curves.easeInCubic),
-                      transitionBuilder: (child, animation) => FadeTransition(
-                        opacity: animation,
-                        child: child,
-                      ),
+                      switchInCurve: context.motionCurve(PulsrMotion.enter),
+                      switchOutCurve: context.motionCurve(PulsrMotion.exit),
+                      transitionBuilder: (child, animation) {
+                        if (!PulsrMotion.shouldAnimate(context)) return child;
+                        return FadeTransition(
+                          opacity: animation,
+                          child: ScaleTransition(
+                            scale: Tween<double>(begin: 0.96, end: 1.0)
+                                .animate(animation),
+                            child: child,
+                          ),
+                        );
+                      },
                       child: KeyedSubtree(
                         key: ValueKey(isWide && activeTab != 2
                             ? 'wide_specs_output'

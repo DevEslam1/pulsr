@@ -252,10 +252,8 @@ class AdvancedPlaybackBar extends StatelessWidget {
                                     alignment: Alignment.center,
                                     decoration: BoxDecoration(
                                       shape: BoxShape.circle,
-                                      color: (p.isDark
-                                              ? p.textPrimary
-                                              : AppColors.scrimAt(1.0))
-                                          .withValues(alpha: 0.08),
+                                      color:
+                                          p.textPrimary.withValues(alpha: 0.08),
                                     ),
                                     child: Icon(Icons.close_rounded,
                                         size: 15, color: p.textSecondary),

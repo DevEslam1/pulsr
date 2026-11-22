@@ -822,12 +822,14 @@ class _LyricsViewState extends State<LyricsView> {
             ? p.textPrimary
             : (isSeamless ? p.textPrimary : activeCol),
         height: 1.35,
-        shadows: [
-          Shadow(
-            color: activeCol.withValues(alpha: 0.55),
-            blurRadius: 18,
-          ),
-        ],
+        shadows: p.isCalmDensity
+            ? null
+            : [
+                Shadow(
+                  color: activeCol.withValues(alpha: 0.55),
+                  blurRadius: 18,
+                ),
+              ],
       ),
       highlight: LyricHighlight.solid(activeCol),
       textAlign: isInSplit ? TextAlign.start : TextAlign.center,

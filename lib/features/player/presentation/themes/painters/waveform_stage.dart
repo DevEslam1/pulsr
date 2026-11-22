@@ -631,13 +631,11 @@ class _OscilloscopeGridPainter extends CustomPainter {
 
     // 3. Subtle dB scale calibration markings along the leading edge.
     if (!isCompact && size.height >= 120 && size.width >= 200) {
-      final labels = <(double, String)>[
-        (size.height * 0.16, '0 dB'),
-        (size.height * 0.33, '-6 dB'),
-        (size.height * 0.67, '-6 dB'),
-      ];
-      for (final (y, text) in labels) {
-        final painter = _getTextPainter(text, labelColor);
+      const labels = ['0 dB', '-6 dB', '-6 dB'];
+      const fracs = [0.16, 0.33, 0.67];
+      for (int i = 0; i < 3; i++) {
+        final y = size.height * fracs[i];
+        final painter = _getTextPainter(labels[i], labelColor);
         painter.paint(canvas, Offset(AppSpacing.xs, y - painter.height - 1));
       }
     }
@@ -676,6 +674,13 @@ class _OscilloscopeWaveformPainter extends CustomPainter {
 
   static final Map<String, TextPainter> _pinTextPainters = {};
   static Color? _lastPinTextColor;
+
+  static List<double>? _cachedBars;
+  static List<double>? _lastSamples;
+  static int? _lastTargetBars;
+
+  static Shader? _cachedPlayedShader;
+  static int? _lastShaderKey;
 
   final List<double> samples;
   final double progress;
@@ -798,22 +803,42 @@ class _OscilloscopeWaveformPainter extends CustomPainter {
 
     // 2. Resample peaks smoothly to match viewport density (~3.5dp per bar).
     final int targetBars = (usableW / 4.2).round().clamp(24, 110);
-    final List<double> bars = List<double>.generate(targetBars, (i) {
-      final double pos =
-          samples.length == 1 ? 0.0 : (i / (targetBars - 1)) * (samples.length - 1);
-      final int lo = pos.floor().clamp(0, samples.length - 1);
-      final int hi = (lo + 1).clamp(0, samples.length - 1);
-      final double frac = pos - lo;
-      return (samples[lo] * (1.0 - frac) + samples[hi] * frac).clamp(0.05, 1.0);
-    }, growable: false);
+    final List<double> bars;
+    if (identical(_lastSamples, samples) &&
+        _lastTargetBars == targetBars &&
+        _cachedBars != null) {
+      bars = _cachedBars!;
+    } else {
+      bars = List<double>.generate(targetBars, (i) {
+        final double pos = samples.length == 1
+            ? 0.0
+            : (i / (targetBars - 1)) * (samples.length - 1);
+        final int lo = pos.floor().clamp(0, samples.length - 1);
+        final int hi = (lo + 1).clamp(0, samples.length - 1);
+        final double frac = pos - lo;
+        return (samples[lo] * (1.0 - frac) + samples[hi] * frac).clamp(0.05, 1.0);
+      }, growable: false);
+      _lastSamples = samples;
+      _lastTargetBars = targetBars;
+      _cachedBars = bars;
+    }
 
     final double slot = usableW / targetBars;
     final double barW = math.max(1.8, slot * 0.56);
     final double ampScale = isDragging ? 1.08 : 0.96;
 
     final unplayedPaint = _unplayedPaint..color = unplayedColor;
-    final playedPaint = _playedPaint
-      ..shader = LinearGradient(
+    final int shaderKey = Object.hash(
+      activeColor,
+      playheadCoreColor,
+      isDark,
+      padX,
+      usableW,
+      size.height,
+    );
+    if (_lastShaderKey != shaderKey || _cachedPlayedShader == null) {
+      _lastShaderKey = shaderKey;
+      _cachedPlayedShader = LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
         colors: [
@@ -822,6 +847,8 @@ class _OscilloscopeWaveformPainter extends CustomPainter {
           activeColor.withValues(alpha: 0.95),
         ],
       ).createShader(Rect.fromLTWH(padX, 0, usableW, size.height));
+    }
+    final playedPaint = _playedPaint..shader = _cachedPlayedShader;
 
     final topEnvelope = _topEnvelope..reset();
     final bottomEnvelope = _bottomEnvelope..reset();

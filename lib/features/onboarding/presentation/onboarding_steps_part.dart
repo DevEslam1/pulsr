@@ -47,7 +47,8 @@ extension _OnboardingStepsPart on _OnboardingScreenState {
 
     return Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 680),
+        constraints: const BoxConstraints(
+            maxWidth: PulsrLayoutMetrics.compactDialogMaxWidth),
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
           padding: EdgeInsets.symmetric(
@@ -588,7 +589,8 @@ extension _OnboardingStepsPart on _OnboardingScreenState {
 
     return Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 680),
+        constraints: const BoxConstraints(
+            maxWidth: PulsrLayoutMetrics.compactDialogMaxWidth),
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
           padding: EdgeInsets.symmetric(

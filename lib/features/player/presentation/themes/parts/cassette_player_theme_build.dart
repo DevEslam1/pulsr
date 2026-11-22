@@ -806,6 +806,10 @@ class _DeckSegmentedLedVuMeterState extends State<_DeckSegmentedLedVuMeter>
 }
 
 class _DeckSegmentedLedVuPainter extends CustomPainter {
+  static final Paint _shadowPaint = Paint()
+    ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.0);
+  static final Paint _cellPaint = Paint()..style = PaintingStyle.fill;
+
   final AnimationController controller;
   final bool isPlaying;
   final bool allowMotion;
@@ -890,16 +894,13 @@ class _DeckSegmentedLedVuPainter extends CustomPainter {
         const Radius.circular(AppRadii.r2),
       );
 
-      if (isLit || isPeak) {
-        final shadowPaint = Paint()
-          ..color = segAccent.withValues(alpha: 0.55)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.0);
+      if ((isLit || isPeak) && !GpuBudget.isGpuSaverActive) {
+        final shadowPaint = _shadowPaint
+          ..color = segAccent.withValues(alpha: 0.55);
         canvas.drawRRect(rect, shadowPaint);
       }
 
-      final cellPaint = Paint()
-        ..color = cellColor
-        ..style = PaintingStyle.fill;
+      final cellPaint = _cellPaint..color = cellColor;
       canvas.drawRRect(rect, cellPaint);
     }
   }
@@ -1448,7 +1449,7 @@ class _MechanicalDeckKey extends StatelessWidget {
       excludeSemantics: true,
       child: AnimatedContainer(
         duration: context.motionMs(200),
-        curve: context.motionCurve(Curves.easeOutCubic),
+        curve: context.motionCurve(PulsrMotion.enter),
         height: effectiveHeight,
         transform: Matrix4.translationValues(0, isDepressed ? 1.5 : 0.0, 0),
         decoration: BoxDecoration(

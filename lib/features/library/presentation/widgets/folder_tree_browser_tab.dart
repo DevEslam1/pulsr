@@ -47,7 +47,7 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
         _breadcrumbController.animateTo(
           _breadcrumbController.position.maxScrollExtent,
           duration: context.motion(PulsrDurations.layout),
-          curve: Curves.easeOutCubic,
+          curve: context.motionCurve(PulsrMotion.enter),
         );
       }
     });
@@ -323,6 +323,10 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
                             onTap: isLast ? null : () => _navigateTo(crumbPath),
                             borderRadius: AppRadii.r8All,
                             child: Container(
+                              constraints: const BoxConstraints(
+                                minHeight: AppSpacing.minTouchTarget,
+                              ),
+                              alignment: Alignment.center,
                               padding: const EdgeInsets.symmetric(
                                 horizontal: AppSpacing.s8,
                                 vertical: AppSpacing.s4,

@@ -188,7 +188,7 @@ void main() {
     await pumpScreen(tester, twoStatuses());
 
     await tester.longPress(find.text('Song c'));
-    await tester.pump();
+    await tester.pumpAndSettle();
     expect(find.text('1 Selected'), findsOneWidget);
 
     await tester.tap(find.widgetWithText(TextButton, l10n.retry));

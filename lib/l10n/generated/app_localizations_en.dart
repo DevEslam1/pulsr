@@ -6717,6 +6717,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get browseDisc => 'Disc';
 
   @override
+  String get browseDiscUnnumbered => 'Unnumbered';
+
+  @override
   String get browseDiscNumber => 'Disc Number';
 
   @override
@@ -10013,6 +10016,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get badgeLossless => 'Lossless';
+
+  @override
+  String get badgeHiRes => 'Hi-Res';
 
   @override
   String get badgeHiResLossless => 'Hi-Res Lossless';

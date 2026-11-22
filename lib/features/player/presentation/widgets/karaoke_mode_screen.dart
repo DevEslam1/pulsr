@@ -483,8 +483,9 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
                                                         i < highlightedCount
                                                             ? FontWeight.w900
                                                             : FontWeight.w700,
-                                                    shadows: i <
-                                                            highlightedCount
+                                                    shadows: (i <
+                                                                highlightedCount &&
+                                                            !p.isCalmDensity)
                                                         ? [
                                                             Shadow(
                                                               color: p.primary

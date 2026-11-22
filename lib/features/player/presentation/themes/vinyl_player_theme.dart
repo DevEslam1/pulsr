@@ -91,8 +91,8 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
 
     _tonearmAnimation = CurvedAnimation(
       parent: _tonearmController,
-      curve: Curves.easeInOutCubic,
-      reverseCurve: Curves.easeInOutCubic,
+      curve: PulsrMotion.move,
+      reverseCurve: PulsrMotion.move,
     );
 
     _ticker = createTicker(_onTick);
@@ -141,7 +141,7 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
       _velocityController.animateTo(
         1.0,
         duration: context.motionMs(650),
-        curve: Curves.easeOutCubic,
+        curve: context.motionCurve(PulsrMotion.enter),
       );
     } else {
       if (!allowMotion) {
@@ -160,7 +160,7 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
             .animateTo(
           0.0,
           duration: context.motionMs(650),
-          curve: Curves.decelerate,
+          curve: context.motionCurve(PulsrMotion.decelerate),
         )
             .whenComplete(() {
           if (mounted &&

@@ -12,6 +12,7 @@ import 'package:pulsr/core/constants/app_colors.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
+import 'package:pulsr/core/responsive/pulsr_layout_metrics.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/di/injection.dart';
@@ -450,7 +451,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 // ---------- Top Bar with Brand, Step Pill & Skip ----------
                 Center(
                   child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 680),
+                    constraints: const BoxConstraints(
+                        maxWidth: PulsrLayoutMetrics.compactDialogMaxWidth),
                     child: Padding(
                       padding: EdgeInsets.symmetric(
                         horizontal: AppSpacing.lg,
@@ -587,7 +589,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 // ---------- Bottom Navigation & Page Indicators ----------
                 Center(
                   child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 680),
+                    constraints: const BoxConstraints(
+                        maxWidth: PulsrLayoutMetrics.compactDialogMaxWidth),
                     child: Padding(
                       padding: EdgeInsetsDirectional.fromSTEB(
                         AppSpacing.s28,
@@ -1129,7 +1132,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
     return Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 680),
+        constraints: const BoxConstraints(
+            maxWidth: PulsrLayoutMetrics.compactDialogMaxWidth),
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
           padding: EdgeInsets.symmetric(

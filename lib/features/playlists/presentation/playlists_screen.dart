@@ -637,7 +637,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
               ? Row(
                   children: [
                     SizedBox(
-                      width: 380,
+                      width: PulsrLayoutMetrics.defaultLeftPaneWidth,
                       child: playlistListWidget,
                     ),
                     if (context.hasHinge)
@@ -854,12 +854,19 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
           const SizedBox(height: AppSpacing.md),
           AnimatedSwitcher(
             duration: context.motion(PulsrMotion.state),
-            switchInCurve: context.motionCurve(Curves.easeOutCubic),
-            switchOutCurve: context.motionCurve(Curves.easeInCubic),
-            transitionBuilder: (child, animation) => FadeTransition(
-              opacity: animation,
-              child: child,
-            ),
+            switchInCurve: context.motionCurve(PulsrMotion.enter),
+            switchOutCurve: context.motionCurve(PulsrMotion.exit),
+            transitionBuilder: (child, animation) {
+              if (!PulsrMotion.shouldAnimate(context)) return child;
+              return FadeTransition(
+                opacity: animation,
+                child: ScaleTransition(
+                  scale: Tween<double>(begin: 0.96, end: 1.0)
+                      .animate(animation),
+                  child: child,
+                ),
+              );
+            },
             child: KeyedSubtree(
               key: ValueKey(_scope),
               child: _scope == SourceScope.local
@@ -1684,20 +1691,23 @@ class _AccountPlaylistCard extends StatelessWidget {
                   fit: StackFit.expand,
                   children: [
                     ExcludeSemantics(
-                      child: playlist.artworkUrl != null
-                          ? Image.network(
-                              playlist.artworkUrl!,
-                              fit: BoxFit.cover,
-                              cacheWidth: 360,
-                              cacheHeight: 360,
-                              loadingBuilder: (context, child, progress) =>
-                                  progress == null
-                                      ? child
-                                      : _buildFallbackCover(gradientColors),
-                              errorBuilder: (_, __, ___) =>
-                                  _buildFallbackCover(gradientColors),
-                            )
-                          : _buildFallbackCover(gradientColors),
+                      child: Hero(
+                        tag: 'online_playlist_${playlist.playlistId}',
+                        child: playlist.artworkUrl != null
+                            ? Image.network(
+                                playlist.artworkUrl!,
+                                fit: BoxFit.cover,
+                                cacheWidth: 360,
+                                cacheHeight: 360,
+                                loadingBuilder: (context, child, progress) =>
+                                    progress == null
+                                        ? child
+                                        : _buildFallbackCover(gradientColors),
+                                errorBuilder: (_, __, ___) =>
+                                    _buildFallbackCover(gradientColors),
+                              )
+                            : _buildFallbackCover(gradientColors),
+                      ),
                     ),
                     if (onDownload != null)
                       PositionedDirectional(

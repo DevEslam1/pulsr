@@ -846,20 +846,20 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
                           onTap: _busy
                               ? null
                               : () async {
-                                  final messenger =
-                                      ScaffoldMessenger.maybeOf(context);
                                   setState(() => _busy = true);
                                   try {
                                     final deviceName = _devices[i].name;
                                     final res =
                                         await _service.castTo(_devices[i].id);
-                                    if (!mounted) return;
+                                    if (!context.mounted) return;
                                     final msg = res.success
                                         ? l10n.settingsCastingTo(deviceName)
                                         : (res.message ??
                                             l10n.settingsCastFailed);
-                                    messenger?.showSnackBar(
-                                      SnackBar(content: Text(msg)),
+                                    PulsrToast.show(
+                                      context,
+                                      message: msg,
+                                      isSuccess: res.success,
                                     );
                                   } finally {
                                     if (mounted) {

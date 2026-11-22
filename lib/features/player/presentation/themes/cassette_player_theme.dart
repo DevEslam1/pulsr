@@ -137,7 +137,7 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
       _spoolVelocityController.animateTo(
         1.0,
         duration: context.motionMs(650),
-        curve: Curves.easeOutCubic,
+        curve: context.motionCurve(PulsrMotion.enter),
       );
     } else {
       if (!allowMotion || !hasValidDuration) {
@@ -156,7 +156,7 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
             .animateTo(
           0.0,
           duration: context.motionMs(650),
-          curve: Curves.decelerate,
+          curve: context.motionCurve(PulsrMotion.decelerate),
         )
             .whenComplete(() {
           if (mounted &&

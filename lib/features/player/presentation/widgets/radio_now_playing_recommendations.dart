@@ -102,7 +102,7 @@ class _RadioNowPlayingRecommendationsState
 
     return AnimatedContainer(
       duration: context.motion(PulsrMotion.layout),
-      curve: context.motionCurve(Curves.easeOutCubic),
+      curve: context.motionCurve(PulsrMotion.enter),
       margin: const EdgeInsets.symmetric(
         horizontal: AppSpacing.s12,
         vertical: AppSpacing.xxs,
@@ -148,9 +148,9 @@ class _RadioNowPlayingRecommendationsState
 
             if (!_isCollapsed) ...[
               AnimatedSwitcher(
-                duration: context.motionMs(260),
-                switchInCurve: context.motionCurve(Curves.easeOutCubic),
-                switchOutCurve: context.motionCurve(Curves.easeInCubic),
+                duration: context.motion(PulsrDurations.layout),
+                switchInCurve: context.motionCurve(PulsrMotion.enter),
+                switchOutCurve: context.motionCurve(PulsrMotion.exit),
                 transitionBuilder: (child, animation) => FadeTransition(
                   opacity: animation,
                   child: child,
@@ -460,8 +460,8 @@ class _RadioNowPlayingRecommendationsState
       },
       borderRadius: AppRadii.r10All,
       child: AnimatedContainer(
-        duration: context.motionMs(200),
-        curve: context.motionCurve(Curves.easeOutCubic),
+        duration: context.motion(PulsrMotion.state),
+        curve: context.motionCurve(PulsrMotion.enter),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
           gradient: isSelected
@@ -543,8 +543,14 @@ class _RadioNowPlayingRecommendationsState
       onTap: onTap,
       borderRadius: AppRadii.r12All,
       child: AnimatedContainer(
-        duration: context.motionMs(200),
-        curve: context.motionCurve(Curves.easeOutCubic),
+        duration: context.motion(PulsrMotion.state),
+        curve: context.motionCurve(PulsrMotion.enter),
+        constraints: BoxConstraints(
+          minHeight: math.max(
+            AppSpacing.minTouchTarget,
+            MediaQuery.textScalerOf(context).scale(38.0),
+          ),
+        ),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
           gradient: isSelected

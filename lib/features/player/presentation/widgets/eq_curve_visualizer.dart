@@ -473,6 +473,12 @@ class _CatmullRomEqPainter extends CustomPainter {
   static final Map<String, TextPainter> _cachedFreqTextPainters = {};
   static Color? _lastFreqColor;
 
+  static Shader? _cachedFillShader;
+  static int? _lastFillShaderKey;
+
+  static List<Offset>? _cachedTargetPoints;
+  static int? _lastTargetKey;
+
   final List<double> gains;
   final Color color;
   final Color specularColor;
@@ -599,8 +605,10 @@ class _CatmullRomEqPainter extends CustomPainter {
       ..lineTo(points.first.dx, midY)
       ..close();
 
-    final fillPaint = _fillPaint
-      ..shader = LinearGradient(
+    final int fillKey = Object.hash(color, size.width, size.height);
+    if (_lastFillShaderKey != fillKey || _cachedFillShader == null) {
+      _lastFillShaderKey = fillKey;
+      _cachedFillShader = LinearGradient(
         colors: [
           color.withValues(alpha: 0.28),
           color.withValues(alpha: 0.0),
@@ -608,6 +616,8 @@ class _CatmullRomEqPainter extends CustomPainter {
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
       ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
+    }
+    final fillPaint = _fillPaint..shader = _cachedFillShader;
     canvas.drawPath(fillPath, fillPaint);
 
     // 6. Draw Curve Glow & Stroke
@@ -693,13 +703,22 @@ class _CatmullRomEqPainter extends CustomPainter {
     final span = maxLog - minLog;
     const samples = 160;
 
-    final points = <Offset>[];
-    for (var i = 0; i <= samples; i++) {
-      final t = i / samples;
-      final hz = math.exp(minLog + span * t);
-      final db = curve.interpolateDbAt(hz);
-      final y = midY - (db / maxGain) * verticalScale;
-      points.add(Offset(t * size.width, y));
+    final int targetKey =
+        Object.hash(curve, maxGain, midY, verticalScale, size.width);
+    final List<Offset> points;
+    if (_lastTargetKey == targetKey && _cachedTargetPoints != null) {
+      points = _cachedTargetPoints!;
+    } else {
+      points = <Offset>[];
+      for (var i = 0; i <= samples; i++) {
+        final t = i / samples;
+        final hz = math.exp(minLog + span * t);
+        final db = curve.interpolateDbAt(hz);
+        final y = midY - (db / maxGain) * verticalScale;
+        points.add(Offset(t * size.width, y));
+      }
+      _lastTargetKey = targetKey;
+      _cachedTargetPoints = points;
     }
 
     final paint = _targetPaint..color = color.withValues(alpha: 0.55);
