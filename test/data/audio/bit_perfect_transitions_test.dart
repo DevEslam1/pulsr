@@ -153,6 +153,19 @@ void main() {
     expect(cubit.state.bitPerfectOutput, false);
     verify(() => hires.setBitPerfectMode(false)).called(1);
   });
+  test('a mode transition is observable while it owns the audio mutex',
+      () async {
+    final gate = Completer<bool>();
+    when(() => hires.setBitPerfectMode(true)).thenAnswer((_) => gate.future);
+    final on = cubit.setBitPerfectOutput(true);
+    await pumpEventQueue();
+    expect(cubit.audioModeTransitionInFlight, isTrue);
+    gate.complete(true);
+    await on;
+    expect(cubit.audioModeTransitionInFlight, isFalse);
+    expect(cubit.state.bitPerfectOutput, isTrue);
+  });
+
   test('rapid ON/OFF requests run in order', () async {
     final gate = Completer<bool>();
     when(() => hires.setBitPerfectMode(true)).thenAnswer((_) => gate.future);
