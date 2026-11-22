@@ -34,6 +34,7 @@ extension _AudioQualityRateBitDepth on AudioQualitySheet {
     const goldAccent = AppColors.dacGold;
 
     return Column(
+      mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(context.l10n.audioQualityFormatFollowsEngine,
@@ -133,6 +134,7 @@ extension _AudioQualityRateBitDepth on AudioQualitySheet {
     const goldAccent = AppColors.dacGold;
 
     return Column(
+      mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(context.l10n.audioQualityFormatFollowsEngine,
@@ -242,6 +244,7 @@ extension _AudioQualityRateBitDepth on AudioQualitySheet {
               const SizedBox(width: AppSpacing.sm),
               Expanded(
                 child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
@@ -337,6 +340,12 @@ extension _AudioQualityRateBitDepth on AudioQualitySheet {
                             size: 16,
                             color: p.textTertiary,
                           ),
+                          visualDensity: VisualDensity.compact,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(
+                            minWidth: 32,
+                            minHeight: 32,
+                          ),
                           tooltip: context.l10n.dspAboutBitPerfect,
                           onPressed: () {
                             PulsrDialogHelper.showCustomDialog<void>(
@@ -368,6 +377,7 @@ extension _AudioQualityRateBitDepth on AudioQualitySheet {
                   ],
                 ),
               ),
+              const SizedBox(width: AppSpacing.xs),
               Switch.adaptive(
                 value: isBitPerfectEnabled,
                 activeTrackColor: goldAccent,

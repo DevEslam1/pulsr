@@ -83,6 +83,11 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
     private int deferredBufferSize;
     private int[] deferredChannels;
     private boolean playing = false;
+    private boolean usbClockActive = false;
+    private long usbStartPresentationTimeUs = C.TIME_UNSET;
+    private long usbWrittenFrames = 0;
+    private long usbLastPositionUs = C.TIME_UNSET;
+    private boolean usbEosPending = false;
 
     /** Shared byte-preserving gapless editor; no conversion precedes the native tee. */
     static final class PcmFrameEditor {
@@ -440,9 +445,17 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
                 return super.handleBuffer(input, presentationTimeUs, accessUnits);
             }
         }
+        final boolean usbExclusiveNow = processFloat && processor != null && processor.isUsbExclusiveActive();
         if (pendingOutput == null) {
-            if (!playing && processFloat && processor != null && processor.isUsbExclusiveActive()) {
+            // Allow the initial pre-play priming block while STATE_BUFFERING
+            // (usbClockActive == false) so ExoPlayer transitions to STATE_READY
+            // and calls play(); UsbAudioSink stays paused/silent until play().
+            // Once primed, stall while paused so zero audio pulses occur in pause.
+            if (!playing && usbExclusiveNow && usbClockActive) {
                 return false;
+            }
+            if (playing && usbExclusiveNow && !usbClockActive) {
+                processor.setUsbPaused(false);
             }
             final boolean edited = frameEditor != null && frameEditor.edits();
             ByteBuffer original = frameEditor == null ? input.duplicate().order(ByteOrder.nativeOrder())
@@ -464,8 +477,44 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
                     // retries this exact input buffer without advancing or dropping frames.
                     return false;
                 }
+                final int consumedFloats = (pcm.position() - pcmStart) / 4;
                 pendingInputEnd = edited ? input.limit()
-                        : input.position() + (pcm.position() - pcmStart) / 4 * sampleBytes;
+                        : input.position() + consumedFloats * sampleBytes;
+                if (usbExclusiveNow) {
+                    // If this was a pre-play priming block while !playing (e.g.
+                    // inactive preload player), release producer ownership immediately
+                    // so the active player can never get EBUSY on track switch.
+                    if (!playing) {
+                        processor.releaseUsbProducer();
+                    }
+                    // Direct USB owns the hardware clock and paces MediaCodecAudioRenderer
+                    // directly via UsbAudioSink backpressure. Do not write silent frames to
+                    // DefaultAudioSink's AudioTrack, whose detached USB ALSA HAL fails
+                    // proxy_open() and runs ~15% slower than real time.
+                    if (usbStartPresentationTimeUs == C.TIME_UNSET) {
+                        usbStartPresentationTimeUs = presentationTimeUs;
+                        usbWrittenFrames = 0;
+                        usbLastPositionUs = presentationTimeUs;
+                    }
+                    final int ch = (lastInputFormat != null && lastInputFormat.channelCount > 0)
+                            ? lastInputFormat.channelCount : 2;
+                    usbWrittenFrames += (consumedFloats / ch);
+                    usbClockActive = true;
+                    usbEosPending = false;
+                    // Drain processor's muted output buffer so it never accumulates.
+                    processor.getOutput();
+                    if (edited) frameEditor.commit();
+                    input.position(pendingInputEnd);
+                    pendingOutput = null;
+                    pendingInput = null;
+                    try {
+                        applyDeferredConfiguration();
+                    } catch (ConfigurationException e) {
+                        throw new InitializationException("Deferred PCM configuration failed", 0,
+                                lastInputFormat, false, e);
+                    }
+                    return !input.hasRemaining();
+                }
                 pendingOutput = boundaryOutput(processor.getOutput(), processorOutputFormat.encoding);
             } else {
                 pendingInputEnd = input.limit();
@@ -612,6 +661,11 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
 
     void transferPendingTo(FloatDspAudioSink target) {
         target.playing = this.playing;
+        target.usbClockActive = this.usbClockActive;
+        target.usbStartPresentationTimeUs = this.usbStartPresentationTimeUs;
+        target.usbWrittenFrames = this.usbWrittenFrames;
+        target.usbLastPositionUs = this.usbLastPositionUs;
+        target.usbEosPending = this.usbEosPending;
         if (deferredFormat != null) {
             target.deferredFormat = deferredFormat;
             target.deferredBufferSize = deferredBufferSize;
@@ -657,10 +711,31 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
     }
 
     @Override
+    public long getCurrentPositionUs(boolean sourceEnded) {
+        if (usbClockActive && processor != null && processor.isUsbExclusiveActive()
+                && lastInputFormat != null && lastInputFormat.sampleRate > 0
+                && usbStartPresentationTimeUs != C.TIME_UNSET) {
+            final long writtenUs = (usbWrittenFrames * 1_000_000L) / lastInputFormat.sampleRate;
+            final long bufferedUs = Math.max(0L, Math.round(processor.getUsbBufferedMs() * 1000.0));
+            long posUs = usbStartPresentationTimeUs + Math.max(0L, writtenUs - bufferedUs);
+            if (usbLastPositionUs != C.TIME_UNSET && posUs < usbLastPositionUs) {
+                posUs = usbLastPositionUs;
+            }
+            usbLastPositionUs = posUs;
+            return posUs;
+        }
+        return super.getCurrentPositionUs(sourceEnded);
+    }
+
+    @Override
     public void playToEndOfStream() throws WriteException {
         // Last declared padding is intentionally discarded, not emitted as music.
         if (!eosQueued && frameEditor != null) frameEditor.endOfStream();
         eosQueued = true;
+        if (usbClockActive && processor != null && processor.isUsbExclusiveActive()) {
+            usbEosPending = true;
+            return;
+        }
         if (pendingOutput != null && pendingOutput.hasRemaining()) {
             try {
                 if (!super.handleBuffer(pendingOutput, pendingPresentationTimeUs, pendingAccessUnits)) return;
@@ -678,11 +753,17 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
 
     @Override
     public boolean hasPendingData() {
+        if (usbClockActive && processor != null && processor.isUsbExclusiveActive()) {
+            return processor.getUsbBufferedMs() > 1.0;
+        }
         return pendingOutput != null || super.hasPendingData();
     }
 
     @Override
     public boolean isEnded() {
+        if (usbClockActive && processor != null && processor.isUsbExclusiveActive()) {
+            return usbEosPending && processor.getUsbBufferedMs() <= 1.0;
+        }
         return pendingOutput == null && super.isEnded();
     }
 
@@ -690,6 +771,11 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
     @SuppressWarnings("deprecation")
     public void flush() {
         eosQueued = false;
+        usbClockActive = false;
+        usbStartPresentationTimeUs = C.TIME_UNSET;
+        usbWrittenFrames = 0;
+        usbLastPositionUs = C.TIME_UNSET;
+        usbEosPending = false;
         if (frameEditor != null) frameEditor.flush();
         pendingOutput = null;
         pendingInput = null;
@@ -711,6 +797,11 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
     @Override
     public void reset() {
         playing = false;
+        usbClockActive = false;
+        usbStartPresentationTimeUs = C.TIME_UNSET;
+        usbWrittenFrames = 0;
+        usbLastPositionUs = C.TIME_UNSET;
+        usbEosPending = false;
         frameEditor = null;
         deferredFormat = null;
         deferredChannels = null;
@@ -718,7 +809,7 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
         lastInputFormat = null;
         eosQueued = false;
         if (processor != null) {
-            processor.setUsbPaused(false);
+            processor.setUsbPaused(true);
             processor.flushUsbSink();
             processor.releaseUsbProducer();
         }

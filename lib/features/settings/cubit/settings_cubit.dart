@@ -229,17 +229,26 @@ class SettingsCubit extends PulsrCubit<SettingsState>
         super(const SettingsState()) {
     autoSub(_hiResAudioService.outputDeviceStream, (device) {
       if (isClosed) return;
+      // When Pulsr's Direct USB sink claims the USB interface, snd-usb-audio
+      // detaches from Android's AudioManager so device.isUsbDac drops to false
+      // even though the DAC is still physically attached. Never treat that
+      // expected driver handoff as an unplug, or lostBitPerfect/gainedBitPerfect
+      // will oscillate in an infinite open/close loop every ~300 ms.
+      final usbPhysicallyAttached = UsbExclusiveService().lastStatus.attached;
       final lostBitPerfect = state.bitPerfectOutput &&
           (state.currentOutputDevice?.isBitPerfectActive == true ||
               state.currentOutputDevice?.isUsbDac == true) &&
           !device.isUsbDac &&
+          !(_bitPerfectViaDirectStream && usbPhysicallyAttached) &&
           device.activeDeviceType != 'unknown';
       // A saved preference whose transport was never armed (boot without a
       // DAC) or was suspended by an unplug is re-armed by the DAC that appears.
       // An unknown route is not a DAC yet: arming there would point the sink
-      // at nothing.
+      // at nothing. Skip while a mode transition already holds _audioModeMutex
+      // so intermediate route events never queue duplicate re-arms.
       final gainedBitPerfect = !state.bitPerfectOutput &&
           _bitPerfectPreferred &&
+          !_audioModeMutex.isLocked &&
           device.isUsbDac &&
           device.activeDeviceType != 'unknown';
       safeEmit(state.copyWith(currentOutputDevice: device));

@@ -43,6 +43,16 @@ extension PlayerDspProfilesExtension on PlayerDspController {
       final service = _deviceProfileService;
       final profilesService = _settingsProfilesService;
       if (service == null || profilesService == null || _isClosed()) return;
+      // When Pulsr's Direct USB sink claims the USB interface, snd-usb-audio
+      // detaches from Android's AudioManager so outputDeviceStream briefly
+      // reports the fallback speaker route even though the DAC is still
+      // physically attached. Ignore that transient detach so we don't flip
+      // _lastAutoAppliedDeviceKey and re-apply the USB profile in a loop.
+      if (!device.isUsbDac &&
+          _settingsCubit?.bitPerfectViaDirectStream == true &&
+          UsbExclusiveService().lastStatus.attached) {
+        return;
+      }
       try {
         final key = DeviceProfileService.deviceKeyFromInfo(device);
         await service.rememberDevice(key, device.deviceName);
@@ -265,7 +275,9 @@ extension PlayerDspProfilesExtension on PlayerDspController {
         if (settings != null) {
           await settings.setCrossfade(
               profile.crossfadeEnabled ? profile.crossfadeSeconds : 0.0);
-          await settings.setBitPerfectOutput(profile.bitPerfectEnabled);
+          if (settings.state.bitPerfectOutput != profile.bitPerfectEnabled) {
+            await settings.setBitPerfectOutput(profile.bitPerfectEnabled);
+          }
         }
 
         // Null-field policy: a stage the profile leaves null is RESET TO DEFAULT

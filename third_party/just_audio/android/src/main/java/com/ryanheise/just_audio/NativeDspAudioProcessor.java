@@ -60,6 +60,7 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
     private static native boolean nativeNeedsUsbPrefillCushion(long engineHandle);
     private static native void nativeSetUsbPaused(long engineHandle, boolean paused);
     private static native void nativeFlushUsbSink(long engineHandle);
+    private static native double nativeGetUsbBufferedMs(long engineHandle);
     private static native void nativeResyncForTrack(
             long engineHandle, double sampleRate, int channels);
 
@@ -561,6 +562,23 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
         } finally {
             engineLock.readLock().unlock();
         }
+    }
+
+    public double getUsbBufferedMs() {
+        if (!NATIVE_AVAILABLE) return 0.0;
+        engineLock.readLock().lock();
+        try {
+            long handle = nativeEngineHandle.get();
+            if (handle != 0) {
+                try { return nativeGetUsbBufferedMs(handle); }
+                catch (RuntimeException | UnsatisfiedLinkError e) {
+                    logJniFailureOnce("nativeGetUsbBufferedMs", e);
+                }
+            }
+        } finally {
+            engineLock.readLock().unlock();
+        }
+        return 0.0;
     }
 
     @Override

@@ -1693,7 +1693,11 @@ class PulsrAudioHandler extends BaseAudioHandler
     }
     await Future.wait([
       _syncDirectUsbVolume(applied, song: song),
-      player.setVolume(applied),
+      player.setVolume(applied).catchError((Object e) {
+        // A concurrent sink rebuild (reconfigurePlaybackSink) can momentarily
+        // dispose the old just_audio platform channel; ignore MissingPluginException.
+        if (e is! MissingPluginException) throw e;
+      }),
     ]);
   }
 

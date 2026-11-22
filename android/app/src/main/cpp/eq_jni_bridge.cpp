@@ -1880,14 +1880,21 @@ Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeReleaseUsbProducer(
 
 JNIEXPORT void JNICALL
 Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeSetUsbPaused(
-        JNIEnv* /* env */, jclass /* clazz */, jlong /* engineHandle */, jboolean paused) {
-    pulsr::UsbAudioSink::instance().SetPaused(paused == JNI_TRUE);
+        JNIEnv* /* env */, jclass /* clazz */, jlong engineHandle, jboolean paused) {
+    pulsr::UsbAudioSink::instance().SetPaused(
+            static_cast<int64_t>(engineHandle), paused == JNI_TRUE);
 }
 
 JNIEXPORT void JNICALL
 Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeFlushUsbSink(
+        JNIEnv* /* env */, jclass /* clazz */, jlong engineHandle) {
+    pulsr::UsbAudioSink::instance().FlushStream(static_cast<int64_t>(engineHandle));
+}
+
+JNIEXPORT jdouble JNICALL
+Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeGetUsbBufferedMs(
         JNIEnv* /* env */, jclass /* clazz */, jlong /* engineHandle */) {
-    pulsr::UsbAudioSink::instance().FlushStream();
+    return static_cast<jdouble>(pulsr::UsbAudioSink::instance().GetBufferedMsFast());
 }
 
 // Negative results distinguish rejection from zero-frame SRC priming.

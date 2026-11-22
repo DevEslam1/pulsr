@@ -107,15 +107,38 @@ extension SettingsAudioOutputSync on SettingsAudioActions {
   Future<void> applyBitPerfectPolicyMuted(
     bool enabled, {
     bool keepPreferenceWhenDisabling = false,
-  }) =>
-      runSinkTransitionMuted(
-        disarmTapSrc: enabled,
-        syncTapSrcAfter: !enabled,
-        body: () => _applyBitPerfectPolicy(
-          enabled,
-          keepPreferenceWhenDisabling: keepPreferenceWhenDisabling,
-        ),
-      );
+  }) async {
+    // Idempotent fast-path: if Bit-Perfect is already active on Direct USB or
+    // the platform exclusive mixer, do not tear down and reopen the live USB
+    // stream (which detaches/reattaches snd-usb-audio and can trigger a route
+    // oscillation loop).
+    final usbStatus = UsbExclusiveService().lastStatus;
+    if (enabled &&
+        state.bitPerfectOutput &&
+        ((_bitPerfectViaDirectStream && usbStatus.streamingActive) ||
+            state.currentOutputDevice?.isBitPerfectActive == true)) {
+      return;
+    }
+    if (!enabled &&
+        !state.bitPerfectOutput &&
+        !_bitPerfectViaDirectStream &&
+        !usbStatus.streamingActive) {
+      if (!keepPreferenceWhenDisabling && _bitPerfectPreferred) {
+        _bitPerfectPreferred = false;
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool(PrefsKeys.bitPerfectOutput, false);
+      }
+      return;
+    }
+    return runSinkTransitionMuted(
+      disarmTapSrc: enabled,
+      syncTapSrcAfter: !enabled,
+      body: () => _applyBitPerfectPolicy(
+        enabled,
+        keepPreferenceWhenDisabling: keepPreferenceWhenDisabling,
+      ),
+    );
+  }
 
   /// Runs the Strict Bit-Perfect policy through the same muted rebuild
   /// envelope so enabling/disabling Strict mid-track disarms tap-SRC, rebuilds

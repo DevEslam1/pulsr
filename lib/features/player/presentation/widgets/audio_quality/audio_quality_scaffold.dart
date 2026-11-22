@@ -100,33 +100,33 @@ class _AudioQualityTabbedScaffoldState
 
     final Widget tabContent;
     if (isWide && activeTab != 2) {
-      tabContent = IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: widget.nowPlayingChildren,
+      tabContent = Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: widget.nowPlayingChildren,
+            ),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Container(
+              padding: const EdgeInsetsDirectional.only(start: AppSpacing.md),
+              decoration: BoxDecoration(
+                border: BorderDirectional(
+                  start: BorderSide(color: p.hairline, width: 1),
+                ),
               ),
-            ),
-            const SizedBox(width: AppSpacing.md),
-            VerticalDivider(
-              width: 1,
-              thickness: 1,
-              color: p.hairline,
-            ),
-            const SizedBox(width: AppSpacing.md),
-            Expanded(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: widget.outputChildren,
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       );
     } else {
       tabContent = Column(

@@ -513,8 +513,11 @@ UsbStreamResult UsbAudioSink::Open(int fd, int endpointAddress, int interfaceNum
         snap.bitPerfect.directUsbActive = true;
     });
     producerOwner_.store(0, std::memory_order_release);
-    paused_.store(false, std::memory_order_release);
-    pullRenderer_.setPaused(false);
+    // Start paused until an actively playing producer unpauses via play() or
+    // its first live block, so idle/preload sinks never count spurious underruns.
+    paused_.store(true, std::memory_order_release);
+    prefillResetRequested_.store(false, std::memory_order_release);
+    pullRenderer_.setPaused(true);
     running_.store(true, std::memory_order_release);
     active_.store(true, std::memory_order_release);
     writerGate_.store(0, std::memory_order_release);
@@ -1352,6 +1355,12 @@ void UsbAudioSink::workerLoop() {
         size_t readFrame = ringRead_.load(std::memory_order_relaxed);
         uint8_t* dst = buf;
         int urbTotalBytes = 0;
+        if (prefillResetRequested_.exchange(false, std::memory_order_acq_rel)) {
+            prefillDone = pullMode ? pullRenderer_.prefillSatisfied()
+                                   : (prefillFrames_ == 0);
+            producerSeen = false;
+            gapFader_.reset();
+        }
         const bool isPaused = paused_.load(std::memory_order_acquire);
         const size_t wNow = ringWrite_.load(std::memory_order_acquire);
         const size_t availNow = wNow - readFrame;
@@ -1525,13 +1534,25 @@ void UsbAudioSink::ReleaseProducer(int64_t id) {
     }
 }
 
-void UsbAudioSink::SetPaused(bool paused) {
+void UsbAudioSink::SetPaused(int64_t producerId, bool paused) {
+    if (paused) {
+        const int64_t owner = producerOwner_.load(std::memory_order_acquire);
+        // Never let a background/preloading inactive player pause the live owner.
+        if (owner != 0 && producerId != 0 && owner != producerId) {
+            return;
+        }
+    }
     paused_.store(paused, std::memory_order_release);
     pullRenderer_.setPaused(paused);
 }
 
-void UsbAudioSink::FlushStream() {
+void UsbAudioSink::FlushStream(int64_t producerId) {
     if (!active_.load(std::memory_order_acquire)) return;
+    const int64_t owner = producerOwner_.load(std::memory_order_acquire);
+    // Never let a background/preloading inactive player flush the live owner.
+    if (owner != 0 && producerId != 0 && owner != producerId) {
+        return;
+    }
     // Wait briefly for any active producer write to finish before advancing read
     // pointer to write pointer (or flushing the pull reservoir).
     for (int spin = 0; spin < 200; ++spin) {
@@ -1543,6 +1564,7 @@ void UsbAudioSink::FlushStream() {
     if (IsReservoirMode(renderMode_)) {
         pullRenderer_.flush();
     }
+    prefillResetRequested_.store(true, std::memory_order_release);
     deliveryEpoch_.fetch_add(1, std::memory_order_acq_rel);
 }
 
@@ -1914,6 +1936,10 @@ size_t UsbAudioSink::fillAsrcPacket(uint8_t* dst, int framesInPacket, int& rawDe
 
 double UsbAudioSink::GetBufferedMs() {
     std::lock_guard<std::mutex> control(controlMutex_); // status/control, not render
+    return GetBufferedMsFast();
+}
+
+double UsbAudioSink::GetBufferedMsFast() const {
     if (!active_.load(std::memory_order_acquire)) return 0.0;
     if (IsReservoirMode(renderMode_)) {
         return static_cast<double>(pullRenderer_.fillMs());
@@ -2095,19 +2121,34 @@ int UsbAudioSink::WaitForWriteSpace(int frames, int maxWaitMs) {
                 // Pull modes answer from their own reservoir, not ring_: the
                 // ring stays empty there and would always report "space free".
                 const size_t capacity = pullRenderer_.capacityFrames();
+                const size_t configured = pullRenderer_.configuredFrames();
+                const size_t ceiling = (configured > 0 && configured < capacity)
+                    ? std::max(configured, neededFrames * 2)
+                    : capacity;
+                const size_t effectiveCap = std::min(capacity, ceiling);
                 const size_t available = pullRenderer_.availableFrames();
-                if (capacity > available) {
-                    const size_t freeFrames = capacity - available;
+                if (effectiveCap > available) {
+                    const size_t freeFrames = effectiveCap - available;
                     status = (neededFrames <= freeFrames) ? 0 : 1;
+                } else {
+                    status = 1;
                 }
             } else {
                 const size_t capFrames = ringRawDepth_.size();
                 if (capFrames > 1 && neededFrames <= capFrames - 1) {
+                    // Cap real-time producer lead to ~2x prefill (~240 ms) so
+                    // Direct USB self-paces MediaCodecAudioRenderer directly
+                    // against the DAC's hardware clock with low seek/pause
+                    // latency and zero AudioTrack clock-drift starvation.
+                    const size_t targetCap = (prefillFrames_ > 0)
+                        ? std::min(capFrames - 1,
+                                   std::max<size_t>(prefillFrames_ * 2, neededFrames * 2))
+                        : (capFrames - 1);
                     const size_t w = ringWrite_.load(std::memory_order_relaxed);
                     const size_t r = ringRead_.load(std::memory_order_acquire);
                     const size_t occupiedFrames = w - r;
                     const size_t freeFrames =
-                        capFrames > occupiedFrames ? capFrames - occupiedFrames - 1 : 0;
+                        targetCap > occupiedFrames ? targetCap - occupiedFrames : 0;
                     status = (neededFrames <= freeFrames) ? 0 : 1;
                 }
             }

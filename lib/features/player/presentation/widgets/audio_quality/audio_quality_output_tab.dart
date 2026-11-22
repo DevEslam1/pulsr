@@ -18,6 +18,7 @@ extension _AudioQualityOutputTab on AudioQualitySheet {
     final isUsb = outputDevice?.isUsbDac == true || usbStatus.attached;
 
     final formatControls = Column(
+      mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(

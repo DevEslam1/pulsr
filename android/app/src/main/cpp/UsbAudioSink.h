@@ -157,6 +157,7 @@ public:
     uint64_t GetChannelMismatchFrames() const { return channelMismatchFrames_.load(std::memory_order_relaxed); }
     void ResetChannelMismatchFrames() { channelMismatchFrames_.store(0, std::memory_order_relaxed); }
     double GetBufferedMs();
+    double GetBufferedMsFast() const;
     // Bounded backpressure check: returns 0 when `frames` fit in the ring,
     // 1 when active & exclusive but full after `maxWaitMs`, or -1 when
     // inactive/closed/unbounded so callers can route through normal error handling.
@@ -301,9 +302,9 @@ public:
         return producerIsDop_.load(std::memory_order_relaxed);
     }
     void ReleaseProducer(int64_t id);
-    void SetPaused(bool paused);
+    void SetPaused(int64_t producerId, bool paused);
     bool IsPaused() const { return paused_.load(std::memory_order_acquire); }
-    void FlushStream();
+    void FlushStream(int64_t producerId);
     void ReportWriteError(int error);
     int GetRawPcmBitDepth() const {
         const uint64_t status = rawPcmStatus_.load(std::memory_order_acquire);
@@ -395,6 +396,7 @@ private:
     std::atomic<bool> exclusive_{false};
     std::atomic<bool> running_{false};
     std::atomic<bool> paused_{false};
+    std::atomic<bool> prefillResetRequested_{false};
     std::atomic<int> lastError_{0};
     std::atomic<int64_t> lastFaultLogNs_{0};
     std::atomic<int64_t> lastRejectLogNs_{0};

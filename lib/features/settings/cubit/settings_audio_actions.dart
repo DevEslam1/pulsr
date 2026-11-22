@@ -155,15 +155,19 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
           'AAudio Direct output is on — turn it off to use the direct USB path';
       return false;
     }
-    // The direct sink writes to the USB device it opens; never start it while
-    // the media route is on Bluetooth, the speaker, or an unknown route.
-    if (state.currentOutputDevice?.isUsbDac != true) {
-      _lastDirectUsbFailure = 'The current output is not a USB DAC.';
-      return false;
-    }
     try {
       final usb = UsbExclusiveService();
       var status = await usb.getStatus();
+      // The direct sink writes to the USB device it opens; never start it while
+      // the media route is on Bluetooth. If AudioManager is still re-enumerating
+      // the USB card after a recent rebind, allow a physically attached,
+      // streamable USB DAC to proceed.
+      final routeIsBt = state.currentOutputDevice?.isBluetooth == true;
+      final routeIsUsb = state.currentOutputDevice?.isUsbDac == true;
+      if (routeIsBt || (!routeIsUsb && (!status.attached || !status.streamingSupported))) {
+        _lastDirectUsbFailure = 'The current output is not a USB DAC.';
+        return false;
+      }
       if (!status.attached) {
         _lastDirectUsbFailure = 'the USB DAC is not visible to the app';
         return false;
@@ -242,6 +246,14 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
         streamingBitDepth: status.streamingBitDepth,
         deviceBitDepth: effectiveDeviceDepth,
       );
+      // When the source depth is not yet known (0), prefer 24-bit if the DAC
+      // advertises it: a 24-bit subslot carries both 16-bit and 24-bit PCM
+      // bit-perfectly, whereas 16-bit rejects 24-bit tracks (ERANGE).
+      if (effectiveSourceDepth <= 0 &&
+          trackDepth < 24 &&
+          dacSupportedDepths.contains(24)) {
+        trackDepth = 24;
+      }
       if (dacSupportedDepths.isNotEmpty && !dacSupportedDepths.contains(trackDepth)) {
         if (trackDepth > 24 && dacSupportedDepths.contains(24)) {
           trackDepth = 24;
@@ -255,7 +267,9 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
           : AudioSourceCodecState.unknown;
       if (song != null &&
           (!HiResAudioService.validTargetSampleRates.contains(effectiveRate) ||
-              (codecState == AudioSourceCodecState.unknown && !isKnownMp3))) {
+              ((strict || state.strictBitPerfect) &&
+                  codecState == AudioSourceCodecState.unknown &&
+                  !isKnownMp3))) {
         _lastDirectUsbFailure =
             'Source format is unconfirmed; direct playback suspended.';
         return false;
@@ -579,6 +593,14 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
         streamingBitDepth: status.streamingBitDepth,
         deviceBitDepth: effectiveDeviceDepth,
       );
+      // When the source depth is not yet known (0), prefer 24-bit if the DAC
+      // advertises it: a 24-bit subslot carries both 16-bit and 24-bit PCM
+      // bit-perfectly, whereas 16-bit rejects 24-bit tracks (ERANGE).
+      if (effectiveSourceDepth <= 0 &&
+          trackDepth < 24 &&
+          dacSupportedDepths.contains(24)) {
+        trackDepth = 24;
+      }
       if (dacSupportedDepths.isNotEmpty && !dacSupportedDepths.contains(trackDepth)) {
         if (trackDepth > 24 && dacSupportedDepths.contains(24)) {
           trackDepth = 24;
@@ -775,8 +797,13 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
         // format negotiation that carries that rate cannot stay off.
         await setOutputFormatNegotiationEnabled(true);
       }
-      if (state.currentOutputDevice?.isUsbDac == true &&
-          !state.aaudioOutputEnabled) {
+      // Refresh the live route if not already showing a USB DAC (e.g. right
+      // after toggling off while snd-usb-audio rebinds, or right after plugging
+      // in a Type-C DAC) so a stale snapshot never falsely refuses the toggle.
+      if (state.currentOutputDevice?.isUsbDac != true) {
+        await refreshOutputDevice();
+      }
+      if (!state.aaudioOutputEnabled) {
         await UsbExclusiveService().getStatus();
       }
       final song = getIt.isRegistered<PulsrAudioHandler>()
