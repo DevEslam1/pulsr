@@ -242,14 +242,14 @@ mixin SettingsCategoryWidgetsSection
         return [
           _section(
             context,
-            ExtrasStrings.settingsCategoryTitle,
-            ExtrasStrings.settingsCategorySubtitle,
+            context.l10n.extrasSettingsCategoryTitle,
+            context.l10n.extrasSettingsCategorySubtitle,
             [
               _navTile(
                 context,
                 Icons.handyman_rounded,
-                ExtrasStrings.title,
-                ExtrasStrings.playbackSubtitle,
+                context.l10n.extrasTitle,
+                context.l10n.extrasPlaybackSubtitle,
                 onTap: () => Navigator.of(context, rootNavigator: true).push(
                   MaterialPageRoute<void>(
                     builder: (_) => const ExtrasScreen(),

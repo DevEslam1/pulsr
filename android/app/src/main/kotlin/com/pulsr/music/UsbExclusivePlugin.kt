@@ -1459,9 +1459,9 @@ class UsbExclusivePlugin(
      */
     private fun refreshHardwareVolumeIfNeeded() {
         val volume = hardwareVolume ?: return
-        if (volume.ready && (streaming || isDsdActive)) return
+        if (volume.applied && (streaming || isDsdActive)) return
         val now = SystemClock.elapsedRealtime()
-        if (volume.ready && now - lastVolumeRefreshAtMs < VOLUME_REFRESH_INTERVAL_MS) return
+        if (volume.ready && volume.applied && now - lastVolumeRefreshAtMs < VOLUME_REFRESH_INTERVAL_MS) return
         lastVolumeRefreshAtMs = now
         volume.refresh()
     }
@@ -2655,6 +2655,7 @@ class UsbExclusivePlugin(
 
         releaseClaim()
         clearPreferredOutputRoute()
+        hardwareVolume?.invalidate()
         val claimed = try { conn.claimInterface(iface, true) } catch (_: Exception) { false }
         if (!claimed) {
             lastStreamResultCode = 1

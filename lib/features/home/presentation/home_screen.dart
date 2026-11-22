@@ -16,8 +16,6 @@ import '../../../core/di/injection.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/l10n_extensions.dart';
-import '../../../core/widgets/pulsr_logo.dart';
-import '../../../core/widgets/source_scope_switcher.dart';
 import '../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../core/widgets/pulsr_dock_tracker.dart';
 import '../../../core/responsive/pulsr_layout_metrics.dart';
@@ -35,6 +33,7 @@ import '../../../core/services/radio_station_store.dart';
 import 'widgets/quran_radio_hero_carousel.dart';
 import 'widgets/quick_tile.dart';
 import 'widgets/online_category_section.dart';
+import 'widgets/quick_discovery_header.dart';
 import 'widgets/recently_added_section.dart';
 import 'widgets/recently_played_section.dart';
 import 'widgets/studio_tools_rail.dart';
@@ -42,6 +41,7 @@ import 'widgets/studio_tools_rail.dart';
 import '../../../core/utils/pulsr_haptics.dart';
 export 'widgets/quick_actions_row.dart';
 export 'widgets/quick_card.dart';
+export 'widgets/quick_discovery_header.dart';
 export 'widgets/quran_radio_hero_carousel.dart';
 export 'widgets/studio_tools_rail.dart';
 
@@ -442,6 +442,8 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                                   ),
                                 ),
                               ),
+                            const ActiveAudioOutputPill(),
+                            const SizedBox(width: AppSpacing.xs),
                             IconButton(
                               key: const ValueKey('home_settings_button'),
                               constraints: const BoxConstraints(
@@ -455,45 +457,6 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                               ),
                               tooltip: context.l10n.settings,
                               onPressed: () => context.push('/settings'),
-                            ),
-                            const SizedBox(width: AppSpacing.xxs),
-                            // Logo in a soft badge with specular outline so the header has an elevated anchor.
-                            Container(
-                              width: 46,
-                              height: 46,
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                  colors: [
-                                    p.accentContainer,
-                                    Color.alphaBlend(
-                                      p.accent.withValues(alpha: 0.12),
-                                      p.surfaceContainerHighest,
-                                    ),
-                                  ],
-                                ),
-                                borderRadius: AppRadii.r16All,
-                                border: Border.all(
-                                  color: p.accent.withValues(alpha: 0.32),
-                                  width: 1.0,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: p.accent.withValues(alpha: 0.12),
-                                    blurRadius: 10,
-                                    offset: const Offset(0, 3),
-                                  ),
-                                ],
-                              ),
-                              child: Center(
-                                child: PulsrLogo(
-                                  size: 24,
-                                  color: p.accent,
-                                  glowColor: p.glow,
-                                  animate: false,
-                                ),
-                              ),
                             ),
                           ],
                         ),
@@ -568,13 +531,19 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
 
                       // ---------- Segmented Tab Selector (Local vs Online) ----------
                       if (showOnlineTab) ...[
-                        const SizedBox(height: AppSpacing.md),
-                        SourceScopeSwitcher(
-                          persistKey: 'home',
-                          margin: EdgeInsets.symmetric(
+                        const SizedBox(height: AppSpacing.sm),
+                        Padding(
+                          padding: EdgeInsets.symmetric(
                               horizontal: Adaptive.pagePadding(context)),
-                          selectedScope: _scope,
-                          onChanged: (next) => setState(() => _scope = next),
+                          child: Align(
+                            alignment: AlignmentDirectional.centerStart,
+                            child: CompactSourceScopeSwitcher(
+                              persistKey: 'home',
+                              selectedScope: _scope,
+                              onChanged: (next) =>
+                                  setState(() => _scope = next),
+                            ),
+                          ),
                         ),
                       ] else if (offlineOnly) ...[
                         const SizedBox(height: AppSpacing.md),
@@ -999,40 +968,46 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
             children: [
               for (final cat in _onlineCategories)
                 Padding(
-                  padding: const EdgeInsetsDirectional.only(end: AppSpacing.xs),
-                  child: ChoiceChip(
-                    avatar: cat == 'Recommended For You'
-                        ? Icon(Icons.auto_awesome_rounded,
-                            size: 14,
-                            color: _selectedOnlineCategory == cat
-                                ? p.onAccent
-                                : p.accent)
-                        : null,
-                    label: Text(_categoryLabel(context, cat)),
-                    selected: _selectedOnlineCategory == cat,
-                    onSelected: (selected) {
-                      PulsrHaptics.selectionClick();
-                      if (selected) {
-                        setState(() => _selectedOnlineCategory = cat);
-                      }
-                    },
-                    selectedColor: p.accent,
-                    backgroundColor: p.surfaceContainer,
-                    labelStyle: TextStyle(
-                      color: _selectedOnlineCategory == cat
-                          ? p.onAccent
-                          : p.textSecondary,
-                      fontWeight: _selectedOnlineCategory == cat
-                          ? FontWeight.w700
-                          : FontWeight.w500,
-                      fontSize: AppFontSize.label,
-                    ),
-                    side: BorderSide(
+                  padding: const EdgeInsetsDirectional.only(end: AppSpacing.s10),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(minHeight: 40.0),
+                    child: ChoiceChip(
+                      showCheckmark: false,
+                      materialTapTargetSize: MaterialTapTargetSize.padded,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.s12,
+                        vertical: AppSpacing.s8,
+                      ),
+                      avatar: cat == 'Recommended For You'
+                          ? Icon(Icons.auto_awesome_rounded,
+                              size: 15,
+                              color: _selectedOnlineCategory == cat
+                                  ? p.onAccent
+                                  : p.accent)
+                          : null,
+                      label: Text(_categoryLabel(context, cat)),
+                      selected: _selectedOnlineCategory == cat,
+                      onSelected: (selected) {
+                        PulsrHaptics.selectionClick();
+                        if (selected) {
+                          setState(() => _selectedOnlineCategory = cat);
+                        }
+                      },
+                      selectedColor: p.accent,
+                      backgroundColor: p.surfaceContainerHigh,
+                      labelStyle: TextStyle(
                         color: _selectedOnlineCategory == cat
-                            ? p.accent
-                            : p.hairline),
-                    shape:
-                        const RoundedRectangleBorder(borderRadius: AppRadii.r20All),
+                            ? p.onAccent
+                            : p.textPrimary,
+                        fontWeight: _selectedOnlineCategory == cat
+                            ? FontWeight.w700
+                            : FontWeight.w600,
+                        fontSize: AppFontSize.label,
+                      ),
+                      side: BorderSide.none,
+                      shape: const RoundedRectangleBorder(
+                          borderRadius: AppRadii.full),
+                    ),
                   ),
                 ),
             ],

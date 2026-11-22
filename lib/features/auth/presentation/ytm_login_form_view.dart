@@ -2,6 +2,8 @@ part of 'ytm_web_login_sheet.dart';
 
 extension _YtmLoginFormView on _YtmWebLoginSheetState {
   Widget _buildLoginHeader(PulsrPalette p) {
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final isTight = screenWidth <= 380;
     // LOGIN HEADER
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -50,17 +52,17 @@ extension _YtmLoginFormView on _YtmWebLoginSheetState {
         if (_isLoggedIn) ...[
           FilledButton.icon(
             onPressed: _forceSaveAndFinish,
-            icon: const Icon(
+            icon: Icon(
               Icons.check_rounded,
               size: 15,
-              color: Colors.white,
+              color: p.onAccent,
             ),
             label: Text(
               context.l10n.doneAction,
               style: TextStyle(
                 fontSize: AppFontSize.label,
                 fontWeight: FontWeight.w700,
-                color: Colors.white,
+                color: p.onAccent,
               ),
             ),
             style: FilledButton.styleFrom(
@@ -104,22 +106,31 @@ extension _YtmLoginFormView on _YtmWebLoginSheetState {
               ),
             ),
           ),
-          const SizedBox(width: AppSpacing.s2),
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded, size: 18),
-            tooltip: context.l10n.browseRefreshPage,
-            padding: const EdgeInsets.all(AppSpacing.s6),
-            constraints: const BoxConstraints(),
-            onPressed: _reloadPage,
-          ),
+          if (!isTight) ...[
+            const SizedBox(width: AppSpacing.s2),
+            IconButton(
+              icon: const Icon(Icons.refresh_rounded, size: 20),
+              tooltip: context.l10n.browseRefreshPage,
+              constraints: const BoxConstraints(
+                minWidth: AppSpacing.minTouchTarget,
+                minHeight: AppSpacing.minTouchTarget,
+              ),
+              onPressed: _reloadPage,
+            ),
+          ],
           const SizedBox(width: AppSpacing.s2),
           PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert_rounded, size: 18),
+            icon: const Icon(Icons.more_vert_rounded, size: 20),
             tooltip: context.l10n.browseMoreOptions,
-            padding: const EdgeInsets.all(AppSpacing.s6),
-            constraints: const BoxConstraints(),
+            constraints: const BoxConstraints(
+              minWidth: AppSpacing.minTouchTarget,
+              minHeight: AppSpacing.minTouchTarget,
+            ),
             onSelected: (action) {
               switch (action) {
+                case 'refresh':
+                  _reloadPage();
+                  break;
                 case 'ytm_web':
                   _navigateTo('https://music.youtube.com');
                   break;
@@ -132,6 +143,18 @@ extension _YtmLoginFormView on _YtmWebLoginSheetState {
               }
             },
             itemBuilder: (context) => [
+              if (isTight)
+                PopupMenuItem(
+                  value: 'refresh',
+                  child: Row(
+                    children: [
+                      Icon(Icons.refresh_rounded,
+                          size: 18, color: p.textSecondary),
+                      const SizedBox(width: AppSpacing.xs),
+                      Text(context.l10n.browseRefreshPage),
+                    ],
+                  ),
+                ),
               PopupMenuItem(
                 value: 'ytm_web',
                 child: Row(
@@ -170,10 +193,12 @@ extension _YtmLoginFormView on _YtmWebLoginSheetState {
         ],
         const SizedBox(width: AppSpacing.s2),
         IconButton(
-          icon: const Icon(Icons.close_rounded, size: 18),
+          icon: const Icon(Icons.close_rounded, size: 20),
           tooltip: context.l10n.browseClose,
-          padding: const EdgeInsets.all(AppSpacing.s6),
-          constraints: const BoxConstraints(),
+          constraints: const BoxConstraints(
+            minWidth: AppSpacing.minTouchTarget,
+            minHeight: AppSpacing.minTouchTarget,
+          ),
           onPressed: () => Navigator.of(context).pop(false),
         ),
       ],
@@ -181,91 +206,100 @@ extension _YtmLoginFormView on _YtmWebLoginSheetState {
   }
 
   Widget _buildLoggedInBanner(PulsrPalette p) {
-    return Container(
-      margin: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.md, vertical: AppSpacing.xxs),
-      padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
-      decoration: BoxDecoration(
-        color: p.success.withValues(alpha: 0.15),
-        borderRadius: AppRadii.r10All,
-        border: Border.all(color: p.success.withValues(alpha: 0.4)),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.check_circle_outline_rounded, size: 18, color: p.success),
-          const SizedBox(width: AppSpacing.xs),
-          Expanded(
-            child: Text(
-              context.l10n.loginDetected,
-              style: TextStyle(
-                fontSize: AppFontSize.label,
-                fontWeight: FontWeight.w600,
-                color: p.textPrimary,
+    return Semantics(
+      liveRegion: true,
+      child: Container(
+        margin: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md, vertical: AppSpacing.xxs),
+        padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
+        decoration: BoxDecoration(
+          color: p.success.withValues(alpha: 0.15),
+          borderRadius: AppRadii.r10All,
+          border: Border.all(color: p.success.withValues(alpha: 0.4)),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.check_circle_outline_rounded, size: 18, color: p.success),
+            const SizedBox(width: AppSpacing.xs),
+            Expanded(
+              child: Text(
+                context.l10n.loginDetected,
+                style: TextStyle(
+                  fontSize: AppFontSize.label,
+                  fontWeight: FontWeight.w600,
+                  color: p.textPrimary,
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildHintBanner(PulsrPalette p) {
-    return Container(
-      margin: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.md, vertical: AppSpacing.xxs),
-      padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
-      decoration: BoxDecoration(
-        color: Colors.amber.withValues(alpha: 0.15),
-        borderRadius: AppRadii.r8All,
-        border: Border.all(color: Colors.amber.withValues(alpha: 0.4)),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.info_outline_rounded, size: 18, color: p.warning),
-          const SizedBox(width: AppSpacing.xs),
-          Expanded(
-            child: Text(
-              context.l10n.confirmAccount,
-              style:
-                  TextStyle(fontSize: AppFontSize.label, color: p.textPrimary),
+    return Semantics(
+      liveRegion: true,
+      child: Container(
+        margin: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md, vertical: AppSpacing.xxs),
+        padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
+        decoration: BoxDecoration(
+          color: p.warningSoft,
+          borderRadius: AppRadii.r8All,
+          border: Border.all(color: p.warning.withValues(alpha: 0.4)),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.info_outline_rounded, size: 18, color: p.warning),
+            const SizedBox(width: AppSpacing.xs),
+            Expanded(
+              child: Text(
+                context.l10n.confirmAccount,
+                style:
+                    TextStyle(fontSize: AppFontSize.label, color: p.textPrimary),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildBlockStatusBanner(PulsrPalette p) {
-    return Container(
-      margin: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.md, vertical: AppSpacing.xxs),
-      padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
-      decoration: BoxDecoration(
-        color: p.accent.withValues(alpha: 0.12),
-        borderRadius: AppRadii.r8All,
-        border: Border.all(color: p.accent.withValues(alpha: 0.4)),
-      ),
-      child: Row(
-        children: [
-          SizedBox(
-            width: AppSpacing.s14,
-            height: 14,
-            child: CircularProgressIndicator(strokeWidth: 2, color: p.accent),
-          ),
-          const SizedBox(width: AppSpacing.xs),
-          Expanded(
-            child: Text(
-              _blockStatus!,
-              style: TextStyle(
-                  fontSize: AppFontSize.label,
-                  fontWeight: FontWeight.w600,
-                  color: p.textPrimary),
+    return Semantics(
+      liveRegion: true,
+      child: Container(
+        margin: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md, vertical: AppSpacing.xxs),
+        padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
+        decoration: BoxDecoration(
+          color: p.accent.withValues(alpha: 0.12),
+          borderRadius: AppRadii.r8All,
+          border: Border.all(color: p.accent.withValues(alpha: 0.4)),
+        ),
+        child: Row(
+          children: [
+            SizedBox(
+              width: AppSpacing.s14,
+              height: 14,
+              child: CircularProgressIndicator(strokeWidth: 2, color: p.accent),
             ),
-          ),
-        ],
+            const SizedBox(width: AppSpacing.xs),
+            Expanded(
+              child: Text(
+                _blockStatus!,
+                style: TextStyle(
+                    fontSize: AppFontSize.label,
+                    fontWeight: FontWeight.w600,
+                    color: p.textPrimary),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

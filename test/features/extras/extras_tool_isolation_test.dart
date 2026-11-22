@@ -5,14 +5,15 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:pulsr/core/theme/aura_theme.dart';
 import 'package:pulsr/features/extras/presentation/extras_screen.dart';
-import 'package:pulsr/features/extras/presentation/extras_strings.dart';
 import 'package:pulsr/features/settings/presentation/widgets/settings_tiles.dart';
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
+import 'package:pulsr/l10n/generated/app_localizations_en.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  final l10n = AppLocalizationsEn();
 
   SettingsNavTile rowFor(WidgetTester tester, String title) {
     return tester.widget<SettingsNavTile>(
@@ -39,19 +40,19 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.scrollUntilVisible(
-      find.text(ExtrasStrings.usbTitle),
+      find.text(l10n.extrasUsbTitle),
       200,
       scrollable: find.byType(Scrollable).first,
     );
     await tester.pumpAndSettle();
 
-    // The failed row shows its inline error and has no action.
+    // The failed row shows its inline error and has no main tile action.
     expect(find.text('USB ergonomics could not start'), findsOneWidget);
-    expect(rowFor(tester, ExtrasStrings.usbTitle).onTap, isNull);
+    expect(rowFor(tester, l10n.extrasUsbTitle).onTap, isNull);
 
     // Every other row keeps its normal subtitle: the failure is not global.
-    final profilesRow = rowFor(tester, ExtrasStrings.profilesTitle);
-    expect(profilesRow.subtitle, ExtrasStrings.profilesSubtitle);
+    final profilesRow = rowFor(tester, l10n.extrasProfilesTitle);
+    expect(profilesRow.subtitle, l10n.extrasProfilesSubtitle);
     expect(
       find.text('USB ergonomics could not start'),
       findsOneWidget,
@@ -98,20 +99,20 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.scrollUntilVisible(
-      find.text(ExtrasStrings.profilesTitle),
+      find.text(l10n.extrasProfilesTitle),
       200,
       scrollable: find.byType(Scrollable).first,
     );
     await tester.pumpAndSettle();
 
-    final profiles = rowFor(tester, ExtrasStrings.profilesTitle);
-    expect(profiles.subtitle, ExtrasStrings.toolUnavailable,
+    final profiles = rowFor(tester, l10n.extrasProfilesTitle);
+    expect(profiles.subtitle, l10n.extrasToolUnavailable,
         reason: 'the caught failure is named on its own row');
     expect(profiles.onTap, isNull);
 
     // Diagnostics initialized on its own and remains usable.
-    final diagnostics = rowFor(tester, ExtrasStrings.diagnosticsTitle);
-    expect(diagnostics.subtitle, ExtrasStrings.diagnosticsSubtitle);
+    final diagnostics = rowFor(tester, l10n.extrasDiagnosticsTitle);
+    expect(diagnostics.subtitle, l10n.extrasDiagnosticsSubtitle);
     expect(diagnostics.onTap, isNotNull,
         reason: 'one failed tool must not blank the hub');
   });

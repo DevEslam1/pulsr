@@ -19543,6 +19543,204 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{value} dB'**
   String telemetryDbValue(String value);
+
+  /// Title of the Tools & extras screen and settings category
+  ///
+  /// In en, this message translates to:
+  /// **'Tools & extras'**
+  String get extrasTitle;
+
+  /// Loading indicator message for Tools & extras screen
+  ///
+  /// In en, this message translates to:
+  /// **'Loading tools…'**
+  String get extrasLoading;
+
+  /// Notice when some tools failed to initialize, suggesting pull-to-refresh or inline retry
+  ///
+  /// In en, this message translates to:
+  /// **'Some tools could not start. Pull to refresh or retry below.'**
+  String get extrasLoadFailed;
+
+  /// Fallback device label when output device is not recognized
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown output device'**
+  String get extrasUnknownDevice;
+
+  /// Inline error message on a tool row that failed to initialize
+  ///
+  /// In en, this message translates to:
+  /// **'Could not start this tool.'**
+  String get extrasToolUnavailable;
+
+  /// Settings category title for Tools & extras
+  ///
+  /// In en, this message translates to:
+  /// **'Tools & extras'**
+  String get extrasSettingsCategoryTitle;
+
+  /// Settings category subtitle for Tools & extras
+  ///
+  /// In en, this message translates to:
+  /// **'Announcements, system behaviour, USB DAC ergonomics, network output, profiles and diagnostics.'**
+  String get extrasSettingsCategorySubtitle;
+
+  /// Section title for playback extras
+  ///
+  /// In en, this message translates to:
+  /// **'Playback extras'**
+  String get extrasPlaybackTitle;
+
+  /// Section subtitle for playback extras
+  ///
+  /// In en, this message translates to:
+  /// **'Announcements, system behaviour and USB DAC ergonomics.'**
+  String get extrasPlaybackSubtitle;
+
+  /// Navigation tile title for Track announcements
+  ///
+  /// In en, this message translates to:
+  /// **'Track announcements'**
+  String get extrasAnnouncementsTitle;
+
+  /// Navigation tile subtitle for Track announcements
+  ///
+  /// In en, this message translates to:
+  /// **'Speak the title, artist and album when a track starts.'**
+  String get extrasAnnouncementsSubtitle;
+
+  /// Navigation tile title for System behaviour
+  ///
+  /// In en, this message translates to:
+  /// **'System behaviour'**
+  String get extrasSystemBehaviorTitle;
+
+  /// Navigation tile subtitle for System behaviour
+  ///
+  /// In en, this message translates to:
+  /// **'Audio-focus release, notification pausing, fade-out and volume steps.'**
+  String get extrasSystemBehaviorSubtitle;
+
+  /// Navigation tile title for USB DAC ergonomics
+  ///
+  /// In en, this message translates to:
+  /// **'USB DAC ergonomics'**
+  String get extrasUsbTitle;
+
+  /// Navigation tile subtitle for USB DAC ergonomics
+  ///
+  /// In en, this message translates to:
+  /// **'Start-of-track silence, alt-setting reset, force 16-bit, HID keys and bus-speed probe per device.'**
+  String get extrasUsbSubtitle;
+
+  /// Section title for network and output
+  ///
+  /// In en, this message translates to:
+  /// **'Network & output'**
+  String get extrasOutputTitle;
+
+  /// Section subtitle for network and output
+  ///
+  /// In en, this message translates to:
+  /// **'Play on DLNA/UPnP renderers or browse SMB/WebDAV/FTP libraries.'**
+  String get extrasOutputSubtitle;
+
+  /// Navigation tile title for DLNA/UPnP output
+  ///
+  /// In en, this message translates to:
+  /// **'DLNA / UPnP output'**
+  String get extrasDlnaTitle;
+
+  /// Navigation tile subtitle for DLNA/UPnP output
+  ///
+  /// In en, this message translates to:
+  /// **'Discover AVRs, Sonos, Kodi and TVs on the local network.'**
+  String get extrasDlnaSubtitle;
+
+  /// Navigation tile title for Network libraries
+  ///
+  /// In en, this message translates to:
+  /// **'Network libraries'**
+  String get extrasRemoteTitle;
+
+  /// Navigation tile subtitle for Network libraries
+  ///
+  /// In en, this message translates to:
+  /// **'SMB2/3, WebDAV and FTP shares as playable sources, with a local cache.'**
+  String get extrasRemoteSubtitle;
+
+  /// Section title for setups and support
+  ///
+  /// In en, this message translates to:
+  /// **'Setups & support'**
+  String get extrasSupportTitle;
+
+  /// Section subtitle for setups and support
+  ///
+  /// In en, this message translates to:
+  /// **'Move a tuned setup between devices, or export a diagnostics bundle.'**
+  String get extrasSupportSubtitle;
+
+  /// Navigation tile title for Assistant & search
+  ///
+  /// In en, this message translates to:
+  /// **'Assistant & search'**
+  String get extrasAssistantTitle;
+
+  /// Navigation tile subtitle for Assistant & search
+  ///
+  /// In en, this message translates to:
+  /// **'Opt in to local playback suggestions in system search; nothing leaves the device.'**
+  String get extrasAssistantSubtitle;
+
+  /// Navigation tile title for Audio profiles
+  ///
+  /// In en, this message translates to:
+  /// **'Audio profiles'**
+  String get extrasProfilesTitle;
+
+  /// Navigation tile subtitle for Audio profiles
+  ///
+  /// In en, this message translates to:
+  /// **'Capture the DSP chain, EQ, crossfeed and output mode as one file.'**
+  String get extrasProfilesSubtitle;
+
+  /// Navigation tile title for Diagnostics & safe mode
+  ///
+  /// In en, this message translates to:
+  /// **'Diagnostics & safe mode'**
+  String get extrasDiagnosticsTitle;
+
+  /// Navigation tile subtitle for Diagnostics & safe mode
+  ///
+  /// In en, this message translates to:
+  /// **'Output path counters, recent logs, and automatic fallback after repeated sink failures.'**
+  String get extrasDiagnosticsSubtitle;
+
+  /// Title when network libraries cannot start stream server
+  ///
+  /// In en, this message translates to:
+  /// **'Network libraries unavailable'**
+  String get extrasRemoteUnavailableTitle;
+
+  /// Body message when network libraries cannot start stream server
+  ///
+  /// In en, this message translates to:
+  /// **'Pulsr could not open the local streaming port. Close other VPN or proxy apps and try again.'**
+  String get extrasRemoteUnavailableBody;
+
+  /// Error message when remote file playback fails
+  ///
+  /// In en, this message translates to:
+  /// **'That file could not be played from the share. Check the connection and try again.'**
+  String get extrasRemotePlaybackFailed;
+
+  /// Album label assigned to tracks played from network libraries
+  ///
+  /// In en, this message translates to:
+  /// **'Network library'**
+  String get extrasRemoteAlbumLabel;
 }
 
 class _AppLocalizationsDelegate

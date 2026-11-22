@@ -1,9 +1,27 @@
 // lib/features/player/cubit/controllers/player_dsp_profiles.dart
 part of 'player_dsp_controller.dart';
 
+final Object _deviceChangeOrProfileZoneKey = Object();
+
+extension _ReentrantMutex on Mutex {
+  Future<T> protectReentrant<T>(
+    Object zoneKey,
+    Future<T> Function() criticalSection,
+  ) {
+    if (Zone.current[zoneKey] == true) {
+      return criticalSection();
+    }
+    return protect(() => runZoned(
+          criticalSection,
+          zoneValues: {zoneKey: true},
+        ));
+  }
+}
+
 extension PlayerDspProfilesExtension on PlayerDspController {
   Future<void> onOutputDeviceChanged(AudioOutputInfo device) async {
-    return _deviceChangeMutex.protect(() async {
+    return _deviceChangeMutex
+        .protectReentrant(_deviceChangeOrProfileZoneKey, () async {
       if (_isClosed()) return;
       final song = _getState().currentSong;
       if (song != null) {
@@ -226,83 +244,86 @@ extension PlayerDspProfilesExtension on PlayerDspController {
 
   Future<bool> applyProfile(SettingsProfile profile,
       {bool manual = false}) async {
-    // Transactional snapshot of the full pre-apply state (DSP slice + the two
-    // transport settings this method touches). A failure at ANY step rolls the
-    // whole profile back in a single reconciliation pass via [_rollbackProfile]
-    // instead of leaving a half-applied mix of DSP stages.
-    final PlayerState snapshot = _getState();
-    final settings = _settingsCubit;
-    final double prevCrossfade = settings?.state.crossfadeSeconds ?? 0.0;
-    final bool prevBitPerfect = settings?.state.bitPerfectOutput ?? false;
+    return _deviceChangeMutex
+        .protectReentrant(_deviceChangeOrProfileZoneKey, () async {
+      // Transactional snapshot of the full pre-apply state (DSP slice + the two
+      // transport settings this method touches). A failure at ANY step rolls the
+      // whole profile back in a single reconciliation pass via [_rollbackProfile]
+      // instead of leaving a half-applied mix of DSP stages.
+      final PlayerState snapshot = _getState();
+      final settings = _settingsCubit;
+      final double prevCrossfade = settings?.state.crossfadeSeconds ?? 0.0;
+      final bool prevBitPerfect = settings?.state.bitPerfectOutput ?? false;
 
-    try {
-      // Apply the output/transport settings FIRST. The guarded DSP setters
-      // below no-op while an exclusive bit-perfect bitstream is active, whereas
-      // crossfade / bit-perfect do not — applying transport first lets us gate
-      // every DSP stage on the RESULTING guard state and apply them
-      // all-or-nothing, instead of the old mixed state (DSP silently skipped
-      // while bit-perfect still flipped).
-      if (settings != null) {
-        await settings.setCrossfade(
-            profile.crossfadeEnabled ? profile.crossfadeSeconds : 0.0);
-        await settings.setBitPerfectOutput(profile.bitPerfectEnabled);
-      }
+      try {
+        // Apply the output/transport settings FIRST. The guarded DSP setters
+        // below no-op while an exclusive bit-perfect bitstream is active, whereas
+        // crossfade / bit-perfect do not — applying transport first lets us gate
+        // every DSP stage on the RESULTING guard state and apply them
+        // all-or-nothing, instead of the old mixed state (DSP silently skipped
+        // while bit-perfect still flipped).
+        if (settings != null) {
+          await settings.setCrossfade(
+              profile.crossfadeEnabled ? profile.crossfadeSeconds : 0.0);
+          await settings.setBitPerfectOutput(profile.bitPerfectEnabled);
+        }
 
-      // Null-field policy: a stage the profile leaves null is RESET TO DEFAULT
-      // (effect OFF / value 0), NOT left at its previous value. A profile
-      // therefore yields a deterministic, fully-specified DSP chain regardless
-      // of what was active before. (This supersedes the earlier "null = don't
-      // manage this stage / leave as-is" behaviour, which made profile results
-      // depend on prior state.)
-      if (dspBlockedReason() == null) {
-        EqPreset preset = EqPreset.defaultPresets.first;
-        for (final p in EqPreset.defaultPresets) {
-          if (p.name == profile.eqPresetName) {
-            preset = p;
-            break;
+        // Null-field policy: a stage the profile leaves null is RESET TO DEFAULT
+        // (effect OFF / value 0), NOT left at its previous value. A profile
+        // therefore yields a deterministic, fully-specified DSP chain regardless
+        // of what was active before. (This supersedes the earlier "null = don't
+        // manage this stage / leave as-is" behaviour, which made profile results
+        // depend on prior state.)
+        if (dspBlockedReason() == null) {
+          EqPreset preset = EqPreset.defaultPresets.first;
+          for (final p in EqPreset.defaultPresets) {
+            if (p.name == profile.eqPresetName) {
+              preset = p;
+              break;
+            }
+          }
+          final okEq = await setEqualizerEnabled(true);
+          final okPreset = await applyPreset(preset);
+          await setVolumeBoost(profile.volumeBoost);
+          await setSaturation(profile.saturationEnabled ?? false);
+          await setStereoWidth(profile.stereoWidthEnabled ?? false);
+          await setLoudnessContour(profile.loudnessContourEnabled ?? false);
+          await setSubCrossover(profile.subCrossoverEnabled ?? false);
+          await setDynamicEq(profile.dynamicEqEnabled ?? false);
+          if (profile.crossfeedEnabled != null) {
+            await setCrossfeed(
+              profile.crossfeedEnabled!,
+              delayUs: profile.crossfeedDelayUs,
+              feedDb: profile.crossfeedFeedDb,
+            );
+          } else {
+            await setCrossfeed(false);
+          }
+          await setHrtfBinaural(false);
+          bool okHp = true;
+          if (profile.headphoneProfileId != null) {
+            final repo = _headphoneProfilesRepo;
+            await repo.loadProfiles();
+            final hpProfile = repo.getProfileById(profile.headphoneProfileId!);
+            okHp = await applyHeadphoneProfile(hpProfile);
+          } else {
+            okHp = await applyHeadphoneProfile(null);
+          }
+          if (!okEq || !okPreset || !okHp) {
+            throw Exception('One or more DSP stages failed to apply');
           }
         }
-        final okEq = await setEqualizerEnabled(true);
-        final okPreset = await applyPreset(preset);
-        await setVolumeBoost(profile.volumeBoost);
-        await setSaturation(profile.saturationEnabled ?? false);
-        await setStereoWidth(profile.stereoWidthEnabled ?? false);
-        await setLoudnessContour(profile.loudnessContourEnabled ?? false);
-        await setSubCrossover(profile.subCrossoverEnabled ?? false);
-        await setDynamicEq(profile.dynamicEqEnabled ?? false);
-        if (profile.crossfeedEnabled != null) {
-          await setCrossfeed(
-            profile.crossfeedEnabled!,
-            delayUs: profile.crossfeedDelayUs,
-            feedDb: profile.crossfeedFeedDb,
-          );
-        } else {
-          await setCrossfeed(false);
-        }
-        await setHrtfBinaural(false);
-        bool okHp = true;
-        if (profile.headphoneProfileId != null) {
-          final repo = _headphoneProfilesRepo;
-          await repo.loadProfiles();
-          final hpProfile = repo.getProfileById(profile.headphoneProfileId!);
-          okHp = await applyHeadphoneProfile(hpProfile);
-        } else {
-          okHp = await applyHeadphoneProfile(null);
-        }
-        if (!okEq || !okPreset || !okHp) {
-          throw Exception('One or more DSP stages failed to apply');
-        }
+        // When DSP is blocked (profile keeps bit-perfect/AAudio/DoP active) the
+        // stages above are intentionally skipped in full — a consistent "all
+        // bypassed" result, not a partial apply.
+        return true;
+      } catch (e, st) {
+        ErrorLogger.log('Failed to apply settings profile — rolling back',
+            error: e, stackTrace: st, category: 'PlayerDspController');
+        await _rollbackProfile(snapshot, prevCrossfade, prevBitPerfect);
+        return false;
       }
-      // When DSP is blocked (profile keeps bit-perfect/AAudio/DoP active) the
-      // stages above are intentionally skipped in full — a consistent "all
-      // bypassed" result, not a partial apply.
-      return true;
-    } catch (e, st) {
-      ErrorLogger.log('Failed to apply settings profile — rolling back',
-          error: e, stackTrace: st, category: 'PlayerDspController');
-      await _rollbackProfile(snapshot, prevCrossfade, prevBitPerfect);
-      return false;
-    }
+    });
   }
 
   /// Single rollback for [applyProfile]: re-pushes the pre-apply [snapshot] DSP
@@ -343,7 +364,7 @@ extension PlayerDspProfilesExtension on PlayerDspController {
       ),
       ('eqPreset', () => _audioHandler.applyPreset(dsp.eqPreset)),
       ('preamp', () => _audioHandler.setPreamp(dsp.preampDb)),
-      ('volumeBoost', () => _audioHandler.setVolumeBoost(dsp.volumeBoost)),
+      ('volumeBoost', () => _audioHandler.setVolumeBoost(dsp.effectiveVolumeBoost)),
       ('bassBoost', () => _audioHandler.setBassBoost(dsp.effectiveBassBoost)),
       (
         'saturation',

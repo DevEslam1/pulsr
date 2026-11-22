@@ -1,7 +1,10 @@
 package com.pulsr.music
 
+import android.content.ContentUris
 import android.content.Context
 import android.net.Uri
+import android.os.Build
+import android.provider.MediaStore
 import android.provider.OpenableColumns
 import java.io.File
 import java.io.IOException
@@ -59,7 +62,12 @@ object AudioTempFiles {
     )
 
     fun extensionFor(context: Context, uri: Uri): String {
-        val fromName = runCatching { displayName(context, uri) }
+        val nameFromUri = if (uri.scheme?.equals("file", ignoreCase = true) == true) {
+            uri.lastPathSegment
+        } else {
+            null
+        }
+        val fromName = runCatching { nameFromUri ?: displayName(context, uri) ?: uri.lastPathSegment }
             .getOrNull()
             ?.substringAfterLast('.', "")
             ?.lowercase()
@@ -79,6 +87,65 @@ object AudioTempFiles {
         return sniffExtension(context, uri)
     }
 
+    /**
+     * Resolves a file:// URI or local file path to a MediaStore content URI
+     * (MediaStore.Audio.Media.DATA) if indexed in MediaStore.
+     */
+    fun resolveMediaStoreContentUri(context: Context, fileUri: Uri): Uri? {
+        val path = fileUri.path ?: return null
+        val file = File(path)
+        val pathsToTry = linkedSetOf<String>()
+        try {
+            pathsToTry.add(file.canonicalPath)
+        } catch (_: Exception) {}
+        pathsToTry.add(file.absolutePath)
+        pathsToTry.add(path)
+        runCatching { pathsToTry.add(Uri.decode(path)) }
+
+        val projection = arrayOf(MediaStore.Audio.Media._ID)
+        val selection = "${MediaStore.Audio.Media.DATA} = ?"
+
+        val collections = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            listOf(
+                MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_EXTERNAL),
+                MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_INTERNAL),
+                MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+            )
+        } else {
+            listOf(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI)
+        }
+
+        for (targetPath in pathsToTry) {
+            val selectionArgs = arrayOf(targetPath)
+            for (collection in collections) {
+                try {
+                    context.contentResolver.query(
+                        collection,
+                        projection,
+                        selection,
+                        selectionArgs,
+                        null
+                    )?.use { cursor ->
+                        if (cursor.moveToFirst()) {
+                            val idIndex = cursor.getColumnIndex(MediaStore.Audio.Media._ID)
+                            if (idIndex >= 0) {
+                                val id = cursor.getLong(idIndex)
+                                val contentUri = ContentUris.withAppendedId(collection, id)
+                                val readable = runCatching {
+                                    context.contentResolver.openInputStream(contentUri)?.use { true } ?: false
+                                }.getOrDefault(false)
+                                if (readable) {
+                                    return contentUri
+                                }
+                            }
+                        }
+                    }
+                } catch (_: Exception) {}
+            }
+        }
+        return null
+    }
+
     @JvmOverloads
     @Throws(IOException::class)
     fun copyToTempFile(
@@ -91,9 +158,26 @@ object AudioTempFiles {
         val suffix = extensionFor(context, uri).ifEmpty { ".tmp" }
         val temp = File.createTempFile(prefix, suffix, context.cacheDir)
         try {
-            val input = context.contentResolver.openInputStream(uri)
-                ?: throw IOException("Cannot open $uri")
-            input.use { src ->
+            var input: InputStream? = null
+            try {
+                input = context.contentResolver.openInputStream(uri)
+            } catch (e: Exception) {
+                if (uri.scheme?.equals("file", ignoreCase = true) == true) {
+                    val contentUri = resolveMediaStoreContentUri(context, uri)
+                    if (contentUri != null) {
+                        input = context.contentResolver.openInputStream(contentUri)
+                    }
+                }
+                if (input == null) throw e
+            }
+            if (input == null && uri.scheme?.equals("file", ignoreCase = true) == true) {
+                val contentUri = resolveMediaStoreContentUri(context, uri)
+                if (contentUri != null) {
+                    input = context.contentResolver.openInputStream(contentUri)
+                }
+            }
+            val stream = input ?: throw IOException("Cannot open $uri")
+            stream.use { src ->
                 temp.outputStream().use { out -> copyLimited(src, out, maxBytes, throwOnOverflow) }
             }
         } catch (e: Exception) {

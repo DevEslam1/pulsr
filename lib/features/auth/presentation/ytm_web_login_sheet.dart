@@ -20,6 +20,7 @@ import '../../../core/utils/error_logger.dart';
 import '../../../core/utils/ytm_locale.dart';
 import '../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../core/widgets/pulsr_dialog.dart';
+import '../../../core/widgets/pulsr_toast.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
@@ -1102,12 +1103,10 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
 
     _finishing = false;
     if (mounted) {
-      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-        SnackBar(
-          content: Text(context.l10n.completeSignInFirst),
-          behavior: SnackBarBehavior.floating,
-          duration: Duration(seconds: 2),
-        ),
+      PulsrToast.show(
+        context,
+        message: context.l10n.completeSignInFirst,
+        duration: const Duration(seconds: 2),
       );
     }
   }

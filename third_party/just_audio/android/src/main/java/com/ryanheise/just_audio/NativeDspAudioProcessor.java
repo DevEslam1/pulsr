@@ -58,6 +58,8 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
     private static native boolean nativeIsBitPerfect(long engineHandle);
     private static native boolean nativeIsUsbExclusive(long engineHandle);
     private static native boolean nativeNeedsUsbPrefillCushion(long engineHandle);
+    private static native void nativeSetUsbPaused(long engineHandle, boolean paused);
+    private static native void nativeFlushUsbSink(long engineHandle);
     private static native void nativeResyncForTrack(
             long engineHandle, double sampleRate, int channels);
 
@@ -522,6 +524,38 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
                 try { nativeReleaseUsbProducer(handle); }
                 catch (RuntimeException | UnsatisfiedLinkError e) {
                     logJniFailureOnce("nativeReleaseUsbProducer", e);
+                }
+            }
+        } finally {
+            engineLock.readLock().unlock();
+        }
+    }
+
+    public void setUsbPaused(boolean paused) {
+        if (!NATIVE_AVAILABLE) return;
+        engineLock.readLock().lock();
+        try {
+            long handle = nativeEngineHandle.get();
+            if (handle != 0) {
+                try { nativeSetUsbPaused(handle, paused); }
+                catch (RuntimeException | UnsatisfiedLinkError e) {
+                    logJniFailureOnce("nativeSetUsbPaused", e);
+                }
+            }
+        } finally {
+            engineLock.readLock().unlock();
+        }
+    }
+
+    public void flushUsbSink() {
+        if (!NATIVE_AVAILABLE) return;
+        engineLock.readLock().lock();
+        try {
+            long handle = nativeEngineHandle.get();
+            if (handle != 0) {
+                try { nativeFlushUsbSink(handle); }
+                catch (RuntimeException | UnsatisfiedLinkError e) {
+                    logJniFailureOnce("nativeFlushUsbSink", e);
                 }
             }
         } finally {

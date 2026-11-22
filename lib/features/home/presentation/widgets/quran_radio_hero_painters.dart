@@ -429,7 +429,10 @@ class _CarouselWindowedDots extends StatelessWidget {
                   onTap: () => onDotTap(i),
                   behavior: HitTestBehavior.opaque,
                   child: Padding(
-                    padding: const EdgeInsetsDirectional.fromSTEB(0, 6, 4.5, 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 2.5,
+                      vertical: 6,
+                    ),
                     child: glyph,
                   ),
                 ),

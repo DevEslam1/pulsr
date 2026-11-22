@@ -11124,4 +11124,118 @@ class AppLocalizationsEn extends AppLocalizations {
   String telemetryDbValue(String value) {
     return '$value dB';
   }
+
+  @override
+  String get extrasTitle => 'Tools & extras';
+
+  @override
+  String get extrasLoading => 'Loading tools…';
+
+  @override
+  String get extrasLoadFailed =>
+      'Some tools could not start. Pull to refresh or retry below.';
+
+  @override
+  String get extrasUnknownDevice => 'Unknown output device';
+
+  @override
+  String get extrasToolUnavailable => 'Could not start this tool.';
+
+  @override
+  String get extrasSettingsCategoryTitle => 'Tools & extras';
+
+  @override
+  String get extrasSettingsCategorySubtitle =>
+      'Announcements, system behaviour, USB DAC ergonomics, network output, profiles and diagnostics.';
+
+  @override
+  String get extrasPlaybackTitle => 'Playback extras';
+
+  @override
+  String get extrasPlaybackSubtitle =>
+      'Announcements, system behaviour and USB DAC ergonomics.';
+
+  @override
+  String get extrasAnnouncementsTitle => 'Track announcements';
+
+  @override
+  String get extrasAnnouncementsSubtitle =>
+      'Speak the title, artist and album when a track starts.';
+
+  @override
+  String get extrasSystemBehaviorTitle => 'System behaviour';
+
+  @override
+  String get extrasSystemBehaviorSubtitle =>
+      'Audio-focus release, notification pausing, fade-out and volume steps.';
+
+  @override
+  String get extrasUsbTitle => 'USB DAC ergonomics';
+
+  @override
+  String get extrasUsbSubtitle =>
+      'Start-of-track silence, alt-setting reset, force 16-bit, HID keys and bus-speed probe per device.';
+
+  @override
+  String get extrasOutputTitle => 'Network & output';
+
+  @override
+  String get extrasOutputSubtitle =>
+      'Play on DLNA/UPnP renderers or browse SMB/WebDAV/FTP libraries.';
+
+  @override
+  String get extrasDlnaTitle => 'DLNA / UPnP output';
+
+  @override
+  String get extrasDlnaSubtitle =>
+      'Discover AVRs, Sonos, Kodi and TVs on the local network.';
+
+  @override
+  String get extrasRemoteTitle => 'Network libraries';
+
+  @override
+  String get extrasRemoteSubtitle =>
+      'SMB2/3, WebDAV and FTP shares as playable sources, with a local cache.';
+
+  @override
+  String get extrasSupportTitle => 'Setups & support';
+
+  @override
+  String get extrasSupportSubtitle =>
+      'Move a tuned setup between devices, or export a diagnostics bundle.';
+
+  @override
+  String get extrasAssistantTitle => 'Assistant & search';
+
+  @override
+  String get extrasAssistantSubtitle =>
+      'Opt in to local playback suggestions in system search; nothing leaves the device.';
+
+  @override
+  String get extrasProfilesTitle => 'Audio profiles';
+
+  @override
+  String get extrasProfilesSubtitle =>
+      'Capture the DSP chain, EQ, crossfeed and output mode as one file.';
+
+  @override
+  String get extrasDiagnosticsTitle => 'Diagnostics & safe mode';
+
+  @override
+  String get extrasDiagnosticsSubtitle =>
+      'Output path counters, recent logs, and automatic fallback after repeated sink failures.';
+
+  @override
+  String get extrasRemoteUnavailableTitle => 'Network libraries unavailable';
+
+  @override
+  String get extrasRemoteUnavailableBody =>
+      'Pulsr could not open the local streaming port. Close other VPN or proxy apps and try again.';
+
+  @override
+  String get extrasRemotePlaybackFailed =>
+      'That file could not be played from the share. Check the connection and try again.';
+
+  @override
+  String get extrasRemoteAlbumLabel => 'Network library';
 }

@@ -71,8 +71,8 @@ mixin SettingsCategoryMetadata on State<SettingsScreen> {
       ),
       _SettingsCategoryItem(
         id: 'tools',
-        title: ExtrasStrings.settingsCategoryTitle,
-        subtitle: ExtrasStrings.settingsCategorySubtitle,
+        title: context.l10n.extrasSettingsCategoryTitle,
+        subtitle: context.l10n.extrasSettingsCategorySubtitle,
         icon: Icons.handyman_rounded,
         tintColor: AppColors.catAbout,
       ),
@@ -112,7 +112,7 @@ mixin SettingsCategoryMetadata on State<SettingsScreen> {
           c.title = context.l10n.about;
           break;
         case 'tools':
-          c.title = ExtrasStrings.settingsCategoryTitle;
+          c.title = context.l10n.extrasSettingsCategoryTitle;
           break;
         default:
           c.title = id;

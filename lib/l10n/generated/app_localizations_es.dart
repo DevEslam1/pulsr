@@ -11216,4 +11216,119 @@ class AppLocalizationsEs extends AppLocalizations {
   String telemetryDbValue(String value) {
     return '$value dB';
   }
+
+  @override
+  String get extrasTitle => 'Herramientas y extras';
+
+  @override
+  String get extrasLoading => 'Cargando herramientas…';
+
+  @override
+  String get extrasLoadFailed =>
+      'Algunas herramientas no pudieron iniciarse. Desliza para actualizar o reintenta abajo.';
+
+  @override
+  String get extrasUnknownDevice => 'Dispositivo de salida desconocido';
+
+  @override
+  String get extrasToolUnavailable => 'No se pudo iniciar esta herramienta.';
+
+  @override
+  String get extrasSettingsCategoryTitle => 'Herramientas y extras';
+
+  @override
+  String get extrasSettingsCategorySubtitle =>
+      'Anuncios, comportamiento del sistema, ergonomía de DAC USB, salida de red, perfiles y diagnósticos.';
+
+  @override
+  String get extrasPlaybackTitle => 'Extras de reproducción';
+
+  @override
+  String get extrasPlaybackSubtitle =>
+      'Anuncios, comportamiento del sistema y ergonomía de DAC USB.';
+
+  @override
+  String get extrasAnnouncementsTitle => 'Anuncios de pista';
+
+  @override
+  String get extrasAnnouncementsSubtitle =>
+      'Pronunciar título, artista y álbum cuando inicia una pista.';
+
+  @override
+  String get extrasSystemBehaviorTitle => 'Comportamiento del sistema';
+
+  @override
+  String get extrasSystemBehaviorSubtitle =>
+      'Liberación de enfoque de audio, pausa por notificación, desvanecimiento y pasos de volumen.';
+
+  @override
+  String get extrasUsbTitle => 'Ergonomía de DAC USB';
+
+  @override
+  String get extrasUsbSubtitle =>
+      'Silencio de inicio de pista, reinicio de configuración alternativa, forzar 16 bits, teclas HID y sondeo de velocidad de bus por dispositivo.';
+
+  @override
+  String get extrasOutputTitle => 'Red y salida';
+
+  @override
+  String get extrasOutputSubtitle =>
+      'Reproducir en renderizadores DLNA/UPnP o explorar bibliotecas SMB/WebDAV/FTP.';
+
+  @override
+  String get extrasDlnaTitle => 'Salida DLNA / UPnP';
+
+  @override
+  String get extrasDlnaSubtitle =>
+      'Descubre receptores AV, Sonos, Kodi y televisores en la red local.';
+
+  @override
+  String get extrasRemoteTitle => 'Bibliotecas de red';
+
+  @override
+  String get extrasRemoteSubtitle =>
+      'Recursos compartidos SMB2/3, WebDAV y FTP como fuentes reproducibles, con caché local.';
+
+  @override
+  String get extrasSupportTitle => 'Configuraciones y soporte';
+
+  @override
+  String get extrasSupportSubtitle =>
+      'Mueve una configuración ajustada entre dispositivos o exporta un paquete de diagnóstico.';
+
+  @override
+  String get extrasAssistantTitle => 'Asistente y búsqueda';
+
+  @override
+  String get extrasAssistantSubtitle =>
+      'Acepta sugerencias de reproducción local en la búsqueda del sistema; nada sale del dispositivo.';
+
+  @override
+  String get extrasProfilesTitle => 'Perfiles de audio';
+
+  @override
+  String get extrasProfilesSubtitle =>
+      'Captura la cadena DSP, ecualizador, crossfeed y modo de salida como un solo archivo.';
+
+  @override
+  String get extrasDiagnosticsTitle => 'Diagnósticos y modo seguro';
+
+  @override
+  String get extrasDiagnosticsSubtitle =>
+      'Contadores de ruta de salida, registros recientes y respaldo automático tras fallos reiterados.';
+
+  @override
+  String get extrasRemoteUnavailableTitle =>
+      'Bibliotecas de red no disponibles';
+
+  @override
+  String get extrasRemoteUnavailableBody =>
+      'Pulsr no pudo abrir el puerto de transmisión local. Cierra otras aplicaciones VPN o proxy e inténtalo de nuevo.';
+
+  @override
+  String get extrasRemotePlaybackFailed =>
+      'Ese archivo no se pudo reproducir desde el recurso compartido. Comprueba la conexión e inténtalo de nuevo.';
+
+  @override
+  String get extrasRemoteAlbumLabel => 'Biblioteca de red';
 }

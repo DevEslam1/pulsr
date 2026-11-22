@@ -374,4 +374,177 @@ void main() {
       expect(parsed.isBitPerfect, isFalse);
     });
   });
+
+  group('AudioSignalPath unprobed PCM encoding fallback', () {
+    test('infers PCM 24-bit from effectiveDecDepth when decodedPcmEncoding is 0', () {
+      final path = AudioSignalPath.fromOutputInfo(
+        sourceCodec: 'FLAC',
+        sourceSampleRate: 96000,
+        sourceBitDepth: 24,
+        output: _usbDacOutput.copyWith(
+          decodedPcmEncoding: 0,
+          decodedBitDepth: 24,
+          decodedSampleRate: 96000,
+        ),
+      );
+
+      expect(path.decoderPcmEncoding, 0);
+      expect(path.decoderEncodingName, 'PCM 24-bit');
+      expect(path.decoderSummary, 'PCM 24-bit (24-bit / 96 kHz)');
+      expect(path.decoderSummary, isNot(contains('PCM Unprobed')));
+    });
+
+    test('infers PCM 16-bit from sourceBitDepth when output has no bit depth and encoding is 0', () {
+      final path = AudioSignalPath.fromOutputInfo(
+        sourceCodec: 'MP3',
+        sourceSampleRate: 44100,
+        sourceBitDepth: 16,
+        output: _usbDacOutput.copyWith(
+          decodedPcmEncoding: 0,
+          decodedBitDepth: 0,
+          decodedSampleRate: 0,
+        ),
+      );
+
+      expect(path.decoderPcmEncoding, 0);
+      expect(path.decoderEncodingName, 'PCM 16-bit');
+      expect(path.decoderSummary, 'PCM 16-bit (16-bit / 44.1 kHz)');
+      expect(path.decoderSummary, isNot(contains('PCM Unprobed')));
+    });
+
+    test('retains PCM Unprobed only when bit depth is completely unknown (0)', () {
+      final path = AudioSignalPath.fromOutputInfo(
+        sourceCodec: 'AAC',
+        sourceSampleRate: 0,
+        sourceBitDepth: 0,
+        output: _usbDacOutput.copyWith(
+          decodedPcmEncoding: 0,
+          decodedBitDepth: 0,
+          decodedSampleRate: 0,
+        ),
+      );
+
+      expect(path.decoderEncodingName, 'PCM Unprobed');
+      expect(path.decoderSummary, 'PCM Unprobed');
+    });
+
+    test('pcmEncodingName static helper supports fallbackBitDepth', () {
+      expect(AudioSignalPath.pcmEncodingName(0, 24), 'PCM 24-bit');
+      expect(AudioSignalPath.pcmEncodingName(0, 16), 'PCM 16-bit');
+      expect(AudioSignalPath.pcmEncodingName(0, 32), 'PCM 32-bit');
+      expect(AudioSignalPath.pcmEncodingName(0, 0), 'PCM Unprobed');
+      expect(AudioSignalPath.pcmEncodingName(21, 16), 'PCM 24-bit Packed');
+      expect(AudioSignalPath.pcmEncodingName(2, 24), 'PCM 16-bit');
+    });
+  });
+
+  group('AudioSignalPath DSP vs Bit-Perfect state transparency', () {
+    final verifiedState = resolveBitPerfectState(
+      requested: true,
+      sinkActive: true,
+      sourceSampleRate: 96000,
+      sourceBitDepth: 24,
+      sinkSampleRate: 96000,
+      sinkBitDepth: 24,
+      exclusive: true,
+      integerBypass: true,
+      halClean: true,
+      unityGain: true,
+    );
+
+    test('DSP Active overrides verified Bit-Perfect claim and reflects in status tag and summary', () {
+      final path = AudioSignalPath.fromOutputInfo(
+        sourceCodec: 'FLAC',
+        sourceSampleRate: 96000,
+        sourceBitDepth: 24,
+        output: _usbDacOutput,
+        bitPerfectState: verifiedState,
+        dspActive: true,
+      );
+
+      expect(path.isBitPerfect, isFalse);
+      expect(path.statusTag, 'DSP Active');
+      expect(path.hardwareSummary, contains('(DSP Active)'));
+      expect(path.hardwareSummary, isNot(contains('Bit-Perfect')));
+    });
+
+    test('EQ active reflects 32-bit Float DSP (EQ Active) in hardware summary and status tag', () {
+      final path = AudioSignalPath.fromOutputInfo(
+        sourceCodec: 'FLAC',
+        sourceSampleRate: 96000,
+        sourceBitDepth: 24,
+        output: _usbDacOutput,
+        bitPerfectState: verifiedState,
+        dspActive: true,
+        dspDescription: 'EQ Active',
+      );
+
+      expect(path.isBitPerfect, isFalse);
+      expect(path.statusTag, '32-bit Float DSP (EQ Active)');
+      expect(path.hardwareSummary, contains('(32-bit Float DSP (EQ Active))'));
+      expect(path.hardwareSummary, isNot(contains('Bit-Perfect')));
+    });
+
+    test('Limiter active reflects 32-bit Float DSP (Limiter Active)', () {
+      final path = AudioSignalPath.fromOutputInfo(
+        sourceCodec: 'FLAC',
+        sourceSampleRate: 96000,
+        sourceBitDepth: 24,
+        output: _usbDacOutput,
+        bitPerfectState: verifiedState,
+        dspActive: true,
+        dspDescription: 'Limiter',
+      );
+
+      expect(path.isBitPerfect, isFalse);
+      expect(path.statusTag, '32-bit Float DSP (Limiter Active)');
+      expect(path.hardwareSummary, contains('(32-bit Float DSP (Limiter Active))'));
+      expect(path.hardwareSummary, isNot(contains('Bit-Perfect')));
+    });
+
+    test('dspProcessing flag engages DSP transparency without Bit-Perfect claim', () {
+      final path = AudioSignalPath.fromOutputInfo(
+        sourceCodec: 'FLAC',
+        sourceSampleRate: 96000,
+        sourceBitDepth: 24,
+        output: _usbDacOutput,
+        bitPerfectState: verifiedState,
+        dspProcessing: true,
+      );
+
+      expect(path.isBitPerfect, isFalse);
+      expect(path.statusTag, 'DSP Active');
+      expect(path.hardwareSummary, contains('(DSP Active)'));
+      expect(path.hardwareSummary, isNot(contains('Bit-Perfect')));
+    });
+
+    test('BitPerfectState with samples_modified reason reflects DSP Active', () {
+      final modifiedState = resolveBitPerfectState(
+        requested: true,
+        sinkActive: true,
+        sourceSampleRate: 96000,
+        sourceBitDepth: 24,
+        sinkSampleRate: 96000,
+        sinkBitDepth: 24,
+        exclusive: true,
+        integerBypass: true,
+        halClean: true,
+        unityGain: true,
+        samplesModified: true,
+      );
+
+      final path = AudioSignalPath.fromOutputInfo(
+        sourceCodec: 'FLAC',
+        sourceSampleRate: 96000,
+        sourceBitDepth: 24,
+        output: _usbDacOutput,
+        bitPerfectState: modifiedState,
+      );
+
+      expect(path.isBitPerfect, isFalse);
+      expect(path.statusTag, 'DSP Active');
+      expect(path.hardwareSummary, contains('(DSP Active)'));
+      expect(path.hardwareSummary, isNot(contains('Bit-Perfect')));
+    });
+  });
 }

@@ -273,6 +273,24 @@ void main() {
       expect(redirect(context, stateFor('/')), isNull);
     });
 
+    testWidgets('top-level redirect redirects external audio intents to home',
+        (tester) async {
+      await pumpContext(tester);
+      final redirect = router.configuration.topRedirect;
+      const externalLocations = [
+        'file:///storage/emulated/0/Music/track.mp3',
+        'content://media/external/audio/media/42',
+        '/sdcard/Music/song.wav',
+        '/storage/emulated/0/Download/song.flac',
+        '/storage/audio/song.ogg',
+        '/music/sample.m4a',
+        '/music/TRACK.MP3',
+      ];
+      for (final loc in externalLocations) {
+        expect(redirect(context, stateFor(loc)), '/', reason: loc);
+      }
+    });
+
     testWidgets('/browse redirect follows the YTM build gate', (tester) async {
       await pumpContext(tester);
       final redirect = routeFor('/browse').redirect;
@@ -615,6 +633,60 @@ void main() {
       expect(errorBuilder, isNotNull);
       final widget = errorBuilder!(context, stateFor('/does-not-exist'));
       expect(widget, isA<Scaffold>());
+      final scaffold = widget as Scaffold;
+      expect(scaffold.appBar, isNotNull);
+    });
+
+    testWidgets('falls back silently without 404 page for external audio',
+        (tester) async {
+      await pumpContext(tester);
+      final errorBuilder = router.routerDelegate.builder.errorBuilder;
+      expect(errorBuilder, isNotNull);
+      final widget = errorBuilder!(
+          context, stateFor('file:///storage/emulated/0/Music/song.mp3'));
+      expect(widget, isA<Scaffold>());
+      final scaffold = widget as Scaffold;
+      expect(scaffold.appBar, isNull);
+    });
+  });
+
+  group('isExternalAudioLocation', () {
+    test('matches file and content schemes', () {
+      expect(
+          isExternalAudioLocation(
+              Uri.parse('file:///storage/emulated/0/track.mp3')),
+          isTrue);
+      expect(
+          isExternalAudioLocation(
+              Uri.parse('content://media/external/audio/media/123')),
+          isTrue);
+    });
+
+    test('matches /sdcard/ and /storage/ prefixes', () {
+      expect(isExternalAudioLocation(Uri.parse('/sdcard/Music/test.wav')),
+          isTrue);
+      expect(
+          isExternalAudioLocation(
+              Uri.parse('/storage/emulated/0/Download/song.flac')),
+          isTrue);
+    });
+
+    test('matches audio extensions', () {
+      expect(isExternalAudioLocation(Uri.parse('/music/track.wav')), isTrue);
+      expect(isExternalAudioLocation(Uri.parse('/music/track.mp3')), isTrue);
+      expect(isExternalAudioLocation(Uri.parse('/music/track.ogg')), isTrue);
+      expect(isExternalAudioLocation(Uri.parse('/music/track.flac')), isTrue);
+      expect(isExternalAudioLocation(Uri.parse('/music/track.m4a')), isTrue);
+      expect(isExternalAudioLocation(Uri.parse('/music/TRACK.MP3')), isTrue);
+    });
+
+    test('returns false for regular internal routes', () {
+      expect(isExternalAudioLocation(Uri.parse('/')), isFalse);
+      expect(isExternalAudioLocation(Uri.parse('/library')), isFalse);
+      expect(isExternalAudioLocation(Uri.parse('/search')), isFalse);
+      expect(isExternalAudioLocation(Uri.parse('/settings')), isFalse);
+      expect(isExternalAudioLocation(Uri.parse('/album/42')), isFalse);
+      expect(isExternalAudioLocation(Uri.parse('/does-not-exist')), isFalse);
     });
   });
 }

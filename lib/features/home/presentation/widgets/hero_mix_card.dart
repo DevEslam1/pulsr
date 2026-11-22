@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:material_ui/material_ui.dart';
 
 import '../../../../core/constants/app_radii.dart';
@@ -31,6 +33,13 @@ class HeroMixCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = context.palette;
     final isCalm = p.isCalmDensity || GpuBudget.isEnabled;
+    final textScale =
+        MediaQuery.textScalerOf(context).scale(1.0).clamp(1.0, 1.8);
+    final effectiveHeight = math.max(
+      height,
+      height + (textScale - 1.0) * 44.0,
+    );
+
     return Semantics(
       button: true,
       label: '$title, $subtitle',
@@ -40,7 +49,7 @@ class HeroMixCard extends StatelessWidget {
         hapticStyle: PulsrHapticStyle.light,
         focusBorderRadius: AppRadii.r24All,
         child: Container(
-          height: height,
+          constraints: BoxConstraints(minHeight: effectiveHeight),
           clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
             color: p.surfaceContainer,
@@ -55,9 +64,11 @@ class HeroMixCard extends StatelessWidget {
                 end: -18,
                 top: -14,
                 child: ExcludeSemantics(
-                  child: Icon(icon,
-                      size: 132,
-                      color: p.accent.withValues(alpha: isCalm ? 0.06 : 0.11)),
+                  child: Icon(
+                    icon,
+                    size: 132,
+                    color: p.accent.withValues(alpha: isCalm ? 0.06 : 0.11),
+                  ),
                 ),
               ),
               Padding(
@@ -66,6 +77,7 @@ class HeroMixCard extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Column(
+                        mainAxisSize: MainAxisSize.min,
                         mainAxisAlignment: MainAxisAlignment.center,
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [

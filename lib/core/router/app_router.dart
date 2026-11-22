@@ -125,6 +125,51 @@ Page<dynamic> _resolveById<T>({
   );
 }
 
+/// Checks whether an incoming URI or location path corresponds to an external
+/// audio file opened via an Android intent or external file manager.
+///
+/// Matches locations starting with 'file:', 'content:', '/sdcard/', '/storage/',
+/// or ending in common audio extensions (.wav, .mp3, .ogg, .flac, .m4a).
+bool isExternalAudioLocation(Uri uri) {
+  final full = uri.toString().toLowerCase();
+  final path = uri.path.toLowerCase();
+
+  if (uri.scheme == 'file' || uri.scheme == 'content') {
+    return true;
+  }
+
+  const prefixes = [
+    'file:',
+    'content:',
+    '/sdcard/',
+    '/storage/',
+    'sdcard/',
+    'storage/',
+  ];
+
+  for (final prefix in prefixes) {
+    if (full.startsWith(prefix) || path.startsWith(prefix)) {
+      return true;
+    }
+  }
+
+  const audioExtensions = [
+    '.wav',
+    '.mp3',
+    '.ogg',
+    '.flac',
+    '.m4a',
+  ];
+
+  for (final ext in audioExtensions) {
+    if (path.endsWith(ext) || full.endsWith(ext)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 Page<dynamic> _buildAlbumRoute(
   BuildContext context,
   GoRouterState state,
@@ -275,6 +320,9 @@ GoRouter createRouter(MediaScannerService scannerService,
     observers: [PulsrModalObserver()],
     initialLocation: '/splash',
     redirect: (context, state) {
+      if (isExternalAudioLocation(state.uri)) {
+        return '/';
+      }
       if (!AppConfig.ytmEnabled) {
         const ytmPaths = {
           '/ytm-search',
@@ -301,26 +349,40 @@ GoRouter createRouter(MediaScannerService scannerService,
       }
       return null;
     },
-    errorBuilder: (context, state) => Scaffold(
-      appBar: AppBar(title: Text(context.l10n.pageNotFoundTitle)),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.music_off_outlined,
-                size: 64, color: Theme.of(context).colorScheme.outline),
-            const SizedBox(height: AppSpacing.md),
-            Text(context.l10n.pageNotFoundMessage(state.uri.toString()),
-                style: const TextStyle(fontSize: AppFontSize.bodyLarge)),
-            const SizedBox(height: AppSpacing.md),
-            FilledButton(
-              onPressed: () => context.go('/'),
-              child: Text(context.l10n.goHome),
-            ),
-          ],
+    errorBuilder: (context, state) {
+      if (isExternalAudioLocation(state.uri)) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (context.mounted) {
+            context.go('/');
+          }
+        });
+        return const Scaffold(
+          body: Center(
+            child: SizedBox.shrink(),
+          ),
+        );
+      }
+      return Scaffold(
+        appBar: AppBar(title: Text(context.l10n.pageNotFoundTitle)),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.music_off_outlined,
+                  size: 64, color: Theme.of(context).colorScheme.outline),
+              const SizedBox(height: AppSpacing.md),
+              Text(context.l10n.pageNotFoundMessage(state.uri.toString()),
+                  style: const TextStyle(fontSize: AppFontSize.bodyLarge)),
+              const SizedBox(height: AppSpacing.md),
+              FilledButton(
+                onPressed: () => context.go('/'),
+                child: Text(context.l10n.goHome),
+              ),
+            ],
+          ),
         ),
-      ),
-    ),
+      );
+    },
     routes: [
       GoRoute(
         path: '/splash',

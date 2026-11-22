@@ -14,6 +14,7 @@ import '../constants/app_typography.dart';
 import '../motion/pulsr_motion.dart';
 import '../theme/aura_theme.dart';
 import '../utils/l10n_extensions.dart';
+import '../utils/track_display_info.dart';
 import 'cached_artwork.dart';
 import 'gesture_hint_overlay.dart';
 import 'pulsr_pressable.dart';
@@ -64,6 +65,10 @@ class _SongTileState extends State<SongTile> {
   Widget build(BuildContext context) {
     final p = context.palette;
     final song = widget.song;
+    final displayInfo = TrackDisplayInfo.resolve(
+      rawTitle: song.title,
+      rawArtist: song.artist,
+    );
     final isCompact = MediaQuery.sizeOf(context).width < 360;
     final baseArtwork = widget.dense ? 44.0 : widget.artworkSize;
     final effectiveArtworkSize =
@@ -169,7 +174,7 @@ class _SongTileState extends State<SongTile> {
                           Expanded(
                             child: Semantics(
                               label: context.l10n
-                                  .songByArtist(song.title, song.artist),
+                                  .songByArtist(displayInfo.title, displayInfo.artist),
                               selected: isActive || widget.selected,
                               button: true,
                               excludeSemantics: true,
@@ -263,6 +268,8 @@ class _SongTileState extends State<SongTile> {
                                                       type: ArtworkType.AUDIO,
                                                       size: effectiveArtwork,
                                                       borderRadius: artRadius,
+                                                      title: displayInfo.title,
+                                                      artist: displayInfo.artist,
                                                     ),
                                                     if (isActive)
                                                       Container(
@@ -295,7 +302,7 @@ class _SongTileState extends State<SongTile> {
                                                   CrossAxisAlignment.start,
                                               children: [
                                                 Text(
-                                                  song.title,
+                                                  displayInfo.title,
                                                   maxLines: 1,
                                                   overflow: TextOverflow.ellipsis,
                                               style: TextStyle(
@@ -324,7 +331,7 @@ class _SongTileState extends State<SongTile> {
                                                 Expanded(
                                                   child: Text(
                                                     widget.subtitleOverride ??
-                                                        song.artist,
+                                                        displayInfo.artist,
                                                     maxLines: 1,
                                                     overflow: TextOverflow.ellipsis,
                                                     style: TextStyle(

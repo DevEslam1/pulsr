@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/constants/prefs_keys.dart';
 import '../../../core/motion/pulsr_motion.dart';
+import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/error_logger.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/utils/list_content_diff.dart';
@@ -449,10 +450,36 @@ class MiniPlayerState extends State<MiniPlayer> {
           swipedLeft: false,
         );
 
+        final p = context.palette;
+
         return Stack(
           clipBehavior: Clip.none,
           alignment: Alignment.topCenter,
           children: [
+            // Subtle ambient color bleed from current track's artwork
+            Positioned(
+              left: 14,
+              right: 14,
+              top: 4,
+              bottom: 4,
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(28),
+                    boxShadow: [
+                      BoxShadow(
+                        color: p.accent.withValues(
+                          alpha: p.isDark ? 0.22 : 0.12,
+                        ),
+                        blurRadius: 26,
+                        spreadRadius: -2,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
             Semantics(
               label: context.l10n.nowPlayingSemantics(song.title, song.artist),
               button: true,

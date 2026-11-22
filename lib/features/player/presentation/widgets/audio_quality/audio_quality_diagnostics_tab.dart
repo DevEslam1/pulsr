@@ -38,6 +38,12 @@ extension _AudioQualityDiagnosticsTab on AudioQualitySheet {
           aaudioEnabled: settingsState?.aaudioOutputEnabled == true,
           floatOutputEnabled: settingsState?.floatOutputEnabled == true,
           bitPerfectState: state,
+          dspActive: dspSlice.isDspActive,
+          dspDescription: dspSlice.isEqEnabled
+              ? 'EQ Active'
+              : (dspSlice.isLimiterEnabled
+                  ? 'Limiter Active'
+                  : (dspSlice.isDspActive ? 'DSP Active' : null)),
         ),
         activeColor: activeColor,
       ),
@@ -185,10 +191,14 @@ extension _AudioQualityDiagnosticsTab on AudioQualitySheet {
     final decRate = outputDevice?.decodedSampleRate ?? 0;
     final decDepth = outputDevice?.decodedBitDepth ?? 0;
     final decEnc = outputDevice?.decodedPcmEncoding ?? 0;
-    final decoderLabel = decRate > 0 && decDepth > 0
-        ? '${AudioSignalPath.pcmEncodingName(decEnc)} • '
-            '${_sampleRateLabel(decRate)} / $decDepth-bit'
-        : AudioSignalPath.pcmEncodingName(decEnc);
+    final sourceDepth = assessment.sourceBitDepth > 0
+        ? assessment.sourceBitDepth
+        : (int.tryParse(info.bitDepth.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0);
+    final effectiveDepth = decDepth > 0 ? decDepth : sourceDepth;
+    final decoderLabel = decRate > 0 && effectiveDepth > 0
+        ? '${AudioSignalPath.pcmEncodingName(decEnc, effectiveDepth)} • '
+            '${_sampleRateLabel(decRate)} / $effectiveDepth-bit'
+        : AudioSignalPath.pcmEncodingName(decEnc, effectiveDepth);
 
     final List<String> namedStages = [
       if (dsp.isEqEnabled) context.l10n.stageEq,

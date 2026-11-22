@@ -74,6 +74,22 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
           tagged: song.sampleRate ?? 0,
           decoded: state.currentOutputDevice?.decodedSampleRate ?? 0,
         );
+        final codecState = AudioConflicts.classifySourceCodec(
+          path: song.path,
+          codec: song.codec,
+        );
+        // When a track has just started loading and ExoPlayer has not yet
+        // emitted its first decoded PCM frame (rate <= 0 and codec not yet
+        // classified as lossy/radio), defer format validation until the
+        // decoded format arrives rather than tearing down Direct USB and
+        // resetting software gain to 1.0 on every track boundary.
+        final awaitingFirstDecodedFrame = rate <= 0 &&
+            song.source != SongSource.radio &&
+            codecState != AudioSourceCodecState.lossy &&
+            depth <= 24;
+        if (awaitingFirstDecodedFrame && !state.strictBitPerfect) {
+          return true;
+        }
         final reason = AudioConflicts.bitPerfectSourceBlockedReason(
           path: song.path,
           codec: song.codec,

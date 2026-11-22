@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
@@ -8,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/errors/failures.dart';
 import '../../../core/motion/pulsr_motion.dart';
+import '../../../core/presentation/widgets/collection_sort_control.dart';
 import '../../../core/responsive/breakpoints.dart';
 import '../../../core/responsive/detail_scaffold.dart';
 import '../../../core/responsive/pulsr_layout_metrics.dart';
@@ -30,6 +32,7 @@ import '../../../domain/usecases/get_albums_usecase.dart';
 import '../../library/domain/album_disc_grouping.dart';
 import '../../library/presentation/library_quality_utils.dart';
 import '../../player/cubit/player_cubit.dart';
+import '../../sheets/add_to_playlist_sheet.dart';
 import '../../sheets/song_options_sheet.dart';
 
 class AlbumDetailScreen extends StatefulWidget {
@@ -69,6 +72,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
   bool _showCollapsedTitle = false;
   double _expandedHeight = 280.0;
   _AlbumSort _sort = _AlbumSort.track;
+  bool _sortAscending = true;
   final Set<int> _selectedIds = {};
 
   // Recreated on retry only, so rebuilds (sort changes, selection, theme) do
@@ -93,6 +97,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
       setState(() {
         _selectedIds.clear();
         _sort = _AlbumSort.track;
+        _sortAscending = true;
         _updateStream();
       });
       _loadSortPreference();
@@ -120,17 +125,26 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
   }
 
   String _sortPrefsKey(int albumId) => 'album_sort_$albumId';
+  String _sortAscendingPrefsKey(int albumId) => 'album_sort_asc_$albumId';
 
   Future<void> _loadSortPreference() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final stored = prefs.getString(_sortPrefsKey(widget.album.id));
-      if (stored != null) {
-        final matches =
-            _AlbumSort.values.where((e) => e.name == stored).toList();
-        if (matches.isNotEmpty && mounted) {
-          setState(() => _sort = matches.first);
-        }
+      final storedAsc = prefs.getBool(_sortAscendingPrefsKey(widget.album.id));
+      if (mounted) {
+        setState(() {
+          if (stored != null) {
+            final matches =
+                _AlbumSort.values.where((e) => e.name == stored).toList();
+            if (matches.isNotEmpty) {
+              _sort = matches.first;
+            }
+          }
+          if (storedAsc != null) {
+            _sortAscending = storedAsc;
+          }
+        });
       }
     } catch (e, st) {
       ErrorLogger.log(
@@ -143,15 +157,17 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
       if (mounted) {
         setState(() {
           _cachedSort = null;
+          _cachedSortAscending = null;
         });
       }
     }
   }
 
-  Future<void> _persistSort(_AlbumSort sort) async {
+  Future<void> _persistSort(_AlbumSort sort, bool ascending) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_sortPrefsKey(widget.album.id), sort.name);
+      await prefs.setBool(_sortAscendingPrefsKey(widget.album.id), ascending);
     } catch (e, st) {
       ErrorLogger.log(
         'Failed to persist album sort',
@@ -164,6 +180,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
 
   int? _cachedSongsHash;
   _AlbumSort? _cachedSort;
+  bool? _cachedSortAscending;
   List<SongsTableData> _cachedSortedSongs = const [];
 
   List<SongsTableData> _sorted(List<SongsTableData> songs) {
@@ -173,23 +190,39 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
       for (final s in songs)
         Object.hash(s.id, s.title, s.durationMs, s.discNumber, s.trackNumber),
     ]);
-    if (_cachedSongsHash == songsHash && _cachedSort == _sort) {
+    if (_cachedSongsHash == songsHash &&
+        _cachedSort == _sort &&
+        _cachedSortAscending == _sortAscending) {
       return _cachedSortedSongs;
     }
     final out = List<SongsTableData>.of(songs);
     switch (_sort) {
       case _AlbumSort.title:
         out.sort(
-          (a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()),
+          (a, b) => _sortAscending
+              ? a.title.toLowerCase().compareTo(b.title.toLowerCase())
+              : b.title.toLowerCase().compareTo(a.title.toLowerCase()),
         );
       case _AlbumSort.duration:
-        out.sort((a, b) => a.durationMs.compareTo(b.durationMs));
+        out.sort(
+          (a, b) => _sortAscending
+              ? a.durationMs.compareTo(b.durationMs)
+              : b.durationMs.compareTo(a.durationMs),
+        );
       case _AlbumSort.track:
-        // Disc grouping (`_trackRows`) owns the disc/track order.
+        if (!_sortAscending) {
+          out.sort((a, b) {
+            final discA = a.discNumber ?? 1;
+            final discB = b.discNumber ?? 1;
+            if (discA != discB) return discB.compareTo(discA);
+            return (b.trackNumber ?? 0).compareTo(a.trackNumber ?? 0);
+          });
+        }
         break;
     }
     _cachedSongsHash = songsHash;
     _cachedSort = _sort;
+    _cachedSortAscending = _sortAscending;
     _cachedSortedSongs = out;
     return out;
   }
@@ -204,7 +237,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
     BuildContext context,
     List<SongsTableData> songs,
   ) {
-    if (_sort != _AlbumSort.track) {
+    if (_sort != _AlbumSort.track || !_sortAscending) {
       return [for (final song in songs) _AlbumTrackRow(song: song)];
     }
     final groups = groupAlbumDiscs<SongsTableData>([
@@ -280,6 +313,9 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
           if (shouldSplit) {
             return DetailScaffold(
               titleText: album.title,
+              bottomNavigationBar: _selectedIds.isNotEmpty
+                  ? _buildBulkActionsBar(context, orderedSongs)
+                  : null,
               onRefresh: () async {
                 if (mounted) setState(() {});
               },
@@ -298,8 +334,16 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
 
           // Phone / portrait: collapsing SliverAppBar layout.
           return PulsrPagePopScope(
+            onPop: _selectedIds.isNotEmpty
+                ? () {
+                    setState(() => _selectedIds.clear());
+                  }
+                : null,
             child: Scaffold(
               backgroundColor: p.bg,
+              bottomNavigationBar: _selectedIds.isNotEmpty
+                  ? _buildBulkActionsBar(context, orderedSongs)
+                  : null,
               body: Center(
                 child: ConstrainedBox(
                   constraints: PulsrLayoutMetrics.contentConstraints(context),
@@ -506,11 +550,14 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                                   child: Padding(
                                     padding:
                                         const EdgeInsets.all(AppSpacing.xl),
-                                    child: PulsrEmptyState(
-                                      icon: Icons.music_off_rounded,
-                                      title: context.l10n.browseNoTracks,
-                                      subtitle:
-                                          context.l10n.browseNoTracksFound,
+                                    child: Semantics(
+                                      liveRegion: true,
+                                      child: PulsrEmptyState(
+                                        icon: Icons.music_off_rounded,
+                                        title: context.l10n.browseNoTracks,
+                                        subtitle:
+                                            context.l10n.browseNoTracksFound,
+                                      ),
                                     ),
                                   ),
                                 )
@@ -692,37 +739,40 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
             Expanded(
               child: Align(
                 alignment: AlignmentDirectional.centerStart,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.s10,
-                    vertical: AppSpacing.xxs,
-                  ),
-                  decoration: BoxDecoration(
-                    color: p.accent.withValues(alpha: 0.15),
-                    borderRadius: AppRadii.r8All,
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.check_circle_rounded,
-                        size: 14,
-                        color: p.accent,
-                      ),
-                      const SizedBox(width: AppSpacing.xxs),
-                      Flexible(
-                        child: Text(
-                          context.l10n.selectedCount(_selectedIds.length),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: p.accent,
-                            fontSize: AppFontSize.caption,
-                            fontWeight: FontWeight.w800,
+                child: Semantics(
+                  liveRegion: true,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.s10,
+                      vertical: AppSpacing.xxs,
+                    ),
+                    decoration: BoxDecoration(
+                      color: p.accent.withValues(alpha: 0.15),
+                      borderRadius: AppRadii.r10All,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.check_circle_rounded,
+                          size: 14,
+                          color: p.accent,
+                        ),
+                        const SizedBox(width: AppSpacing.xxs),
+                        Flexible(
+                          child: Text(
+                            context.l10n.selectedCount(_selectedIds.length),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: p.accent,
+                              fontSize: AppFontSize.caption,
+                              fontWeight: FontWeight.w800,
+                            ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -742,73 +792,43 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
               ),
             ),
           const SizedBox(width: AppSpacing.xs),
-          // In-list sort (gap 07-01, persisted per session).
-          Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.s10,
-              vertical: 2,
-            ),
-            decoration: BoxDecoration(
-              color: p.surfaceContainer,
-              borderRadius: AppRadii.r10All,
-              border: Border.all(color: p.hairline),
-            ),
-            child: DropdownButton<_AlbumSort>(
-              value: _sort,
-              isDense: true,
-              underline: const SizedBox.shrink(),
-              dropdownColor: p.surfaceContainerHigh,
-              borderRadius: AppRadii.r12All,
-              icon: Padding(
-                padding:
-                    const EdgeInsetsDirectional.only(start: AppSpacing.xxs),
-                child: Icon(
-                  Icons.sort_rounded,
-                  color: p.accent,
-                  size: 16,
-                ),
+          CollectionSortControl<_AlbumSort>(
+            currentSort: _sort,
+            ascending: _sortAscending,
+            options: [
+              CollectionSortOption(
+                value: _AlbumSort.track,
+                label: context.l10n.sortTrackNumber,
+                icon: Icons.format_list_numbered_rounded,
               ),
-              style: TextStyle(
-                color: p.textPrimary,
-                fontSize: AppFontSize.caption,
-                fontWeight: FontWeight.w700,
+              CollectionSortOption(
+                value: _AlbumSort.title,
+                label: context.l10n.sortAZ,
+                icon: Icons.sort_by_alpha_rounded,
               ),
-              items: [
-                DropdownMenuItem(
-                  value: _AlbumSort.track,
-                  child: Text(
-                    context.l10n.sortTrackNumber,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                DropdownMenuItem(
-                  value: _AlbumSort.title,
-                  child: Text(
-                    context.l10n.sortAZ,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                DropdownMenuItem(
-                  value: _AlbumSort.duration,
-                  child: Text(
-                    context.l10n.sortDuration,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-              onChanged: (v) {
-                if (v != null) {
-                  setState(() => _sort = v);
-                  _persistSort(v);
-                }
-              },
-            ),
+              CollectionSortOption(
+                value: _AlbumSort.duration,
+                label: context.l10n.sortDuration,
+                icon: Icons.schedule_rounded,
+              ),
+            ],
+            onSortChanged: (v) {
+              setState(() {
+                _sort = v;
+                _cachedSort = null;
+              });
+              _persistSort(v, _sortAscending);
+            },
+            onDirectionChanged: (asc) {
+              setState(() {
+                _sortAscending = asc;
+                _cachedSortAscending = null;
+              });
+              _persistSort(_sort, asc);
+            },
           ),
           const SizedBox(width: AppSpacing.xxs),
-          // Album-level queue actions (gap 07-03).
+          // Album-level queue & multi-select actions.
           PopupMenuButton<String>(
             icon: Icon(Icons.more_horiz_rounded, color: p.textSecondary),
             shape: RoundedRectangleBorder(
@@ -821,12 +841,22 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
               final target = _selectedIds.isEmpty
                   ? songs
                   : songs.where((s) => _selectedIds.contains(s.id)).toList();
-              if (v == 'add') {
+              if (v == 'select') {
+                PulsrHaptics.lightImpact();
+                if (songs.isNotEmpty) {
+                  setState(() => _selectedIds.add(songs.first.id));
+                }
+              } else if (v == 'select_all') {
+                PulsrHaptics.lightImpact();
+                setState(() => _selectedIds.addAll(songs.map((s) => s.id)));
+              } else if (v == 'add') {
+                PulsrHaptics.mediumImpact();
                 await cubit.addAllToQueue(target);
                 if (mounted) {
                   setState(() => _selectedIds.clear());
                 }
               } else if (v == 'next' && target.isNotEmpty) {
+                PulsrHaptics.mediumImpact();
                 for (final s in target.reversed) {
                   await cubit.playNext(s);
                 }
@@ -834,10 +864,49 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                   setState(() => _selectedIds.clear());
                 }
               } else if (v == 'clear') {
+                PulsrHaptics.lightImpact();
                 setState(() => _selectedIds.clear());
               }
             },
             itemBuilder: (c) => [
+              if (_selectedIds.isEmpty)
+                PopupMenuItem(
+                  value: 'select',
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.checklist_rounded,
+                        size: 18,
+                        color: p.accent,
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      const Text('Select tracks'),
+                    ],
+                  ),
+                )
+              else
+                PopupMenuItem(
+                  value: _selectedIds.length == songs.length
+                      ? 'clear'
+                      : 'select_all',
+                  child: Row(
+                    children: [
+                      Icon(
+                        _selectedIds.length == songs.length
+                            ? Icons.deselect_rounded
+                            : Icons.select_all_rounded,
+                        size: 18,
+                        color: p.accent,
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      Text(
+                        _selectedIds.length == songs.length
+                            ? context.l10n.deselectAllAction
+                            : context.l10n.selectAllAction,
+                      ),
+                    ],
+                  ),
+                ),
               PopupMenuItem(
                 value: 'add',
                 child: Row(
@@ -872,7 +941,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                   child: Row(
                     children: [
                       Icon(
-                        Icons.deselect_rounded,
+                        Icons.close_rounded,
                         size: 18,
                         color: p.error,
                       ),
@@ -884,6 +953,109 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildBulkActionsBar(
+    BuildContext context,
+    List<SongsTableData> allSongs,
+  ) {
+    final p = context.palette;
+    final l10n = context.l10n;
+    final selectedSongs =
+        allSongs.where((s) => _selectedIds.contains(s.id)).toList();
+
+    return AnimatedSlide(
+      offset: Offset.zero,
+      duration: context.motion(PulsrDurations.layout),
+      curve: Curves.easeOutCubic,
+      child: AnimatedOpacity(
+        opacity: 1.0,
+        duration: context.motion(PulsrMotion.state),
+        child: SafeArea(
+          key: const ValueKey('album_bulk_actions_bar'),
+          child: Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md,
+              vertical: AppSpacing.sm,
+            ),
+            decoration: BoxDecoration(
+              color: p.surfaceContainer,
+              border: Border(top: BorderSide(color: p.hairline)),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.scrimAt(0.1),
+                  blurRadius: 8,
+                  offset: const Offset(0, -2),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                TextButton.icon(
+                  style: TextButton.styleFrom(foregroundColor: p.accent),
+                  icon: const Icon(Icons.playlist_play_rounded, size: 20),
+                  label: Text(l10n.playNext),
+                  onPressed: selectedSongs.isEmpty
+                      ? null
+                      : () async {
+                          PulsrHaptics.mediumImpact();
+                          final cubit = context.read<PlayerCubit>();
+                          for (final s in selectedSongs.reversed) {
+                            await cubit.playNext(s);
+                          }
+                          if (mounted) {
+                            setState(() => _selectedIds.clear());
+                          }
+                        },
+                ),
+                TextButton.icon(
+                  style: TextButton.styleFrom(foregroundColor: p.textPrimary),
+                  icon: const Icon(Icons.queue_music_rounded, size: 20),
+                  label: Text(l10n.addToQueue),
+                  onPressed: selectedSongs.isEmpty
+                      ? null
+                      : () async {
+                          PulsrHaptics.mediumImpact();
+                          final cubit = context.read<PlayerCubit>();
+                          await cubit.addAllToQueue(selectedSongs);
+                          if (mounted) {
+                            setState(() => _selectedIds.clear());
+                          }
+                        },
+                ),
+                TextButton.icon(
+                  style: TextButton.styleFrom(foregroundColor: p.textPrimary),
+                  icon: const Icon(Icons.playlist_add_rounded, size: 20),
+                  label: Text(l10n.addToPlaylist),
+                  onPressed: selectedSongs.isEmpty
+                      ? null
+                      : () async {
+                          PulsrHaptics.lightImpact();
+                          await AddToPlaylistSheet.show(
+                            context,
+                            song: selectedSongs.first,
+                            songs: selectedSongs,
+                          );
+                          if (mounted) {
+                            setState(() => _selectedIds.clear());
+                          }
+                        },
+                ),
+                IconButton(
+                  tooltip: l10n.cancel,
+                  icon: Icon(Icons.close_rounded, size: 20, color: p.textSecondary),
+                  onPressed: () {
+                    PulsrHaptics.lightImpact();
+                    setState(() => _selectedIds.clear());
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -966,15 +1138,19 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
             // Batch multi-select (gap 07-04): long-press toggles,
             // tap plays (or toggles when selection active).
             selected: _selectedIds.contains(song.id),
-            onLongPress: () => setState(() {
-              if (_selectedIds.contains(song.id)) {
-                _selectedIds.remove(song.id);
-              } else {
-                _selectedIds.add(song.id);
-              }
-            }),
+            onLongPress: () {
+              PulsrHaptics.lightImpact();
+              setState(() {
+                if (_selectedIds.contains(song.id)) {
+                  _selectedIds.remove(song.id);
+                } else {
+                  _selectedIds.add(song.id);
+                }
+              });
+            },
             onTap: () {
               if (_selectedIds.isNotEmpty) {
+                PulsrHaptics.lightImpact();
                 setState(() {
                   if (_selectedIds.contains(song.id)) {
                     _selectedIds.remove(song.id);
@@ -1089,10 +1265,13 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
     if (rows.isEmpty) {
       return Padding(
         padding: const EdgeInsets.all(AppSpacing.xl),
-        child: PulsrEmptyState(
-          icon: Icons.music_off_rounded,
-          title: context.l10n.browseNoTracks,
-          subtitle: context.l10n.browseNoTracksFound,
+        child: Semantics(
+          liveRegion: true,
+          child: PulsrEmptyState(
+            icon: Icons.music_off_rounded,
+            title: context.l10n.browseNoTracks,
+            subtitle: context.l10n.browseNoTracksFound,
+          ),
         ),
       );
     }
@@ -1131,59 +1310,62 @@ class _AlbumLoadingView extends StatelessWidget {
     return PulsrPagePopScope(
       child: Scaffold(
         backgroundColor: p.bg,
-        body: Center(
-          child: ConstrainedBox(
-            constraints: PulsrLayoutMetrics.contentConstraints(context),
-            child: CustomScrollView(
-              slivers: [
-                SliverAppBar(
-                  leading: const PulsrBackButton(),
-                  expandedHeight: expandedHeight,
-                  pinned: true,
-                  elevation: 0,
-                  scrolledUnderElevation: 0,
-                  backgroundColor: p.bg,
-                  flexibleSpace: FlexibleSpaceBar(
-                    background: Container(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            p.accentContainer.withValues(
-                              alpha: p.isDark ? 0.55 : 0.75,
-                            ),
-                            p.bg,
-                          ],
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
+        body: Semantics(
+          liveRegion: true,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: PulsrLayoutMetrics.contentConstraints(context),
+              child: CustomScrollView(
+                slivers: [
+                  SliverAppBar(
+                    leading: const PulsrBackButton(),
+                    expandedHeight: expandedHeight,
+                    pinned: true,
+                    elevation: 0,
+                    scrolledUnderElevation: 0,
+                    backgroundColor: p.bg,
+                    flexibleSpace: FlexibleSpaceBar(
+                      background: Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              p.accentContainer.withValues(
+                                alpha: p.isDark ? 0.55 : 0.75,
+                              ),
+                              p.bg,
+                            ],
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                          ),
                         ),
-                      ),
-                      child: SafeArea(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            SkeletonBox(
-                              width: artworkSize,
-                              height: artworkSize,
-                              radius: 24,
-                            ),
-                            const SizedBox(height: AppSpacing.sm),
-                            const SkeletonBox(width: 180, height: 22),
-                            const SizedBox(height: AppSpacing.xxs),
-                            const SkeletonBox(width: 120, height: 14),
-                            const SizedBox(height: AppSpacing.md),
-                          ],
+                        child: SafeArea(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              SkeletonBox(
+                                width: artworkSize,
+                                height: artworkSize,
+                                radius: 24,
+                              ),
+                              const SizedBox(height: AppSpacing.sm),
+                              const SkeletonBox(width: 180, height: 22),
+                              const SizedBox(height: AppSpacing.xxs),
+                              const SkeletonBox(width: 120, height: 14),
+                              const SizedBox(height: AppSpacing.md),
+                            ],
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
-                const SliverToBoxAdapter(
-                  child: Padding(
-                    padding: EdgeInsets.only(top: AppSpacing.md),
-                    child: SkeletonList(itemCount: 6),
+                  const SliverToBoxAdapter(
+                    child: Padding(
+                      padding: EdgeInsets.only(top: AppSpacing.md),
+                      child: SkeletonList(itemCount: 6),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -1210,14 +1392,17 @@ class _AlbumErrorView extends StatelessWidget {
           leading: const PulsrBackButton(),
         ),
         body: Center(
-          child: PulsrEmptyState(
-            icon: Icons.error_outline_rounded,
-            iconColor: p.error,
-            title: context.l10n.couldNotLoadAlbumSongs,
-            subtitle: context.l10n.libraryReadError,
-            primaryActionLabel: context.l10n.retry,
-            primaryActionIcon: Icons.refresh_rounded,
-            onPrimaryAction: onRetry,
+          child: Semantics(
+            liveRegion: true,
+            child: PulsrEmptyState(
+              icon: Icons.error_outline_rounded,
+              iconColor: p.error,
+              title: context.l10n.couldNotLoadAlbumSongs,
+              subtitle: context.l10n.libraryReadError,
+              primaryActionLabel: context.l10n.retry,
+              primaryActionIcon: Icons.refresh_rounded,
+              onPrimaryAction: onRetry,
+            ),
           ),
         ),
       ),

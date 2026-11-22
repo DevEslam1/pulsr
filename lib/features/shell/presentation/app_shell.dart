@@ -1,14 +1,18 @@
 import 'dart:async';
 import 'dart:collection';
+import 'dart:math' as math;
+import 'dart:ui' show ImageFilter;
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/bloc/base_cubit.dart';
+import '../../../core/constants/app_blur.dart';
 import '../../../core/constants/prefs_keys.dart';
 import '../../../core/errors/error_message_resolver.dart';
 import '../../../core/motion/pulsr_motion.dart';
+import '../../../core/performance/gpu_budget.dart';
 import '../../../core/responsive/layout_delegate.dart';
 import '../../../core/responsive/pulsr_hinge_gap.dart';
 import '../../../core/responsive/pulsr_responsive_tokens.dart';
@@ -377,29 +381,9 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
                 ),
               ),
             ),
-            // Soft bottom ambient vignette so scrolling content fades into the floating dock
-            PositionedDirectional(
-              start: 0,
-              end: 0,
-              bottom: 0,
-              height: 112,
-              child: IgnorePointer(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        p.surface.withValues(alpha: 0.0),
-                        p.surface.withValues(alpha: p.isDark ? 0.55 : 0.38),
-                        p.surface.withValues(alpha: p.isDark ? 0.88 : 0.72),
-                      ],
-                      stops: const [0.0, 0.55, 1.0],
-                    ),
-                  ),
-                ),
-              ),
-            ),
+            // Unified frosted-glass bottom dock with BackdropFilter blur and subtle ambient
+            // color bleed from current track's artwork behind the Mini-Player.
+            const _UnifiedFrostedGlassBottomDock(),
             PositionedDirectional(
               start: 0,
               end: 0,
@@ -584,6 +568,130 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Unified frosted-glass bottom dock with [BackdropFilter] blur and subtle ambient
+/// color bleed from the current track's artwork behind the Mini-Player.
+/// Eliminates the gap between the floating Mini-Player and Bottom Navigation bar
+/// where scrolling content peeks through.
+class _UnifiedFrostedGlassBottomDock extends StatelessWidget {
+  const _UnifiedFrostedGlassBottomDock();
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final isCalm = p.isCalmDensity || GpuBudget.isEnabled;
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
+
+    return ValueListenableBuilder<double>(
+      valueListenable: PulsrDockTracker.dockHeight,
+      builder: (context, dockHeight, _) {
+        final totalDockHeight = dockHeight > 0
+            ? (dockHeight + bottomInset + 12.0)
+            : (64.0 + bottomInset + 12.0);
+
+        return BlocBuilder<PlayerCubit, PlayerState>(
+          buildWhen: (prev, curr) =>
+              prev.currentSong?.id != curr.currentSong?.id ||
+              (prev.currentSong != null) != (curr.currentSong != null),
+          builder: (context, state) {
+            final hasSong = state.currentSong != null;
+            final activeAccent = p.accent;
+
+            return PositionedDirectional(
+              start: 0,
+              end: 0,
+              bottom: 0,
+              height: totalDockHeight,
+              child: IgnorePointer(
+                child: RepaintBoundary(
+                  child: ClipRect(
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(
+                        sigmaX: isCalm
+                            ? 0.0
+                            : AppBlur.clampSigma(AppBlur.standard),
+                        sigmaY: isCalm
+                            ? 0.0
+                            : AppBlur.clampSigma(AppBlur.standard),
+                      ),
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              p.surface.withValues(alpha: 0.0),
+                              p.surface.withValues(
+                                  alpha: p.isDark ? 0.72 : 0.60),
+                              p.surface.withValues(
+                                  alpha: p.isDark ? 0.92 : 0.85),
+                            ],
+                            stops: const [0.0, 0.22, 0.65],
+                          ),
+                        ),
+                        child: hasSong
+                            ? Stack(
+                                children: [
+                                  // Subtle ambient color bleed from the current track's artwork behind the Mini-Player
+                                  PositionedDirectional(
+                                    top: 0,
+                                    start: 0,
+                                    end: 0,
+                                    height: math.min(100.0, totalDockHeight * 0.65),
+                                    child: DecoratedBox(
+                                      decoration: BoxDecoration(
+                                        gradient: RadialGradient(
+                                          center: const Alignment(0.0, -0.2),
+                                          radius: 1.4,
+                                          colors: [
+                                            activeAccent.withValues(
+                                              alpha: p.isDark ? 0.14 : 0.08,
+                                            ),
+                                            activeAccent.withValues(
+                                              alpha: p.isDark ? 0.05 : 0.02,
+                                            ),
+                                            Colors.transparent,
+                                          ],
+                                          stops: const [0.0, 0.55, 1.0],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  // Hairline top border highlight
+                                  PositionedDirectional(
+                                    top: totalDockHeight * 0.12,
+                                    start: 16,
+                                    end: 16,
+                                    child: Container(
+                                      height: 0.75,
+                                      decoration: BoxDecoration(
+                                        gradient: LinearGradient(
+                                          colors: [
+                                            Colors.transparent,
+                                            p.hairline.withValues(
+                                              alpha: p.isDark ? 0.25 : 0.15,
+                                            ),
+                                            Colors.transparent,
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              )
+                            : null,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }

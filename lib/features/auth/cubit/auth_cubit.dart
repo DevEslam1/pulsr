@@ -344,7 +344,7 @@ class AuthCubit extends PulsrCubit<AuthState> {
       _syncing = false;
       _syncingUserId = null;
     }
-    if (_syncQueued) {
+    if (_syncQueued && !isClosed) {
       _syncQueued = false;
       // Bypass the dedupe window: the queued run is the account that must
       // actually sync, not a duplicate of the pass that just finished.

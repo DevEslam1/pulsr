@@ -17,6 +17,12 @@ import '../../../core/constants/app_typography.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/error_logger.dart';
+import '../../../core/utils/l10n_extensions.dart';
+import '../../../core/utils/pulsr_haptics.dart';
+import '../../../core/widgets/pulsr_dialog.dart';
+import '../../../core/widgets/pulsr_refresh_indicator.dart';
+import '../../../core/widgets/pulsr_toast.dart';
+import '../../../core/widgets/shimmer_skeleton.dart';
 import '../../announcements/announcement_screen.dart';
 import '../../announcements/announcement_settings.dart';
 import '../../announcements/tts_engine.dart';
@@ -42,7 +48,6 @@ import '../../usb_tools/usb_ergonomics_screen.dart';
 import '../../usb_tools/usb_ergonomics_service.dart';
 import '../../usb_tools/usb_quirk_store.dart';
 import '../remote_playback_runtime.dart';
-import 'extras_strings.dart';
 
 /// Hub for the parity-gap tools that do not belong inside one settings category
 /// (announcements, system behaviour, USB ergonomics, network/DLNA output,
@@ -80,6 +85,7 @@ class _ExtrasScreenState extends State<ExtrasScreen> {
   bool _ownsRemoteRuntime = false;
   bool _loading = true;
   String? _loadError;
+  final Set<ExtrasTool> _retryingTools = <ExtrasTool>{};
 
   /// Tools whose initialization failed, with the inline message their row
   /// shows. A tool listed here has its row disabled; every other row stays
@@ -122,7 +128,7 @@ class _ExtrasScreenState extends State<ExtrasScreen> {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _loadError = ExtrasStrings.loadFailed;
+        _loadError = context.l10n.extrasLoadFailed;
       });
       return;
     }
@@ -141,7 +147,57 @@ class _ExtrasScreenState extends State<ExtrasScreen> {
     ]);
 
     if (!mounted) return;
-    setState(() => _loading = false);
+    setState(() {
+      _loading = false;
+      if (_toolErrors.isEmpty) {
+        _loadError = null;
+      }
+    });
+  }
+
+  /// Pull-to-refresh self-healing handler.
+  Future<void> _refresh() async {
+    SharedPreferences prefs;
+    try {
+      prefs = await SharedPreferences.getInstance();
+      if (mounted) {
+        setState(() => _loadError = null);
+      }
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Extras tools could not read their preferences on refresh',
+        error: e,
+        stackTrace: st,
+        category: 'Extras',
+      );
+      if (!mounted) return;
+      setState(() => _loadError = context.l10n.extrasLoadFailed);
+      return;
+    }
+
+    final futures = <Future<void>>[];
+    if (!_ready(ExtrasTool.profiles)) futures.add(_initProfiles(prefs));
+    if (!_ready(ExtrasTool.diagnostics)) futures.add(_initDiagnostics(prefs));
+    if (!_ready(ExtrasTool.safeMode)) futures.add(_initSafeMode(prefs));
+    if (!_ready(ExtrasTool.systemBehavior)) futures.add(_initSystemBehavior());
+    if (!_ready(ExtrasTool.usb)) futures.add(_initUsb(prefs));
+    if (!_ready(ExtrasTool.announcements)) futures.add(_initAnnouncements());
+    if (!_ready(ExtrasTool.assistant)) futures.add(_initAssistant());
+
+    // If none failed, refresh all tools to reflect any changes.
+    if (futures.isEmpty) {
+      futures.addAll([
+        _initProfiles(prefs),
+        _initDiagnostics(prefs),
+        _initSafeMode(prefs),
+        _initSystemBehavior(),
+        _initUsb(prefs),
+        _initAnnouncements(),
+        _initAssistant(),
+      ]);
+    }
+
+    await Future.wait<void>(futures);
   }
 
   /// Throws when a test asked this tool's real initialization to fail.
@@ -152,7 +208,8 @@ class _ExtrasScreenState extends State<ExtrasScreen> {
   }
 
   /// Records a failed tool and disables its row.
-  void _failTool(    ExtrasTool tool,
+  void _failTool(
+    ExtrasTool tool,
     String label,
     Object error,
     StackTrace stackTrace,
@@ -164,7 +221,58 @@ class _ExtrasScreenState extends State<ExtrasScreen> {
       category: 'Extras',
     );
     if (!mounted) return;
-    setState(() => _toolErrors[tool] = ExtrasStrings.toolUnavailable);
+    final message = context.l10n.extrasToolUnavailable;
+    setState(() => _toolErrors[tool] = message);
+  }
+
+  Future<void> _retryTool(ExtrasTool tool) async {
+    if (_retryingTools.contains(tool)) return;
+    PulsrHaptics.light();
+    setState(() => _retryingTools.add(tool));
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      switch (tool) {
+        case ExtrasTool.profiles:
+          await _initProfiles(prefs);
+          break;
+        case ExtrasTool.diagnostics:
+          await _initDiagnostics(prefs);
+          if (!_ready(ExtrasTool.safeMode)) {
+            await _initSafeMode(prefs);
+          }
+          break;
+        case ExtrasTool.safeMode:
+          await _initSafeMode(prefs);
+          if (!_ready(ExtrasTool.diagnostics)) {
+            await _initDiagnostics(prefs);
+          }
+          break;
+        case ExtrasTool.systemBehavior:
+          await _initSystemBehavior();
+          break;
+        case ExtrasTool.usb:
+          await _initUsb(prefs);
+          break;
+        case ExtrasTool.announcements:
+          await _initAnnouncements();
+          break;
+        case ExtrasTool.assistant:
+          await _initAssistant();
+          break;
+      }
+    } catch (e, st) {
+      _failTool(tool, tool.name, e, st);
+    } finally {
+      if (mounted) {
+        setState(() {
+          _retryingTools.remove(tool);
+          if (_toolErrors.isEmpty) {
+            _loadError = null;
+          }
+        });
+      }
+    }
   }
 
   Future<void> _initProfiles(SharedPreferences prefs) async {
@@ -172,7 +280,10 @@ class _ExtrasScreenState extends State<ExtrasScreen> {
       _maybeDebugFail(ExtrasTool.profiles);
       final profiles = AudioProfileService(prefs: prefs);
       if (!mounted) return;
-      setState(() => _profiles = profiles);
+      setState(() {
+        _profiles = profiles;
+        _toolErrors.remove(ExtrasTool.profiles);
+      });
     } catch (e, st) {
       _failTool(ExtrasTool.profiles, 'profiles', e, st);
     }
@@ -186,7 +297,10 @@ class _ExtrasScreenState extends State<ExtrasScreen> {
         outputDevice: _outputDeviceSnapshot,
       );
       if (!mounted) return;
-      setState(() => _diagnostics = diagnostics);
+      setState(() {
+        _diagnostics = diagnostics;
+        _toolErrors.remove(ExtrasTool.diagnostics);
+      });
     } catch (e, st) {
       _failTool(ExtrasTool.diagnostics, 'diagnostics', e, st);
     }
@@ -209,6 +323,7 @@ class _ExtrasScreenState extends State<ExtrasScreen> {
       setState(() {
         _safeMode = safeMode;
         _ownsSafeMode = owns;
+        _toolErrors.remove(ExtrasTool.safeMode);
       });
     } catch (e, st) {
       _failTool(ExtrasTool.safeMode, 'safe mode', e, st);
@@ -234,6 +349,7 @@ class _ExtrasScreenState extends State<ExtrasScreen> {
       setState(() {
         _systemBehavior = behavior;
         _ownsSystemBehavior = owns;
+        _toolErrors.remove(ExtrasTool.systemBehavior);
       });
     } catch (e, st) {
       _failTool(ExtrasTool.systemBehavior, 'system behavior', e, st);
@@ -256,6 +372,7 @@ class _ExtrasScreenState extends State<ExtrasScreen> {
       setState(() {
         _usbErgonomics = usbErgonomics;
         _ownsUsbErgonomics = owns;
+        _toolErrors.remove(ExtrasTool.usb);
       });
     } catch (e, st) {
       _failTool(ExtrasTool.usb, 'USB ergonomics', e, st);
@@ -292,6 +409,7 @@ class _ExtrasScreenState extends State<ExtrasScreen> {
       setState(() {
         _announcements = announcements;
         _ttsEngine = engine;
+        _toolErrors.remove(ExtrasTool.announcements);
       });
     } catch (e, st) {
       _failTool(ExtrasTool.announcements, 'announcements', e, st);
@@ -310,7 +428,10 @@ class _ExtrasScreenState extends State<ExtrasScreen> {
           getIt.registerSingleton<AssistantSettings>(assistant);
         } catch (_) {}
       }
-      setState(() => _assistantSettings = assistant);
+      setState(() {
+        _assistantSettings = assistant;
+        _toolErrors.remove(ExtrasTool.assistant);
+      });
     } catch (e, st) {
       _failTool(ExtrasTool.assistant, 'assistant', e, st);
     }
@@ -318,12 +439,14 @@ class _ExtrasScreenState extends State<ExtrasScreen> {
 
   /// Live output-device summary for the diagnostics/profile headers.
   Map<String, Object?> _outputDeviceSnapshot() {
+    final defaultName =
+        mounted ? context.l10n.extrasUnknownDevice : 'Unknown output device';
     if (!getIt.isRegistered<SettingsCubit>()) {
-      return const {'name': 'Unknown output device', 'type': 'unknown'};
+      return {'name': defaultName, 'type': 'unknown'};
     }
     final device = getIt<SettingsCubit>().state.currentOutputDevice;
     if (device == null) {
-      return const {'name': 'Unknown output device', 'type': 'unknown'};
+      return {'name': defaultName, 'type': 'unknown'};
     }
     return {
       'name': device.deviceName,
@@ -340,7 +463,7 @@ class _ExtrasScreenState extends State<ExtrasScreen> {
 
   String _deviceLabel() {
     final name = _outputDeviceSnapshot()['name'];
-    return name is String ? name : ExtrasStrings.unknownDevice;
+    return name is String ? name : context.l10n.extrasUnknownDevice;
   }
 
   String _deviceKey() {
@@ -378,18 +501,16 @@ class _ExtrasScreenState extends State<ExtrasScreen> {
         category: 'RemoteSources',
       );
       if (!mounted) return;
-      await showDialog<void>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: Text(ExtrasStrings.remoteUnavailableTitle),
-          content: Text(ExtrasStrings.remoteUnavailableBody),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: Text(MaterialLocalizations.of(context).okButtonLabel),
-            ),
-          ],
-        ),
+      await PulsrDialogHelper.showPulsrDialog<void>(
+        context,
+        title: Text(context.l10n.extrasRemoteUnavailableTitle),
+        content: Text(context.l10n.extrasRemoteUnavailableBody),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context, rootNavigator: true).pop(),
+            child: Text(MaterialLocalizations.of(context).okButtonLabel),
+          ),
+        ],
       );
     }
   }
@@ -398,6 +519,7 @@ class _ExtrasScreenState extends State<ExtrasScreen> {
   /// URI to the player. The provider is owned by the stream server so its
   /// connection is reused for seeks instead of reopened per range request.
   Future<void> _playRemoteFile(RemoteSource source, RemoteEntry entry) async {
+    final albumLabel = context.l10n.extrasRemoteAlbumLabel;
     try {
       final runtime = _remoteRuntime ??
           (getIt.isRegistered<RemotePlaybackRuntime>()
@@ -412,7 +534,7 @@ class _ExtrasScreenState extends State<ExtrasScreen> {
         id: -DateTime.now().millisecondsSinceEpoch,
         title: name.isEmpty ? source.displayName : name,
         artist: source.displayName,
-        album: ExtrasStrings.remoteAlbumLabel,
+        album: albumLabel,
         durationMs: 0,
         path: uri.toString(),
         isFavorite: false,
@@ -435,20 +557,44 @@ class _ExtrasScreenState extends State<ExtrasScreen> {
         category: 'RemoteSources',
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-        ..clearSnackBars()
-        ..showSnackBar(
-          SnackBar(
-            behavior: SnackBarBehavior.floating,
-            content: Text(ExtrasStrings.remotePlaybackFailed),
-          ),
-        );
+      PulsrToast.show(
+        context,
+        message: context.l10n.extrasRemotePlaybackFailed,
+        isError: true,
+      );
     }
   }
 
   void _push(Widget screen) {
     Navigator.of(context, rootNavigator: true).push(
       MaterialPageRoute<void>(builder: (_) => screen),
+    );
+  }
+
+  Widget? _buildTrailing(ExtrasTool tool) {
+    if (_ready(tool)) return null;
+    final isRetrying = _retryingTools.contains(tool);
+    if (isRetrying) {
+      return const SizedBox(
+        width: 24,
+        height: 24,
+        child: Padding(
+          padding: EdgeInsets.all(AppSpacing.xs),
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      );
+    }
+    return TextButton.icon(
+      style: TextButton.styleFrom(
+        visualDensity: VisualDensity.compact,
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.sm,
+          vertical: AppSpacing.xs,
+        ),
+      ),
+      onPressed: () => _retryTool(tool),
+      icon: const Icon(Icons.refresh_rounded, size: 16),
+      label: Text(context.l10n.retry),
     );
   }
 
@@ -468,167 +614,195 @@ class _ExtrasScreenState extends State<ExtrasScreen> {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
+    final l10n = context.l10n;
     return Scaffold(
       backgroundColor: p.bg,
       appBar: AppBar(
-        title: Text(ExtrasStrings.title),
+        title: Text(l10n.extrasTitle),
         backgroundColor: Colors.transparent,
         elevation: 0,
       ),
       body: SafeArea(
         child: _loading
-            ? Center(
-                child: Text(
-                  ExtrasStrings.loading,
-                  style: TextStyle(color: p.textSecondary),
+            ? Semantics(
+                liveRegion: true,
+                label: l10n.extrasLoading,
+                child: const SkeletonList(
+                  itemCount: 8,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: AppSpacing.md,
+                    vertical: AppSpacing.md,
+                  ),
                 ),
               )
-            : ListView(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.md,
-                  vertical: AppSpacing.md,
-                ),
-                children: [
-                  if (_loadError != null) ...[
-                    _InlineNotice(message: _loadError!),
-                    const SizedBox(height: AppSpacing.md),
-                  ],
-                  SettingsSection(
-                    icon: Icons.record_voice_over_rounded,
-                    title: ExtrasStrings.playbackTitle,
-                    subtitle: ExtrasStrings.playbackSubtitle,
-                    children: [
-                      SettingsNavTile(
-                        Icons.campaign_rounded,
-                        ExtrasStrings.announcementsTitle,
-                        _subtitleFor(ExtrasTool.announcements,
-                            ExtrasStrings.announcementsSubtitle),
-                        onTap: _announcements == null ||
-                                _ttsEngine == null ||
-                                !_ready(ExtrasTool.announcements)
-                            ? null
-                            : () => _push(
-                                  AnnouncementScreen(
-                                    settings: _announcements!,
-                                    engine: _ttsEngine!,
-                                  ),
-                                ),
-                      ),
-                      settingsCardDivider(p),
-                      SettingsNavTile(
-                        Icons.manage_search_rounded,
-                        ExtrasStrings.assistantTitle,
-                        _subtitleFor(ExtrasTool.assistant,
-                            ExtrasStrings.assistantSubtitle),
-                        onTap: _assistantSettings == null ||
-                                !_ready(ExtrasTool.assistant)
-                            ? null
-                            : () => _push(
-                                  AssistantSettingsScreen(
-                                    settings: _assistantSettings!,
-                                  ),
-                                ),
-                      ),
-                      settingsCardDivider(p),
-                      SettingsNavTile(
-                        Icons.tune_rounded,
-                        ExtrasStrings.systemBehaviorTitle,
-                        _subtitleFor(ExtrasTool.systemBehavior,
-                            ExtrasStrings.systemBehaviorSubtitle),
-                        onTap: _systemBehavior == null ||
-                                !_ready(ExtrasTool.systemBehavior)
-                            ? null
-                            : () => _push(
-                                  SystemBehaviorScreen(
-                                    settings: _systemBehavior!,
-                                  ),
-                                ),
-                      ),
-                      settingsCardDivider(p),
-                      SettingsNavTile(
-                        Icons.usb_rounded,
-                        ExtrasStrings.usbTitle,
-                        _subtitleFor(
-                            ExtrasTool.usb, ExtrasStrings.usbSubtitle),
-                        onTap: _usbErgonomics == null || !_ready(ExtrasTool.usb)
-                            ? null
-                            : () => _push(
-                                  UsbErgonomicsScreen(
-                                    service: _usbErgonomics!,
-                                  ),
-                                ),
-                      ),
-                    ],
+            : PulsrRefreshIndicator(
+                onRefresh: _refresh,
+                child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.md,
+                    vertical: AppSpacing.md,
                   ),
-                  SettingsSection(
-                    icon: Icons.cast_connected_rounded,
-                    title: ExtrasStrings.outputTitle,
-                    subtitle: ExtrasStrings.outputSubtitle,
-                    children: [
-                      SettingsNavTile(
-                        Icons.cast_rounded,
-                        ExtrasStrings.dlnaTitle,
-                        ExtrasStrings.dlnaSubtitle,
-                        onTap: () => _push(
-                          getIt.isRegistered<DlnaRendererService>()
-                              ? DlnaScreen(
-                                  service: getIt<DlnaRendererService>(),
-                                )
-                              : const DlnaScreen(),
+                  children: [
+                    if (_loadError != null) ...[
+                      _InlineNotice(
+                        message: _loadError!,
+                        onRetry: _load,
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                    ] else if (_toolErrors.isNotEmpty) ...[
+                      _InlineNotice(
+                        message: l10n.extrasLoadFailed,
+                        onRetry: _refresh,
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                    ],
+                    SettingsSection(
+                      icon: Icons.record_voice_over_rounded,
+                      title: l10n.extrasPlaybackTitle,
+                      subtitle: l10n.extrasPlaybackSubtitle,
+                      children: [
+                        SettingsNavTile(
+                          Icons.campaign_rounded,
+                          l10n.extrasAnnouncementsTitle,
+                          _subtitleFor(ExtrasTool.announcements,
+                              l10n.extrasAnnouncementsSubtitle),
+                          trailing: _buildTrailing(ExtrasTool.announcements),
+                          onTap: _announcements == null ||
+                                  _ttsEngine == null ||
+                                  !_ready(ExtrasTool.announcements)
+                              ? null
+                              : () => _push(
+                                    AnnouncementScreen(
+                                      settings: _announcements!,
+                                      engine: _ttsEngine!,
+                                    ),
+                                  ),
                         ),
-                      ),
-                      settingsCardDivider(p),
-                      SettingsNavTile(
-                        Icons.dns_rounded,
-                        ExtrasStrings.remoteTitle,
-                        ExtrasStrings.remoteSubtitle,
-                        onTap: () =>
-                            _openRemoteSources(),
-                      ),
-                    ],
-                  ),
-                  SettingsSection(
-                    icon: Icons.health_and_safety_rounded,
-                    title: ExtrasStrings.supportTitle,
-                    subtitle: ExtrasStrings.supportSubtitle,
-                    children: [
-                      SettingsNavTile(
-                        Icons.badge_rounded,
-                        ExtrasStrings.profilesTitle,
-                        _subtitleFor(
-                            ExtrasTool.profiles, ExtrasStrings.profilesSubtitle),
-                        onTap: _profiles == null || !_ready(ExtrasTool.profiles)
-                            ? null
-                            : () => _push(
-                                  AudioProfilesScreen(
-                                    service: _profiles!,
-                                    deviceLabel: _deviceLabel,
+                        settingsCardDivider(p),
+                        SettingsNavTile(
+                          Icons.manage_search_rounded,
+                          l10n.extrasAssistantTitle,
+                          _subtitleFor(ExtrasTool.assistant,
+                              l10n.extrasAssistantSubtitle),
+                          trailing: _buildTrailing(ExtrasTool.assistant),
+                          onTap: _assistantSettings == null ||
+                                  !_ready(ExtrasTool.assistant)
+                              ? null
+                              : () => _push(
+                                    AssistantSettingsScreen(
+                                      settings: _assistantSettings!,
+                                    ),
                                   ),
-                                ),
-                      ),
-                      settingsCardDivider(p),
-                      SettingsNavTile(
-                        Icons.monitor_heart_rounded,
-                        ExtrasStrings.diagnosticsTitle,
-                        _subtitleFor(ExtrasTool.diagnostics,
-                            ExtrasStrings.diagnosticsSubtitle),
-                        onTap: _diagnostics == null ||
-                                _safeMode == null ||
-                                !_ready(ExtrasTool.diagnostics) ||
-                                !_ready(ExtrasTool.safeMode)
-                            ? null
-                            : () => _push(
-                                  DiagnosticsScreen(
-                                    bundleService: _diagnostics!,
-                                    safeMode: _safeMode!,
-                                    deviceLabel: _deviceLabel,
-                                    deviceKey: _deviceKey,
+                        ),
+                        settingsCardDivider(p),
+                        SettingsNavTile(
+                          Icons.tune_rounded,
+                          l10n.extrasSystemBehaviorTitle,
+                          _subtitleFor(ExtrasTool.systemBehavior,
+                              l10n.extrasSystemBehaviorSubtitle),
+                          trailing: _buildTrailing(ExtrasTool.systemBehavior),
+                          onTap: _systemBehavior == null ||
+                                  !_ready(ExtrasTool.systemBehavior)
+                              ? null
+                              : () => _push(
+                                    SystemBehaviorScreen(
+                                      settings: _systemBehavior!,
+                                    ),
                                   ),
-                                ),
-                      ),
-                    ],
-                  ),
-                ],
+                        ),
+                        settingsCardDivider(p),
+                        SettingsNavTile(
+                          Icons.usb_rounded,
+                          l10n.extrasUsbTitle,
+                          _subtitleFor(
+                              ExtrasTool.usb, l10n.extrasUsbSubtitle),
+                          trailing: _buildTrailing(ExtrasTool.usb),
+                          onTap: _usbErgonomics == null || !_ready(ExtrasTool.usb)
+                              ? null
+                              : () => _push(
+                                    UsbErgonomicsScreen(
+                                      service: _usbErgonomics!,
+                                    ),
+                                  ),
+                        ),
+                      ],
+                    ),
+                    SettingsSection(
+                      icon: Icons.cast_connected_rounded,
+                      title: l10n.extrasOutputTitle,
+                      subtitle: l10n.extrasOutputSubtitle,
+                      children: [
+                        SettingsNavTile(
+                          Icons.cast_rounded,
+                          l10n.extrasDlnaTitle,
+                          l10n.extrasDlnaSubtitle,
+                          onTap: () => _push(
+                            getIt.isRegistered<DlnaRendererService>()
+                                ? DlnaScreen(
+                                    service: getIt<DlnaRendererService>(),
+                                  )
+                                : const DlnaScreen(),
+                          ),
+                        ),
+                        settingsCardDivider(p),
+                        SettingsNavTile(
+                          Icons.dns_rounded,
+                          l10n.extrasRemoteTitle,
+                          l10n.extrasRemoteSubtitle,
+                          onTap: () => _openRemoteSources(),
+                        ),
+                      ],
+                    ),
+                    SettingsSection(
+                      icon: Icons.health_and_safety_rounded,
+                      title: l10n.extrasSupportTitle,
+                      subtitle: l10n.extrasSupportSubtitle,
+                      children: [
+                        SettingsNavTile(
+                          Icons.badge_rounded,
+                          l10n.extrasProfilesTitle,
+                          _subtitleFor(
+                              ExtrasTool.profiles, l10n.extrasProfilesSubtitle),
+                          trailing: _buildTrailing(ExtrasTool.profiles),
+                          onTap: _profiles == null || !_ready(ExtrasTool.profiles)
+                              ? null
+                              : () => _push(
+                                    AudioProfilesScreen(
+                                      service: _profiles!,
+                                      deviceLabel: _deviceLabel,
+                                    ),
+                                  ),
+                        ),
+                        settingsCardDivider(p),
+                        SettingsNavTile(
+                          Icons.monitor_heart_rounded,
+                          l10n.extrasDiagnosticsTitle,
+                          _subtitleFor(ExtrasTool.diagnostics,
+                              l10n.extrasDiagnosticsSubtitle),
+                          trailing: !_ready(ExtrasTool.diagnostics)
+                              ? _buildTrailing(ExtrasTool.diagnostics)
+                              : !_ready(ExtrasTool.safeMode)
+                                  ? _buildTrailing(ExtrasTool.safeMode)
+                                  : null,
+                          onTap: _diagnostics == null ||
+                                  _safeMode == null ||
+                                  !_ready(ExtrasTool.diagnostics) ||
+                                  !_ready(ExtrasTool.safeMode)
+                              ? null
+                              : () => _push(
+                                    DiagnosticsScreen(
+                                      bundleService: _diagnostics!,
+                                      safeMode: _safeMode!,
+                                      deviceLabel: _deviceLabel,
+                                      deviceKey: _deviceKey,
+                                    ),
+                                  ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
       ),
     );
@@ -637,8 +811,9 @@ class _ExtrasScreenState extends State<ExtrasScreen> {
 
 class _InlineNotice extends StatelessWidget {
   final String message;
+  final VoidCallback? onRetry;
 
-  const _InlineNotice({required this.message});
+  const _InlineNotice({required this.message, this.onRetry});
 
   @override
   Widget build(BuildContext context) {
@@ -662,6 +837,17 @@ class _InlineNotice extends StatelessWidget {
                 style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.label),
               ),
             ),
+            if (onRetry != null) ...[
+              const SizedBox(width: AppSpacing.xs),
+              TextButton(
+                onPressed: onRetry,
+                style: TextButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+                ),
+                child: Text(context.l10n.retry),
+              ),
+            ],
           ],
         ),
       ),

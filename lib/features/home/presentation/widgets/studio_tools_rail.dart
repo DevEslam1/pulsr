@@ -138,53 +138,29 @@ class StudioToolsRail extends StatelessWidget {
         ),
         SizedBox(
           height: railHeight,
-          child: Row(
-            children: [
-              Expanded(
-                child: PulsrScrollEdgeFade(
-                  child: ListView.separated(
-                    key: const ValueKey('studio_tools_horizontal_list'),
-                    scrollDirection: Axis.horizontal,
-                    physics: const BouncingScrollPhysics(),
-                    padding: EdgeInsetsDirectional.only(
-                      start: Adaptive.pagePadding(context),
-                      end: AppSpacing.sm,
-                    ),
-                    itemCount: items.length,
-                    separatorBuilder: (_, __) =>
-                        const SizedBox(width: AppSpacing.s8),
-                    itemBuilder: (context, index) {
-                      final item = items[index];
-                      return Center(
-                        child: DiscoveryChip(
-                          icon: item.icon,
-                          label: item.label,
-                          iconColor: item.color,
-                          onTap: item.onTap,
-                        ),
-                      );
-                    },
-                  ),
-                ),
+          child: PulsrScrollEdgeFade(
+            child: ListView.separated(
+              key: const ValueKey('studio_tools_horizontal_list'),
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              padding: EdgeInsetsDirectional.symmetric(
+                horizontal: Adaptive.pagePadding(context),
               ),
-              Padding(
-                padding: EdgeInsetsDirectional.only(
-                  end: Adaptive.pagePadding(context),
-                ),
-                child: SizedBox(
-                  height: railHeight,
-                  child: Center(
-                    child: DiscoveryChip(
-                      icon: Icons.apps_rounded,
-                      label: context.l10n.browseMoreTools,
-                      iconColor: p.textSecondary,
-                      onTap: onMore,
-                      compact: true,
-                    ),
+              itemCount: items.length,
+              separatorBuilder: (_, __) =>
+                  const SizedBox(width: AppSpacing.s10),
+              itemBuilder: (context, index) {
+                final item = items[index];
+                return Center(
+                  child: DiscoveryChip(
+                    icon: item.icon,
+                    label: item.label,
+                    iconColor: item.color,
+                    onTap: item.onTap,
                   ),
-                ),
-              ),
-            ],
+                );
+              },
+            ),
           ),
         ),
       ],

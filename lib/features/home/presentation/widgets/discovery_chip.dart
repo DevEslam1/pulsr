@@ -35,50 +35,48 @@ class DiscoveryChip extends StatelessWidget {
       onTap: onTap,
       pressedScale: 0.97,
       hapticStyle: PulsrHapticStyle.selection,
-      focusBorderRadius: isCapsule ? chipRadius : AppRadii.r14All,
-      // 48dp tap target around a lighter 36dp visual pill: the row does not
-      // need nine heavy 48dp capsules competing with the hero card.
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: AppSpacing.s6),
-        child: Container(
-          padding: EdgeInsets.symmetric(
-              horizontal: compact
-                  ? (isCapsule ? 8.5 : AppSpacing.s8)
-                  : (isCapsule ? 11.0 : AppSpacing.s10),
-              vertical: isCapsule ? 4.5 : AppSpacing.xs),
-          decoration: isCapsule
-              ? PulsrCapsuleStyle.decoration(p, borderRadius: chipRadius)
-              : BoxDecoration(
-                  color: p.surfaceContainer,
-                  borderRadius: AppRadii.r14All,
-                  border: Border.all(color: p.hairline),
-                ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                icon,
-                size: compact ? 13 : 14,
+      focusBorderRadius: isCapsule ? chipRadius : AppRadii.full,
+      // 40dp+ touch target styled as a clean borderless tinted pill
+      // (surfaceContainerHigh) with comfortable horizontal padding.
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 40.0),
+        padding: EdgeInsets.symmetric(
+            horizontal: compact
+                ? (isCapsule ? 10.0 : AppSpacing.s10)
+                : (isCapsule ? 14.0 : AppSpacing.s12),
+            vertical: isCapsule ? 6.0 : AppSpacing.s8),
+        decoration: isCapsule
+            ? PulsrCapsuleStyle.decoration(p, borderRadius: chipRadius)
+            : BoxDecoration(
+                color: p.surfaceContainerHigh,
+                borderRadius: AppRadii.full,
+              ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: compact ? 14 : 15,
+              color: isCapsule
+                  ? PulsrCapsuleStyle.foregroundColor(p)
+                  : iconColor,
+            ),
+            SizedBox(width: compact ? AppSpacing.xs : AppSpacing.s8),
+            Text(
+              label,
+              style: TextStyle(
                 color: isCapsule
                     ? PulsrCapsuleStyle.foregroundColor(p)
-                    : iconColor,
+                    : p.textPrimary,
+                fontSize: compact
+                    ? AppFontSize.caption
+                    : (isCapsule ? 12.0 : AppFontSize.label),
+                fontWeight: isCapsule ? FontWeight.w700 : FontWeight.w600,
+                letterSpacing: isCapsule ? 0.2 : null,
               ),
-              SizedBox(width: compact ? AppSpacing.xxs : AppSpacing.s6),
-              Text(
-                label,
-                style: TextStyle(
-                  color: isCapsule
-                      ? PulsrCapsuleStyle.foregroundColor(p)
-                      : p.textPrimary,
-                  fontSize: compact
-                      ? AppFontSize.caption
-                      : (isCapsule ? 11.5 : AppFontSize.label),
-                  fontWeight: isCapsule ? FontWeight.w700 : FontWeight.w600,
-                  letterSpacing: isCapsule ? 0.2 : null,
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

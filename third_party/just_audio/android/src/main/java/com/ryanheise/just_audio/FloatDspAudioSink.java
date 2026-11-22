@@ -82,6 +82,7 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
     private Format deferredFormat;
     private int deferredBufferSize;
     private int[] deferredChannels;
+    private boolean playing = false;
 
     /** Shared byte-preserving gapless editor; no conversion precedes the native tee. */
     static final class PcmFrameEditor {
@@ -440,6 +441,9 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
             }
         }
         if (pendingOutput == null) {
+            if (!playing && processFloat && processor != null && processor.isUsbExclusiveActive()) {
+                return false;
+            }
             final boolean edited = frameEditor != null && frameEditor.edits();
             ByteBuffer original = frameEditor == null ? input.duplicate().order(ByteOrder.nativeOrder())
                     : frameEditor.prepare(input);
@@ -478,14 +482,7 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
         // not an AudioSink write, but the consumed source bytes still advance.
         if (pendingOutput.hasRemaining() && !super.handleBuffer(pendingOutput,
                 pendingPresentationTimeUs, pendingAccessUnits)) {
-            // When Direct USB is active, pendingOutput is zeroed silence fed to
-            // DefaultAudioSink's AudioTrack for media-clock pacing. If the
-            // silent AudioTrack is temporarily full while the Direct USB ring or
-            // pull reservoir still needs frames to reach/maintain its prefill
-            // cushion, do not stall the USB producer behind the silent track.
-            if (!(processFloat && processor != null && processor.needsUsbPrefillCushion())) {
-                return false;
-            }
+            return false;
         }
         input.position(pendingInputEnd);
         pendingOutput = null;
@@ -614,6 +611,7 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
     }
 
     void transferPendingTo(FloatDspAudioSink target) {
+        target.playing = this.playing;
         if (deferredFormat != null) {
             target.deferredFormat = deferredFormat;
             target.deferredBufferSize = deferredBufferSize;
@@ -642,8 +640,19 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
     }
 
     @Override
+    public void play() {
+        playing = true;
+        if (processor != null) processor.setUsbPaused(false);
+        super.play();
+    }
+
+    @Override
     public void pause() {
-        if (processor != null) processor.releaseUsbProducer();
+        playing = false;
+        if (processor != null) {
+            processor.setUsbPaused(true);
+            processor.releaseUsbProducer();
+        }
         super.pause();
     }
 
@@ -686,6 +695,9 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
         pendingInput = null;
         try { applyDeferredConfiguration(); }
         catch (ConfigurationException e) { throw new IllegalStateException("Deferred PCM configuration failed", e); }
+        if (processor != null) {
+            processor.flushUsbSink();
+        }
         if (processFloat && processor != null) {
             processor.flush();
             // Seek/discontinuity: clear the native engine state (filter history,
@@ -698,13 +710,18 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
 
     @Override
     public void reset() {
+        playing = false;
         frameEditor = null;
         deferredFormat = null;
         deferredChannels = null;
         quantizedOutput = null;
         lastInputFormat = null;
         eosQueued = false;
-        if (processor != null) processor.releaseUsbProducer();
+        if (processor != null) {
+            processor.setUsbPaused(false);
+            processor.flushUsbSink();
+            processor.releaseUsbProducer();
+        }
         pendingOutput = null;
         pendingInput = null;
         converted = null;

@@ -86,7 +86,8 @@ void main() {
     // Verify Sheikh Minshawi is displayed on the initial card
     expect(find.text('الشيخ محمد صديق المنشاوي'), findsWidgets);
     expect(find.textContaining('المصحف المجود'), findsOneWidget);
-    expect(find.text('1/11'), findsOneWidget);
+    expect(find.bySemanticsLabel('1 / 11'), findsOneWidget);
+    expect(find.text('1/11'), findsNothing);
     expect(find.byIcon(Icons.play_arrow_rounded), findsWidgets);
   });
 
@@ -118,7 +119,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('1/11'), findsOneWidget);
+    expect(find.bySemanticsLabel('1 / 11'), findsOneWidget);
 
     // In RTL (Arabic), swiping forward to next page is dragging to the right (positive dx)
     await tester.fling(
@@ -129,7 +130,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // Now page 2/11 is centered (Rare Khashia Recitations)
-    expect(find.text('2/11'), findsOneWidget);
+    expect(find.bySemanticsLabel('2 / 11'), findsOneWidget);
     expect(find.text('إذاعة تلاوات خاشعة نادرة'), findsOneWidget);
 
     // Swipe again to view 3rd station: Sheikh Minshawi rare recitations
@@ -140,7 +141,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('3/11'), findsOneWidget);
+    expect(find.bySemanticsLabel('3 / 11'), findsOneWidget);
     expect(find.text('تلاوات نادرة ومحافل خاشعة'), findsOneWidget);
   });
 
@@ -190,7 +191,7 @@ void main() {
     verify(() => playerCubit.togglePlayPause()).called(1);
   });
 
-  testWidgets('tapping Radio navigation link routes to /radio', (tester) async {
+  testWidgets('decluttered carousel chrome renders minimal dots without redundant chips', (tester) async {
     await tester.pumpWidget(
       buildHarness(
         locale: const Locale('en'),
@@ -199,13 +200,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    final radioLink = find.text('Radio');
-    expect(radioLink, findsOneWidget);
-
-    await tester.tap(radioLink);
-    await tester.pumpAndSettle();
-
-    expect(find.text('radio-directory-route'), findsOneWidget);
+    expect(find.text('Radio'), findsNothing);
+    expect(find.text('1/11'), findsNothing);
+    expect(find.bySemanticsLabel('1 / 11'), findsOneWidget);
   });
 
   testWidgets('renders English text when locale is English', (tester) async {
@@ -305,7 +302,7 @@ void main() {
       1000,
     );
     await tester.pumpAndSettle();
-    expect(find.text('2/11'), findsOneWidget);
+    expect(find.bySemanticsLabel('2 / 11'), findsOneWidget);
 
     // Long-press the 2nd card to open options sheet
     await tester.longPress(find.text('Rare Khashia Recitations Radio'));
@@ -323,7 +320,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // Carousel jumps to page 1/11 and shows the pinned card with pin icon
-    expect(find.text('1/11'), findsOneWidget);
+    expect(find.bySemanticsLabel('1 / 11'), findsOneWidget);
     expect(find.byIcon(Icons.push_pin_rounded), findsWidgets);
     expect(
       RadioStationStore.heroPinnedUrls.value,

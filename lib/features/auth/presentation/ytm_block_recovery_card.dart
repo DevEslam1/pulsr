@@ -310,135 +310,177 @@ extension _YtmBlockRecoveryCard on _YtmWebLoginSheetState {
       }
     }
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.s20, vertical: AppSpacing.md),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(AppSpacing.md),
-            decoration: BoxDecoration(
-              color: p.error.withValues(alpha: 0.08),
-              borderRadius: AppRadii.r14All,
-              border: Border.all(color: p.error.withValues(alpha: 0.35)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(Icons.gpp_bad_rounded, color: p.error, size: 22),
-                    const SizedBox(width: AppSpacing.s10),
-                    Expanded(
-                      child: Text(
-                        context.l10n.browseGoogleBlocking,
-                        style: TextStyle(
-                            color: p.textPrimary,
-                            fontSize: AppFontSize.callout,
-                            fontWeight: FontWeight.w800),
+    return Semantics(
+      liveRegion: true,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.s20, vertical: AppSpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              decoration: BoxDecoration(
+                color: p.error.withValues(alpha: 0.08),
+                borderRadius: AppRadii.r14All,
+                border: Border.all(color: p.error.withValues(alpha: 0.35)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.gpp_bad_rounded, color: p.error, size: 22),
+                      const SizedBox(width: AppSpacing.s10),
+                      Expanded(
+                        child: Text(
+                          context.l10n.browseGoogleBlocking,
+                          style: TextStyle(
+                              color: p.textPrimary,
+                              fontSize: AppFontSize.callout,
+                              fontWeight: FontWeight.w800),
+                        ),
                       ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.s10),
+                  Text(
+                    context.l10n.browseGoogleBlockingBody,
+                    style: TextStyle(
+                        color: p.textSecondary,
+                        fontSize: AppFontSize.label,
+                        height: 1.4),
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    '${context.l10n.browseCurrentIdentity}: ${identityLabel(currentIdentity)}',
+                    style: TextStyle(
+                        color: p.textTertiary,
+                        fontSize: AppFontSize.caption,
+                        fontWeight: FontWeight.w600),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: AppSpacing.s14),
+            // Primary Action: Google TV Sign-In
+            FilledButton.icon(
+              onPressed: () async {
+                final ok = await YtmOAuthLoginSheet.show(context);
+                if (ok == true && mounted) Navigator.of(context).pop(true);
+              },
+              icon: const Icon(Icons.tv_rounded, size: 18),
+              label: Text(context.l10n.googleTvSignIn,
+                  style: const TextStyle(fontWeight: FontWeight.w700)),
+              style: FilledButton.styleFrom(
+                backgroundColor: p.accent,
+                foregroundColor: p.onAccent,
+                minimumSize: const Size.fromHeight(AppSpacing.minTouchTarget),
+                padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                shape: RoundedRectangleBorder(borderRadius: AppRadii.r12All),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            // Secondary Tonal Action: Retry
+            FilledButton.icon(
+              onPressed: _manualRetryFromBlock,
+              icon: const Icon(Icons.refresh_rounded, size: 18),
+              label: Text(context.l10n.retry,
+                  style: const TextStyle(fontWeight: FontWeight.w700)),
+              style: FilledButton.styleFrom(
+                backgroundColor: p.surfaceContainerHigh,
+                foregroundColor: p.textPrimary,
+                minimumSize: const Size.fromHeight(AppSpacing.minTouchTarget),
+                padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                shape: RoundedRectangleBorder(borderRadius: AppRadii.r12All),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            // Collapsible advanced fallbacks
+            Theme(
+              data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+              child: ExpansionTile(
+                shape: const Border(),
+                collapsedShape: const Border(),
+                tilePadding: EdgeInsets.zero,
+                childrenPadding: const EdgeInsets.only(top: AppSpacing.xs),
+                iconColor: p.textSecondary,
+                collapsedIconColor: p.textTertiary,
+                title: Text(
+                  'More recovery options',
+                  style: TextStyle(
+                    color: p.textSecondary,
+                    fontSize: AppFontSize.label,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: () => _switchIdentityManually(otherIdentity),
+                    icon: Icon(identityIcon(otherIdentity), size: 18),
+                    label: Text(
+                        context.l10n.tryIdentity(identityLabel(otherIdentity)),
+                        style: const TextStyle(fontWeight: FontWeight.w700)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: p.textPrimary,
+                      side: BorderSide(color: p.hairline),
+                      minimumSize:
+                          const Size.fromHeight(AppSpacing.minTouchTarget),
+                      padding:
+                          const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                      shape:
+                          RoundedRectangleBorder(borderRadius: AppRadii.r12All),
                     ),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.s10),
-                Text(
-                  context.l10n.browseGoogleBlockingBody,
-                  style: TextStyle(
-                      color: p.textSecondary,
-                      fontSize: AppFontSize.label,
-                      height: 1.4),
-                ),
-                const SizedBox(height: AppSpacing.xs),
-                Text(
-                  '${context.l10n.browseCurrentIdentity}: ${identityLabel(currentIdentity)}',
-                  style: TextStyle(
-                      color: p.textTertiary,
-                      fontSize: AppFontSize.caption,
-                      fontWeight: FontWeight.w600),
-                ),
-              ],
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      _setStateSafe(() => _blockExhausted = false);
+                      _navigateTo('https://music.youtube.com');
+                    },
+                    icon: const Icon(Icons.music_note_rounded, size: 18),
+                    label: Text(context.l10n.openYtmWebDirect,
+                        style: const TextStyle(fontWeight: FontWeight.w700)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: p.textPrimary,
+                      side: BorderSide(color: p.hairline),
+                      minimumSize:
+                          const Size.fromHeight(AppSpacing.minTouchTarget),
+                      padding:
+                          const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                      shape:
+                          RoundedRectangleBorder(borderRadius: AppRadii.r12All),
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  OutlinedButton.icon(
+                    onPressed: () => _showManualCookieDialog(context),
+                    icon: const Icon(Icons.vpn_key_rounded, size: 18),
+                    label: Text(context.l10n.importCookiesToken,
+                        style: const TextStyle(fontWeight: FontWeight.w700)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: p.textPrimary,
+                      side: BorderSide(color: p.hairline),
+                      minimumSize:
+                          const Size.fromHeight(AppSpacing.minTouchTarget),
+                      padding:
+                          const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                      shape:
+                          RoundedRectangleBorder(borderRadius: AppRadii.r12All),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: AppSpacing.s14),
-          FilledButton.icon(
-            onPressed: () async {
-              final ok = await YtmOAuthLoginSheet.show(context);
-              if (ok == true && mounted) Navigator.of(context).pop(true);
-            },
-            icon: const Icon(Icons.tv_rounded, size: 18),
-            label: Text(context.l10n.googleTvSignIn,
-                style: TextStyle(fontWeight: FontWeight.w700)),
-            style: FilledButton.styleFrom(
-              backgroundColor: p.accent,
-              foregroundColor: p.onAccent,
-              padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-              shape: RoundedRectangleBorder(borderRadius: AppRadii.r12All),
+            const SizedBox(height: AppSpacing.s10),
+            Text(
+              context.l10n.googleBlockTip,
+              textAlign: TextAlign.center,
+              style:
+                  TextStyle(color: p.textTertiary, fontSize: AppFontSize.caption),
             ),
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          FilledButton.icon(
-            onPressed: _manualRetryFromBlock,
-            icon: const Icon(Icons.refresh_rounded, size: 18),
-            label: Text(context.l10n.retry,
-                style: TextStyle(fontWeight: FontWeight.w700)),
-            style: FilledButton.styleFrom(
-              backgroundColor: p.surfaceContainerHigh,
-              foregroundColor: p.textPrimary,
-              padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-              shape: RoundedRectangleBorder(borderRadius: AppRadii.r12All),
-            ),
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          OutlinedButton.icon(
-            onPressed: () => _switchIdentityManually(otherIdentity),
-            icon: Icon(identityIcon(otherIdentity), size: 18),
-            label: Text(context.l10n.tryIdentity(identityLabel(otherIdentity)),
-                style: const TextStyle(fontWeight: FontWeight.w700)),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: p.textPrimary,
-              side: BorderSide(color: p.hairline),
-              padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-              shape: RoundedRectangleBorder(borderRadius: AppRadii.r12All),
-            ),
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          OutlinedButton.icon(
-            onPressed: () {
-              _setStateSafe(() => _blockExhausted = false);
-              _navigateTo('https://music.youtube.com');
-            },
-            icon: const Icon(Icons.music_note_rounded, size: 18),
-            label: Text(context.l10n.openYtmWebDirect,
-                style: TextStyle(fontWeight: FontWeight.w700)),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: p.textPrimary,
-              side: BorderSide(color: p.hairline),
-              padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-              shape: RoundedRectangleBorder(borderRadius: AppRadii.r12All),
-            ),
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          OutlinedButton.icon(
-            onPressed: () => _showManualCookieDialog(context),
-            icon: const Icon(Icons.vpn_key_rounded, size: 18),
-            label: Text(context.l10n.importCookiesToken,
-                style: TextStyle(fontWeight: FontWeight.w700)),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: p.textPrimary,
-              side: BorderSide(color: p.hairline),
-              padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-              shape: RoundedRectangleBorder(borderRadius: AppRadii.r12All),
-            ),
-          ),
-          const SizedBox(height: AppSpacing.s10),
-          Text(
-            context.l10n.googleBlockTip,
-            textAlign: TextAlign.center,
-            style:
-                TextStyle(color: p.textTertiary, fontSize: AppFontSize.caption),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

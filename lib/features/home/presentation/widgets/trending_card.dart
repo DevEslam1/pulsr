@@ -4,6 +4,7 @@ import 'package:on_audio_query/on_audio_query.dart';
 import '../../../../core/responsive/responsive_values.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
+import '../../../../core/utils/track_display_info.dart';
 import '../../../../core/widgets/cached_artwork.dart';
 import '../../../../data/db/app_database.dart';
 import '../../../ytm_search/presentation/widgets/ytm_download_button.dart';
@@ -22,6 +23,10 @@ class TrendingCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
+    final displayInfo = TrackDisplayInfo.resolve(
+      rawTitle: song.title,
+      rawArtist: song.artist,
+    );
     final size = context.responsive
         .value(compact: 138.0, medium: 150.0, expanded: 158.0);
 
@@ -29,7 +34,7 @@ class TrendingCard extends StatelessWidget {
       padding: const EdgeInsetsDirectional.only(end: AppSpacing.s14),
       child: Semantics(
         button: true,
-        label: '${song.title}, ${song.artist}',
+        label: '${displayInfo.title}, ${displayInfo.artist}',
         hint: context.l10n.play,
         child: InkWell(
           borderRadius: AppRadii.r20All,
@@ -49,6 +54,8 @@ class TrendingCard extends StatelessWidget {
                       type: ArtworkType.AUDIO,
                       size: size,
                       borderRadius: AppRadii.r18,
+                      title: displayInfo.title,
+                      artist: displayInfo.artist,
                     ),
                     // Scrim keeps the download icon legible over arbitrary artwork.
                     PositionedDirectional(
@@ -76,7 +83,7 @@ class TrendingCard extends StatelessWidget {
                 SizedBox(
                   height: scaledTitleBoxHeight(context),
                   child: Text(
-                    song.title,
+                    displayInfo.title,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
@@ -89,7 +96,7 @@ class TrendingCard extends StatelessWidget {
                 ),
                 const SizedBox(height: AppSpacing.s2),
                 Text(
-                  song.artist,
+                  displayInfo.artist,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(

@@ -537,6 +537,7 @@ bool DspEngineRegistry::registerEngine(AudioDspEngine* engine) {
     auto current = tmpl.getParams();
     if (current) {
         engine->publishParams(current);
+        engine->initVolumeSmoothersFromSnapshot(*current);
     }
     engine->setWeeklyDose(tmpl.getWeeklyDose());
     engine->setPerformanceProfile(tmpl.getPerformanceProfile());
@@ -1098,7 +1099,19 @@ double AudioDspEngine::effectiveDirectUsbGain(const DspParamSnapshot& snapshot) 
         : 1.0;
 }
 
+void AudioDspEngine::initVolumeSmoothersFromSnapshot(const DspParamSnapshot& snap) {
+    smoothedDirectUsbVolume_ = snap.bitPerfect.directUsbActive
+        ? std::clamp(snap.bitPerfect.directUsbGain, 0.0, 1.0)
+        : 1.0;
+    smoothedDirectVolume_ = snap.directVolume.enabled
+        ? std::clamp(snap.directVolume.gainLinear, 0.0, 8.0)
+        : 1.0;
+    lastAppliedDirectVolume_ = smoothedDirectVolume_;
+    lastBitPerfectRequested_ = snap.bitPerfect.enabled;
+}
+
 void AudioDspEngine::resetInternal() {
+    auto current = currentParams_.load();
     eq_.reset();
     crossfeed_.reset();
     limiter_.reset();
@@ -1129,8 +1142,12 @@ void AudioDspEngine::resetInternal() {
     dacVoicing_.reset();
     smoothedReplayGain_ = 1.0;
     targetReplayGain_ = 1.0;
-    smoothedDirectVolume_ = 1.0;
-    smoothedDirectUsbVolume_ = 1.0;
+    smoothedDirectVolume_ = (current && current->directVolume.enabled)
+        ? std::clamp(current->directVolume.gainLinear, 0.0, 8.0)
+        : 1.0;
+    smoothedDirectUsbVolume_ = (current && current->bitPerfect.directUsbActive)
+        ? std::clamp(current->bitPerfect.directUsbGain, 0.0, 1.0)
+        : 1.0;
     smoothedSafetyGain_ = 1.0;
     gainBoostLatched_ = false;
     lastRgTrackDb_ = 0.0;
@@ -1919,9 +1936,11 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
         // so the ReplayGain stage picks up where it left off.
         smoothedReplayGain_ = bitPerfectRequested ? 1.0 : lastAppliedReplayGain_;
         smoothedDirectVolume_ = bitPerfectRequested ? 1.0 : lastAppliedDirectVolume_;
-        // The full-chain DVC stage re-unities this every block, so it carries
-        // no history to restore.
-        smoothedDirectUsbVolume_ = 1.0;
+        // The full-chain DVC stage re-unities this every block, so seed from
+        // the current Direct USB target rather than snapping to 1.0 (full volume).
+        smoothedDirectUsbVolume_ = snapshot->bitPerfect.directUsbActive
+            ? std::clamp(snapshot->bitPerfect.directUsbGain, 0.0, 1.0)
+            : 1.0;
         lastBitPerfectRequested_ = bitPerfectRequested;
     }
     // Measured custody: capture the exact bytes this block enters with, and (via

@@ -176,22 +176,13 @@ void main() {
         )).called(1);
   });
 
-  testWidgets('the More chip opens the discovery tools sheet', (tester) async {
+  testWidgets('the See All action opens the discovery tools sheet', (tester) async {
     await pumpScreen(tester);
 
-    // The discovery strip is a lazy horizontal list; scroll it to the end so
-    // the trailing "More tools" chip is built and hittable.
-    final horizontal = find
-        .byWidgetPredicate(
-            (w) => w is ListView && w.scrollDirection == Axis.horizontal)
-        .first;
-    await tester.drag(horizontal, const Offset(-800, 0));
-    await tester.pumpAndSettle();
-
-    final more =
-        find.text(lookupAppLocalizations(const Locale('en')).browseMoreTools);
-    expect(more, findsOneWidget);
-    await tester.tap(more);
+    final seeAll =
+        find.text(lookupAppLocalizations(const Locale('en')).browseSeeAll);
+    expect(seeAll, findsOneWidget);
+    await tester.tap(seeAll);
     await tester.pumpAndSettle();
 
     // The sheet's ListTiles trip a debug-only "ink splash may be invisible"

@@ -55,15 +55,17 @@ extension _YtmGeoBlockBanner on _YtmWebLoginSheetState {
   }
 
   Widget _buildGeoBlockBanner(PulsrPalette p) {
-    return Container(
-      margin: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.md, vertical: AppSpacing.xxs),
-      padding: const EdgeInsets.all(AppSpacing.s10),
-      decoration: BoxDecoration(
-        color: Colors.amber.withValues(alpha: 0.12),
-        borderRadius: AppRadii.r10All,
-        border: Border.all(color: Colors.amber.withValues(alpha: 0.4)),
-      ),
+    return Semantics(
+      liveRegion: true,
+      child: Container(
+        margin: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md, vertical: AppSpacing.xxs),
+        padding: const EdgeInsets.all(AppSpacing.s10),
+        decoration: BoxDecoration(
+          color: p.warningSoft,
+          borderRadius: AppRadii.r10All,
+          border: Border.all(color: p.warning.withValues(alpha: 0.4)),
+        ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -124,6 +126,7 @@ extension _YtmGeoBlockBanner on _YtmWebLoginSheetState {
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 }

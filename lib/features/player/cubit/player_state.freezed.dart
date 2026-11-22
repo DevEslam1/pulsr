@@ -30,6 +30,8 @@ mixin _$PlaybackSlice {
   Color? get dominantColor;
   Duration? get sleepTimerRemaining;
   int? get sleepTimerRemainingTracks;
+  SleepTimerMode? get sleepTimerMode;
+  bool get isEndOfQueueSleepTimer;
   bool get abLoopEnabled;
   Duration? get abPointA;
   Duration? get abPointB;
@@ -88,6 +90,10 @@ mixin _$PlaybackSlice {
                     _this.sleepTimerRemainingTracks) ||
                 other.sleepTimerRemainingTracks ==
                     _this.sleepTimerRemainingTracks) &&
+            (identical(other.sleepTimerMode, _this.sleepTimerMode) ||
+                other.sleepTimerMode == _this.sleepTimerMode) &&
+            (identical(other.isEndOfQueueSleepTimer, _this.isEndOfQueueSleepTimer) ||
+                other.isEndOfQueueSleepTimer == _this.isEndOfQueueSleepTimer) &&
             (identical(other.abLoopEnabled, _this.abLoopEnabled) ||
                 other.abLoopEnabled == _this.abLoopEnabled) &&
             (identical(other.abPointA, _this.abPointA) ||
@@ -98,8 +104,7 @@ mixin _$PlaybackSlice {
                 other.trackDelayMs == _this.trackDelayMs) &&
             (identical(other.bookmarkPosition, _this.bookmarkPosition) ||
                 other.bookmarkPosition == _this.bookmarkPosition) &&
-            (identical(other.silenceSkipSensitivity,
-                    _this.silenceSkipSensitivity) ||
+            (identical(other.silenceSkipSensitivity, _this.silenceSkipSensitivity) ||
                 other.silenceSkipSensitivity == _this.silenceSkipSensitivity) &&
             (identical(other.currentSongRating, _this.currentSongRating) ||
                 other.currentSongRating == _this.currentSongRating) &&
@@ -135,6 +140,8 @@ mixin _$PlaybackSlice {
       _this.dominantColor,
       _this.sleepTimerRemaining,
       _this.sleepTimerRemainingTracks,
+      _this.sleepTimerMode,
+      _this.isEndOfQueueSleepTimer,
       _this.abLoopEnabled,
       _this.abPointA,
       _this.abPointB,
@@ -152,7 +159,7 @@ mixin _$PlaybackSlice {
   @override
   String toString() {
     final _this = this as PlaybackSlice;
-    return 'PlaybackSlice(currentSong: ${_this.currentSong}, isPlaying: ${_this.isPlaying}, isBuffering: ${_this.isBuffering}, position: ${_this.position}, duration: ${_this.duration}, isShuffle: ${_this.isShuffle}, repeatMode: ${_this.repeatMode}, playbackSpeed: ${_this.playbackSpeed}, playbackPitch: ${_this.playbackPitch}, audioSessionId: ${_this.audioSessionId}, error: ${_this.error}, isExpanded: ${_this.isExpanded}, dominantColor: ${_this.dominantColor}, sleepTimerRemaining: ${_this.sleepTimerRemaining}, sleepTimerRemainingTracks: ${_this.sleepTimerRemainingTracks}, abLoopEnabled: ${_this.abLoopEnabled}, abPointA: ${_this.abPointA}, abPointB: ${_this.abPointB}, trackDelayMs: ${_this.trackDelayMs}, bookmarkPosition: ${_this.bookmarkPosition}, silenceSkipSensitivity: ${_this.silenceSkipSensitivity}, currentSongRating: ${_this.currentSongRating}, currentSongEqOverride: ${_this.currentSongEqOverride}, currentSongVolumeOverrideDb: ${_this.currentSongVolumeOverrideDb}, isMuted: ${_this.isMuted}, volume: ${_this.volume})';
+    return 'PlaybackSlice(currentSong: ${_this.currentSong}, isPlaying: ${_this.isPlaying}, isBuffering: ${_this.isBuffering}, position: ${_this.position}, duration: ${_this.duration}, isShuffle: ${_this.isShuffle}, repeatMode: ${_this.repeatMode}, playbackSpeed: ${_this.playbackSpeed}, playbackPitch: ${_this.playbackPitch}, audioSessionId: ${_this.audioSessionId}, error: ${_this.error}, isExpanded: ${_this.isExpanded}, dominantColor: ${_this.dominantColor}, sleepTimerRemaining: ${_this.sleepTimerRemaining}, sleepTimerRemainingTracks: ${_this.sleepTimerRemainingTracks}, sleepTimerMode: ${_this.sleepTimerMode}, isEndOfQueueSleepTimer: ${_this.isEndOfQueueSleepTimer}, abLoopEnabled: ${_this.abLoopEnabled}, abPointA: ${_this.abPointA}, abPointB: ${_this.abPointB}, trackDelayMs: ${_this.trackDelayMs}, bookmarkPosition: ${_this.bookmarkPosition}, silenceSkipSensitivity: ${_this.silenceSkipSensitivity}, currentSongRating: ${_this.currentSongRating}, currentSongEqOverride: ${_this.currentSongEqOverride}, currentSongVolumeOverrideDb: ${_this.currentSongVolumeOverrideDb}, isMuted: ${_this.isMuted}, volume: ${_this.volume})';
   }
 }
 
@@ -178,6 +185,8 @@ abstract mixin class $PlaybackSliceCopyWith<$Res> {
       Color? dominantColor,
       Duration? sleepTimerRemaining,
       int? sleepTimerRemainingTracks,
+      SleepTimerMode? sleepTimerMode,
+      bool isEndOfQueueSleepTimer,
       bool abLoopEnabled,
       Duration? abPointA,
       Duration? abPointB,
@@ -219,6 +228,8 @@ class _$PlaybackSliceCopyWithImpl<$Res>
     Object? dominantColor = freezed,
     Object? sleepTimerRemaining = freezed,
     Object? sleepTimerRemainingTracks = freezed,
+    Object? sleepTimerMode = freezed,
+    Object? isEndOfQueueSleepTimer = null,
     Object? abLoopEnabled = null,
     Object? abPointA = freezed,
     Object? abPointB = freezed,
@@ -292,6 +303,14 @@ class _$PlaybackSliceCopyWithImpl<$Res>
           ? _self.sleepTimerRemainingTracks
           : sleepTimerRemainingTracks // ignore: cast_nullable_to_non_nullable
               as int?,
+      sleepTimerMode: freezed == sleepTimerMode
+          ? _self.sleepTimerMode
+          : sleepTimerMode // ignore: cast_nullable_to_non_nullable
+              as SleepTimerMode?,
+      isEndOfQueueSleepTimer: null == isEndOfQueueSleepTimer
+          ? _self.isEndOfQueueSleepTimer
+          : isEndOfQueueSleepTimer // ignore: cast_nullable_to_non_nullable
+              as bool,
       abLoopEnabled: null == abLoopEnabled
           ? _self.abLoopEnabled
           : abLoopEnabled // ignore: cast_nullable_to_non_nullable
@@ -449,6 +468,8 @@ extension PlaybackSlicePatterns on PlaybackSlice {
             Color? dominantColor,
             Duration? sleepTimerRemaining,
             int? sleepTimerRemainingTracks,
+            SleepTimerMode? sleepTimerMode,
+            bool isEndOfQueueSleepTimer,
             bool abLoopEnabled,
             Duration? abPointA,
             Duration? abPointB,
@@ -482,6 +503,8 @@ extension PlaybackSlicePatterns on PlaybackSlice {
             _that.dominantColor,
             _that.sleepTimerRemaining,
             _that.sleepTimerRemainingTracks,
+            _that.sleepTimerMode,
+            _that.isEndOfQueueSleepTimer,
             _that.abLoopEnabled,
             _that.abPointA,
             _that.abPointB,
@@ -529,6 +552,8 @@ extension PlaybackSlicePatterns on PlaybackSlice {
             Color? dominantColor,
             Duration? sleepTimerRemaining,
             int? sleepTimerRemainingTracks,
+            SleepTimerMode? sleepTimerMode,
+            bool isEndOfQueueSleepTimer,
             bool abLoopEnabled,
             Duration? abPointA,
             Duration? abPointB,
@@ -561,6 +586,8 @@ extension PlaybackSlicePatterns on PlaybackSlice {
             _that.dominantColor,
             _that.sleepTimerRemaining,
             _that.sleepTimerRemainingTracks,
+            _that.sleepTimerMode,
+            _that.isEndOfQueueSleepTimer,
             _that.abLoopEnabled,
             _that.abPointA,
             _that.abPointB,
@@ -607,6 +634,8 @@ extension PlaybackSlicePatterns on PlaybackSlice {
             Color? dominantColor,
             Duration? sleepTimerRemaining,
             int? sleepTimerRemainingTracks,
+            SleepTimerMode? sleepTimerMode,
+            bool isEndOfQueueSleepTimer,
             bool abLoopEnabled,
             Duration? abPointA,
             Duration? abPointB,
@@ -639,6 +668,8 @@ extension PlaybackSlicePatterns on PlaybackSlice {
             _that.dominantColor,
             _that.sleepTimerRemaining,
             _that.sleepTimerRemainingTracks,
+            _that.sleepTimerMode,
+            _that.isEndOfQueueSleepTimer,
             _that.abLoopEnabled,
             _that.abPointA,
             _that.abPointB,
@@ -675,6 +706,8 @@ class _PlaybackSlice extends PlaybackSlice {
       this.dominantColor,
       this.sleepTimerRemaining,
       this.sleepTimerRemainingTracks,
+      this.sleepTimerMode,
+      this.isEndOfQueueSleepTimer = false,
       this.abLoopEnabled = false,
       this.abPointA,
       this.abPointB,
@@ -727,6 +760,11 @@ class _PlaybackSlice extends PlaybackSlice {
   final Duration? sleepTimerRemaining;
   @override
   final int? sleepTimerRemainingTracks;
+  @override
+  final SleepTimerMode? sleepTimerMode;
+  @override
+  @JsonKey()
+  final bool isEndOfQueueSleepTimer;
   @override
   @JsonKey()
   final bool abLoopEnabled;
@@ -800,6 +838,10 @@ class _PlaybackSlice extends PlaybackSlice {
             (identical(other.sleepTimerRemainingTracks,
                     sleepTimerRemainingTracks) ||
                 other.sleepTimerRemainingTracks == sleepTimerRemainingTracks) &&
+            (identical(other.sleepTimerMode, sleepTimerMode) ||
+                other.sleepTimerMode == sleepTimerMode) &&
+            (identical(other.isEndOfQueueSleepTimer, isEndOfQueueSleepTimer) ||
+                other.isEndOfQueueSleepTimer == isEndOfQueueSleepTimer) &&
             (identical(other.abLoopEnabled, abLoopEnabled) ||
                 other.abLoopEnabled == abLoopEnabled) &&
             (identical(other.abPointA, abPointA) ||
@@ -843,6 +885,8 @@ class _PlaybackSlice extends PlaybackSlice {
       dominantColor,
       sleepTimerRemaining,
       sleepTimerRemainingTracks,
+      sleepTimerMode,
+      isEndOfQueueSleepTimer,
       abLoopEnabled,
       abPointA,
       abPointB,
@@ -859,7 +903,7 @@ class _PlaybackSlice extends PlaybackSlice {
 
   @override
   String toString() {
-    return 'PlaybackSlice(currentSong: $currentSong, isPlaying: $isPlaying, isBuffering: $isBuffering, position: $position, duration: $duration, isShuffle: $isShuffle, repeatMode: $repeatMode, playbackSpeed: $playbackSpeed, playbackPitch: $playbackPitch, audioSessionId: $audioSessionId, error: $error, isExpanded: $isExpanded, dominantColor: $dominantColor, sleepTimerRemaining: $sleepTimerRemaining, sleepTimerRemainingTracks: $sleepTimerRemainingTracks, abLoopEnabled: $abLoopEnabled, abPointA: $abPointA, abPointB: $abPointB, trackDelayMs: $trackDelayMs, bookmarkPosition: $bookmarkPosition, silenceSkipSensitivity: $silenceSkipSensitivity, currentSongRating: $currentSongRating, currentSongEqOverride: $currentSongEqOverride, currentSongVolumeOverrideDb: $currentSongVolumeOverrideDb, isMuted: $isMuted, volume: $volume)';
+    return 'PlaybackSlice(currentSong: $currentSong, isPlaying: $isPlaying, isBuffering: $isBuffering, position: $position, duration: $duration, isShuffle: $isShuffle, repeatMode: $repeatMode, playbackSpeed: $playbackSpeed, playbackPitch: $playbackPitch, audioSessionId: $audioSessionId, error: $error, isExpanded: $isExpanded, dominantColor: $dominantColor, sleepTimerRemaining: $sleepTimerRemaining, sleepTimerRemainingTracks: $sleepTimerRemainingTracks, sleepTimerMode: $sleepTimerMode, isEndOfQueueSleepTimer: $isEndOfQueueSleepTimer, abLoopEnabled: $abLoopEnabled, abPointA: $abPointA, abPointB: $abPointB, trackDelayMs: $trackDelayMs, bookmarkPosition: $bookmarkPosition, silenceSkipSensitivity: $silenceSkipSensitivity, currentSongRating: $currentSongRating, currentSongEqOverride: $currentSongEqOverride, currentSongVolumeOverrideDb: $currentSongVolumeOverrideDb, isMuted: $isMuted, volume: $volume)';
   }
 }
 
@@ -887,6 +931,8 @@ abstract mixin class _$PlaybackSliceCopyWith<$Res>
       Color? dominantColor,
       Duration? sleepTimerRemaining,
       int? sleepTimerRemainingTracks,
+      SleepTimerMode? sleepTimerMode,
+      bool isEndOfQueueSleepTimer,
       bool abLoopEnabled,
       Duration? abPointA,
       Duration? abPointB,
@@ -928,6 +974,8 @@ class __$PlaybackSliceCopyWithImpl<$Res>
     Object? dominantColor = freezed,
     Object? sleepTimerRemaining = freezed,
     Object? sleepTimerRemainingTracks = freezed,
+    Object? sleepTimerMode = freezed,
+    Object? isEndOfQueueSleepTimer = null,
     Object? abLoopEnabled = null,
     Object? abPointA = freezed,
     Object? abPointB = freezed,
@@ -1001,6 +1049,14 @@ class __$PlaybackSliceCopyWithImpl<$Res>
           ? _self.sleepTimerRemainingTracks
           : sleepTimerRemainingTracks // ignore: cast_nullable_to_non_nullable
               as int?,
+      sleepTimerMode: freezed == sleepTimerMode
+          ? _self.sleepTimerMode
+          : sleepTimerMode // ignore: cast_nullable_to_non_nullable
+              as SleepTimerMode?,
+      isEndOfQueueSleepTimer: null == isEndOfQueueSleepTimer
+          ? _self.isEndOfQueueSleepTimer
+          : isEndOfQueueSleepTimer // ignore: cast_nullable_to_non_nullable
+              as bool,
       abLoopEnabled: null == abLoopEnabled
           ? _self.abLoopEnabled
           : abLoopEnabled // ignore: cast_nullable_to_non_nullable

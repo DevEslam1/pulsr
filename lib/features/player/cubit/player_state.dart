@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import '../../../core/errors/app_error.dart';
 import '../../../core/utils/list_content_diff.dart';
+import '../../../data/audio/sleep_timer_manager.dart' show SleepTimerMode;
 import '../../../data/db/app_database.dart';
 import '../../../domain/models/audio_effects_config.dart';
 import '../../../domain/models/chapter_info.dart';
@@ -58,6 +59,8 @@ abstract class PlaybackSlice with _$PlaybackSlice {
     Color? dominantColor,
     Duration? sleepTimerRemaining,
     int? sleepTimerRemainingTracks,
+    SleepTimerMode? sleepTimerMode,
+    @Default(false) bool isEndOfQueueSleepTimer,
     @Default(false) bool abLoopEnabled,
     Duration? abPointA,
     Duration? abPointB,
@@ -94,6 +97,8 @@ abstract class PlaybackSlice with _$PlaybackSlice {
                 sleepTimerRemaining!.inSeconds !=
                     other.sleepTimerRemaining!.inSeconds)) ||
         sleepTimerRemainingTracks != other.sleepTimerRemainingTracks ||
+        sleepTimerMode != other.sleepTimerMode ||
+        isEndOfQueueSleepTimer != other.isEndOfQueueSleepTimer ||
         abLoopEnabled != other.abLoopEnabled ||
         abPointA != other.abPointA ||
         abPointB != other.abPointB ||
@@ -346,6 +351,8 @@ abstract class PlayerState with _$PlayerState {
   Color? get dominantColor => playback.dominantColor;
   Duration? get sleepTimerRemaining => playback.sleepTimerRemaining;
   int? get sleepTimerRemainingTracks => playback.sleepTimerRemainingTracks;
+  SleepTimerMode? get sleepTimerMode => playback.sleepTimerMode;
+  bool get isEndOfQueueSleepTimer => playback.isEndOfQueueSleepTimer;
   bool get abLoopEnabled => playback.abLoopEnabled;
   Duration? get abPointA => playback.abPointA;
   Duration? get abPointB => playback.abPointB;

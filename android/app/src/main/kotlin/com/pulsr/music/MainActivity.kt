@@ -2,6 +2,7 @@ package com.pulsr.music
  
 import android.content.ActivityNotFoundException
 import android.content.ComponentName
+import android.content.ContentUris
 import android.content.Context
 import android.content.Intent
 import android.app.SearchManager
@@ -23,6 +24,7 @@ import org.jaudiotagger.tag.FieldKey
 import org.jaudiotagger.tag.flac.FlacTag
 import org.jaudiotagger.tag.vorbiscomment.VorbisCommentTag
 import java.io.File
+import java.io.FileInputStream
  
 class MainActivity : AudioServiceActivity() {
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
@@ -271,6 +273,48 @@ class MainActivity : AudioServiceActivity() {
         return safe
     }
 
+    internal fun canReadDirectly(fileUri: Uri): Boolean {
+        val path = fileUri.path ?: return false
+        val file = File(path)
+        return try {
+            file.exists() && file.canRead() && FileInputStream(file).use { true }
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    internal fun resolveFileUriToContentUri(fileUri: Uri): Uri? {
+        return AudioTempFiles.resolveMediaStoreContentUri(this, fileUri)
+    }
+
+    internal fun resolvePlayableAudioUri(uri: Uri): Uri {
+        if (uri.scheme?.equals("file", ignoreCase = true) != true) {
+            return uri
+        }
+        if (canReadDirectly(uri)) {
+            return uri
+        }
+
+        // Resolves file:// URI that cannot be read directly due to scoped storage/permissions (Android 13-17).
+        // 1. Try resolving to a content URI via MediaStore query (MediaStore.Audio.Media.DATA)
+        val contentUri = resolveFileUriToContentUri(uri)
+        if (contentUri != null) {
+            Log.d("MainActivity", "Resolved unreadable file URI $uri to content URI $contentUri")
+            return contentUri
+        }
+
+        // 2. Fall back to copying using AudioTempFiles.copyToTempFile to app cache
+        return try {
+            val tempFile = AudioTempFiles.copyToTempFile(this, uri, "audio_intent_")
+            val cachedUri = Uri.fromFile(tempFile)
+            Log.d("MainActivity", "Copied unreadable file URI $uri to app cache $cachedUri")
+            cachedUri
+        } catch (e: Exception) {
+            Log.w("MainActivity", "Failed to resolve or copy audio file URI $uri: ${e.message}", e)
+            uri
+        }
+    }
+
     private fun handleAudioIntent(intent: Intent?, fromColdStart: Boolean) {
         // Assistant / voice-search entry point: bring the app forward so the
         // Dart layer can resume or start playback. Previously dropped.
@@ -332,6 +376,18 @@ class MainActivity : AudioServiceActivity() {
                         mimeType = mime,
                         textExtra = null,
                     )
+                }?.map { u ->
+                    if (u.scheme?.equals("content", ignoreCase = true) == true) {
+                        try {
+                            val flags = intent.flags and (Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+                            if (flags != 0) {
+                                contentResolver.takePersistableUriPermission(u, flags and Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            }
+                        } catch (e: Exception) {
+                            Log.d("MainActivity", "Persistable URI grant not supported or failed for $u: ${e.message}")
+                        }
+                    }
+                    resolvePlayableAudioUri(u)
                 }
                 if (!list.isNullOrEmpty()) {
                     if (fromColdStart || fileOpenerChannel == null) {
@@ -372,7 +428,8 @@ class MainActivity : AudioServiceActivity() {
             }
         }
 
-        val uriStr = uri.toString()
+        val playableUri = resolvePlayableAudioUri(uri)
+        val uriStr = playableUri.toString()
         if (fromColdStart || fileOpenerChannel == null) {
             addPendingAudioUri(uriStr)
         } else {
@@ -594,7 +651,23 @@ class MainActivity : AudioServiceActivity() {
                             }
                         } else {
                             val file = File(filePath)
-                            if (file.exists()) lyrics = readFrom(file)
+                            if (file.exists() && file.canRead()) {
+                                lyrics = readFrom(file)
+                            } else {
+                                val uri = if (filePath.startsWith("file://")) Uri.parse(filePath) else Uri.fromFile(file)
+                                val resolvedUri = resolveFileUriToContentUri(uri) ?: uri
+                                runCatching {
+                                    val fallbackTemp = AudioTempFiles.copyToTempFile(
+                                        applicationContext,
+                                        resolvedUri,
+                                        "lyrics_fallback_",
+                                        16L * 1024 * 1024,
+                                        throwOnOverflow = false,
+                                    )
+                                    tempFile = fallbackTemp
+                                    lyrics = readFrom(fallbackTemp)
+                                }
+                            }
                         }
                         runOnUiThread { runCatching { result.success(lyrics) } }
                     } catch (e: Exception) {

@@ -257,6 +257,7 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
             }
             safeEmit(state.copyWith(
                 songs: List<SongsTableData>.unmodifiable(songs),
+                infoMessage: null,
                 error: null,
                 isLoading: false,
                 isLoadingMore: false));

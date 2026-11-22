@@ -3,7 +3,6 @@ import 'dart:math' as math;
 
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_radii.dart';
@@ -569,8 +568,6 @@ class _QuranRadioHeroCarouselState extends State<QuranRadioHeroCarousel> {
 
   @override
   Widget build(BuildContext context) {
-    final p = context.palette;
-    final gilt = _giltOf(context);
     final total = _stations.length;
     final shouldAnimate = PulsrMotion.shouldAnimate(context);
     _syncAutoScrollTimer(shouldAnimate);
@@ -654,129 +651,19 @@ class _QuranRadioHeroCarouselState extends State<QuranRadioHeroCarousel> {
             },
           ),
         ),
-        const SizedBox(height: AppSpacing.s10),
-        // ── Indicator strip: diamond window + tabular counter + radio chip ──
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 6.0),
-          child: Row(
-            children: [
-              _CarouselWindowedDots(
-                total: total,
-                currentPage: _currentPage,
-                onDotTap: (i) {
-                  PulsrHaptics.selectionClick();
-                  _goToPage(i);
-                },
-              ),
-              const SizedBox(width: AppSpacing.xs),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 6.0,
-                  vertical: 2.0,
-                ),
-                decoration: BoxDecoration(
-                  color: p.surfaceContainer.withValues(alpha: 0.9),
-                  borderRadius: AppRadii.r6All,
-                  border: Border.all(
-                    color: p.hairline.withValues(alpha: 0.8),
-                    width: 0.7,
-                  ),
-                ),
-                child: Text(
-                  '${_currentPage + 1}/$total',
-                  style: TextStyle(
-                    color: p.textSecondary,
-                    fontSize: AppFontSize.caption,
-                    fontWeight: FontWeight.w700,
-                    fontFeatures: const [
-                      FontFeature.tabularFigures(),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(width: AppSpacing.xs),
-              // Quick "All Stations" tonal action chip
-              Expanded(
-                child: Align(
-                  alignment: AlignmentDirectional.centerEnd,
-                  child: Semantics(
-                    button: true,
-                    label: context.l10n.viewAllRadioStations,
-                    child: Material(
-                      color: AppColors.fadeStopTransparent,
-                      child: Builder(
-                        builder: (context) {
-                          final isCapsule = context.isCapsuleButtons;
-                          final radius = context.buttonRadius(rectRadius: 10.0);
-                          return InkWell(
-                            borderRadius: radius,
-                            onTap: widget.onMoreStations ??
-                                () {
-                                  PulsrHaptics.selectionClick();
-                                  context.push('/radio');
-                                },
-                            child: Container(
-                              padding: const EdgeInsetsDirectional.fromSTEB(
-                                9.0,
-                                4.5,
-                                6.0,
-                                4.5,
-                              ),
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [
-                                    p.accent.withValues(alpha: 0.16),
-                                    gilt.withValues(alpha: 0.10),
-                                  ],
-                                ),
-                                borderRadius:
-                                    isCapsule ? radius : AppRadii.circular(999),
-                                border: Border.all(
-                                  color: p.accent.withValues(alpha: 0.28),
-                                  width: 0.8,
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Icons.radio_rounded,
-                                    size: 12.5,
-                                    color: p.accent,
-                                  ),
-                                  const SizedBox(width: 4.5),
-                                  Flexible(
-                                    child: Text(
-                                      context.l10n.radioTitle,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        color: p.accent,
-                                        fontSize: AppFontSize.caption,
-                                        fontWeight: FontWeight.w700,
-                                        letterSpacing: 0.2,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 1),
-                                  Icon(
-                                    Icons.chevron_right_rounded,
-                                    size: 14,
-                                    color: p.accent.withValues(alpha: 0.85),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
+        if (total > 1) ...[
+          const SizedBox(height: AppSpacing.s8),
+          Center(
+            child: _CarouselWindowedDots(
+              total: total,
+              currentPage: _currentPage,
+              onDotTap: (i) {
+                PulsrHaptics.selectionClick();
+                _goToPage(i);
+              },
+            ),
           ),
-        ),
+        ],
       ],
     );
   }
@@ -1219,10 +1106,12 @@ class _QuranHeroCard extends StatelessWidget {
                 ),
                 child: LayoutBuilder(
                   builder: (context, constraints) {
-                    final archWidth = (constraints.maxWidth * 0.42)
-                        .clamp(128.0, 190.0)
+                    final isWide = constraints.maxWidth >= 500;
+                    final archFraction = isWide ? 0.34 : 0.38;
+                    final archWidth = (constraints.maxWidth * archFraction)
+                        .clamp(116.0, 172.0)
                         .toDouble();
-                    final trailingReserved = archWidth + 24.0;
+                    final trailingReserved = archWidth + 14.0;
 
                     return Stack(
                       fit: StackFit.expand,
@@ -1417,314 +1306,328 @@ class _QuranHeroCard extends StatelessWidget {
                           ),
                         ),
                         // ── Editorial column ─────────────────────────────────
-                        Padding(
-                          padding: EdgeInsetsDirectional.fromSTEB(
-                            AppSpacing.md,
-                            12,
-                            trailingReserved,
-                            12,
-                          ),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // Overline: live badge / category seal + pin.
-                              Row(
-                                children: [
-                                  Flexible(
-                                    child: AnimatedSwitcher(
-                                      duration:
-                                          context.motion(PulsrMotion.layout),
-                                      child: Container(
-                                        key: ValueKey<bool>(isPlaying),
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 8,
-                                          vertical: 3,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: isPlaying
-                                              ? p.accent.withValues(alpha: 0.18)
-                                              : p.accent
-                                                  .withValues(alpha: 0.11),
-                                          borderRadius: AppRadii.circular(999),
-                                          border: Border.all(
-                                            color: p.accent.withValues(
-                                              alpha: isPlaying ? 0.45 : 0.24,
+                        ClipRect(
+                          child: Padding(
+                            padding: EdgeInsetsDirectional.fromSTEB(
+                              14.0,
+                              12,
+                              trailingReserved,
+                              12,
+                            ),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Overline: live badge / category seal + pin.
+                                Row(
+                                  children: [
+                                    Flexible(
+                                      child: AnimatedSwitcher(
+                                        duration:
+                                            context.motion(PulsrMotion.layout),
+                                        child: Container(
+                                          key: ValueKey<bool>(isPlaying),
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 3,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: isPlaying
+                                                ? p.accent.withValues(alpha: 0.18)
+                                                : p.accent
+                                                    .withValues(alpha: 0.11),
+                                            borderRadius: AppRadii.circular(999),
+                                            border: Border.all(
+                                              color: p.accent.withValues(
+                                                alpha: isPlaying ? 0.45 : 0.24,
+                                              ),
+                                              width: 0.8,
                                             ),
-                                            width: 0.8,
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              if (isPlaying) ...[
+                                                const _PulsingLiveDot(),
+                                                const SizedBox(width: 5),
+                                                Flexible(
+                                                  child: Text(
+                                                    context
+                                                        .l10n.radioLiveOnAirBadge,
+                                                    maxLines: 1,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                    style: TextStyle(
+                                                      color: p.accent,
+                                                      fontSize: AppFontSize.caption,
+                                                      fontWeight: FontWeight.w800,
+                                                      letterSpacing: 0.45,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ] else ...[
+                                                _StarGlyph(
+                                                  size: 10,
+                                                  color: p.accent,
+                                                ),
+                                                const SizedBox(width: 4.5),
+                                                Flexible(
+                                                  child: Text(
+                                                    badgeText ?? defaultBadge,
+                                                    maxLines: 1,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                    style: TextStyle(
+                                                      color: p.accent,
+                                                      fontSize: AppFontSize.caption,
+                                                      fontWeight: FontWeight.w700,
+                                                      letterSpacing: 0.3,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ],
                                           ),
                                         ),
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            if (isPlaying) ...[
-                                              const _PulsingLiveDot(),
-                                              const SizedBox(width: 5),
+                                      ),
+                                    ),
+                                    if (isPinned) ...[
+                                      const SizedBox(width: 6),
+                                      Container(
+                                        padding: const EdgeInsets.all(4),
+                                        decoration: BoxDecoration(
+                                          color: gilt.withValues(alpha: 0.14),
+                                          shape: BoxShape.circle,
+                                          border: Border.all(
+                                            color: gilt.withValues(alpha: 0.35),
+                                            width: 0.7,
+                                          ),
+                                        ),
+                                        child: Icon(
+                                          Icons.push_pin_rounded,
+                                          size: 10,
+                                          color: gilt,
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                                const SizedBox(height: 7),
+                                // Station / reciter title.
+                                MarqueeText(
+                                  key: ValueKey('hero_title_${item.station.id}'),
+                                  text: reciterTitle,
+                                  textAlign: isArabic
+                                      ? TextAlign.right
+                                      : TextAlign.left,
+                                  textDirection: isArabic
+                                      ? TextDirection.rtl
+                                      : TextDirection.ltr,
+                                  allowUserPause: false,
+                                  showTooltip: false,
+                                  velocity: 28.0,
+                                  blankSpace: 36.0,
+                                  style: TextStyle(
+                                    color: p.textPrimary,
+                                    fontSize: AppFontSize.subtitle,
+                                    fontWeight: FontWeight.w800,
+                                    height: 1.2,
+                                    letterSpacing: -0.25,
+                                  ),
+                                ),
+                                const SizedBox(height: 3),
+                                // Subtitle / live ICY surah ticker.
+                                Row(
+                                  children: [
+                                    if (isPlaying)
+                                      Padding(
+                                        padding: const EdgeInsetsDirectional.only(
+                                            end: 4.5),
+                                        child: Icon(
+                                          Icons.graphic_eq_rounded,
+                                          size: 13,
+                                          color: p.accent,
+                                        ),
+                                      ),
+                                    Expanded(
+                                      child: MarqueeText(
+                                        key: ValueKey('hero_sub_${item.station.id}'),
+                                        text: displaySubtitle,
+                                        textAlign: isArabic
+                                            ? TextAlign.right
+                                            : TextAlign.left,
+                                        textDirection: isArabic
+                                            ? TextDirection.rtl
+                                            : TextDirection.ltr,
+                                        allowUserPause: false,
+                                        showTooltip: false,
+                                        velocity: 24.0,
+                                        blankSpace: 32.0,
+                                        style: TextStyle(
+                                          color: isPlaying
+                                              ? p.accent
+                                              : p.textSecondary,
+                                          fontSize: AppFontSize.label,
+                                          fontWeight: isPlaying
+                                              ? FontWeight.w700
+                                              : FontWeight.w500,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 10),
+                                // ── Gilt transport row ─────────────────────────
+                                Row(
+                                  children: [
+                                    Flexible(
+                                      child: ExcludeSemantics(
+                                        child: Material(
+                                          color: AppColors.fadeStopTransparent,
+                                          child: InkWell(
+                                            borderRadius: ctaRadius,
+                                            onTap: () => onPlayPressed(isCurrent),
+                                            child: Container(
+                                              constraints: const BoxConstraints(
+                                                minHeight: 34,
+                                              ),
+                                              padding:
+                                                  EdgeInsetsDirectional.fromSTEB(
+                                                isPlaying ? 11 : 10,
+                                                4,
+                                                isPlaying ? 11 : 13,
+                                                4,
+                                              ),
+                                              decoration: BoxDecoration(
+                                                gradient: LinearGradient(
+                                                  begin: Alignment.topLeft,
+                                                  end: Alignment.bottomRight,
+                                                  colors: [
+                                                    Color.alphaBlend(
+                                                      AppColors.specularAt(0.20),
+                                                      gilt,
+                                                    ),
+                                                    gilt,
+                                                  ],
+                                                ),
+                                                borderRadius: ctaRadius,
+                                                boxShadow: [
+                                                  BoxShadow(
+                                                    color: gilt.withValues(
+                                                      alpha:
+                                                          isPlaying ? 0.34 : 0.22,
+                                                    ),
+                                                    blurRadius: 10,
+                                                    offset: const Offset(0, 3),
+                                                  ),
+                                                ],
+                                                border: Border.all(
+                                                  color: onGilt.withValues(
+                                                    alpha:
+                                                        isPlaying ? 0.32 : 0.16,
+                                                  ),
+                                                  width: 0.9,
+                                                ),
+                                              ),
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  if (isBuffering)
+                                                    const SkeletonShimmer(
+                                                      child: SkeletonBox(
+                                                        width: 14,
+                                                        height: 14,
+                                                        radius: 7,
+                                                      ),
+                                                    )
+                                                  else
+                                                    Icon(
+                                                      isPlaying
+                                                          ? Icons.pause_rounded
+                                                          : Icons
+                                                              .play_arrow_rounded,
+                                                      color: onGilt,
+                                                      size: 19,
+                                                    ),
+                                                  if (!isPlaying) ...[
+                                                    const SizedBox(width: 5),
+                                                    Flexible(
+                                                      child: Text(
+                                                        context
+                                                            .l10n.radioListenNow,
+                                                        maxLines: 1,
+                                                        overflow:
+                                                            TextOverflow.ellipsis,
+                                                        style: TextStyle(
+                                                          color: onGilt,
+                                                          fontSize:
+                                                              AppFontSize.label,
+                                                          fontWeight:
+                                                              FontWeight.w800,
+                                                          letterSpacing: 0.1,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    if (isPlaying) ...[
+                                      const SizedBox(width: 8),
+                                      Flexible(
+                                        child: Container(
+                                          constraints: const BoxConstraints(
+                                            minHeight: 34,
+                                          ),
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 10,
+                                            vertical: 4,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color:
+                                                p.accent.withValues(alpha: 0.14),
+                                            borderRadius: ctaRadius,
+                                            border: Border.all(
+                                              color:
+                                                  p.accent.withValues(alpha: 0.35),
+                                              width: 0.85,
+                                            ),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              _MiniEqualizerBars(
+                                                isPlaying: true,
+                                                color: p.accent,
+                                              ),
+                                              const SizedBox(width: 6),
                                               Flexible(
                                                 child: Text(
                                                   context
-                                                      .l10n.radioLiveOnAirBadge,
+                                                      .l10n.radioLiveShortBadge,
                                                   maxLines: 1,
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
+                                                  overflow: TextOverflow.ellipsis,
                                                   style: TextStyle(
                                                     color: p.accent,
                                                     fontSize: AppFontSize.caption,
                                                     fontWeight: FontWeight.w800,
-                                                    letterSpacing: 0.45,
-                                                  ),
-                                                ),
-                                              ),
-                                            ] else ...[
-                                              _StarGlyph(
-                                                size: 10,
-                                                color: p.accent,
-                                              ),
-                                              const SizedBox(width: 4.5),
-                                              Flexible(
-                                                child: Text(
-                                                  badgeText ?? defaultBadge,
-                                                  maxLines: 1,
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                  style: TextStyle(
-                                                    color: p.accent,
-                                                    fontSize: AppFontSize.caption,
-                                                    fontWeight: FontWeight.w700,
                                                     letterSpacing: 0.3,
                                                   ),
                                                 ),
                                               ),
                                             ],
-                                          ],
+                                          ),
                                         ),
                                       ),
-                                    ),
-                                  ),
-                                  if (isPinned) ...[
-                                    const SizedBox(width: 6),
-                                    Container(
-                                      padding: const EdgeInsets.all(4),
-                                      decoration: BoxDecoration(
-                                        color: gilt.withValues(alpha: 0.14),
-                                        shape: BoxShape.circle,
-                                        border: Border.all(
-                                          color: gilt.withValues(alpha: 0.35),
-                                          width: 0.7,
-                                        ),
-                                      ),
-                                      child: Icon(
-                                        Icons.push_pin_rounded,
-                                        size: 10,
-                                        color: gilt,
-                                      ),
-                                    ),
+                                    ],
                                   ],
-                                ],
-                              ),
-                              const SizedBox(height: 7),
-                              // Station / reciter title.
-                              MarqueeText(
-                                text: reciterTitle,
-                                textAlign: TextAlign.start,
-                                allowUserPause: false,
-                                showTooltip: false,
-                                velocity: 28.0,
-                                blankSpace: 36.0,
-                                style: TextStyle(
-                                  color: p.textPrimary,
-                                  fontSize: AppFontSize.subtitle,
-                                  fontWeight: FontWeight.w800,
-                                  height: 1.2,
-                                  letterSpacing: -0.25,
                                 ),
-                              ),
-                              const SizedBox(height: 3),
-                              // Subtitle / live ICY surah ticker.
-                              Row(
-                                children: [
-                                  if (isPlaying)
-                                    Padding(
-                                      padding: const EdgeInsetsDirectional.only(
-                                          end: 4.5),
-                                      child: Icon(
-                                        Icons.graphic_eq_rounded,
-                                        size: 13,
-                                        color: p.accent,
-                                      ),
-                                    ),
-                                  Expanded(
-                                    child: MarqueeText(
-                                      text: displaySubtitle,
-                                      textAlign: TextAlign.start,
-                                      allowUserPause: false,
-                                      showTooltip: false,
-                                      velocity: 24.0,
-                                      blankSpace: 32.0,
-                                      style: TextStyle(
-                                        color: isPlaying
-                                            ? p.accent
-                                            : p.textSecondary,
-                                        fontSize: AppFontSize.label,
-                                        fontWeight: isPlaying
-                                            ? FontWeight.w700
-                                            : FontWeight.w500,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 10),
-                              // ── Gilt transport row ─────────────────────────
-                              Row(
-                                children: [
-                                  Flexible(
-                                    child: ExcludeSemantics(
-                                      child: Material(
-                                        color: AppColors.fadeStopTransparent,
-                                        child: InkWell(
-                                          borderRadius: ctaRadius,
-                                          onTap: () => onPlayPressed(isCurrent),
-                                          child: Container(
-                                            constraints: const BoxConstraints(
-                                              minHeight: 34,
-                                            ),
-                                            padding:
-                                                EdgeInsetsDirectional.fromSTEB(
-                                              isPlaying ? 11 : 10,
-                                              4,
-                                              isPlaying ? 11 : 13,
-                                              4,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              gradient: LinearGradient(
-                                                begin: Alignment.topLeft,
-                                                end: Alignment.bottomRight,
-                                                colors: [
-                                                  Color.alphaBlend(
-                                                    AppColors.specularAt(0.20),
-                                                    gilt,
-                                                  ),
-                                                  gilt,
-                                                ],
-                                              ),
-                                              borderRadius: ctaRadius,
-                                              boxShadow: [
-                                                BoxShadow(
-                                                  color: gilt.withValues(
-                                                    alpha:
-                                                        isPlaying ? 0.34 : 0.22,
-                                                  ),
-                                                  blurRadius: 10,
-                                                  offset: const Offset(0, 3),
-                                                ),
-                                              ],
-                                              border: Border.all(
-                                                color: onGilt.withValues(
-                                                  alpha:
-                                                      isPlaying ? 0.32 : 0.16,
-                                                ),
-                                                width: 0.9,
-                                              ),
-                                            ),
-                                            child: Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                if (isBuffering)
-                                                  const SkeletonShimmer(
-                                                    child: SkeletonBox(
-                                                      width: 14,
-                                                      height: 14,
-                                                      radius: 7,
-                                                    ),
-                                                  )
-                                                else
-                                                  Icon(
-                                                    isPlaying
-                                                        ? Icons.pause_rounded
-                                                        : Icons
-                                                            .play_arrow_rounded,
-                                                    color: onGilt,
-                                                    size: 19,
-                                                  ),
-                                                if (!isPlaying) ...[
-                                                  const SizedBox(width: 5),
-                                                  Flexible(
-                                                    child: Text(
-                                                      context
-                                                          .l10n.radioListenNow,
-                                                      maxLines: 1,
-                                                      overflow:
-                                                          TextOverflow.ellipsis,
-                                                      style: TextStyle(
-                                                        color: onGilt,
-                                                        fontSize:
-                                                            AppFontSize.label,
-                                                        fontWeight:
-                                                            FontWeight.w800,
-                                                        letterSpacing: 0.1,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ],
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  if (isPlaying) ...[
-                                    const SizedBox(width: 8),
-                                    Flexible(
-                                      child: Container(
-                                        constraints: const BoxConstraints(
-                                          minHeight: 34,
-                                        ),
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 10,
-                                          vertical: 4,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color:
-                                              p.accent.withValues(alpha: 0.14),
-                                          borderRadius: ctaRadius,
-                                          border: Border.all(
-                                            color:
-                                                p.accent.withValues(alpha: 0.35),
-                                            width: 0.85,
-                                          ),
-                                        ),
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            _MiniEqualizerBars(
-                                              isPlaying: true,
-                                              color: p.accent,
-                                            ),
-                                            const SizedBox(width: 6),
-                                            Flexible(
-                                              child: Text(
-                                                context
-                                                    .l10n.radioLiveShortBadge,
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: TextStyle(
-                                                  color: p.accent,
-                                                  fontSize: AppFontSize.caption,
-                                                  fontWeight: FontWeight.w800,
-                                                  letterSpacing: 0.3,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
                         // Animated outer border: hairline at rest, accent on air.

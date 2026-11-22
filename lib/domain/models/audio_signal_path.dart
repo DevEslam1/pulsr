@@ -36,6 +36,7 @@ class AudioSignalPath {
   final int hardwareChannels;
   final bool isBitPerfect;
   final bool isDirectPath;
+  final String statusTag;
   final String hardwareSummary;
 
   const AudioSignalPath({
@@ -63,6 +64,7 @@ class AudioSignalPath {
     this.hardwareChannels = 2,
     required this.isBitPerfect,
     required this.isDirectPath,
+    this.statusTag = '',
     required this.hardwareSummary,
   });
 
@@ -79,13 +81,17 @@ class AudioSignalPath {
   }
 
   /// Decodes Android `AudioFormat.ENCODING_PCM_*` integer constants into readable names.
-  static String pcmEncodingName(int encoding) => switch (encoding) {
+  /// Falls back gracefully to inferring PCM bit depth from [fallbackBitDepth] (e.g. 'PCM 24-bit')
+  /// when [encoding] is 0 (unprobed).
+  static String pcmEncodingName(int encoding, [int fallbackBitDepth = 0]) => switch (encoding) {
         2 => 'PCM 16-bit',
         3 => 'PCM 8-bit',
         4 => 'PCM Float 32',
         21 => 'PCM 24-bit Packed',
         22 => 'PCM 32-bit',
-        _ => encoding > 0 ? 'PCM (enc $encoding)' : 'PCM Unprobed',
+        _ => encoding > 0
+            ? 'PCM (enc $encoding)'
+            : (fallbackBitDepth > 0 ? 'PCM $fallbackBitDepth-bit' : 'PCM Unprobed'),
       };
 
   /// Builds the four-stage trace from the live output facts.
@@ -111,6 +117,10 @@ class AudioSignalPath {
     bool aaudioEnabled = false,
     bool floatOutputEnabled = false,
     BitPerfectState? bitPerfectState,
+    bool dspActive = false,
+    bool dspProcessing = false,
+    bool dspEffectsActive = false,
+    String? dspDescription,
   }) {
     final normCodec = sourceCodec.trim().isEmpty ? 'Audio' : sourceCodec.trim();
     final srcRateLabel =
@@ -123,9 +133,11 @@ class AudioSignalPath {
     final decRate = output?.decodedSampleRate ?? 0;
     final decDepth = output?.decodedBitDepth ?? 0;
     final decEnc = output?.decodedPcmEncoding ?? 0;
-    final decEncName = pcmEncodingName(decEnc);
     final effectiveDecRate = decRate > 0 ? decRate : sourceSampleRate;
     final effectiveDecDepth = decDepth > 0 ? decDepth : sourceBitDepth;
+    final fallbackDepth =
+        effectiveDecDepth > 0 ? effectiveDecDepth : sourceBitDepth;
+    final decEncName = pcmEncodingName(decEnc, fallbackDepth);
     final decSummary = effectiveDecRate > 0 && effectiveDecDepth > 0
         ? '$decEncName ($effectiveDecDepth-bit / ${formatRate(effectiveDecRate)})'
         : (effectiveDecRate > 0
@@ -176,20 +188,26 @@ class AudioSignalPath {
 
     final hwRate = (isBt ? (output?.btSampleRateHz ?? output?.sampleRate) : output?.sampleRate) ?? 0;
     final hwDepth = (isBt ? (output?.btBitDepth ?? output?.bitDepth) : output?.bitDepth) ?? 0;
-    // Only a verified state is evidence. An exclusive attribute, a direct
-    // route or [AudioOutputInfo.isBitPerfectActive] all describe intent or
-    // routing, never the samples, so without a state the claim is false.
-    final bitPerfect = bitPerfectState?.isVerified ?? false;
+    final isDspEngaged = dspActive ||
+        dspProcessing ||
+        dspEffectsActive ||
+        (dspDescription != null && dspDescription.trim().isNotEmpty) ||
+        (bitPerfectState?.reasonCode == 'samples_modified');
+
+    // Only a verified state is evidence. However, if DSP processing is
+    // engaged, samples are altered in the DSP pipeline (EQ, Limiter, etc.),
+    // so the claim must never be Bit-Perfect.
+    final bitPerfect = !isDspEngaged && (bitPerfectState?.isVerified ?? false);
     final direct = output?.isDirectSupported == true || aaudioEnabled || uac2DirectActive;
 
     final String driver;
     if (uac2DirectActive) {
       driver = 'Pulsr UAC2 Isochronous';
-    } else if (bitPerfectState?.isVerified == true && isUsb) {
+    } else if (bitPerfect && isUsb) {
       driver = 'USB Exclusive Mixer';
     } else if (aaudioEnabled) {
       driver = 'AAudio Direct';
-    } else if (floatOutputEnabled) {
+    } else if (floatOutputEnabled || isDspEngaged) {
       driver = 'Media3 Float DSP';
     } else {
       driver = 'Media3 AudioTrack';
@@ -201,16 +219,35 @@ class AudioSignalPath {
     // not verified, the honest tag is that the route is exclusive at best -
     // and `armed` is not exclusive at all: the platform never confirmed a sink,
     // so it is intent only and must not borrow the exclusive wording.
+    // When DSP processing is engaged, the hardware summary / status tag
+    // reflects DSP activity (e.g. '32-bit Float DSP (EQ Active)' or 'DSP Active').
     final tier = bitPerfectState?.tier;
-    final statusTag = bitPerfect
-        ? 'Bit-Perfect'
-        : (isBt
-            ? 'Lossy A2DP/LE'
-            : (tier == BitPerfectTier.armed
-                ? 'Arming'
-                : (tier != null && tier != BitPerfectTier.off
-                    ? 'Exclusive / Unverified'
-                    : (direct ? 'Direct PCM' : 'OS Mixer'))));
+    final String statusTag;
+    if (isDspEngaged) {
+      final desc = dspDescription?.trim();
+      if (desc != null && desc.isNotEmpty) {
+        if (desc == 'DSP Active' ||
+            desc == '32-bit Float DSP (EQ Active)' ||
+            desc.toLowerCase().contains('float dsp')) {
+          statusTag = desc;
+        } else {
+          final clean = desc.replaceAll(RegExp(r'\s+Active$', caseSensitive: false), '').trim();
+          statusTag = '32-bit Float DSP ($clean Active)';
+        }
+      } else {
+        statusTag = 'DSP Active';
+      }
+    } else if (bitPerfect) {
+      statusTag = 'Bit-Perfect';
+    } else if (isBt) {
+      statusTag = 'Lossy A2DP/LE';
+    } else if (tier == BitPerfectTier.armed) {
+      statusTag = 'Arming';
+    } else if (tier != null && tier != BitPerfectTier.off) {
+      statusTag = 'Exclusive / Unverified';
+    } else {
+      statusTag = direct ? 'Direct PCM' : 'OS Mixer';
+    }
     final hwText = '$driver • $hwDepthText / $hwRateText ($statusTag)';
 
     return AudioSignalPath(
@@ -241,6 +278,7 @@ class AudioSignalPath {
           : (output?.decodedChannelCount ?? 2),
       isBitPerfect: bitPerfect,
       isDirectPath: direct,
+      statusTag: statusTag,
       hardwareSummary: hwText,
     );
   }

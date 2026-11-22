@@ -123,12 +123,17 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
   Future<void> loadInitialTasks() async {
     try {
       final tasks = await _observeDownloadsUseCase.getAll();
-      final merged = <String, DownloadTask>{
-        for (final t in tasks) t.videoId: t,
-        ...state.tasks,
-      };
+      final taskMap = await _deleteMutex.protect(() async {
+        final now = _nowMs;
+        _deletedAtMsByVideoId.removeWhere(
+            (_, deletedAt) => now - deletedAt >= _deletedIgnoreWindowMs);
+        return <String, DownloadTask>{
+          for (final t in tasks)
+            if (!_deletedAtMsByVideoId.containsKey(t.videoId)) t.videoId: t,
+        };
+      });
       safeEmit(state.copyWith(
-          tasks: Map<String, DownloadTask>.unmodifiable(merged)));
+          tasks: Map<String, DownloadTask>.unmodifiable(taskMap)));
     } catch (e, st) {
       // Was `catch (_) {}`: a failed load was indistinguishable from an empty
       // library. Log it and surface it in state.
@@ -439,6 +444,7 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
   Future<void> close() async {
     _storageStatsDebounceTimer?.cancel(); // FIX-A14
     _resubscribeTimer?.cancel();
+    _throttleStopwatch.stop();
     // C-01: Await the mutex-protected tombstone clear. Previously the returned
     // future was dropped, so `super.close()` could complete while the clear was
     // still queued behind an in-flight write — leaving dirty tombstones behind.

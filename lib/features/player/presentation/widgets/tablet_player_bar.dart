@@ -187,7 +187,7 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                   return RepaintBoundary(
                     child: Padding(
                       padding: EdgeInsetsDirectional.fromSTEB(
-                        AppSpacing.sm,
+                        AppSpacing.xs,
                         0,
                         AppSpacing.sm,
                         effectiveBottomMargin,
@@ -312,12 +312,12 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                   ConstrainedBox(
                                                     constraints: BoxConstraints(
                                                       maxWidth: isShortHeight
-                                                          ? (leftMaxWidth - 78)
+                                                          ? (leftMaxWidth - 64)
                                                               .clamp(
-                                                                  80.0, 180.0)
-                                                          : (leftMaxWidth - 90)
+                                                                  80.0, 190.0)
+                                                          : (leftMaxWidth - 72)
                                                               .clamp(
-                                                                  60.0, 200.0),
+                                                                  80.0, 240.0),
                                                     ),
                                                     child: GestureDetector(
                                                       onTap: widget
@@ -375,9 +375,7 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                           ),
                                                           if (!isShortHeight) ...[
                                                             const SizedBox(
-                                                                height:
-                                                                    AppSpacing
-                                                                        .xxs),
+                                                                height: 5.0),
                                                             FittedBox(
                                                               fit: BoxFit
                                                                   .scaleDown,
@@ -1100,6 +1098,11 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                                             effectiveVolume,
                                                                         activeColor:
                                                                             p.textPrimary,
+                                                                        sliderStyle: playerSliderStyle == PlayerSliderStyle.wavy
+                                                                            ? PlayerSliderStyle.wavy
+                                                                            : PlayerSliderStyle.normal,
+                                                                        isWavy: playerSliderStyle == PlayerSliderStyle.wavy,
+                                                                        animateWave: false,
                                                                         onChangeStart:
                                                                             (v) =>
                                                                                 _dragVolumeNotifier.value = v,

@@ -334,6 +334,7 @@ public:
 
     void reset();
     void publishParams(std::shared_ptr<const DspParamSnapshot> snapshot);
+    void initVolumeSmoothersFromSnapshot(const DspParamSnapshot& snap);
 
     void drainRetireQueue() {
         std::vector<std::shared_ptr<const DspParamSnapshot>> toFree;

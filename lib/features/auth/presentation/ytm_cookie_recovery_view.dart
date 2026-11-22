@@ -53,11 +53,10 @@ extension _YtmCookieRecoveryView on _YtmWebLoginSheetState {
           : _YtmWebLoginSheetState.googleSignInUrl;
       unawaited(_navigateTo(target));
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(context.l10n.cookiesCleared),
-            duration: Duration(seconds: 2),
-          ),
+        PulsrToast.show(
+          context,
+          message: context.l10n.cookiesCleared,
+          duration: const Duration(seconds: 2),
         );
       }
     } catch (e) {
@@ -81,44 +80,47 @@ extension _YtmCookieRecoveryView on _YtmWebLoginSheetState {
   Widget _buildDeadWebViewCard(PulsrPalette p) {
     final sessionInterruptedTitle = context.l10n.webSessionInterruptedTitle;
     final sessionInterruptedDesc = context.l10n.webSessionInterruptedDesc;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.sync_problem_rounded, color: p.warning, size: 48),
-            const SizedBox(height: AppSpacing.md),
-            Text(
-              sessionInterruptedTitle,
-              style: TextStyle(
-                color: p.textPrimary,
-                fontSize: AppFontSize.title,
-                fontWeight: FontWeight.bold,
+    return Semantics(
+      liveRegion: true,
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.sync_problem_rounded, color: p.warning, size: 48),
+              const SizedBox(height: AppSpacing.md),
+              Text(
+                sessionInterruptedTitle,
+                style: TextStyle(
+                  color: p.textPrimary,
+                  fontSize: AppFontSize.title,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-            ),
-            const SizedBox(height: AppSpacing.xs),
-            Text(
-              sessionInterruptedDesc,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: p.textSecondary,
-                fontSize: AppFontSize.caption,
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                sessionInterruptedDesc,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: p.textSecondary,
+                  fontSize: AppFontSize.caption,
+                ),
               ),
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            FilledButton.icon(
-              onPressed: () => _navigateTo(widget.isBrowseMode
-                  ? YtmLocale.homeUrl()
-                  : _YtmWebLoginSheetState.googleSignInUrl),
-              icon: const Icon(Icons.refresh_rounded),
-              label: Text(context.l10n.retry),
-              style: FilledButton.styleFrom(
-                backgroundColor: p.accent,
-                foregroundColor: p.onAccent,
+              const SizedBox(height: AppSpacing.lg),
+              FilledButton.icon(
+                onPressed: () => _navigateTo(widget.isBrowseMode
+                    ? YtmLocale.homeUrl()
+                    : _YtmWebLoginSheetState.googleSignInUrl),
+                icon: const Icon(Icons.refresh_rounded),
+                label: Text(context.l10n.retry),
+                style: FilledButton.styleFrom(
+                  backgroundColor: p.accent,
+                  foregroundColor: p.onAccent,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

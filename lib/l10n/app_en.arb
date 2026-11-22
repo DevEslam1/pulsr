@@ -8940,5 +8940,137 @@
         "type": "String"
       }
     }
+  },
+  "extrasTitle": "Tools & extras",
+  "@extrasTitle": {
+    "description": "Title of the Tools & extras screen and settings category"
+  },
+  "extrasLoading": "Loading tools…",
+  "@extrasLoading": {
+    "description": "Loading indicator message for Tools & extras screen"
+  },
+  "extrasLoadFailed": "Some tools could not start. Pull to refresh or retry below.",
+  "@extrasLoadFailed": {
+    "description": "Notice when some tools failed to initialize, suggesting pull-to-refresh or inline retry"
+  },
+  "extrasUnknownDevice": "Unknown output device",
+  "@extrasUnknownDevice": {
+    "description": "Fallback device label when output device is not recognized"
+  },
+  "extrasToolUnavailable": "Could not start this tool.",
+  "@extrasToolUnavailable": {
+    "description": "Inline error message on a tool row that failed to initialize"
+  },
+  "extrasSettingsCategoryTitle": "Tools & extras",
+  "@extrasSettingsCategoryTitle": {
+    "description": "Settings category title for Tools & extras"
+  },
+  "extrasSettingsCategorySubtitle": "Announcements, system behaviour, USB DAC ergonomics, network output, profiles and diagnostics.",
+  "@extrasSettingsCategorySubtitle": {
+    "description": "Settings category subtitle for Tools & extras"
+  },
+  "extrasPlaybackTitle": "Playback extras",
+  "@extrasPlaybackTitle": {
+    "description": "Section title for playback extras"
+  },
+  "extrasPlaybackSubtitle": "Announcements, system behaviour and USB DAC ergonomics.",
+  "@extrasPlaybackSubtitle": {
+    "description": "Section subtitle for playback extras"
+  },
+  "extrasAnnouncementsTitle": "Track announcements",
+  "@extrasAnnouncementsTitle": {
+    "description": "Navigation tile title for Track announcements"
+  },
+  "extrasAnnouncementsSubtitle": "Speak the title, artist and album when a track starts.",
+  "@extrasAnnouncementsSubtitle": {
+    "description": "Navigation tile subtitle for Track announcements"
+  },
+  "extrasSystemBehaviorTitle": "System behaviour",
+  "@extrasSystemBehaviorTitle": {
+    "description": "Navigation tile title for System behaviour"
+  },
+  "extrasSystemBehaviorSubtitle": "Audio-focus release, notification pausing, fade-out and volume steps.",
+  "@extrasSystemBehaviorSubtitle": {
+    "description": "Navigation tile subtitle for System behaviour"
+  },
+  "extrasUsbTitle": "USB DAC ergonomics",
+  "@extrasUsbTitle": {
+    "description": "Navigation tile title for USB DAC ergonomics"
+  },
+  "extrasUsbSubtitle": "Start-of-track silence, alt-setting reset, force 16-bit, HID keys and bus-speed probe per device.",
+  "@extrasUsbSubtitle": {
+    "description": "Navigation tile subtitle for USB DAC ergonomics"
+  },
+  "extrasOutputTitle": "Network & output",
+  "@extrasOutputTitle": {
+    "description": "Section title for network and output"
+  },
+  "extrasOutputSubtitle": "Play on DLNA/UPnP renderers or browse SMB/WebDAV/FTP libraries.",
+  "@extrasOutputSubtitle": {
+    "description": "Section subtitle for network and output"
+  },
+  "extrasDlnaTitle": "DLNA / UPnP output",
+  "@extrasDlnaTitle": {
+    "description": "Navigation tile title for DLNA/UPnP output"
+  },
+  "extrasDlnaSubtitle": "Discover AVRs, Sonos, Kodi and TVs on the local network.",
+  "@extrasDlnaSubtitle": {
+    "description": "Navigation tile subtitle for DLNA/UPnP output"
+  },
+  "extrasRemoteTitle": "Network libraries",
+  "@extrasRemoteTitle": {
+    "description": "Navigation tile title for Network libraries"
+  },
+  "extrasRemoteSubtitle": "SMB2/3, WebDAV and FTP shares as playable sources, with a local cache.",
+  "@extrasRemoteSubtitle": {
+    "description": "Navigation tile subtitle for Network libraries"
+  },
+  "extrasSupportTitle": "Setups & support",
+  "@extrasSupportTitle": {
+    "description": "Section title for setups and support"
+  },
+  "extrasSupportSubtitle": "Move a tuned setup between devices, or export a diagnostics bundle.",
+  "@extrasSupportSubtitle": {
+    "description": "Section subtitle for setups and support"
+  },
+  "extrasAssistantTitle": "Assistant & search",
+  "@extrasAssistantTitle": {
+    "description": "Navigation tile title for Assistant & search"
+  },
+  "extrasAssistantSubtitle": "Opt in to local playback suggestions in system search; nothing leaves the device.",
+  "@extrasAssistantSubtitle": {
+    "description": "Navigation tile subtitle for Assistant & search"
+  },
+  "extrasProfilesTitle": "Audio profiles",
+  "@extrasProfilesTitle": {
+    "description": "Navigation tile title for Audio profiles"
+  },
+  "extrasProfilesSubtitle": "Capture the DSP chain, EQ, crossfeed and output mode as one file.",
+  "@extrasProfilesSubtitle": {
+    "description": "Navigation tile subtitle for Audio profiles"
+  },
+  "extrasDiagnosticsTitle": "Diagnostics & safe mode",
+  "@extrasDiagnosticsTitle": {
+    "description": "Navigation tile title for Diagnostics & safe mode"
+  },
+  "extrasDiagnosticsSubtitle": "Output path counters, recent logs, and automatic fallback after repeated sink failures.",
+  "@extrasDiagnosticsSubtitle": {
+    "description": "Navigation tile subtitle for Diagnostics & safe mode"
+  },
+  "extrasRemoteUnavailableTitle": "Network libraries unavailable",
+  "@extrasRemoteUnavailableTitle": {
+    "description": "Title when network libraries cannot start stream server"
+  },
+  "extrasRemoteUnavailableBody": "Pulsr could not open the local streaming port. Close other VPN or proxy apps and try again.",
+  "@extrasRemoteUnavailableBody": {
+    "description": "Body message when network libraries cannot start stream server"
+  },
+  "extrasRemotePlaybackFailed": "That file could not be played from the share. Check the connection and try again.",
+  "@extrasRemotePlaybackFailed": {
+    "description": "Error message when remote file playback fails"
+  },
+  "extrasRemoteAlbumLabel": "Network library",
+  "@extrasRemoteAlbumLabel": {
+    "description": "Album label assigned to tracks played from network libraries"
   }
 }

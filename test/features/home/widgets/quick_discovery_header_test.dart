@@ -155,4 +155,62 @@ void main() {
       expect(more, 1);
     });
   });
+
+  group('ActiveAudioOutputPill', () {
+    testWidgets('renders speaker by default and handles tap', (tester) async {
+      var tapped = false;
+      await pumpHeader(
+        tester,
+        QuickDiscoveryHeader(
+          showShortcuts: false,
+          onAudioOutputTap: () => tapped = true,
+        ),
+      );
+
+      expect(find.byType(ActiveAudioOutputPill), findsOneWidget);
+      expect(find.text(l10n.dspSpeaker), findsOneWidget);
+
+      await tester.tap(find.byType(ActiveAudioOutputPill));
+      await tester.pump();
+
+      expect(tapped, isTrue);
+    });
+  });
+
+  group('CompactSourceScopeSwitcher', () {
+    testWidgets('renders local and online segments and notifies on selection',
+        (tester) async {
+      SourceScope current = SourceScope.local;
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: StatefulBuilder(
+              builder: (context, setState) => CompactSourceScopeSwitcher(
+                selectedScope: current,
+                onChanged: (next) => setState(() => current = next),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('compact_source_scope_switcher')),
+          findsOneWidget);
+      expect(find.text(l10n.local), findsOneWidget);
+      expect(find.text(l10n.online), findsOneWidget);
+
+      await tester.tap(find.byKey(const ValueKey('scope_segment_online')));
+      await tester.pumpAndSettle();
+
+      expect(current, SourceScope.online);
+
+      await tester.tap(find.byKey(const ValueKey('scope_segment_local')));
+      await tester.pumpAndSettle();
+
+      expect(current, SourceScope.local);
+    });
+  });
 }

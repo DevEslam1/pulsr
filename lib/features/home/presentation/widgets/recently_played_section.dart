@@ -10,6 +10,7 @@ import '../../../../core/responsive/responsive_values.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';
 import '../../../../core/utils/l10n_extensions.dart';
+import '../../../../core/utils/track_display_info.dart';
 import '../../../../core/widgets/cached_artwork.dart';
 import '../../../../core/widgets/pulsr_section_header.dart';
 import '../../../../core/widgets/shimmer_skeleton.dart';
@@ -283,6 +284,10 @@ class _RecentlyPlayedSectionState extends State<RecentlyPlayedSection> {
                     }
 
                     final song = songs[index];
+                    final displayInfo = TrackDisplayInfo.resolve(
+                      rawTitle: song.title,
+                      rawArtist: song.artist,
+                    );
                     return StaggeredReveal(
                       index: index,
                       horizontal: true,
@@ -312,6 +317,8 @@ class _RecentlyPlayedSectionState extends State<RecentlyPlayedSection> {
                                       type: ArtworkType.AUDIO,
                                       size: size,
                                       borderRadius: AppRadii.r18,
+                                      title: displayInfo.title,
+                                      artist: displayInfo.artist,
                                     ),
                                     PositionedDirectional(
                                       end: 8,
@@ -337,7 +344,7 @@ class _RecentlyPlayedSectionState extends State<RecentlyPlayedSection> {
                                 SizedBox(
                                   height: scaledTitleBoxHeight(context),
                                   child: Text(
-                                    song.title,
+                                    displayInfo.title,
                                     maxLines: 2,
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
@@ -350,7 +357,7 @@ class _RecentlyPlayedSectionState extends State<RecentlyPlayedSection> {
                                 ),
                                 const SizedBox(height: AppSpacing.s2),
                                 Text(
-                                  song.artist,
+                                  displayInfo.artist,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(

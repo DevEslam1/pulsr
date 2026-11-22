@@ -297,18 +297,18 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('1/11'), findsOneWidget);
+    expect(find.bySemanticsLabel('1 / 11'), findsOneWidget);
 
     // Advance 6 seconds (> 2s interval): auto-scroll must NOT fire under reduceMotion.
     await tester.pump(const Duration(seconds: 6));
-    expect(find.text('1/11'), findsOneWidget);
+    expect(find.bySemanticsLabel('1 / 11'), findsOneWidget);
 
     // Tapping dot 3 / 11 jumps immediately in a single frame without animated transition.
     final dot3 = find.bySemanticsLabel('3 / 11');
     expect(dot3, findsOneWidget);
     await tester.tap(dot3);
     await tester.pump();
-    expect(find.text('3/11'), findsOneWidget);
+    expect(find.bySemanticsLabel('3 / 11'), findsOneWidget);
   });
 
   for (final scale in const [1.3, 1.6]) {

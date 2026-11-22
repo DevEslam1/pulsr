@@ -12,6 +12,7 @@ import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_typography.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/errors/failures.dart';
+import '../../../core/presentation/widgets/collection_sort_control.dart';
 import '../../../core/responsive/breakpoints.dart';
 import '../../../core/responsive/detail_scaffold.dart';
 import '../../../core/responsive/pulsr_layout_metrics.dart';
@@ -125,33 +126,6 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
       return copy.reversed.toList();
     }
     return copy;
-  }
-
-  void _cycleSortMode() {
-    PulsrHaptics.selectionClick();
-    setState(() {
-      const values = _FolderSortMode.values;
-      final nextIndex = (_sortMode.index + 1) % values.length;
-      _sortMode = values[nextIndex];
-    });
-  }
-
-  void _toggleSortDirection() {
-    PulsrHaptics.selectionClick();
-    setState(() => _sortAscending = !_sortAscending);
-  }
-
-  IconData _sortIcon(_FolderSortMode mode) {
-    switch (mode) {
-      case _FolderSortMode.natural:
-        return Icons.format_list_numbered_rounded;
-      case _FolderSortMode.title:
-        return Icons.sort_by_alpha_rounded;
-      case _FolderSortMode.artist:
-        return Icons.person_outline_rounded;
-      case _FolderSortMode.duration:
-        return Icons.schedule_rounded;
-    }
   }
 
   Future<void> _toggleExclusion() async {
@@ -1031,59 +1005,39 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
             ),
           ),
           const Spacer(),
-          if (songs.length > 1) ...[
-            Material(
-              color: p.surfaceContainer,
-              borderRadius: AppRadii.r10All,
-              clipBehavior: Clip.antiAlias,
-              child: InkWell(
-                onTap: _cycleSortMode,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.s8,
-                    vertical: 5,
-                  ),
-                  decoration: BoxDecoration(
-                    borderRadius: AppRadii.r10All,
-                    border: Border.all(color: p.hairline),
-                  ),
-                  child: Icon(
-                    _sortIcon(_sortMode),
-                    size: 16,
-                    color: _sortMode == _FolderSortMode.natural
-                        ? p.textSecondary
-                        : p.accent,
-                  ),
+          if (songs.length > 1)
+            CollectionSortControl<_FolderSortMode>(
+              currentSort: _sortMode,
+              ascending: _sortAscending,
+              options: [
+                CollectionSortOption(
+                  value: _FolderSortMode.natural,
+                  label: context.l10n.sortTrackNumber,
+                  icon: Icons.format_list_numbered_rounded,
                 ),
-              ),
-            ),
-            const SizedBox(width: AppSpacing.xxs),
-            Material(
-              color: p.surfaceContainer,
-              borderRadius: AppRadii.r10All,
-              clipBehavior: Clip.antiAlias,
-              child: InkWell(
-                onTap: _toggleSortDirection,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.s6,
-                    vertical: 5,
-                  ),
-                  decoration: BoxDecoration(
-                    borderRadius: AppRadii.r10All,
-                    border: Border.all(color: p.hairline),
-                  ),
-                  child: Icon(
-                    _sortAscending
-                        ? Icons.arrow_upward_rounded
-                        : Icons.arrow_downward_rounded,
-                    size: 16,
-                    color: _sortAscending ? p.textSecondary : p.accent,
-                  ),
+                CollectionSortOption(
+                  value: _FolderSortMode.title,
+                  label: context.l10n.sortTitle,
+                  icon: Icons.sort_by_alpha_rounded,
                 ),
-              ),
+                CollectionSortOption(
+                  value: _FolderSortMode.artist,
+                  label: context.l10n.sortArtist,
+                  icon: Icons.person_outline_rounded,
+                ),
+                CollectionSortOption(
+                  value: _FolderSortMode.duration,
+                  label: context.l10n.sortDuration,
+                  icon: Icons.schedule_rounded,
+                ),
+              ],
+              onSortChanged: (mode) {
+                setState(() => _sortMode = mode);
+              },
+              onDirectionChanged: (asc) {
+                setState(() => _sortAscending = asc);
+              },
             ),
-          ],
         ],
       ),
     );
@@ -1319,10 +1273,13 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
     if (songs.isEmpty) {
       return Padding(
         padding: const EdgeInsets.all(AppSpacing.xl),
-        child: PulsrEmptyState(
-          icon: Icons.music_off_rounded,
-          title: context.l10n.browseNoTracksFound,
-          subtitle: context.l10n.browseNoTracksInFolder,
+        child: Semantics(
+          liveRegion: true,
+          child: PulsrEmptyState(
+            icon: Icons.music_off_rounded,
+            title: context.l10n.browseNoTracksFound,
+            subtitle: context.l10n.browseNoTracksInFolder,
+          ),
         ),
       );
     }
@@ -1626,10 +1583,13 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                     SliverToBoxAdapter(
                       child: Padding(
                         padding: const EdgeInsets.all(AppSpacing.xl),
-                        child: PulsrEmptyState(
-                          icon: Icons.music_off_rounded,
-                          title: context.l10n.browseNoTracksFound,
-                          subtitle: context.l10n.browseNoTracksInFolder,
+                        child: Semantics(
+                          liveRegion: true,
+                          child: PulsrEmptyState(
+                            icon: Icons.music_off_rounded,
+                            title: context.l10n.browseNoTracksFound,
+                            subtitle: context.l10n.browseNoTracksInFolder,
+                          ),
                         ),
                       ),
                     )
@@ -1669,20 +1629,26 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
               );
             }
 
-            final errorView = PulsrEmptyState(
-              icon: Icons.error_outline_rounded,
-              iconColor: p.error,
-              title: context.l10n.couldNotLoadFolderSongs,
-              subtitle: context.l10n.libraryReadError,
-              primaryActionLabel: context.l10n.retry,
-              primaryActionIcon: Icons.refresh_rounded,
-              onPrimaryAction: () => setState(_updateStream),
+            final errorView = Semantics(
+              liveRegion: true,
+              child: PulsrEmptyState(
+                icon: Icons.error_outline_rounded,
+                iconColor: p.error,
+                title: context.l10n.couldNotLoadFolderSongs,
+                subtitle: context.l10n.libraryReadError,
+                primaryActionLabel: context.l10n.retry,
+                primaryActionIcon: Icons.refresh_rounded,
+                onPrimaryAction: () => setState(_updateStream),
+              ),
             );
 
             return AsyncStateBuilder<Result<List<SongsTableData>>>(
               snapshot: snapshot,
-              loadingWidget: const SkeletonList(
-                padding: EdgeInsets.only(top: AppSpacing.xl),
+              loadingWidget: Semantics(
+                liveRegion: true,
+                child: const SkeletonList(
+                  padding: EdgeInsets.only(top: AppSpacing.xl),
+                ),
               ),
               emptyWidget: buildContent(const []),
               onError: (_) => errorView,

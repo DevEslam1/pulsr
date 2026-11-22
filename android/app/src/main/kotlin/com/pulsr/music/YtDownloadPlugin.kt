@@ -232,6 +232,22 @@ class YtDownloadPlugin : FlutterPlugin, MethodCallHandler {
                     }
                 }
             }
+            "getTotalDiskSpace" -> {
+                try {
+                    val musicDir = currentContext.getExternalFilesDir(Environment.DIRECTORY_MUSIC)
+                        ?: currentContext.filesDir
+                    val stat = android.os.StatFs(musicDir.path)
+                    val totalBytes = stat.blockCountLong * stat.blockSizeLong
+                    result.success(totalBytes)
+                } catch (e: Exception) {
+                    try {
+                        val totalBytes = currentContext.filesDir.totalSpace
+                        result.success(totalBytes)
+                    } catch (e2: Exception) {
+                        result.success(-1L)
+                    }
+                }
+            }
             // B-07: Download foreground service lifecycle
             "startDownloadForeground" -> {
                 val videoId = call.argument<String>("videoId") ?: ""

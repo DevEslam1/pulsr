@@ -1,4 +1,5 @@
 // lib/features/artist_detail/presentation/artist_detail_screen.dart
+import 'dart:async';
 import 'package:material_ui/material_ui.dart';
 import 'package:pulsr/core/motion/pulsr_motion.dart';
 import '../../../core/widgets/pulsr_pressable.dart';
@@ -50,6 +51,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
   // on every rebuild and reset the StreamBuilder's snapshot.
   late Stream<Result<List<AlbumsTableData>>> _albumsStream;
   late Stream<Result<List<SongsTableData>>> _songsStream;
+  List<SongsTableData> _latestSongs = const [];
 
   @override
   void initState() {
@@ -72,7 +74,17 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
   }
 
   void _updateSongsStream() {
-    _songsStream = _useCase.watchArtistSongs(widget.artist.id).distinct();
+    _songsStream =
+        _useCase.watchArtistSongs(widget.artist.id).distinct().map((res) {
+      res.fold(
+        (_) => _latestSongs = const [],
+        (songs) => _latestSongs = songs,
+      );
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() {});
+      });
+      return res;
+    });
   }
 
   @override
@@ -86,6 +98,68 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
     }
   }
 
+  Widget _actionButtons(BuildContext context, List<SongsTableData> songs) {
+    final p = context.palette;
+    return Row(
+      children: [
+        Expanded(
+          child: FilledButton.icon(
+            style: FilledButton.styleFrom(
+              backgroundColor: p.accent,
+              foregroundColor: p.onAccent,
+              padding: const EdgeInsets.symmetric(vertical: AppSpacing.s12),
+              shape: RoundedRectangleBorder(
+                borderRadius: AppRadii.r14All,
+              ),
+            ),
+            onPressed: songs.isEmpty
+                ? null
+                : () {
+                    PulsrHaptics.mediumImpact();
+                    context
+                        .read<PlayerCubit>()
+                        .playSong(songs.first, queue: songs);
+                  },
+            icon: const Icon(Icons.play_arrow_rounded, size: 22),
+            label: Text(
+              context.l10n.playAll,
+              style: const TextStyle(fontWeight: FontWeight.w800),
+            ),
+          ),
+        ),
+        const SizedBox(width: AppSpacing.sm),
+        Expanded(
+          child: FilledButton.tonalIcon(
+            style: FilledButton.styleFrom(
+              backgroundColor: p.surfaceContainerHigh,
+              foregroundColor: p.textPrimary,
+              side: BorderSide(color: p.hairline),
+              padding: const EdgeInsets.symmetric(vertical: AppSpacing.s12),
+              shape: RoundedRectangleBorder(
+                borderRadius: AppRadii.r14All,
+              ),
+            ),
+            onPressed: songs.isEmpty
+                ? null
+                : () {
+                    PulsrHaptics.mediumImpact();
+                    final shuffled = List<SongsTableData>.from(songs)
+                      ..shuffle();
+                    context
+                        .read<PlayerCubit>()
+                        .playSong(shuffled.first, queue: shuffled);
+                  },
+            icon: Icon(Icons.shuffle_rounded, color: p.accent, size: 20),
+            label: Text(
+              context.l10n.shuffle,
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
@@ -97,184 +171,214 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
       onRefresh: () async {
         if (mounted) setState(() {});
       },
-      hero: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const SizedBox(height: AppSpacing.md),
-          Center(
-            child: Semantics(
-              image: true,
-              label: artist.name,
-              child: Container(
-                padding: const EdgeInsets.all(AppSpacing.xxs),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                      color: p.accent.withValues(alpha: 0.3), width: 2),
-                  boxShadow: [
-                    BoxShadow(
-                        color: p.glow,
-                        blurRadius: 28,
-                        spreadRadius: -4,
-                        offset: const Offset(0, 8)),
-                  ],
-                ),
-                child: CachedArtwork(
-                  id: artist.id,
-                  type: ArtworkType.ARTIST,
-                  size: isTablet ? 160 : 130,
-                  borderRadius: 999,
-                  fallbackIcon: Icons.person_rounded,
+      hero: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              p.accentContainer.withValues(
+                alpha: p.isDark ? 0.45 : 0.65,
+              ),
+              p.bg,
+            ],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: AppSpacing.md),
+            Center(
+              child: Semantics(
+                image: true,
+                label: artist.name,
+                child: Container(
+                  padding: const EdgeInsets.all(AppSpacing.xxs),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                        color: p.accent.withValues(alpha: 0.3), width: 2),
+                    boxShadow: [
+                      BoxShadow(
+                          color: p.glow,
+                          blurRadius: 28,
+                          spreadRadius: -4,
+                          offset: const Offset(0, 8)),
+                    ],
+                  ),
+                  child: CachedArtwork(
+                    id: artist.id,
+                    type: ArtworkType.ARTIST,
+                    size: isTablet ? 160 : 130,
+                    borderRadius: 999,
+                    fallbackIcon: Icons.person_rounded,
+                  ),
                 ),
               ),
             ),
-          ),
-          const SizedBox(height: AppSpacing.s14),
-          Center(
-            child: Text(
-              artist.name,
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.headlineSmall,
+            const SizedBox(height: AppSpacing.s14),
+            Center(
+              child: Text(
+                artist.name,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.headlineSmall,
+              ),
             ),
-          ),
-          const SizedBox(height: AppSpacing.xxs),
-          Center(
-            child: Text(
-              context.l10n.tracksCount(artist.songCount),
-              style: TextStyle(
-                  color: p.textSecondary, fontSize: AppFontSize.bodySmall),
+            const SizedBox(height: AppSpacing.xxs),
+            Center(
+              child: Text(
+                context.l10n.tracksCount(artist.songCount),
+                style: TextStyle(
+                    color: p.textSecondary, fontSize: AppFontSize.bodySmall),
+              ),
             ),
-          ),
-          const SizedBox(height: AppSpacing.sm),
+            const SizedBox(height: AppSpacing.sm),
 
-          // Artist Biography & HD Info
-          FutureBuilder<ArtistInfo?>(
-            key: ValueKey('artist_bio_${artist.id}'),
-            future: _bioFuture,
-            builder: (context, snapshot) {
-              return AsyncStateBuilder<ArtistInfo?>(
-                snapshot: snapshot,
-                loadingWidget: Container(
-                  margin: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.s20, vertical: AppSpacing.xs),
-                  height: 56,
-                  decoration: BoxDecoration(
-                    color: p.surfaceContainer.withValues(alpha: 0.4),
-                    borderRadius: AppRadii.r16All,
-                  ),
-                  child: Center(
-                    child: SkeletonBox(
-                      width: double.infinity,
-                      height: 40,
-                      radius: AppRadii.r12,
-                    ),
-                  ),
-                ),
-                onError: (_) => Container(
-                  margin: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.s20, vertical: AppSpacing.xs),
-                  padding: const EdgeInsets.all(AppSpacing.sm),
-                  decoration: BoxDecoration(
-                    color: p.surfaceContainer.withValues(alpha: 0.4),
-                    borderRadius: AppRadii.r16All,
-                    border: Border.all(color: p.hairline),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.info_outline_rounded,
-                          size: 16, color: p.textTertiary),
-                      const SizedBox(width: AppSpacing.xs),
-                      Text(
-                        context.l10n.bioUnavailable,
-                        style: TextStyle(
-                          fontSize: AppFontSize.label,
-                          color: p.textTertiary,
+            // Primary Play / Shuffle action row
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.s20,
+                vertical: AppSpacing.xs,
+              ),
+              child: _actionButtons(context, _latestSongs),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+
+            // Artist Biography & HD Info
+            FutureBuilder<ArtistInfo?>(
+              key: ValueKey('artist_bio_${artist.id}'),
+              future: _bioFuture,
+              builder: (context, snapshot) {
+                return AsyncStateBuilder<ArtistInfo?>(
+                  snapshot: snapshot,
+                  loadingWidget: Semantics(
+                    liveRegion: true,
+                    child: Container(
+                      margin: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.s20, vertical: AppSpacing.xs),
+                      height: 56,
+                      decoration: BoxDecoration(
+                        color: p.surfaceContainer.withValues(alpha: 0.4),
+                        borderRadius: AppRadii.r16All,
+                      ),
+                      child: Center(
+                        child: SkeletonBox(
+                          width: double.infinity,
+                          height: 40,
+                          radius: AppRadii.r12,
                         ),
                       ),
-                    ],
-                  ),
-                ),
-                emptyWidget: const SizedBox.shrink(),
-                isEmpty: (info) => info?.bio == null,
-                onData: (info) {
-                  final bio = info!.bio!;
-                  return Container(
-                    margin: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.s20, vertical: AppSpacing.xs),
-                    decoration: BoxDecoration(
-                      color: p.surfaceContainer.withValues(alpha: 0.6),
-                      borderRadius: AppRadii.r16All,
-                      border: Border.all(color: p.hairline),
                     ),
-                    child: Material(
-                      color: Colors.transparent,
-                      borderRadius: AppRadii.r16All,
-                      child: InkWell(
+                  ),
+                  onError: (_) => Semantics(
+                    liveRegion: true,
+                    child: Container(
+                      margin: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.s20, vertical: AppSpacing.xs),
+                      padding: const EdgeInsets.all(AppSpacing.sm),
+                      decoration: BoxDecoration(
+                        color: p.surfaceContainer.withValues(alpha: 0.4),
                         borderRadius: AppRadii.r16All,
-                        onTap: () {
-                          PulsrHaptics.selectionClick();
-                          setState(() => _bioExpanded = !_bioExpanded);
-                        },
-                        child: Padding(
-                          padding: const EdgeInsets.all(AppSpacing.s14),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Icon(Icons.info_outline_rounded,
-                                      size: 16, color: p.accent),
-                                  const SizedBox(width: AppSpacing.s6),
-                                  Text(
-                                    context.l10n.aboutArtist,
+                        border: Border.all(color: p.hairline),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.info_outline_rounded,
+                              size: 16, color: p.textTertiary),
+                          const SizedBox(width: AppSpacing.xs),
+                          Text(
+                            context.l10n.bioUnavailable,
+                            style: TextStyle(
+                              fontSize: AppFontSize.label,
+                              color: p.textTertiary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  emptyWidget: const SizedBox.shrink(),
+                  isEmpty: (info) => info?.bio == null,
+                  onData: (info) {
+                    final bio = info!.bio!;
+                    return Container(
+                      margin: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.s20, vertical: AppSpacing.xs),
+                      decoration: BoxDecoration(
+                        color: p.surfaceContainer.withValues(alpha: 0.6),
+                        borderRadius: AppRadii.r16All,
+                        border: Border.all(color: p.hairline),
+                      ),
+                      child: Material(
+                        color: Colors.transparent,
+                        borderRadius: AppRadii.r16All,
+                        child: InkWell(
+                          borderRadius: AppRadii.r16All,
+                          onTap: () {
+                            PulsrHaptics.selectionClick();
+                            setState(() => _bioExpanded = !_bioExpanded);
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.all(AppSpacing.s14),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(Icons.info_outline_rounded,
+                                        size: 16, color: p.accent),
+                                    const SizedBox(width: AppSpacing.s6),
+                                    Text(
+                                      context.l10n.aboutArtist,
+                                      style: TextStyle(
+                                        fontSize: AppFontSize.label,
+                                        fontWeight: FontWeight.w700,
+                                        color: p.accent,
+                                      ),
+                                    ),
+                                    const Spacer(),
+                                    AnimatedRotation(
+                                      turns: _bioExpanded ? 0.5 : 0.0,
+                                      duration: context.motionMs(200),
+                                      child: Icon(
+                                        Icons.keyboard_arrow_down_rounded,
+                                        size: 18,
+                                        color: p.accent,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: AppSpacing.s6),
+                                AnimatedSize(
+                                  duration: context.motionMs(200),
+                                  curve: Curves.easeOutCubic,
+                                  alignment: Alignment.topCenter,
+                                  child: Text(
+                                    bio,
+                                    maxLines: _bioExpanded ? null : 4,
+                                    overflow: _bioExpanded
+                                        ? TextOverflow.visible
+                                        : TextOverflow.ellipsis,
                                     style: TextStyle(
                                       fontSize: AppFontSize.label,
-                                      fontWeight: FontWeight.w700,
-                                      color: p.accent,
+                                      color: p.textSecondary,
+                                      height: 1.4,
                                     ),
-                                  ),
-                                  const Spacer(),
-                                  AnimatedRotation(
-                                    turns: _bioExpanded ? 0.5 : 0.0,
-                                    duration: context.motionMs(200),
-                                    child: Icon(
-                                      Icons.keyboard_arrow_down_rounded,
-                                      size: 18,
-                                      color: p.accent,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: AppSpacing.s6),
-                              AnimatedSize(
-                                duration: context.motionMs(200),
-                                curve: Curves.easeOutCubic,
-                                alignment: Alignment.topCenter,
-                                child: Text(
-                                  bio,
-                                  maxLines: _bioExpanded ? null : 4,
-                                  overflow: _bioExpanded
-                                      ? TextOverflow.visible
-                                      : TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: AppFontSize.label,
-                                    color: p.textSecondary,
-                                    height: 1.4,
                                   ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  );
-                },
-              );
-            },
-          ),
-          const SizedBox(height: AppSpacing.md),
-        ],
+                    );
+                  },
+                );
+              },
+            ),
+            const SizedBox(height: AppSpacing.md),
+          ],
+        ),
       ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -291,10 +395,13 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
 
               return AsyncStateBuilder<Result<List<AlbumsTableData>>>(
                 snapshot: snapshot,
-                loadingWidget: Padding(
-                  padding: EdgeInsets.symmetric(
-                      horizontal: Adaptive.pagePadding(context)),
-                  child: const SkeletonList(itemCount: 2),
+                loadingWidget: Semantics(
+                  liveRegion: true,
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(
+                        horizontal: Adaptive.pagePadding(context)),
+                    child: const SkeletonList(itemCount: 2),
+                  ),
                 ),
                 onError: (_) => buildErrorSection(),
                 emptyWidget: const SizedBox.shrink(),
@@ -386,10 +493,13 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
 
               return AsyncStateBuilder<Result<List<SongsTableData>>>(
                 snapshot: snapshot,
-                loadingWidget: Padding(
-                  padding: EdgeInsets.symmetric(
-                      horizontal: Adaptive.pagePadding(context)),
-                  child: const SkeletonList(itemCount: 4),
+                loadingWidget: Semantics(
+                  liveRegion: true,
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(
+                        horizontal: Adaptive.pagePadding(context)),
+                    child: const SkeletonList(itemCount: 4),
+                  ),
                 ),
                 onError: (_) => buildErrorSection(),
                 emptyWidget: const SizedBox.shrink(),
@@ -406,11 +516,16 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
                           song: songs[i],
                           index: i,
                           subtitleOverride: songs[i].album,
-                          onTap: () => context
-                              .read<PlayerCubit>()
-                              .playSong(songs[i], queue: songs),
-                          onMorePressed: () =>
-                              SongOptionsSheet.show(context, song: songs[i]),
+                          onTap: () {
+                            PulsrHaptics.lightImpact();
+                            context
+                                .read<PlayerCubit>()
+                                .playSong(songs[i], queue: songs);
+                          },
+                          onMorePressed: () {
+                            PulsrHaptics.lightImpact();
+                            SongOptionsSheet.show(context, song: songs[i]);
+                          },
                         ),
                     ],
                   ),
@@ -443,31 +558,34 @@ class _ErrorSection extends StatelessWidget {
         children: [
           PulsrSectionHeader(title: title),
           const SizedBox(height: AppSpacing.xs),
-          Container(
-            padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.md, vertical: AppSpacing.s14),
-            decoration: BoxDecoration(
-              color: p.error.withValues(alpha: 0.08),
-              borderRadius: AppRadii.r14All,
-              border: Border.all(color: p.error.withValues(alpha: 0.3)),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.error_outline_rounded, color: p.error),
-                const SizedBox(width: AppSpacing.sm),
-                Expanded(
-                  child: Text(
-                    message,
-                    style: TextStyle(
-                        color: p.textSecondary,
-                        fontSize: AppFontSize.bodySmall),
+          Semantics(
+            liveRegion: true,
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md, vertical: AppSpacing.s14),
+              decoration: BoxDecoration(
+                color: p.error.withValues(alpha: 0.08),
+                borderRadius: AppRadii.r14All,
+                border: Border.all(color: p.error.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.error_outline_rounded, color: p.error),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Text(
+                      message,
+                      style: TextStyle(
+                          color: p.textSecondary,
+                          fontSize: AppFontSize.bodySmall),
+                    ),
                   ),
-                ),
-                TextButton(
-                  onPressed: onRetry,
-                  child: Text(context.l10n.retry),
-                ),
-              ],
+                  TextButton(
+                    onPressed: onRetry,
+                    child: Text(context.l10n.retry),
+                  ),
+                ],
+              ),
             ),
           ),
         ],

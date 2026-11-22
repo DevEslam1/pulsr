@@ -11047,4 +11047,118 @@ class AppLocalizationsAr extends AppLocalizations {
   String telemetryDbValue(String value) {
     return '$value ديسيبل';
   }
+
+  @override
+  String get extrasTitle => 'الأدوات والإضافات';
+
+  @override
+  String get extrasLoading => 'جارٍ تحميل الأدوات…';
+
+  @override
+  String get extrasLoadFailed =>
+      'تعذر بدء بعض الأدوات. اسحب للتحديث أو أعد المحاولة أدناه.';
+
+  @override
+  String get extrasUnknownDevice => 'جهاز إخراج غير معروف';
+
+  @override
+  String get extrasToolUnavailable => 'تعذر بدء هذه الأداة.';
+
+  @override
+  String get extrasSettingsCategoryTitle => 'الأدوات والإضافات';
+
+  @override
+  String get extrasSettingsCategorySubtitle =>
+      'الإعلانات، سلوك النظام، راحة استخدام USB DAC، إخراج الشبكة، الملفات الصوتية والتشخيصات.';
+
+  @override
+  String get extrasPlaybackTitle => 'إضافات التشغيل';
+
+  @override
+  String get extrasPlaybackSubtitle =>
+      'الإعلانات، سلوك النظام وراحة استخدام USB DAC.';
+
+  @override
+  String get extrasAnnouncementsTitle => 'إعلانات المقاطع';
+
+  @override
+  String get extrasAnnouncementsSubtitle =>
+      'نطق العنوان والفنان والألبوم عند بدء تشغيل المقطع.';
+
+  @override
+  String get extrasSystemBehaviorTitle => 'سلوك النظام';
+
+  @override
+  String get extrasSystemBehaviorSubtitle =>
+      'تحرير تركيز الصوت، الإيقاف المؤقت للإشعارات، التلاشي التدريجي وخطوات مستوى الصوت.';
+
+  @override
+  String get extrasUsbTitle => 'راحة استخدام USB DAC';
+
+  @override
+  String get extrasUsbSubtitle =>
+      'صمت بداية المقطع، إعادة ضبط الإعداد البديل، فرض 16 بت، مفاتيح HID وفحص سرعة الناقل لكل جهاز.';
+
+  @override
+  String get extrasOutputTitle => 'الشبكة والإخراج';
+
+  @override
+  String get extrasOutputSubtitle =>
+      'التشغيل على وحدات DLNA/UPnP أو تصفح مكتبات SMB/WebDAV/FTP.';
+
+  @override
+  String get extrasDlnaTitle => 'إخراج DLNA / UPnP';
+
+  @override
+  String get extrasDlnaSubtitle =>
+      'اكتشاف أجهزة استقبال AVR وSonos وKodi والتلفزيونات على الشبكة المحلية.';
+
+  @override
+  String get extrasRemoteTitle => 'مكتبات الشبكة';
+
+  @override
+  String get extrasRemoteSubtitle =>
+      'مشاركات SMB2/3 وWebDAV وFTP كمصادر قابلة للتشغيل، مع ذاكرة تخزين مؤقت محلية.';
+
+  @override
+  String get extrasSupportTitle => 'الإعدادات والدعم';
+
+  @override
+  String get extrasSupportSubtitle =>
+      'نقل الإعداد المضبوط بين الأجهزة، أو تصدير حزمة التشخيص.';
+
+  @override
+  String get extrasAssistantTitle => 'المساعد والبحث';
+
+  @override
+  String get extrasAssistantSubtitle =>
+      'الاشتراك في اقتراحات التشغيل المحلي في بحث النظام؛ لا شيء يغادر الجهاز.';
+
+  @override
+  String get extrasProfilesTitle => 'الملفات الصوتية';
+
+  @override
+  String get extrasProfilesSubtitle =>
+      'حفظ سلسلة DSP والمعادل وتغذية التداخل ووضع الإخراج في ملف واحد.';
+
+  @override
+  String get extrasDiagnosticsTitle => 'التشخيصات والوضع الآمن';
+
+  @override
+  String get extrasDiagnosticsSubtitle =>
+      'عدادات مسار الإخراج، السجلات الأخيرة، والرجوع التلقائي بعد فشل متكرر.';
+
+  @override
+  String get extrasRemoteUnavailableTitle => 'مكتبات الشبكة غير متوفرة';
+
+  @override
+  String get extrasRemoteUnavailableBody =>
+      'تعذر على Pulsr فتح منفذ البث المحلي. أغلق تطبيقات VPN أو البروكسي الأخرى وحاول ثانية.';
+
+  @override
+  String get extrasRemotePlaybackFailed =>
+      'تعذر تشغيل هذا الملف من المشاركة. تحقق من الاتصال وحاول ثانية.';
+
+  @override
+  String get extrasRemoteAlbumLabel => 'مكتبة الشبكة';
 }

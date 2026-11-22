@@ -24,6 +24,7 @@ class DynamicThemeState {
   final Color surfaceColor;
   final bool isDark;
   final bool hasCustomArtworkColor;
+  final int? songId;
 
   const DynamicThemeState({
     this.primaryColor = AppColors.primary,
@@ -32,6 +33,7 @@ class DynamicThemeState {
     this.surfaceColor = AppColors.surface,
     this.isDark = true,
     this.hasCustomArtworkColor = false,
+    this.songId,
   });
 
   DynamicThemeState copyWith({
@@ -41,6 +43,7 @@ class DynamicThemeState {
     Color? surfaceColor,
     bool? isDark,
     bool? hasCustomArtworkColor,
+    int? songId,
   }) {
     return DynamicThemeState(
       primaryColor: primaryColor ?? this.primaryColor,
@@ -50,8 +53,33 @@ class DynamicThemeState {
       isDark: isDark ?? this.isDark,
       hasCustomArtworkColor:
           hasCustomArtworkColor ?? this.hasCustomArtworkColor,
+      songId: songId ?? this.songId,
     );
   }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is DynamicThemeState &&
+          runtimeType == other.runtimeType &&
+          primaryColor == other.primaryColor &&
+          secondaryColor == other.secondaryColor &&
+          backgroundColor == other.backgroundColor &&
+          surfaceColor == other.surfaceColor &&
+          isDark == other.isDark &&
+          hasCustomArtworkColor == other.hasCustomArtworkColor &&
+          songId == other.songId;
+
+  @override
+  int get hashCode => Object.hash(
+        primaryColor,
+        secondaryColor,
+        backgroundColor,
+        surfaceColor,
+        isDark,
+        hasCustomArtworkColor,
+        songId,
+      );
 }
 
 /// Palette-only snapshot cached per song/artwork. Deliberately excludes
@@ -79,12 +107,14 @@ class _CachedPalette {
         cachedAtElapsedMs =
             cachedAtElapsedMs ?? _monotonicClock.elapsedMilliseconds;
 
-  DynamicThemeState applyTo(DynamicThemeState current) => current.copyWith(
+  DynamicThemeState applyTo(DynamicThemeState current, {int? songId}) =>
+      current.copyWith(
         primaryColor: primaryColor,
         secondaryColor: secondaryColor,
         backgroundColor: backgroundColor,
         surfaceColor: surfaceColor,
         hasCustomArtworkColor: true,
+        songId: songId ?? current.songId,
       );
 }
 
@@ -161,7 +191,7 @@ class DynamicThemeCubit extends PulsrCubit<DynamicThemeState> {
         _lastEmittedPalette = cached;
         // Guarded like every other emit: this path fires during teardown when
         // the player screen disposes while artwork updates are still landing.
-        safeEmit(cached.applyTo(state));
+        safeEmit(cached.applyTo(state, songId: songId));
         return;
       }
     }
@@ -202,19 +232,21 @@ class DynamicThemeCubit extends PulsrCubit<DynamicThemeState> {
 
       // 1. If online remote artwork URL exists (YouTube Music streaming / online song)
       if (remoteArtworkUrl != null && remoteArtworkUrl.isNotEmpty) {
+        final isHttp = remoteArtworkUrl.startsWith('http://') ||
+            remoteArtworkUrl.startsWith('https://');
         if (remoteArtworkUrl.startsWith('assets/')) {
           imageProvider = AssetImage(remoteArtworkUrl);
         } else if (remoteArtworkUrl.startsWith('file://')) {
-          imageProvider =
-              FileImage(File(Uri.parse(remoteArtworkUrl).toFilePath()));
-        } else if (!remoteArtworkUrl.startsWith('http://') &&
-            !remoteArtworkUrl.startsWith('https://')) {
+          final localFile = File(Uri.parse(remoteArtworkUrl).toFilePath());
+          if (await localFile.exists()) {
+            imageProvider = FileImage(localFile);
+          }
+        } else if (!isHttp) {
           final localFile = File(remoteArtworkUrl);
           if (await localFile.exists()) {
             imageProvider = FileImage(localFile);
           }
-        }
-        if (imageProvider == null) {
+        } else {
           final highResUrl =
               CachedArtwork.upgradeToHighResArtwork(remoteArtworkUrl);
           final cachedBytes = ArtworkLruCache().get(highResUrl) ??
@@ -319,7 +351,7 @@ class DynamicThemeCubit extends PulsrCubit<DynamicThemeState> {
         _cachedPalettes[cacheKey] = newPalette;
         _lastEmittedPalette = newPalette;
         if (!isClosed && token == _currentRequestToken) {
-          safeEmit(newPalette.applyTo(state));
+          safeEmit(newPalette.applyTo(state, songId: songId));
         }
         return;
       }
@@ -329,13 +361,13 @@ class DynamicThemeCubit extends PulsrCubit<DynamicThemeState> {
           !isClosed &&
           token == _currentRequestToken) {
         _lastEmittedPalette = expiredFallback;
-        safeEmit(expiredFallback.applyTo(state));
+        safeEmit(expiredFallback.applyTo(state, songId: songId));
         return;
       }
       if (_lastEmittedPalette != null &&
           !isClosed &&
           token == _currentRequestToken) {
-        safeEmit(_lastEmittedPalette!.applyTo(state));
+        safeEmit(_lastEmittedPalette!.applyTo(state, songId: songId));
         return;
       }
       // Do not reset to default on single artwork 404/timeout — keep existing palette
@@ -366,7 +398,7 @@ class DynamicThemeCubit extends PulsrCubit<DynamicThemeState> {
     }
 
     if (token == _currentRequestToken && !isClosed) {
-      safeEmit(DynamicThemeState(isDark: state.isDark));
+      safeEmit(DynamicThemeState(isDark: state.isDark, songId: songId));
     }
   }
 

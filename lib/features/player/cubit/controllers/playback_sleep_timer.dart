@@ -28,6 +28,8 @@ class PlaybackSleepTimer {
       playback: s.playback.copyWith(
         sleepTimerRemaining: duration,
         sleepTimerRemainingTracks: null,
+        sleepTimerMode: SleepTimerMode.duration,
+        isEndOfQueueSleepTimer: false,
       ),
     ));
   }
@@ -53,6 +55,8 @@ class PlaybackSleepTimer {
       playback: s.playback.copyWith(
         sleepTimerRemaining: diff,
         sleepTimerRemainingTracks: null,
+        sleepTimerMode: SleepTimerMode.duration,
+        isEndOfQueueSleepTimer: false,
       ),
     ));
   }
@@ -67,6 +71,8 @@ class PlaybackSleepTimer {
       playback: s.playback.copyWith(
         sleepTimerRemaining: remaining,
         sleepTimerRemainingTracks: null,
+        sleepTimerMode: SleepTimerMode.endOfTrack,
+        isEndOfQueueSleepTimer: false,
       ),
     ));
   }
@@ -79,6 +85,8 @@ class PlaybackSleepTimer {
       playback: s.playback.copyWith(
         sleepTimerRemaining: null,
         sleepTimerRemainingTracks: trackCount,
+        sleepTimerMode: SleepTimerMode.afterNTracks,
+        isEndOfQueueSleepTimer: false,
       ),
     ));
   }
@@ -90,6 +98,8 @@ class PlaybackSleepTimer {
       playback: s.playback.copyWith(
         sleepTimerRemaining: null,
         sleepTimerRemainingTracks: null,
+        sleepTimerMode: SleepTimerMode.endOfQueue,
+        isEndOfQueueSleepTimer: true,
       ),
     ));
   }
@@ -101,6 +111,8 @@ class PlaybackSleepTimer {
       playback: s.playback.copyWith(
         sleepTimerRemaining: null,
         sleepTimerRemainingTracks: null,
+        sleepTimerMode: null,
+        isEndOfQueueSleepTimer: false,
       ),
     ));
   }

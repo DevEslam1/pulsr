@@ -170,7 +170,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Continue with Google'));
     await tester.pumpAndSettle();
-    expect(find.byType(SnackBar), findsOneWidget);
+
     expect(find.text('No account found with this email.'), findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());
   });
@@ -185,8 +185,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Sign-in was cancelled.'), findsOneWidget);
-    final snackBar = tester.widget<SnackBar>(find.byType(SnackBar));
-    expect(snackBar.backgroundColor, isNull);
+
+
     await tester.pumpWidget(const SizedBox.shrink());
   });
 

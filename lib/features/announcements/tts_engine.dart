@@ -125,7 +125,7 @@ class MethodChannelTtsEngine implements TtsEngine {
     try {
       final ready = await _channel
               .invokeMethod<bool>('init')
-              .timeout(const Duration(seconds: 5)) ??
+              .timeout(const Duration(seconds: 12)) ??
           false;
       if (_disposed) return false;
       _setAvailable(ready);

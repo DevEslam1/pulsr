@@ -80,8 +80,8 @@ class AudioQualityBadge extends StatelessWidget {
         borderRadius: AppRadii.r20All,
         child: Ink(
           padding: EdgeInsets.symmetric(
-            horizontal: compact ? 8 : 12,
-            vertical: compact ? 3 : 6,
+            horizontal: compact ? 7.5 : 12,
+            vertical: compact ? 3.0 : 6,
           ),
           decoration: BoxDecoration(
             gradient: LinearGradient(
@@ -116,7 +116,7 @@ class AudioQualityBadge extends StatelessWidget {
                   size: compact ? 12 : 14,
                   color: isUsb ? gold : info.badgeColor,
                 ),
-                const SizedBox(width: AppSpacing.s6),
+                SizedBox(width: compact ? 5.0 : AppSpacing.s6),
                 Text(
                   info.shortBadgeLabel,
                   style: TextStyle(
@@ -151,10 +151,10 @@ class AudioQualityBadge extends StatelessWidget {
                     ),
                   ),
                 ],
-                const SizedBox(width: AppSpacing.xxs),
+                SizedBox(width: compact ? 3.5 : AppSpacing.xxs),
                 Icon(
                   Icons.tune_rounded,
-                  size: compact ? 11 : 13,
+                  size: compact ? 10.5 : 13,
                   color:
                       (isUsb ? gold : info.badgeColor).withValues(alpha: 0.8),
                 ),

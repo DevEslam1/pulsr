@@ -519,32 +519,38 @@ extension PlayerDspEffectsExtension on PlayerDspController {
     double? releaseMs,
     double? makeupGainDb,
   }) {
+    final clampedThresholdDb = thresholdDb != null
+        ? DspParamRanges.limiterThresholdDb.clamp(thresholdDb)
+        : null;
+    final clampedRatio =
+        ratio != null ? DspParamRanges.compressorRatio.clamp(ratio) : null;
+    final clampedAttackMs = attackMs != null
+        ? DspParamRanges.compressorAttackMs.clamp(attackMs)
+        : null;
+    final clampedReleaseMs = releaseMs != null
+        ? DspParamRanges.limiterReleaseMs.clamp(releaseMs)
+        : null;
+    final clampedMakeupGainDb = makeupGainDb != null
+        ? DspParamRanges.compressorMakeupGainDb.clamp(makeupGainDb)
+        : null;
+
     return applyDspEffect(
       featureName: 'Compressor',
       updateDsp: (dsp) => dsp.copyWith(
-        limiterThresholdDb: thresholdDb != null
-            ? DspParamRanges.limiterThresholdDb.clamp(thresholdDb)
-            : dsp.limiterThresholdDb,
-        compressorRatio: ratio != null
-            ? DspParamRanges.compressorRatio.clamp(ratio)
-            : dsp.compressorRatio,
-        compressorAttackMs: attackMs != null
-            ? DspParamRanges.compressorAttackMs.clamp(attackMs)
-            : dsp.compressorAttackMs,
-        limiterReleaseMs: releaseMs != null
-            ? DspParamRanges.limiterReleaseMs.clamp(releaseMs)
-            : dsp.limiterReleaseMs,
-        compressorMakeupGainDb: makeupGainDb != null
-            ? DspParamRanges.compressorMakeupGainDb.clamp(makeupGainDb)
-            : dsp.compressorMakeupGainDb,
+        limiterThresholdDb: clampedThresholdDb ?? dsp.limiterThresholdDb,
+        compressorRatio: clampedRatio ?? dsp.compressorRatio,
+        compressorAttackMs: clampedAttackMs ?? dsp.compressorAttackMs,
+        limiterReleaseMs: clampedReleaseMs ?? dsp.limiterReleaseMs,
+        compressorMakeupGainDb:
+            clampedMakeupGainDb ?? dsp.compressorMakeupGainDb,
       ),
       applyAudioHandler: () =>
           _audioHandler.equalizerManager.setCompressorParams(
-        thresholdDb: thresholdDb,
-        ratio: ratio,
-        attackMs: attackMs,
-        releaseMs: releaseMs,
-        makeupGainDb: makeupGainDb,
+        thresholdDb: clampedThresholdDb,
+        ratio: clampedRatio,
+        attackMs: clampedAttackMs,
+        releaseMs: clampedReleaseMs,
+        makeupGainDb: clampedMakeupGainDb,
       ),
     );
   }
@@ -1110,6 +1116,8 @@ extension PlayerDspEffectsExtension on PlayerDspController {
       );
 
   Future<void> setLiveProgSlider(int sliderIndex, double value) async {
+    if (!value.isFinite) return;
+    if (!guardDsp('Live Programmable DSP')) return;
     try {
       await _audioHandler.setLiveProgSlider(sliderIndex, value);
     } catch (e) {

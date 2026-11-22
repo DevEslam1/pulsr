@@ -663,6 +663,7 @@ class PulsrAudioHandler extends BaseAudioHandler
     _cueAdvanceTriggered = false;
     _playbackStateCoordinator.resetSavedPosition();
     final previousDop = DsdDecoderHelper.dsdDopActive;
+    final prevDop = _lastSyncedNativeDop;
     final isDop = _resolvedDopBySongId[song.id] ?? false;
     final isNativeDsd = _resolvedNativeDsdBySongId[song.id] ?? false;
     DsdDecoderHelper.dsdDopActive = isDop;
@@ -671,7 +672,15 @@ class PulsrAudioHandler extends BaseAudioHandler
       unawaited(_syncDopToEffectsEngine(isDop));
     }
     unawaited(_pushNativeReplayGain(song));
-    if (isDop != previousDop) {
+    // Always re-sync output/Direct-USB/hardware volume on track change so a
+    // newly opened or reconfigured Bit-Perfect/Direct-USB sink never starts at
+    // full scale (1.0) waiting for a physical volume key press.
+    _lastDirectUsbVolume = -1.0;
+    if (_shouldForwardSystemVolumeToOutput()) {
+      unawaited(_refreshLoudnessContourFromSystemVolume(
+        forceUsbHardwareSeed: true,
+      ));
+    } else if (isDop != prevDop || isDop != previousDop) {
       unawaited(_reapplyActiveVolume());
     }
     if (!_onTrackChangedSubject.isClosed) {
@@ -844,9 +853,12 @@ class PulsrAudioHandler extends BaseAudioHandler
             category: 'PulsrAudioHandler',
           );
         }
-        // Track start: re-seed the loudness contour from the hardware volume
-        // (no-op / software fallback when the contour is disabled).
-        unawaited(_refreshLoudnessContourFromSystemVolume());
+        // Track start: re-seed the loudness contour and re-apply hardware /
+        // Direct USB volume (reapplyToSession released and rebuilt native DSP).
+        _lastDirectUsbVolume = -1.0;
+        unawaited(_refreshLoudnessContourFromSystemVolume(
+          forceUsbHardwareSeed: true,
+        ));
       },
       onRouteChanged: () async {
         _syncBluetoothRouteFromCache();
@@ -865,7 +877,10 @@ class PulsrAudioHandler extends BaseAudioHandler
         unawaited(_recordSessionRouteChange());
         // STREAM_MUSIC volume is per-route on Android; re-seed so a bypassed
         // (bit-perfect / AAudio / USB) output does not keep the old route's gain.
-        unawaited(_refreshLoudnessContourFromSystemVolume());
+        _lastDirectUsbVolume = -1.0;
+        unawaited(_refreshLoudnessContourFromSystemVolume(
+          forceUsbHardwareSeed: true,
+        ));
       },
     );
     if (getIt.isRegistered<EqualizerManager>()) {
@@ -1510,13 +1525,15 @@ class PulsrAudioHandler extends BaseAudioHandler
       dvcEnabled: _dvcEnabled,
       hardwareVolumeOwnsOutput: _hardwareVolumeOwnsOutput(),
       forwardSystemVolume: _shouldForwardSystemVolumeToOutput(),
+      forceUsbHardwareSeed: true,
+      externalHardwareVolumeSet: _externalHardwareVolumeSet,
     );
     if (!shouldSeed) {
       return null;
     }
-    return _refreshLoudnessContourFromSystemVolume()
-        .timeout(const Duration(milliseconds: 400))
-        .catchError((Object _) {
+    return _refreshLoudnessContourFromSystemVolume(
+      forceUsbHardwareSeed: true,
+    ).timeout(const Duration(milliseconds: 400)).catchError((Object _) {
       // Best effort: the track-start / volume-event paths still correct it.
     });
   }
@@ -1547,9 +1564,12 @@ class PulsrAudioHandler extends BaseAudioHandler
     // Bit-perfect / AAudio / direct-USB bypass Android's mixer, so the output
     // gain IS the system volume. [_volume] defaults to 1.0 and was only ever
     // updated by volume-key events, so the first track after launch (or after
-    // enabling bit-perfect) played at full scale. Seed it from the system level.
+    // enabling bit-perfect) played at full scale. Seed it from the system level,
+    // and always push to hardware / active output even when [_volume] already
+    // matches [sys] because a new track or reopened USB/DSP sink may have reset
+    // its native/hardware gain to unity (1.0).
     final sys = _lastSystemVolumeRatio;
-    if (shouldSeed && sys != null && (sys - _volume).abs() > 1e-4) {
+    if (shouldSeed && sys != null) {
       _volume = sys;
       if (!_volumeSubject.isClosed) _volumeSubject.add(_volume);
       _volumeController?.updateSettings(userVolume: _volume);
@@ -1605,8 +1625,11 @@ class PulsrAudioHandler extends BaseAudioHandler
   @override
   bool _shouldForwardSystemVolumeToOutput() {
     final prefs = _cachedPrefs;
+    final bitPerfectEnabled = _isBitPerfectBypassEnabled() ||
+        (prefs?.getBool(PrefsKeys.bitPerfectOutput) ?? false) ||
+        (prefs?.getBool(PrefsKeys.strictBitPerfect) ?? false);
     return shouldForwardSystemVolumeToOutput(
-      bitPerfectBypass: _isBitPerfectBypassEnabled(),
+      bitPerfectBypass: bitPerfectEnabled,
       aaudioOutputEnabled:
           prefs?.getBool(PrefsKeys.aaudioOutputEnabled) ?? false,
       directUsbStreaming: UsbExclusiveService().lastStatus.streamingActive,
@@ -1619,7 +1642,10 @@ class PulsrAudioHandler extends BaseAudioHandler
   }) async {
     if (!PlatformCapabilities.isAndroid) return;
     final streamingUsb = UsbExclusiveService().lastStatus.streamingActive;
-    if (!streamingUsb) {
+    final bitPerfectArmed = _isBitPerfectBypassEnabled() ||
+        (_cachedPrefs?.getBool(PrefsKeys.bitPerfectOutput) ?? false) ||
+        (_cachedPrefs?.getBool(PrefsKeys.strictBitPerfect) ?? false);
+    if (!streamingUsb && !bitPerfectArmed) {
       if (_lastDirectUsbVolume >= 0.0 &&
           (_lastDirectUsbVolume - 1.0).abs() >= 1e-6) {
         await AudioEffectsChannel().setDirectUsbVolume(1.0);
@@ -1656,6 +1682,9 @@ class PulsrAudioHandler extends BaseAudioHandler
     bool smooth = false,
   }) async {
     final applied = (targetVolume * _sleepFadeFactor).clamp(0.0, 1.0);
+    if (_isUsbHardwareVolumeEnabled()) {
+      unawaited(_pushUsbHardwareVolume());
+    }
     final controller = _volumeController;
     if (smooth && controller != null) {
       await _syncDirectUsbVolume(applied, song: song);
@@ -1696,11 +1725,16 @@ class PulsrAudioHandler extends BaseAudioHandler
   /// stays attenuated — and a gain of 0 leaves it silent after Bit-Perfect is
   /// turned off. Reset the native stage to unity and re-apply the app volume.
   Future<void> _resetDirectUsbGainAfterStop() async {
-    try {
-      await AudioEffectsChannel().setDirectUsbVolume(1.0);
-    } catch (e, st) {
-      ErrorLogger.log('Failed to reset direct USB software gain',
-          error: e, stackTrace: st, category: 'AudioHandler');
+    final bitPerfectArmed = _isBitPerfectBypassEnabled() ||
+        (_cachedPrefs?.getBool(PrefsKeys.bitPerfectOutput) ?? false) ||
+        (_cachedPrefs?.getBool(PrefsKeys.strictBitPerfect) ?? false);
+    if (!bitPerfectArmed && !UsbExclusiveService().lastStatus.streamingActive) {
+      try {
+        await AudioEffectsChannel().setDirectUsbVolume(1.0);
+      } catch (e, st) {
+        ErrorLogger.log('Failed to reset direct USB software gain',
+            error: e, stackTrace: st, category: 'AudioHandler');
+      }
     }
     if (_disposed) return;
     try {
@@ -2565,7 +2599,11 @@ class PulsrAudioHandler extends BaseAudioHandler
     _hardwareVolumeOwned = _hardwareVolumeOwnsOutput();
     _subscriptions.add(UsbExclusiveService().statusStream.listen((status) {
       if (_disposed) return;
-      final startedStreaming = !wasDirectStreaming && status.streamingActive;
+      final startedStreaming = (!wasDirectStreaming && status.streamingActive) ||
+          (status.streamingActive &&
+              _isUsbHardwareVolumeEnabled() &&
+              status.hasVolumeControl &&
+              !status.hardwareVolumeApplied);
       wasDirectStreaming = status.streamingActive;
       if (!status.streamingActive) {
         _externalHardwareVolumeSet = false;

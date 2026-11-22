@@ -61,6 +61,9 @@ void main() {
     expect(find.text('Google is blocking this sign-in'), findsOneWidget);
     expect(find.text('Sign in with Google TV (no captcha)'), findsOneWidget);
     expect(find.text('Retry'), findsOneWidget);
+    expect(find.text('More recovery options'), findsOneWidget);
+    await tester.tap(find.text('More recovery options'));
+    await tester.pumpAndSettle();
     expect(find.text('Try Safari Mobile'), findsOneWidget);
     expect(find.text('Open YouTube Music web directly'), findsOneWidget);
     expect(find.text('Import Cookies / Token Manually'), findsOneWidget);
@@ -83,7 +86,12 @@ void main() {
   testWidgets('the identity toggle reloads with the next browser identity',
       (tester) async {
     await pumpBlocked(tester);
-    await tester.tap(find.text('Try Safari Mobile'));
+    await tester.tap(find.text('More recovery options'));
+    await tester.pumpAndSettle();
+    final target = find.text('Try Safari Mobile');
+    await tester.ensureVisible(target);
+    await tester.pump();
+    await tester.tap(target);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
     expect(find.text('Google is blocking this sign-in'), findsNothing);
@@ -94,6 +102,8 @@ void main() {
   testWidgets('opening YouTube Music directly dismisses the recovery card',
       (tester) async {
     await pumpBlocked(tester);
+    await tester.tap(find.text('More recovery options'));
+    await tester.pumpAndSettle();
     final target = find.text('Open YouTube Music web directly');
     await tester.ensureVisible(target);
     await tester.pump();
@@ -107,6 +117,8 @@ void main() {
 
   testWidgets('the card can open the manual cookie dialog', (tester) async {
     await pumpBlocked(tester);
+    await tester.tap(find.text('More recovery options'));
+    await tester.pumpAndSettle();
     final target = find.text('Import Cookies / Token Manually');
     await tester.ensureVisible(target);
     await tester.pump();

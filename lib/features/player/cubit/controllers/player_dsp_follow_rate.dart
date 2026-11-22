@@ -81,6 +81,11 @@ extension PlayerDspFollowRate on PlayerDspController {
         final bitPerfectState = verdict.state;
         final sourceRate = verdict.sourceSampleRate;
         final sourceDepth = verdict.sourceBitDepth;
+        final dspDesc = dspSlice.isEqEnabled
+            ? 'EQ Active'
+            : (dspSlice.isLimiterEnabled
+                ? 'Limiter Active'
+                : (dspSlice.isDspActive ? 'DSP Active' : null));
         final signalPath = AudioSignalPath.fromOutputInfo(
           sourceCodec: song.codec ?? '',
           sourceSampleRate: sourceRate,
@@ -93,6 +98,8 @@ extension PlayerDspFollowRate on PlayerDspController {
           aaudioEnabled: settings.aaudioOutputEnabled,
           floatOutputEnabled: settings.floatOutputEnabled,
           bitPerfectState: bitPerfectState,
+          dspActive: dspSlice.isDspActive,
+          dspDescription: dspDesc,
         );
         unawaited(AudioSessionLog.instance.updateOutputInfo(
           routeType:

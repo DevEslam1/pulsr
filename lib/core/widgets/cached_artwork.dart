@@ -189,6 +189,12 @@ class CachedArtwork extends StatefulWidget {
   /// How the image aligns inside its bounds when cropped via [BoxFit.cover].
   final AlignmentGeometry alignment;
 
+  /// Optional track title used for deterministic seeded mesh-gradient placeholder.
+  final String? title;
+
+  /// Optional track artist used for deterministic seeded mesh-gradient placeholder.
+  final String? artist;
+
   const CachedArtwork({
     super.key,
     required this.id,
@@ -204,6 +210,8 @@ class CachedArtwork extends StatefulWidget {
     this.cacheHeight,
     this.albumId,
     this.alignment = Alignment.center,
+    this.title,
+    this.artist,
   });
 
   /// Drops every cached quality tier for [type]/[id] and notifies mounted
@@ -639,6 +647,9 @@ class _CachedArtworkState extends State<CachedArtwork> {
           size: placeholderSize,
           borderRadius: effectiveBorderRadius,
           icon: widget.fallbackIcon,
+          seed: widget.id,
+          title: widget.title,
+          artist: widget.artist,
         );
 
         final isHq = _isHighRes;

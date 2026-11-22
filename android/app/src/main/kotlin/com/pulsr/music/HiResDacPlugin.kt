@@ -1837,6 +1837,7 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
                                 ) {
                                     bitPerfectRequested = true
                                     directRouteFallbackActive = false
+                                    resyncSystemMusicVolumeToHal()
                                     return true
                                 }
                             }
@@ -1858,6 +1859,7 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
                             bitPerfectRequested = true
                             directRouteFallbackActive = false
                             bitPerfectUsbDeviceId = usbDevice.id
+                            resyncSystemMusicVolumeToHal()
                             return true
                         }
                     }
@@ -1890,6 +1892,17 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
      * device") but returns the device itself so the DSD probe can read its raw
      * configuration descriptor. Null when nothing is attached or selectable.
      */
+    private fun resyncSystemMusicVolumeToHal() {
+        val am = audioManager ?: return
+        try {
+            val cur = am.getStreamVolume(AudioManager.STREAM_MUSIC)
+            val max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+            if (cur in 0..max && max > 0) {
+                am.setStreamVolume(AudioManager.STREAM_MUSIC, cur, 0)
+            }
+        } catch (_: Throwable) {}
+    }
+
     private fun selectUsbDacDevice(): UsbDevice? {
         return try {
             val attached = usbManager?.deviceList?.values?.toList().orEmpty()

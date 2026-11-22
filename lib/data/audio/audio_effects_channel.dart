@@ -1559,7 +1559,7 @@ class AudioEffectsChannel {
     try {
       final mult = await _channel
           .invokeMethod<int>('getActiveOversampleMultiplier')
-          .timeout(const Duration(seconds: 2));
+          .timeout(const Duration(seconds: 6));
       _activeOversampleMultiplier =
           (mult == 2 || mult == 4 || mult == 8) ? mult! : 1;
       return _activeOversampleMultiplier;

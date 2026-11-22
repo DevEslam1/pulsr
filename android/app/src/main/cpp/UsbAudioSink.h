@@ -301,6 +301,9 @@ public:
         return producerIsDop_.load(std::memory_order_relaxed);
     }
     void ReleaseProducer(int64_t id);
+    void SetPaused(bool paused);
+    bool IsPaused() const { return paused_.load(std::memory_order_acquire); }
+    void FlushStream();
     void ReportWriteError(int error);
     int GetRawPcmBitDepth() const {
         const uint64_t status = rawPcmStatus_.load(std::memory_order_acquire);
@@ -391,6 +394,7 @@ private:
     std::atomic<bool> active_{false};
     std::atomic<bool> exclusive_{false};
     std::atomic<bool> running_{false};
+    std::atomic<bool> paused_{false};
     std::atomic<int> lastError_{0};
     std::atomic<int64_t> lastFaultLogNs_{0};
     std::atomic<int64_t> lastRejectLogNs_{0};

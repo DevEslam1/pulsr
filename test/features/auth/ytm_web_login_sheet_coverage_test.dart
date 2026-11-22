@@ -122,6 +122,8 @@ void main() {
     });
 
     // Default identity is mobile -> the switch offers Safari Mobile.
+    await tester.tap(find.text('More recovery options'));
+    await tester.pumpAndSettle();
     final switchBtn = find.byIcon(Icons.phone_iphone_rounded);
     await tester.ensureVisible(switchBtn);
     await tester.pump();

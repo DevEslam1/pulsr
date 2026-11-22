@@ -513,6 +513,8 @@ UsbStreamResult UsbAudioSink::Open(int fd, int endpointAddress, int interfaceNum
         snap.bitPerfect.directUsbActive = true;
     });
     producerOwner_.store(0, std::memory_order_release);
+    paused_.store(false, std::memory_order_release);
+    pullRenderer_.setPaused(false);
     running_.store(true, std::memory_order_release);
     active_.store(true, std::memory_order_release);
     writerGate_.store(0, std::memory_order_release);
@@ -567,6 +569,8 @@ void UsbAudioSink::Abandon() {
     }
     producerOwner_.store(0, std::memory_order_release);
     producerRawDepth_.store(0, std::memory_order_release);
+    paused_.store(false, std::memory_order_release);
+    pullRenderer_.setPaused(false);
     // A new stream starts as plain PCM; the JNI tap re-declares DoP on its next
     // direct-USB block. Reset the marker phase so it starts on 0x05 like every
     // other DoP framer in this codebase.
@@ -963,6 +967,8 @@ bool UsbAudioSink::releaseResources() {
     }
     producerOwner_.store(0, std::memory_order_release);
     producerRawDepth_.store(0, std::memory_order_release);
+    paused_.store(false, std::memory_order_release);
+    pullRenderer_.setPaused(false);
     // Item 3: a new stream starts as plain PCM; the JNI tap re-declares DoP on the
     // next direct-USB block. Reset the marker phase so a fresh stream starts on
     // 0x05 like every DoP framer in this codebase.
@@ -1346,37 +1352,40 @@ void UsbAudioSink::workerLoop() {
         size_t readFrame = ringRead_.load(std::memory_order_relaxed);
         uint8_t* dst = buf;
         int urbTotalBytes = 0;
+        const bool isPaused = paused_.load(std::memory_order_acquire);
         const size_t wNow = ringWrite_.load(std::memory_order_acquire);
         const size_t availNow = wNow - readFrame;
-        if (pullMode) {
-            if (!prefillDone && pullRenderer_.prefillSatisfied()) {
-                prefillDone = true;
-                PULSR_USB_LOG(ANDROID_LOG_INFO,
-                              "pull prefill ready: fillMs=%d targetMs=%zu",
-                              pullRenderer_.fillMs(),
-                              pullRenderer_.configuredFrames() * 1000 /
-                                  static_cast<size_t>(std::max(1, sampleRate_)));
-            }
-        } else if (!prefillDone) {
-            if (availNow > 0 && !producerSeen) {
-                producerSeen = true;
-                prefillDeadline = std::chrono::steady_clock::now() +
-                                  std::chrono::milliseconds(250);
-            }
-            if (availNow >= prefillFrames_ ||
-                (producerSeen && availNow > 0 &&
-                 std::chrono::steady_clock::now() >= prefillDeadline)) {
-                prefillDone = true;
-                PULSR_USB_LOG(ANDROID_LOG_INFO,
-                              "prefill ready: fillMs=%.1f targetMs=%zu",
-                              sampleRate_ > 0
-                                  ? static_cast<double>(availNow) * 1000.0 / sampleRate_
-                                  : 0.0,
-                              prefillFrames_ * 1000 /
-                                  static_cast<size_t>(std::max(1, sampleRate_)));
+        if (!isPaused) {
+            if (pullMode) {
+                if (!prefillDone && pullRenderer_.prefillSatisfied()) {
+                    prefillDone = true;
+                    PULSR_USB_LOG(ANDROID_LOG_INFO,
+                                  "pull prefill ready: fillMs=%d targetMs=%zu",
+                                  pullRenderer_.fillMs(),
+                                  pullRenderer_.configuredFrames() * 1000 /
+                                      static_cast<size_t>(std::max(1, sampleRate_)));
+                }
+            } else if (!prefillDone) {
+                if (availNow > 0 && !producerSeen) {
+                    producerSeen = true;
+                    prefillDeadline = std::chrono::steady_clock::now() +
+                                      std::chrono::milliseconds(250);
+                }
+                if (availNow >= prefillFrames_ ||
+                    (producerSeen && availNow > 0 &&
+                     std::chrono::steady_clock::now() >= prefillDeadline)) {
+                    prefillDone = true;
+                    PULSR_USB_LOG(ANDROID_LOG_INFO,
+                                  "prefill ready: fillMs=%.1f targetMs=%zu",
+                                  sampleRate_ > 0
+                                      ? static_cast<double>(availNow) * 1000.0 / sampleRate_
+                                      : 0.0,
+                                  prefillFrames_ * 1000 /
+                                      static_cast<size_t>(std::max(1, sampleRate_)));
+                }
             }
         }
-        if (!pullMode && feedbackEndpoint_ == 0 && prefillDone) {
+        if (!isPaused && !pullMode && feedbackEndpoint_ == 0 && prefillDone) {
             // Steer against the operating window (~2x prefillFrames_), not the
             // full 1+ second physical ring capacity: ExoPlayer's AudioTrack
             // buffer caps producer lead at ~200-250 ms, which would otherwise
@@ -1391,7 +1400,8 @@ void UsbAudioSink::workerLoop() {
                     feedbackRatePerSec_.load(std::memory_order_relaxed),
                     sampleRate_, availNow, steerWindow),
                 std::memory_order_relaxed);
-        } else if (renderMode_ == static_cast<int>(UsbRenderMode::BitPerfectPull) &&
+        } else if (!isPaused &&
+                   renderMode_ == static_cast<int>(UsbRenderMode::BitPerfectPull) &&
                    feedbackEndpoint_ == 0 && prefillDone) {
             // Whole-frame packet cadence steering for feedback-less UAC DACs in
             // BitPerfectPull mode: samples remain bit-identical while packet
@@ -1420,7 +1430,7 @@ void UsbAudioSink::workerLoop() {
             const int framesInPacket = NextPacketFrames(
                 frameAccumulator_, ratePerSec, serviceIntervalUs_, maxFramesPerPacket_);
             size_t pktLen = 0;
-            if (!prefillDone) {
+            if (!prefillDone || isPaused) {
                 pktLen = static_cast<size_t>(framesInPacket) * frameBytes;
                 if (pktLen > 0) {
                     if (dsdStream) {
@@ -1460,7 +1470,7 @@ void UsbAudioSink::workerLoop() {
         urb->error_count = 0;
         urbRawDepth_[urbIndex] = std::max(rawDepth, 0);
         urbDeliveryEpoch_[urbIndex] = deliveryEpoch;
-        if (!pullMode) ringRead_.store(readFrame, std::memory_order_release);
+        if (!pullMode && !isPaused) ringRead_.store(readFrame, std::memory_order_release);
 
         if (!submitUrb(urb, false, urbIndex)) {
             ReportWriteError(errno);
@@ -1513,6 +1523,27 @@ void UsbAudioSink::ReleaseProducer(int64_t id) {
             std::memory_order_acq_rel, std::memory_order_relaxed)) {
         deliveryEpoch_.fetch_add(1, std::memory_order_acq_rel);
     }
+}
+
+void UsbAudioSink::SetPaused(bool paused) {
+    paused_.store(paused, std::memory_order_release);
+    pullRenderer_.setPaused(paused);
+}
+
+void UsbAudioSink::FlushStream() {
+    if (!active_.load(std::memory_order_acquire)) return;
+    // Wait briefly for any active producer write to finish before advancing read
+    // pointer to write pointer (or flushing the pull reservoir).
+    for (int spin = 0; spin < 200; ++spin) {
+        if ((writerGate_.load(std::memory_order_acquire) & kWriterBusy) == 0) break;
+        std::this_thread::yield();
+    }
+    const size_t w = ringWrite_.load(std::memory_order_acquire);
+    ringRead_.store(w, std::memory_order_release);
+    if (IsReservoirMode(renderMode_)) {
+        pullRenderer_.flush();
+    }
+    deliveryEpoch_.fetch_add(1, std::memory_order_acq_rel);
 }
 
 bool UsbAudioSink::WriteInterleaved(const float* buffer, int frames, int channels,
@@ -1631,9 +1662,41 @@ bool UsbAudioSink::writeBlock(const float* floats, const uint8_t* pcm, int frame
     }
     if (renderMode_ == static_cast<int>(UsbRenderMode::BitPerfectPull)) {
         // Bit-perfect pull stores the wire bytes exactly as the producer wrote
-        // them. A float block or a different valid depth cannot be made
-        // sample-identical, so it disqualifies the session instead of being
-        // converted behind the user's back.
+        // them. A float block (e.g. when software directUsbGain < 1.0 scaled
+        // the stream on a DAC without hardware volume) or a different valid
+        // depth cannot be claimed as sample-identical, so it disqualifies the
+        // bit-perfect badge while still rendering audio instead of dropping out.
+        if (!pcm && floats != nullptr) {
+            bitPerfectDisqualified_.store(true, std::memory_order_release);
+            bitPerfectEligible_.store(false, std::memory_order_release);
+            if (static_cast<size_t>(frames) > pullPackFrames_) {
+                ReportWriteError(ENOTSUP);
+                rejectLog("pull_block_too_large");
+                return false;
+            }
+            const size_t fb = static_cast<size_t>(channels_) *
+                              static_cast<size_t>(bytesPerSample_);
+            for (int f = 0; f < frames; ++f) {
+                for (int c = 0; c < channels_; ++c) {
+                    const size_t sample = static_cast<size_t>(f) * channels_ + c;
+                    uint8_t packed[4] = {0, 0, 0, 0};
+                    PackPcmSample(floats[sample], packed, bytesPerSample_,
+                                  producerDither_, validBitDepth_);
+                    std::memcpy(pullPack_.data() + static_cast<size_t>(f) * fb +
+                                    static_cast<size_t>(c) * bytesPerSample_,
+                                packed, static_cast<size_t>(bytesPerSample_));
+                }
+            }
+            if (!pullRenderer_.write(pullPack_.data(), frames)) {
+                overrunCount_.fetch_add(static_cast<uint64_t>(frames),
+                                        std::memory_order_relaxed);
+                ReportWriteError(ENOSPC);
+                return false;
+            }
+            producerRawDepth_.store(0, std::memory_order_release);
+            deliveryEpoch_.fetch_add(1, std::memory_order_acq_rel);
+            return true;
+        }
         if (!pcm || sourceBitDepth <= 0 || sourceBitDepth > validBitDepth_) {
             bitPerfectDisqualified_.store(true, std::memory_order_release);
             bitPerfectEligible_.store(false, std::memory_order_release);
