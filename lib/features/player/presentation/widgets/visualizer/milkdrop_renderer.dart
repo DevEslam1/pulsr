@@ -1,6 +1,7 @@
 // lib/features/player/presentation/widgets/visualizer/milkdrop_renderer.dart
 import 'dart:math' as math;
 import 'dart:ui' as ui;
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:material_ui/material_ui.dart';
 import '../../../../../core/performance/gpu_budget.dart';
 import '../../../../../domain/models/milkdrop_preset.dart';
@@ -107,7 +108,12 @@ class MilkdropGpuPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant MilkdropGpuPainter oldDelegate) => true;
+  bool shouldRepaint(covariant MilkdropGpuPainter oldDelegate) =>
+      oldDelegate.shader != shader ||
+      oldDelegate.color != color ||
+      oldDelegate.preset != preset ||
+      oldDelegate.transparentBackground != transparentBackground ||
+      !listEquals(oldDelegate.data, data);
 }
 
 /// Parameter-driven Canvas fallback approximation for MilkDrop presets.
@@ -243,5 +249,9 @@ class MilkdropCanvasPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant MilkdropCanvasPainter oldDelegate) => true;
+  bool shouldRepaint(covariant MilkdropCanvasPainter oldDelegate) =>
+      oldDelegate.color != color ||
+      oldDelegate.preset != preset ||
+      oldDelegate.transparentBackground != transparentBackground ||
+      !listEquals(oldDelegate.data, data);
 }

@@ -109,13 +109,15 @@ extension _AudioQualityNowPlayingTab on AudioQualitySheet {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              context.l10n.streamingQuality,
-              style: TextStyle(
-                fontSize: AppFontSize.caption,
-                letterSpacing: AppTracking.wide,
-                fontWeight: FontWeight.w800,
-                color: p.textSecondary,
+            Expanded(
+              child: Text(
+                context.l10n.streamingQuality,
+                style: TextStyle(
+                  fontSize: AppFontSize.caption,
+                  letterSpacing: AppTracking.wide,
+                  fontWeight: FontWeight.w800,
+                  color: p.textSecondary,
+                ),
               ),
             ),
             Text(

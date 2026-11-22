@@ -39,8 +39,8 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
       onRefresh: () => _handleRefresh(context),
       child: AnimatedSwitcher(
         duration: context.motion(const Duration(milliseconds: 240)),
-        switchInCurve: Curves.easeOutCubic,
-        switchOutCurve: Curves.easeInCubic,
+        switchInCurve: context.motionCurve(Curves.easeOutCubic),
+        switchOutCurve: context.motionCurve(Curves.easeInCubic),
         transitionBuilder: (child, animation) => FadeTransition(
           opacity: animation,
           child: child,
@@ -291,8 +291,8 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
       onRefresh: () => _handleRefresh(context),
       child: AnimatedSwitcher(
         duration: context.motion(const Duration(milliseconds: 240)),
-        switchInCurve: Curves.easeOutCubic,
-        switchOutCurve: Curves.easeInCubic,
+        switchInCurve: context.motionCurve(Curves.easeOutCubic),
+        switchOutCurve: context.motionCurve(Curves.easeInCubic),
         transitionBuilder: (child, animation) => FadeTransition(
           opacity: animation,
           child: child,

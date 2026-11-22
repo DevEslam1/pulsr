@@ -1,6 +1,7 @@
 // lib/features/player/presentation/themes/vinyl_player_theme.dart
 import 'dart:math' as math;
 
+import 'package:flutter/scheduler.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:on_audio_query/on_audio_query.dart';
@@ -63,6 +64,9 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
   late final AnimationController _velocityController;
   late final AnimationController _tonearmController;
   late final CurvedAnimation _tonearmAnimation;
+  late final Ticker _ticker;
+  Duration? _lastTick;
+  double _phase = 0.0;
   bool? _lastAllowMotion;
 
   @override
@@ -90,6 +94,27 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
       curve: Curves.easeInOutCubic,
       reverseCurve: Curves.easeInOutCubic,
     );
+
+    _ticker = createTicker(_onTick);
+  }
+
+  void _onTick(Duration elapsed) {
+    final last = _lastTick;
+    _lastTick = elapsed;
+    if (last == null) return;
+    final dt = (elapsed - last).inMicroseconds / 1000000.0;
+    if (dt <= 0.0 || dt > 0.5) return;
+
+    final velocity = _velocityController.value;
+    if (velocity > 0.0) {
+      // 12 seconds per revolution at full velocity (1.0)
+      final delta = (dt / 12.0) * velocity;
+      _phase = (_phase + delta) % 1.0;
+      _rotationController.value = _phase;
+    } else if (!_velocityController.isAnimating) {
+      _ticker.stop();
+      _lastTick = null;
+    }
   }
 
   bool _allowMotion(BuildContext context) =>
@@ -109,8 +134,9 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
     final allowMotion = allowMotionOverride ?? _allowMotion(context);
     final shouldSpin = widget.props.state.isPlaying && allowMotion;
     if (shouldSpin) {
-      if (!_rotationController.isAnimating) {
-        _rotationController.repeat();
+      if (!_ticker.isActive) {
+        _lastTick = null;
+        _ticker.start();
       }
       _velocityController.animateTo(
         1.0,
@@ -121,10 +147,15 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
       if (!allowMotion) {
         _velocityController.stop();
         _velocityController.value = 0.0;
-        if (_rotationController.isAnimating) {
-          _rotationController.stop();
+        if (_ticker.isActive) {
+          _ticker.stop();
+          _lastTick = null;
         }
-      } else if (_rotationController.isAnimating) {
+      } else if (_ticker.isActive || _velocityController.value > 0.0) {
+        if (!_ticker.isActive) {
+          _lastTick = null;
+          _ticker.start();
+        }
         _velocityController
             .animateTo(
           0.0,
@@ -135,7 +166,10 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
           if (mounted &&
               !widget.props.state.isPlaying &&
               _velocityController.value == 0.0) {
-            _rotationController.stop();
+            if (_ticker.isActive) {
+              _ticker.stop();
+              _lastTick = null;
+            }
           }
         });
       }
@@ -161,6 +195,7 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
 
   @override
   void dispose() {
+    _ticker.dispose();
     _tonearmAnimation.dispose();
     _velocityController.dispose();
     _rotationController.dispose();
@@ -174,8 +209,9 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
     if (_lastAllowMotion != allowMotion) {
       _lastAllowMotion = allowMotion;
       if (!allowMotion) {
-        if (_rotationController.isAnimating) {
-          _rotationController.stop();
+        if (_ticker.isActive) {
+          _ticker.stop();
+          _lastTick = null;
         }
         _velocityController.stop();
         _velocityController.value = 0.0;

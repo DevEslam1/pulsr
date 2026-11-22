@@ -13,6 +13,7 @@ import '../../../../core/constants/prefs_keys.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/presentation/audio_quality_presentation.dart';
+import '../../../../core/responsive/pulsr_layout_metrics.dart';
 import '../../../../core/services/coach_mark_service.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';

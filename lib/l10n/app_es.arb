@@ -6126,5 +6126,22 @@
   "extrasRemoteUnavailableTitle": "Bibliotecas de red no disponibles",
   "extrasRemoteUnavailableBody": "Pulsr no pudo abrir el puerto de transmisión local. Cierra otras aplicaciones VPN o proxy e inténtalo de nuevo.",
   "extrasRemotePlaybackFailed": "Ese archivo no se pudo reproducir desde el recurso compartido. Comprueba la conexión e inténtalo de nuevo.",
-  "extrasRemoteAlbumLabel": "Biblioteca de red"
+  "extrasRemoteAlbumLabel": "Biblioteca de red",
+  "selectTracks": "Seleccionar pistas",
+  "moreRecoveryOptions": "Más opciones de recuperación",
+  "retryingCleanSession": "Reintentando inicio de sesión con una sesión limpia…",
+  "reloadingIdentity": "Recargando con la identidad de navegador {identity}…",
+  "browserIdentityChromeDesktop": "Chrome para escritorio",
+  "browserIdentityChromeMobile": "Chrome móvil",
+  "browserIdentitySafariMobile": "Safari móvil",
+  "browserIdentityFirefoxDesktop": "Firefox para escritorio",
+  "copyCodeAndOpenBrowser": "Copiar código y abrir navegador",
+  "partyServerUrlEmpty": "La URL del servidor no puede estar vacía",
+  "partyServerUrlInvalid": "Introduce una URL válida (http, https, ws o wss)",
+  "castDefaultDevice": "dispositivo",
+  "paste": "Pegar",
+  "spotifyInvalidUrl": "URL de lista de Spotify no válida. Comprueba el enlace e inténtalo de nuevo.",
+  "spotifyFetchingMetadata": "Obteniendo metadatos de la lista de Spotify...",
+  "spotifyMatchingTracks": "Buscando coincidencias en YouTube Music ({completed}/{total})...",
+  "spotifyImportComplete": "Importación completada"
 }

@@ -1,5 +1,6 @@
 // lib/features/player/presentation/widgets/radio_now_playing_recommendations.dart
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:material_ui/material_ui.dart';
 
@@ -328,7 +329,9 @@ class _RadioNowPlayingRecommendationsState
     );
 
     final collapseButton = IconButton(
-      constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+      constraints: const BoxConstraints(
+          minWidth: AppSpacing.minTouchTarget,
+          minHeight: AppSpacing.minTouchTarget),
       padding: EdgeInsets.zero,
       tooltip:
           _isCollapsed ? 'Expand recommendations' : 'Collapse recommendations',
@@ -645,7 +648,9 @@ class _RadioNowPlayingRecommendationsState
             onChanged: onChanged,
           ),
           IconButton(
-            constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
+            constraints: const BoxConstraints(
+                minWidth: AppSpacing.minTouchTarget,
+                minHeight: AppSpacing.minTouchTarget),
             padding: EdgeInsets.zero,
             icon: Icon(
               Icons.open_in_new_rounded,
@@ -722,7 +727,10 @@ class _RadioNowPlayingRecommendationsState
 
           // Reciter style pills (user choice saved as the new default)
           SizedBox(
-            height: 38,
+            height: math.max(
+              AppSpacing.minTouchTarget,
+              MediaQuery.textScalerOf(context).scale(38.0),
+            ),
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               itemCount: QuranReciterStyle.values.length,
@@ -860,7 +868,10 @@ class _RadioNowPlayingRecommendationsState
 
               // Effect pills
               SizedBox(
-                height: 38,
+                height: math.max(
+                  AppSpacing.minTouchTarget,
+                  MediaQuery.textScalerOf(context).scale(38.0),
+                ),
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
                   itemCount: AmbientSoundEffect.values.length,

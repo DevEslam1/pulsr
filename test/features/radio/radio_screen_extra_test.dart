@@ -230,6 +230,8 @@ void main() {
   testWidgets('manual import adds the parsed stream URLs', (tester) async {
     await pumpRadio(tester);
 
+    await tester.tap(find.byType(PopupMenuButton<String>));
+    await tester.pumpAndSettle();
     await tester.tap(find.byIcon(Icons.playlist_add_rounded));
     await tester.pumpAndSettle();
 
@@ -250,6 +252,8 @@ void main() {
   testWidgets('manual import with no valid streams reports it', (tester) async {
     await pumpRadio(tester);
 
+    await tester.tap(find.byType(PopupMenuButton<String>));
+    await tester.pumpAndSettle();
     await tester.tap(find.byIcon(Icons.playlist_add_rounded));
     await tester.pumpAndSettle();
 
@@ -270,6 +274,8 @@ void main() {
       (tester) async {
     await pumpRadio(tester);
 
+    await tester.tap(find.byType(PopupMenuButton<String>));
+    await tester.pumpAndSettle();
     await tester.tap(find.byIcon(Icons.explore_rounded));
     await tester.pumpAndSettle();
 
@@ -278,6 +284,8 @@ void main() {
             .radioCuratedAdded(RadioStationStore.curatedDirectory().length)),
         findsOneWidget);
 
+    await tester.tap(find.byType(PopupMenuButton<String>));
+    await tester.pumpAndSettle();
     await tester.tap(find.byIcon(Icons.explore_rounded));
     await tester.pumpAndSettle();
 

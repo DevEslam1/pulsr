@@ -1,5 +1,7 @@
+import 'dart:math' as math;
 import 'package:material_ui/material_ui.dart';
 import '../../../../core/errors/failures.dart';
+import '../../../../core/responsive/pulsr_layout_metrics.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -281,7 +283,10 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
               children: [
                 // Breadcrumbs bar
                 Container(
-                  height: 42,
+                  height: math.max(
+                    AppSpacing.minTouchTarget,
+                    MediaQuery.textScalerOf(context).scale(42.0),
+                  ),
                   margin: const EdgeInsets.symmetric(
                     horizontal: AppSpacing.sm,
                     vertical: AppSpacing.xxs,
@@ -362,8 +367,12 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
                 // Content list (sub-folders + files)
                 Expanded(
                   child: ListView(
-                    padding: const EdgeInsetsDirectional.fromSTEB(
-                        AppSpacing.md, AppSpacing.xs, AppSpacing.md, 120),
+                    padding: EdgeInsetsDirectional.fromSTEB(
+                      AppSpacing.md,
+                      AppSpacing.xs,
+                      AppSpacing.md,
+                      PulsrLayoutMetrics.scrollBottom(context),
+                    ),
                     children: [
                       // Parent folder button
                       if (breadcrumbs.length > 1) ...[
@@ -544,8 +553,11 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
                           padding: EdgeInsets.only(top: AppSpacing.md),
                           child: SkeletonList(itemCount: 3),
                         ),
-                      for (int i = 0; i < childSongs.length; i++) ...[
-                        SongTile(
+                      ListView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: childSongs.length,
+                        itemBuilder: (context, i) => SongTile(
                           song: childSongs[i],
                           onTap: () {
                             context
@@ -553,7 +565,7 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
                                 .playSong(childSongs[i], queue: childSongs);
                           },
                         ),
-                      ],
+                      ),
 
                       if (childFolders.isEmpty &&
                           childSongs.isEmpty &&

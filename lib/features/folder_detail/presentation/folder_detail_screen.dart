@@ -1303,18 +1303,26 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                 AppSpacing.xs,
               ),
             ),
-            for (int i = 0; i < songs.length; i++) ...[
-              _buildSongRow(context, songs, i, p),
-              if (i < songs.length - 1)
-                Padding(
-                  padding: const EdgeInsetsDirectional.only(start: 68),
-                  child: Divider(
-                    height: 1,
-                    thickness: 0.5,
-                    color: p.hairline.withValues(alpha: 0.35),
-                  ),
-                ),
-            ],
+            ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: songs.length,
+              itemBuilder: (context, i) => Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildSongRow(context, songs, i, p),
+                  if (i < songs.length - 1)
+                    Padding(
+                      padding: const EdgeInsetsDirectional.only(start: 68),
+                      child: Divider(
+                        height: 1,
+                        thickness: 0.5,
+                        color: p.hairline.withValues(alpha: 0.35),
+                      ),
+                    ),
+                ],
+              ),
+            ),
           ],
         ),
       ),

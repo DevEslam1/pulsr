@@ -6126,5 +6126,22 @@
   "extrasRemoteUnavailableTitle": "مكتبات الشبكة غير متوفرة",
   "extrasRemoteUnavailableBody": "تعذر على Pulsr فتح منفذ البث المحلي. أغلق تطبيقات VPN أو البروكسي الأخرى وحاول ثانية.",
   "extrasRemotePlaybackFailed": "تعذر تشغيل هذا الملف من المشاركة. تحقق من الاتصال وحاول ثانية.",
-  "extrasRemoteAlbumLabel": "مكتبة الشبكة"
+  "extrasRemoteAlbumLabel": "مكتبة الشبكة",
+  "selectTracks": "تحديد المقاطع",
+  "moreRecoveryOptions": "المزيد من خيارات الاسترداد",
+  "retryingCleanSession": "إعادة محاولة تسجيل الدخول بجلسة نظيفة…",
+  "reloadingIdentity": "إعادة التحميل بهوية المتصفح {identity}…",
+  "browserIdentityChromeDesktop": "كروم للكمبيوتر",
+  "browserIdentityChromeMobile": "كروم للجوال",
+  "browserIdentitySafariMobile": "سفاري للجوال",
+  "browserIdentityFirefoxDesktop": "فايرفوكس للكمبيوتر",
+  "copyCodeAndOpenBrowser": "نسخ الرمز وفتح المتصفح",
+  "partyServerUrlEmpty": "لا يمكن أن يكون عنوان URL للخادم فارغاً",
+  "partyServerUrlInvalid": "أدخل عنوان URL صالحاً (http أو https أو ws أو wss)",
+  "castDefaultDevice": "الجهاز",
+  "paste": "لصق",
+  "spotifyInvalidUrl": "رابط قائمة تشغيل سبوتيفاي غير صالح. يرجى التحقق من الرابط والمحاولة مجدداً.",
+  "spotifyFetchingMetadata": "جارٍ جلب البيانات الوصفية لقائمة تشغيل سبوتيفاي...",
+  "spotifyMatchingTracks": "جارٍ مطابقة المقاطع على يوتيوب ميوزك ({completed}/{total})...",
+  "spotifyImportComplete": "اكتمل الاستيراد"
 }

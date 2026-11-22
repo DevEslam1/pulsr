@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import '../../../../core/di/injection.dart';
 // lib/features/player/presentation/widgets/autoeq_search_sheet.dart
 import 'package:file_picker/file_picker.dart';
@@ -344,7 +345,10 @@ class _AutoEqSearchSheetState extends State<AutoEqSearchSheet> {
             ),
             const SizedBox(height: AppSpacing.xs),
             SizedBox(
-              height: 36,
+              height: math.max(
+                AppSpacing.minTouchTarget,
+                MediaQuery.textScalerOf(context).scale(38.0),
+              ),
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 itemCount: _categories.length,

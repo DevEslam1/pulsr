@@ -348,38 +348,40 @@ class _SpatialBlurredCanvas extends StatelessWidget {
 
           // Blurred-feel tinted atmospheric gradient (essential when blur is
           // disabled, and deepens spatial tone when blur is active).
-          DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: RadialGradient(
-                center: const Alignment(-0.65, -0.55),
-                radius: 1.15,
-                colors: [
-                  activeColor.withValues(
-                    alpha: canBlur
-                        ? (isDark ? 0.22 : 0.14)
-                        : (isDark ? 0.36 : 0.20),
-                  ),
-                  Colors.transparent,
-                ],
+          if (!p.isCalmDensity) ...[
+            DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: RadialGradient(
+                  center: const Alignment(-0.65, -0.55),
+                  radius: 1.15,
+                  colors: [
+                    activeColor.withValues(
+                      alpha: canBlur
+                          ? (isDark ? 0.22 : 0.14)
+                          : (isDark ? 0.36 : 0.20),
+                    ),
+                    Colors.transparent,
+                  ],
+                ),
               ),
             ),
-          ),
-          DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: RadialGradient(
-                center: const Alignment(0.75, 0.45),
-                radius: 1.1,
-                colors: [
-                  accentLift.withValues(
-                    alpha: canBlur
-                        ? (isDark ? 0.18 : 0.10)
-                        : (isDark ? 0.28 : 0.16),
-                  ),
-                  Colors.transparent,
-                ],
+            DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: RadialGradient(
+                  center: const Alignment(0.75, 0.45),
+                  radius: 1.1,
+                  colors: [
+                    accentLift.withValues(
+                      alpha: canBlur
+                          ? (isDark ? 0.18 : 0.10)
+                          : (isDark ? 0.28 : 0.16),
+                    ),
+                    Colors.transparent,
+                  ],
+                ),
               ),
             ),
-          ),
+          ],
 
           // Vertical legibility gradient protecting both top chrome and glass card.
           DecoratedBox(
@@ -697,13 +699,15 @@ class _SpatialCardDeckState extends State<_SpatialCardDeck>
                                 : p.hairline,
                             width: 1.0,
                           ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppColors.scrimAt(isDark ? 0.36 : 0.14),
-                              blurRadius: 18,
-                              offset: const Offset(0, 8),
-                            ),
-                          ],
+                          boxShadow: p.isCalmDensity
+                              ? null
+                              : [
+                                  BoxShadow(
+                                    color: AppColors.scrimAt(isDark ? 0.36 : 0.14),
+                                    blurRadius: 18,
+                                    offset: const Offset(0, 8),
+                                  ),
+                                ],
                         ),
                         child: ClipRRect(
                           borderRadius: cardCorners,
@@ -815,28 +819,30 @@ class _SpatialCardDeckState extends State<_SpatialCardDeck>
                             : AppColors.specularAt(0.50),
                         width: 1.2,
                       ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.scrimAt(
-                            isDark
-                                ? (isPlaying ? 0.60 : 0.44)
-                                : (isPlaying ? 0.24 : 0.15),
-                          ),
-                          blurRadius: isPlaying ? 38 : 22,
-                          spreadRadius: isPlaying ? -2 : -4,
-                          offset: Offset(0, isPlaying ? 18 : 10),
-                        ),
-                        BoxShadow(
-                          color: activeColor.withValues(
-                            alpha: widget.customGlow
-                                ? (isPlaying ? 0.44 : 0.28)
-                                : (isPlaying ? 0.26 : 0.14),
-                          ),
-                          blurRadius: widget.customGlow ? 42 : 24,
-                          spreadRadius: widget.customGlow ? 0 : -4,
-                          offset: const Offset(0, 8),
-                        ),
-                      ],
+                      boxShadow: p.isCalmDensity
+                          ? null
+                          : [
+                              BoxShadow(
+                                color: AppColors.scrimAt(
+                                  isDark
+                                      ? (isPlaying ? 0.60 : 0.44)
+                                      : (isPlaying ? 0.24 : 0.15),
+                                ),
+                                blurRadius: isPlaying ? 38 : 22,
+                                spreadRadius: isPlaying ? -2 : -4,
+                                offset: Offset(0, isPlaying ? 18 : 10),
+                              ),
+                              BoxShadow(
+                                color: activeColor.withValues(
+                                  alpha: widget.customGlow
+                                      ? (isPlaying ? 0.44 : 0.28)
+                                      : (isPlaying ? 0.26 : 0.14),
+                                ),
+                                blurRadius: widget.customGlow ? 42 : 24,
+                                spreadRadius: widget.customGlow ? 0 : -4,
+                                offset: const Offset(0, 8),
+                              ),
+                            ],
                     ),
                     child: ClipRRect(
                       borderRadius: cardCorners,
@@ -961,14 +967,16 @@ class _SpatialGlassControlCard extends StatelessWidget {
         borderRadius: corners,
         color: glassFill,
         border: Border.all(color: outerBorder, width: 1.0),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.scrimAt(isDark ? 0.40 : 0.10),
-            blurRadius: 28,
-            spreadRadius: -4,
-            offset: const Offset(0, 12),
-          ),
-        ],
+        boxShadow: p.isCalmDensity
+            ? null
+            : [
+                BoxShadow(
+                  color: AppColors.scrimAt(isDark ? 0.40 : 0.10),
+                  blurRadius: 28,
+                  spreadRadius: -4,
+                  offset: const Offset(0, 12),
+                ),
+              ],
       ),
       child: Stack(
         children: [

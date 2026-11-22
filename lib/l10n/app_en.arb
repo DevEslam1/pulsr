@@ -9062,5 +9062,86 @@
   "extrasRemoteAlbumLabel": "Network library",
   "@extrasRemoteAlbumLabel": {
     "description": "Album label assigned to tracks played from network libraries"
+  },
+  "selectTracks": "Select tracks",
+  "@selectTracks": {
+    "description": "Menu action to enter track selection mode in album detail"
+  },
+  "moreRecoveryOptions": "More recovery options",
+  "@moreRecoveryOptions": {
+    "description": "Title for expandable secondary recovery actions in the YTM block screen"
+  },
+  "retryingCleanSession": "Retrying sign-in with a clean session…",
+  "@retryingCleanSession": {
+    "description": "Status text while clearing cookies and restarting login"
+  },
+  "reloadingIdentity": "Reloading with {identity} browser identity…",
+  "@reloadingIdentity": {
+    "description": "Status text while switching user agent and reloading login",
+    "placeholders": {
+      "identity": {
+        "type": "String"
+      }
+    }
+  },
+  "browserIdentityChromeDesktop": "Chrome Desktop",
+  "@browserIdentityChromeDesktop": {
+    "description": "Desktop Chrome browser identity label"
+  },
+  "browserIdentityChromeMobile": "Chrome Mobile",
+  "@browserIdentityChromeMobile": {
+    "description": "Mobile Chrome browser identity label"
+  },
+  "browserIdentitySafariMobile": "Safari Mobile",
+  "@browserIdentitySafariMobile": {
+    "description": "Mobile Safari browser identity label"
+  },
+  "browserIdentityFirefoxDesktop": "Firefox Desktop",
+  "@browserIdentityFirefoxDesktop": {
+    "description": "Desktop Firefox browser identity label"
+  },
+  "copyCodeAndOpenBrowser": "Copy code & open browser",
+  "@copyCodeAndOpenBrowser": {
+    "description": "Button label to copy user code and launch browser for OAuth login"
+  },
+  "partyServerUrlEmpty": "Server URL cannot be empty",
+  "@partyServerUrlEmpty": {
+    "description": "Validation error when party server URL is empty"
+  },
+  "partyServerUrlInvalid": "Enter a valid URL (http, https, ws, or wss)",
+  "@partyServerUrlInvalid": {
+    "description": "Validation error when party server URL scheme or host is invalid"
+  },
+  "castDefaultDevice": "device",
+  "@castDefaultDevice": {
+    "description": "Fallback name for a cast target when device name is unavailable"
+  },
+  "paste": "Paste",
+  "@paste": {
+    "description": "Tooltip and button label to paste text from clipboard"
+  },
+  "spotifyInvalidUrl": "Invalid Spotify playlist URL. Please check the link and try again.",
+  "@spotifyInvalidUrl": {
+    "description": "Error message when the entered Spotify playlist link is invalid"
+  },
+  "spotifyFetchingMetadata": "Fetching Spotify playlist metadata...",
+  "@spotifyFetchingMetadata": {
+    "description": "Status message while fetching playlist info from Spotify"
+  },
+  "spotifyMatchingTracks": "Matching tracks on YouTube Music ({completed}/{total})...",
+  "@spotifyMatchingTracks": {
+    "description": "Progress status while searching and matching Spotify tracks on YouTube Music",
+    "placeholders": {
+      "completed": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "spotifyImportComplete": "Import Complete",
+  "@spotifyImportComplete": {
+    "description": "Title of the Spotify import dialog when the import finished"
   }
 }

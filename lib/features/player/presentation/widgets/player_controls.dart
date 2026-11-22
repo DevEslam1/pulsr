@@ -240,7 +240,7 @@ class _PlayerControlsState extends State<PlayerControls> {
                   child: TweenAnimationBuilder<double>(
                     tween: Tween<double>(begin: 0, end: _prevNudgeX),
                     duration: context.motionMs(200),
-                    curve: Curves.easeOutBack,
+                    curve: context.motionCurve(Curves.easeOutBack),
                     builder: (context, dx, child) => Transform.translate(
                       offset: Offset(dx, 0),
                       child: child,
@@ -285,7 +285,7 @@ class _PlayerControlsState extends State<PlayerControls> {
                                     : p.hairline.withValues(alpha: 0.4),
                                 width: 1.0,
                               ),
-                              boxShadow: widget.hasPrevious
+                              boxShadow: (widget.hasPrevious && !p.isCalmDensity)
                                   ? PulsrElevation.level1(context)
                                   : null,
                             ),
@@ -328,8 +328,8 @@ class _PlayerControlsState extends State<PlayerControls> {
                           scale: _isPlayPressed ? 0.92 : 1.0,
                           duration: context.motionMs(_isPlayPressed ? 90 : 280),
                           curve: _isPlayPressed
-                              ? Curves.easeOutCubic
-                              : Curves.easeOutBack,
+                              ? context.motionCurve(Curves.easeOutCubic)
+                              : context.motionCurve(Curves.easeOutBack),
                           child: AnimatedContainer(
                             duration: context.motionMs(200),
                             width: widget.mainButtonSize,
@@ -347,17 +347,19 @@ class _PlayerControlsState extends State<PlayerControls> {
                                   widget.primaryColor,
                                 ],
                               ),
-                              boxShadow: [
-                                ...PulsrElevation.level2(context),
-                                BoxShadow(
-                                  color: widget.primaryColor.withValues(
-                                    alpha: widget.isPlaying ? 0.36 : 0.18,
-                                  ),
-                                  blurRadius: widget.isPlaying ? 18 : 10,
-                                  spreadRadius: -2,
-                                  offset: const Offset(0, 6),
-                                ),
-                              ],
+                              boxShadow: p.isCalmDensity
+                                  ? null
+                                  : [
+                                      ...PulsrElevation.level2(context),
+                                      BoxShadow(
+                                        color: widget.primaryColor.withValues(
+                                          alpha: widget.isPlaying ? 0.36 : 0.18,
+                                        ),
+                                        blurRadius: widget.isPlaying ? 18 : 10,
+                                        spreadRadius: -2,
+                                        offset: const Offset(0, 6),
+                                      ),
+                                    ],
                               border: Border.all(
                                 color: widget.abLoopActive
                                     ? p.accent
@@ -370,7 +372,7 @@ class _PlayerControlsState extends State<PlayerControls> {
                                 duration: context.motionMs(260),
                                 transitionBuilder: (child, anim) {
                                   final curve = CurveTween(
-                                    curve: Curves.easeOutBack,
+                                    curve: context.motionCurve(Curves.easeOutBack),
                                   );
                                   return FadeTransition(
                                     opacity: anim,
@@ -427,7 +429,7 @@ class _PlayerControlsState extends State<PlayerControls> {
                   child: TweenAnimationBuilder<double>(
                     tween: Tween<double>(begin: 0, end: _nextNudgeX),
                     duration: context.motionMs(200),
-                    curve: Curves.easeOutBack,
+                    curve: context.motionCurve(Curves.easeOutBack),
                     builder: (context, dx, child) => Transform.translate(
                       offset: Offset(dx, 0),
                       child: child,
@@ -472,7 +474,7 @@ class _PlayerControlsState extends State<PlayerControls> {
                                     : p.hairline.withValues(alpha: 0.4),
                                 width: 1.0,
                               ),
-                              boxShadow: widget.hasNext
+                              boxShadow: (widget.hasNext && !p.isCalmDensity)
                                   ? PulsrElevation.level1(context)
                                   : null,
                             ),
@@ -713,19 +715,21 @@ class _ControlButton extends StatelessWidget {
                     child: AnimatedScale(
                       scale: isActive ? 1.0 : 0.0,
                       duration: context.motionMs(200),
-                      curve: Curves.easeOutBack,
+                      curve: context.motionCurve(Curves.easeOutBack),
                       child: Container(
                         width: 6,
                         height: 6,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color: activeColor,
-                          boxShadow: [
-                            BoxShadow(
-                              color: activeColor.withValues(alpha: 0.65),
-                              blurRadius: 4,
-                            ),
-                          ],
+                          boxShadow: context.palette.isCalmDensity
+                              ? null
+                              : [
+                                  BoxShadow(
+                                    color: activeColor.withValues(alpha: 0.65),
+                                    blurRadius: 4,
+                                  ),
+                                ],
                         ),
                       ),
                     ),
@@ -804,8 +808,9 @@ class _AbPointButton extends StatelessWidget {
                         color: isActive ? effectiveColor : p.hairline,
                         width: 1.0,
                       ),
-                      boxShadow:
-                          isActive ? PulsrElevation.level1(context) : null,
+                      boxShadow: (isActive && !p.isCalmDensity)
+                          ? PulsrElevation.level1(context)
+                          : null,
                     ),
                     child: Text(
                       label,
@@ -825,7 +830,7 @@ class _AbPointButton extends StatelessWidget {
                     decoration: BoxDecoration(
                       borderRadius: AppRadii.r2All,
                       color: effectiveColor,
-                      boxShadow: isActive
+                      boxShadow: (isActive && !p.isCalmDensity)
                           ? [
                               BoxShadow(
                                 color: effectiveColor.withValues(alpha: 0.5),

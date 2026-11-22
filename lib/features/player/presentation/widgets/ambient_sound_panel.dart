@@ -8,6 +8,7 @@ import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/services/ambient_sound_service.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
+import '../../../../core/widgets/pulsr_dialog.dart';
 import '../../../../core/widgets/pulsr_switch.dart';
 
 import '../../../../core/utils/pulsr_haptics.dart';
@@ -103,31 +104,14 @@ class _AmbientSoundPanelState extends State<AmbientSoundPanel> {
 
   Future<void> _promptSaveMix() async {
     final l10n = context.l10n;
-    final controller = TextEditingController();
-    final name = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(l10n.ambientSaveMix),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: InputDecoration(hintText: l10n.ambientMixName),
-          onSubmitted: (v) => Navigator.of(ctx).pop(v),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: Text(l10n.ambientCancel),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(controller.text),
-            child: Text(l10n.ambientSave),
-          ),
-        ],
-      ),
+    final name = await PulsrDialogHelper.showInputDialog(
+      context,
+      title: l10n.ambientSaveMix,
+      hintText: l10n.ambientMixName,
+      confirmLabel: l10n.ambientSave,
+      cancelLabel: l10n.ambientCancel,
     );
-    controller.dispose();
-    if (name != null && name.trim().isNotEmpty) _service.saveMix(name);
+    if (name != null && name.trim().isNotEmpty) _service.saveMix(name.trim());
   }
 
   @override

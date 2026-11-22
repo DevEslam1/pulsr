@@ -419,7 +419,7 @@ class _TargetCurvePicker extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: color.withValues(alpha: 0.85),
-                        fontSize: AppFontSize.nano,
+                        fontSize: AppFontSize.tiny,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -437,6 +437,42 @@ class _TargetCurvePicker extends StatelessWidget {
 }
 
 class _CatmullRomEqPainter extends CustomPainter {
+  static final Path _curvePath = Path();
+  static final Path _fillPath = Path();
+
+  static final Paint _fillPaint = Paint();
+  static final Paint _glowPaint = Paint()
+    ..strokeWidth = 3.6
+    ..style = PaintingStyle.stroke
+    ..strokeCap = StrokeCap.round
+    ..strokeJoin = StrokeJoin.round
+    ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.0);
+  static final Paint _strokePaint = Paint()
+    ..strokeWidth = 2.4
+    ..style = PaintingStyle.stroke
+    ..strokeCap = StrokeCap.round
+    ..strokeJoin = StrokeJoin.round;
+  static final Paint _specPaint = Paint()..style = PaintingStyle.fill;
+  static final Paint _gridPaint = Paint()..strokeWidth = 1.0;
+  static final Paint _centerGridPaint = Paint()..strokeWidth = 1.2;
+  static final Paint _targetPaint = Paint()
+    ..strokeWidth = 1.4
+    ..style = PaintingStyle.stroke;
+  static final Paint _dotPaint = Paint()..style = PaintingStyle.fill;
+  static final Paint _haloPaint = Paint()..style = PaintingStyle.fill;
+  static final Paint _cursorPaint = Paint()
+    ..strokeWidth = 1.2
+    ..style = PaintingStyle.stroke;
+  static final Paint _outerGlowPaint = Paint()
+    ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5.0);
+  static final Paint _specularPaint = Paint()..style = PaintingStyle.fill;
+  static final Paint _zeroPaint = Paint()..style = PaintingStyle.fill;
+
+  static final Map<String, TextPainter> _cachedDbTextPainters = {};
+  static Color? _lastDbColor;
+  static final Map<String, TextPainter> _cachedFreqTextPainters = {};
+  static Color? _lastFreqColor;
+
   final List<double> gains;
   final Color color;
   final Color specularColor;
@@ -460,6 +496,49 @@ class _CatmullRomEqPainter extends CustomPainter {
     required this.showLabels,
     this.selectedBandIndex,
   });
+
+  static TextPainter _getDbTextPainter(String text, Color color) {
+    if (_lastDbColor != color) {
+      _cachedDbTextPainters.clear();
+      _lastDbColor = color;
+    }
+    return _cachedDbTextPainters.putIfAbsent(
+      text,
+      () => TextPainter(
+        text: TextSpan(
+          text: text,
+          style: TextStyle(
+            color: color.withValues(alpha: 0.38),
+            fontSize: AppFontSize.tiny,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.2,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout(),
+    );
+  }
+
+  static TextPainter _getFreqTextPainter(String text, Color color) {
+    if (_lastFreqColor != color) {
+      _cachedFreqTextPainters.clear();
+      _lastFreqColor = color;
+    }
+    return _cachedFreqTextPainters.putIfAbsent(
+      text,
+      () => TextPainter(
+        text: TextSpan(
+          text: text,
+          style: TextStyle(
+            color: color.withValues(alpha: 0.28),
+            fontSize: AppFontSize.tiny,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout(),
+    );
+  }
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -513,12 +592,14 @@ class _CatmullRomEqPainter extends CustomPainter {
     final curvePath = _buildCentripetalCatmullRomSpline(points);
 
     // 5. Fill Area under Curve (Gradient towards 0 dB line)
-    final fillPath = Path.from(curvePath)
+    final fillPath = _fillPath
+      ..reset()
+      ..addPath(curvePath, Offset.zero)
       ..lineTo(points.last.dx, midY)
       ..lineTo(points.first.dx, midY)
       ..close();
 
-    final fillPaint = Paint()
+    final fillPaint = _fillPaint
       ..shader = LinearGradient(
         colors: [
           color.withValues(alpha: 0.28),
@@ -530,21 +611,10 @@ class _CatmullRomEqPainter extends CustomPainter {
     canvas.drawPath(fillPath, fillPaint);
 
     // 6. Draw Curve Glow & Stroke
-    final glowPaint = Paint()
-      ..color = color.withValues(alpha: 0.45)
-      ..strokeWidth = 3.6
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.0);
+    final glowPaint = _glowPaint..color = color.withValues(alpha: 0.45);
     canvas.drawPath(curvePath, glowPaint);
 
-    final strokePaint = Paint()
-      ..color = color
-      ..strokeWidth = 2.4
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
+    final strokePaint = _strokePaint..color = color;
     canvas.drawPath(curvePath, strokePaint);
 
     // 7. Draw Band Control Nodes & Selection Halos
@@ -552,9 +622,7 @@ class _CatmullRomEqPainter extends CustomPainter {
   }
 
   void _paintSpectrum(Canvas canvas, Size size) {
-    final specPaint = Paint()
-      ..color = color.withValues(alpha: 0.14)
-      ..style = PaintingStyle.fill;
+    final specPaint = _specPaint..color = color.withValues(alpha: 0.14);
 
     final specWidth = size.width / spectrumData!.length;
     for (int i = 0; i < spectrumData!.length; i++) {
@@ -571,13 +639,9 @@ class _CatmullRomEqPainter extends CustomPainter {
   }
 
   void _paintGrid(Canvas canvas, Size size, double midY, double verticalScale) {
-    final gridPaint = Paint()
-      ..color = color.withValues(alpha: 0.08)
-      ..strokeWidth = 1.0;
+    final gridPaint = _gridPaint..color = color.withValues(alpha: 0.08);
 
-    final centerPaint = Paint()
-      ..color = color.withValues(alpha: 0.22)
-      ..strokeWidth = 1.2;
+    final centerPaint = _centerGridPaint..color = color.withValues(alpha: 0.22);
 
     // 0 dB reference line
     canvas.drawLine(Offset(0, midY), Offset(size.width, midY), centerPaint);
@@ -590,46 +654,29 @@ class _CatmullRomEqPainter extends CustomPainter {
     }
 
     if (size.height >= 48) {
-      final labelStyle = TextStyle(
-        color: color.withValues(alpha: 0.38),
-        fontSize: AppFontSize.nano,
-        fontWeight: FontWeight.w700,
-        letterSpacing: 0.2,
-      );
-      final tp = TextPainter(textDirection: TextDirection.ltr);
+      final tpPlus = _getDbTextPainter('+${maxGain.toInt()} dB', color);
+      tpPlus.paint(canvas, Offset(6, midY - verticalScale - 1));
 
-      tp.text = TextSpan(text: '+${maxGain.toInt()} dB', style: labelStyle);
-      tp.layout();
-      tp.paint(canvas, Offset(6, midY - verticalScale - 1));
+      final tpZero = _getDbTextPainter('0 dB', color);
+      tpZero.paint(canvas, Offset(6, midY - tpZero.height / 2));
 
-      tp.text = TextSpan(text: '0 dB', style: labelStyle);
-      tp.layout();
-      tp.paint(canvas, Offset(6, midY - tp.height / 2));
-
-      tp.text = TextSpan(text: '-${maxGain.toInt()} dB', style: labelStyle);
-      tp.layout();
-      tp.paint(canvas, Offset(6, midY + verticalScale - tp.height));
+      final tpMinus = _getDbTextPainter('-${maxGain.toInt()} dB', color);
+      tpMinus.paint(canvas, Offset(6, midY + verticalScale - tpMinus.height));
 
       // Paint frequency markers along bottom when showLabels is true
       if (showLabels) {
         final fMarkers = [100.0, 1000.0, 10000.0];
         final fLabels = ['100', '1k', '10k'];
-        final markerStyle = TextStyle(
-          color: color.withValues(alpha: 0.28),
-          fontSize: AppFontSize.nano,
-          fontWeight: FontWeight.w600,
-        );
         for (int m = 0; m < fMarkers.length; m++) {
           final f = fMarkers[m];
           final x = ((math.log(f) - math.log(20.0)) /
                   (math.log(20000.0) - math.log(20.0))) *
               size.width;
-          tp.text = TextSpan(text: fLabels[m], style: markerStyle);
-          tp.layout();
-          tp.paint(
+          final tpMarker = _getFreqTextPainter(fLabels[m], color);
+          tpMarker.paint(
               canvas,
-              Offset((x - tp.width / 2).clamp(24.0, size.width - 24.0),
-                  size.height - tp.height - 1));
+              Offset((x - tpMarker.width / 2).clamp(24.0, size.width - 24.0),
+                  size.height - tpMarker.height - 1));
         }
       }
     }
@@ -655,10 +702,7 @@ class _CatmullRomEqPainter extends CustomPainter {
       points.add(Offset(t * size.width, y));
     }
 
-    final paint = Paint()
-      ..color = color.withValues(alpha: 0.55)
-      ..strokeWidth = 1.4
-      ..style = PaintingStyle.stroke;
+    final paint = _targetPaint..color = color.withValues(alpha: 0.55);
 
     canvas.save();
     canvas.clipRect(Offset.zero & size);
@@ -692,7 +736,7 @@ class _CatmullRomEqPainter extends CustomPainter {
   }
 
   Path _buildCentripetalCatmullRomSpline(List<Offset> points) {
-    final path = Path();
+    final path = _curvePath..reset();
     if (points.isEmpty) return path;
     if (points.length == 1) {
       path.moveTo(points.first.dx, points.first.dy);
@@ -745,13 +789,9 @@ class _CatmullRomEqPainter extends CustomPainter {
 
   void _paintBandNodes(
       Canvas canvas, List<Offset> points, double midY, Size size) {
-    final dotPaint = Paint()
-      ..color = color
-      ..style = PaintingStyle.fill;
+    final dotPaint = _dotPaint..color = color;
 
-    final haloPaint = Paint()
-      ..color = color.withValues(alpha: 0.28)
-      ..style = PaintingStyle.fill;
+    final haloPaint = _haloPaint..color = color.withValues(alpha: 0.28);
 
     for (int i = 0; i < points.length; i++) {
       final pt = points[i];
@@ -760,10 +800,7 @@ class _CatmullRomEqPainter extends CustomPainter {
 
       if (isSelected) {
         // Vertical frequency cursor line
-        final cursorPaint = Paint()
-          ..color = color.withValues(alpha: 0.40)
-          ..strokeWidth = 1.2
-          ..style = PaintingStyle.stroke;
+        final cursorPaint = _cursorPaint..color = color.withValues(alpha: 0.40);
         canvas.drawLine(
           Offset(pt.dx, 0),
           Offset(pt.dx, size.height),
@@ -771,26 +808,22 @@ class _CatmullRomEqPainter extends CustomPainter {
         );
 
         // Highlighted node outer soft glow
-        final outerGlowPaint = Paint()
-          ..color = color.withValues(alpha: 0.22)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5.0);
+        final outerGlowPaint = _outerGlowPaint
+          ..color = color.withValues(alpha: 0.22);
         canvas.drawCircle(pt, 14.0, outerGlowPaint);
 
         canvas.drawCircle(pt, 9.0, haloPaint);
         canvas.drawCircle(pt, 4.5, dotPaint);
 
         // Specular center dot
-        final specularPaint = Paint()
-          ..color = specularColor.withValues(alpha: 0.90)
-          ..style = PaintingStyle.fill;
+        final specularPaint = _specularPaint
+          ..color = specularColor.withValues(alpha: 0.90);
         canvas.drawCircle(pt, 1.8, specularPaint);
       } else if (hasGain) {
         canvas.drawCircle(pt, 3.2, dotPaint);
       } else {
         // Flat node on 0 dB line
-        final zeroPaint = Paint()
-          ..color = color.withValues(alpha: 0.45)
-          ..style = PaintingStyle.fill;
+        final zeroPaint = _zeroPaint..color = color.withValues(alpha: 0.45);
         canvas.drawCircle(pt, 2.0, zeroPaint);
       }
     }

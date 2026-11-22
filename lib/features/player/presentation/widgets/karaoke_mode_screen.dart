@@ -18,8 +18,29 @@ import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/utils/error_logger.dart';
+import '../../../../domain/models/lyrics_line.dart';
 
 import '../../../../core/utils/pulsr_haptics.dart';
+
+class _KaraokeActiveLyricData {
+  final int activeIdx;
+  final int highlightedCount;
+
+  const _KaraokeActiveLyricData({
+    required this.activeIdx,
+    required this.highlightedCount,
+  });
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is _KaraokeActiveLyricData &&
+          other.activeIdx == activeIdx &&
+          other.highlightedCount == highlightedCount;
+
+  @override
+  int get hashCode => Object.hash(activeIdx, highlightedCount);
+}
 
 class KaraokeModeScreen extends StatefulWidget {
   const KaraokeModeScreen({super.key});
@@ -231,44 +252,14 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
 
       return BlocBuilder<PlayerCubit, PlayerState>(
         buildWhen: (prev, curr) =>
-            prev.position != curr.position ||
             prev.currentSong != curr.currentSong ||
             prev.duration != curr.duration ||
             prev.isPlaying != curr.isPlaying ||
             prev.isLoadingLyrics != curr.isLoadingLyrics ||
             prev.lyrics != curr.lyrics,
         builder: (context, state) {
-          final rawPos = state.position - audibleOffset;
-          final pos = rawPos.isNegative ? Duration.zero : rawPos;
           final song = state.currentSong;
           final effectiveLyrics = state.lyrics;
-
-          // Determine current active line index
-          int activeIdx = -1;
-          for (int i = 0; i < effectiveLyrics.length; i++) {
-            if (pos >= effectiveLyrics[i].timestamp) {
-              activeIdx = i;
-            } else {
-              break;
-            }
-          }
-
-          final activeLine =
-              (activeIdx >= 0 && activeIdx < effectiveLyrics.length)
-                  ? effectiveLyrics[activeIdx]
-                  : null;
-          final nextLine =
-              (activeIdx + 1 >= 0 && activeIdx + 1 < effectiveLyrics.length)
-                  ? effectiveLyrics[activeIdx + 1]
-                  : (activeIdx == -1 && effectiveLyrics.isNotEmpty
-                      ? effectiveLyrics[0]
-                      : null);
-
-          final durationMs = state.duration.inMilliseconds;
-          final progressPct = durationMs > 0
-              ? ((pos.inMilliseconds / durationMs).clamp(0.0, 1.0) * 100)
-                  .round()
-              : 0;
 
           final avgScore =
               _totalTaps > 0 ? (_scoreAccumulator / _totalTaps).round() : null;
@@ -301,49 +292,63 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
                       padding: const EdgeInsets.symmetric(
                           horizontal: AppSpacing.s8, vertical: AppSpacing.xxs),
                       decoration: BoxDecoration(
-                        color: Colors.amber.withValues(alpha: 0.2),
+                        color: p.warningSoft,
                         borderRadius: AppRadii.r10All,
-                        border: Border.all(color: Colors.amber),
+                        border: Border.all(color: p.warning),
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.star_rounded,
-                              size: 16, color: Colors.amber),
+                          Icon(Icons.star_rounded,
+                              size: 16, color: p.warning),
                           const SizedBox(width: AppSpacing.xxs),
                           Text(
                             '$avgScore',
-                            style: const TextStyle(
+                            style: TextStyle(
                                 fontSize: AppFontSize.caption,
                                 fontWeight: FontWeight.w900,
-                                color: Colors.amber),
+                                color: p.warning),
                           ),
                         ],
                       ),
                     ),
-                  Container(
-                    margin:
-                        const EdgeInsetsDirectional.only(end: AppSpacing.md),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.s10, vertical: AppSpacing.xxs),
-                    decoration: BoxDecoration(
-                      color: p.primary.withValues(alpha: 0.2),
-                      borderRadius: AppRadii.r10All,
-                      border: Border.all(color: p.primary),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.timelapse_rounded,
-                            size: 16, color: p.primary),
-                        const SizedBox(width: AppSpacing.xxs),
-                        Text(
-                          '$progressPct%',
-                          style: TextStyle(
-                              fontSize: AppFontSize.caption,
-                              fontWeight: FontWeight.w900,
-                              color: p.primary),
+                  BlocSelector<PlayerCubit, PlayerState, int>(
+                    selector: (s) {
+                      final rawPos = s.position - audibleOffset;
+                      final pos = rawPos.isNegative ? Duration.zero : rawPos;
+                      final durationMs = s.duration.inMilliseconds;
+                      return durationMs > 0
+                          ? ((pos.inMilliseconds / durationMs).clamp(0.0, 1.0) *
+                                  100)
+                              .round()
+                          : 0;
+                    },
+                    builder: (context, progressPct) {
+                      return Container(
+                        margin:
+                            const EdgeInsetsDirectional.only(end: AppSpacing.md),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.s10, vertical: AppSpacing.xxs),
+                        decoration: BoxDecoration(
+                          color: p.primary.withValues(alpha: 0.2),
+                          borderRadius: AppRadii.r10All,
+                          border: Border.all(color: p.primary),
                         ),
-                      ],
-                    ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.timelapse_rounded,
+                                size: 16, color: p.primary),
+                            const SizedBox(width: AppSpacing.xxs),
+                            Text(
+                              '$progressPct%',
+                              style: TextStyle(
+                                  fontSize: AppFontSize.caption,
+                                  fontWeight: FontWeight.w900,
+                                  color: p.primary),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
                   ),
                 ],
               ),
@@ -352,168 +357,228 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
                   final isLandscape = MediaQuery.orientationOf(context) ==
                       Orientation.landscape;
 
-                  final lyricsWidget = Column(
-                    mainAxisSize: MainAxisSize.min,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      if (effectiveLyrics.isEmpty)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: AppSpacing.xl),
-                          child: Text(
-                            state.isLoadingLyrics
-                                ? context.l10n.dspLoadingLyrics
-                                : context.l10n.noLyricsFound,
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: AppFontSize.bodyLarge,
-                              fontWeight: FontWeight.w600,
-                              color: p.textSecondary,
+                  Widget buildLyricsWidget({required bool isLandscape}) {
+                    if (effectiveLyrics.isEmpty) {
+                      return Column(
+                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: AppSpacing.xl),
+                            child: Text(
+                              state.isLoadingLyrics
+                                  ? context.l10n.dspLoadingLyrics
+                                  : context.l10n.noLyricsFound,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: AppFontSize.bodyLarge,
+                                fontWeight: FontWeight.w600,
+                                color: p.textSecondary,
+                              ),
                             ),
                           ),
-                        ),
-                      // Active Lyric Line with Glow & Tap-to-Seek
-                      if (activeLine != null)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: AppSpacing.xl),
-                          child: InkWell(
-                            onTap: () {
-                              PulsrHaptics.selectionClick();
-                              context
-                                  .read<PlayerCubit>()
-                                  .seek(activeLine.timestamp);
-                            },
-                            borderRadius: AppRadii.r16All,
-                            splashColor: p.primary.withValues(alpha: 0.2),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                  vertical: AppSpacing.xs,
-                                  horizontal: AppSpacing.sm),
-                              child: Builder(
-                                builder: (_) {
-                                  final lineStart =
-                                      activeLine.timestamp.inMilliseconds;
-                                  final lineEnd = (nextLine?.timestamp ??
-                                          (activeLine.timestamp +
-                                              const Duration(seconds: 4)))
-                                      .inMilliseconds;
-                                  final lineDuration =
-                                      math.max(1, lineEnd - lineStart);
-                                  final currentProgress =
-                                      ((pos.inMilliseconds - lineStart) /
-                                              lineDuration)
-                                          .clamp(0.0, 1.0);
-                                  final words = activeLine.text.split(' ');
-                                  final highlightedCount =
-                                      (currentProgress * words.length).ceil();
+                        ],
+                      );
+                    }
 
-                                  return Text.rich(
-                                    TextSpan(
-                                      children: [
-                                        for (int i = 0;
-                                            i < words.length;
-                                            i++) ...[
+                    return BlocSelector<PlayerCubit, PlayerState,
+                        _KaraokeActiveLyricData>(
+                      selector: (s) {
+                        final rawPos = s.position - audibleOffset;
+                        final pos = rawPos.isNegative ? Duration.zero : rawPos;
+                        int activeIdx = -1;
+                        for (int i = 0; i < effectiveLyrics.length; i++) {
+                          if (pos >= effectiveLyrics[i].timestamp) {
+                            activeIdx = i;
+                          } else {
+                            break;
+                          }
+                        }
+                        if (activeIdx < 0 ||
+                            activeIdx >= effectiveLyrics.length) {
+                          return const _KaraokeActiveLyricData(
+                              activeIdx: -1, highlightedCount: 0);
+                        }
+                        final line = effectiveLyrics[activeIdx];
+                        final next = (activeIdx + 1 < effectiveLyrics.length)
+                            ? effectiveLyrics[activeIdx + 1]
+                            : null;
+                        final lineStart = line.timestamp.inMilliseconds;
+                        final lineEnd = (next?.timestamp ??
+                                (line.timestamp + const Duration(seconds: 4)))
+                            .inMilliseconds;
+                        final lineDuration = math.max(1, lineEnd - lineStart);
+                        final currentProgress =
+                            ((pos.inMilliseconds - lineStart) / lineDuration)
+                                .clamp(0.0, 1.0);
+                        final words = line.text.split(' ');
+                        final highlightedCount =
+                            (currentProgress * words.length).ceil();
+                        return _KaraokeActiveLyricData(
+                          activeIdx: activeIdx,
+                          highlightedCount: highlightedCount,
+                        );
+                      },
+                      builder: (context, lyricData) {
+                        final activeIdx = lyricData.activeIdx;
+                        final activeLine = (activeIdx >= 0 &&
+                                activeIdx < effectiveLyrics.length)
+                            ? effectiveLyrics[activeIdx]
+                            : null;
+                        final nextLine = (activeIdx + 1 >= 0 &&
+                                activeIdx + 1 < effectiveLyrics.length)
+                            ? effectiveLyrics[activeIdx + 1]
+                            : (activeIdx == -1 && effectiveLyrics.isNotEmpty
+                                ? effectiveLyrics[0]
+                                : null);
+
+                        return Column(
+                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            // Active Lyric Line with Glow & Tap-to-Seek
+                            if (activeLine != null)
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: AppSpacing.xl),
+                                child: InkWell(
+                                  onTap: () {
+                                    PulsrHaptics.selectionClick();
+                                    context
+                                        .read<PlayerCubit>()
+                                        .seek(activeLine.timestamp);
+                                  },
+                                  borderRadius: AppRadii.r16All,
+                                  splashColor:
+                                      p.primary.withValues(alpha: 0.2),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: AppSpacing.xs,
+                                        horizontal: AppSpacing.sm),
+                                    child: Builder(
+                                      builder: (_) {
+                                        final words =
+                                            activeLine.text.split(' ');
+                                        final highlightedCount =
+                                            lyricData.highlightedCount;
+
+                                        return Text.rich(
                                           TextSpan(
-                                            text: words[i] +
-                                                (i < words.length - 1
-                                                    ? ' '
-                                                    : ''),
-                                            style: TextStyle(
-                                              color: i < highlightedCount
-                                                  ? p.primary
-                                                  : p.primary
-                                                      .withValues(alpha: 0.38),
-                                              fontWeight: i < highlightedCount
-                                                  ? FontWeight.w900
-                                                  : FontWeight.w700,
-                                              shadows: i < highlightedCount
-                                                  ? [
-                                                      Shadow(
-                                                        color: p.primary
-                                                            .withValues(
-                                                                alpha: 0.8),
-                                                        blurRadius: 28,
-                                                      ),
-                                                    ]
-                                                  : null,
-                                            ),
+                                            children: [
+                                              for (int i = 0;
+                                                  i < words.length;
+                                                  i++) ...[
+                                                TextSpan(
+                                                  text: words[i] +
+                                                      (i < words.length - 1
+                                                          ? ' '
+                                                          : ''),
+                                                  style: TextStyle(
+                                                    color: i < highlightedCount
+                                                        ? p.primary
+                                                        : p.primary.withValues(
+                                                            alpha: 0.38),
+                                                    fontWeight:
+                                                        i < highlightedCount
+                                                            ? FontWeight.w900
+                                                            : FontWeight.w700,
+                                                    shadows: i <
+                                                            highlightedCount
+                                                        ? [
+                                                            Shadow(
+                                                              color: p.primary
+                                                                  .withValues(
+                                                                      alpha:
+                                                                          0.8),
+                                                              blurRadius: 10,
+                                                            ),
+                                                          ]
+                                                        : null,
+                                                  ),
+                                                ),
+                                              ],
+                                            ],
                                           ),
-                                        ],
-                                      ],
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            fontSize: isLandscape
+                                                ? math.min(_fontSize, 22.0)
+                                                : _fontSize,
+                                          ),
+                                        );
+                                      },
                                     ),
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      fontSize: isLandscape
-                                          ? math.min(_fontSize, 22.0)
-                                          : _fontSize,
+                                  ),
+                                ),
+                              )
+                            else if (effectiveLyrics.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: AppSpacing.xl),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.music_note_rounded,
+                                        size: 32,
+                                        color:
+                                            p.primary.withValues(alpha: 0.7)),
+                                    const SizedBox(height: AppSpacing.xs),
+                                    Text(
+                                      '•••',
+                                      style: TextStyle(
+                                        fontSize: AppFontSize.display,
+                                        fontWeight: FontWeight.w700,
+                                        color: p.textTertiary,
+                                        letterSpacing: 4.0,
+                                      ),
                                     ),
-                                  );
-                                },
-                              ),
-                            ),
-                          ),
-                        )
-                      else if (effectiveLyrics.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: AppSpacing.xl),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.music_note_rounded,
-                                  size: 32,
-                                  color: p.primary.withValues(alpha: 0.7)),
-                              const SizedBox(height: AppSpacing.xs),
-                              Text(
-                                '•••',
-                                style: TextStyle(
-                                  fontSize: AppFontSize.display,
-                                  fontWeight: FontWeight.w700,
-                                  color: p.textTertiary,
-                                  letterSpacing: 4.0,
+                                  ],
                                 ),
                               ),
-                            ],
-                          ),
-                        ),
-                      const SizedBox(height: AppSpacing.md),
-                      // Next Upcoming Line (Tappable)
-                      if (nextLine != null)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 36),
-                          child: InkWell(
-                            onTap: () {
-                              PulsrHaptics.selectionClick();
-                              context
-                                  .read<PlayerCubit>()
-                                  .seek(nextLine.timestamp);
-                            },
-                            borderRadius: AppRadii.r12All,
-                            splashColor: p.primary.withValues(alpha: 0.15),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                  vertical: AppSpacing.s6,
-                                  horizontal: AppSpacing.sm),
-                              child: Text(
-                                nextLine.text,
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontSize: math.max(
-                                      13.0,
-                                      (isLandscape
-                                              ? math.min(_fontSize, 22.0)
-                                              : _fontSize) *
-                                          0.65),
-                                  fontWeight: FontWeight.w600,
-                                  color: p.textTertiary,
+                            const SizedBox(height: AppSpacing.md),
+                            // Next Upcoming Line (Tappable)
+                            if (nextLine != null)
+                              Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 36),
+                                child: InkWell(
+                                  onTap: () {
+                                    PulsrHaptics.selectionClick();
+                                    context
+                                        .read<PlayerCubit>()
+                                        .seek(nextLine.timestamp);
+                                  },
+                                  borderRadius: AppRadii.r12All,
+                                  splashColor:
+                                      p.primary.withValues(alpha: 0.15),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: AppSpacing.s6,
+                                        horizontal: AppSpacing.sm),
+                                    child: Text(
+                                      nextLine.text,
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: math.max(
+                                            13.0,
+                                            (isLandscape
+                                                    ? math.min(
+                                                        _fontSize, 22.0)
+                                                    : _fontSize) *
+                                                0.65),
+                                        fontWeight: FontWeight.w600,
+                                        color: p.textTertiary,
+                                      ),
+                                    ),
+                                  ),
                                 ),
                               ),
-                            ),
-                          ),
-                        ),
-                    ],
-                  );
+                          ],
+                        );
+                      },
+                    );
+                  }
 
                   Widget buildKaraokeBar({required bool compact}) {
                     return Padding(
@@ -605,29 +670,56 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
                               });
                             },
                           ),
-                          if (activeLine != null)
-                            ElevatedButton.icon(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor:
-                                    Colors.amber.withValues(alpha: 0.25),
-                                foregroundColor: Colors.amber,
-                                elevation: 0,
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: AppSpacing.xs,
-                                    vertical: AppSpacing.xxs),
-                              ),
-                              onPressed: () =>
-                                  _recordTapTiming(pos, activeLine.timestamp),
-                              icon:
-                                  const Icon(Icons.touch_app_rounded, size: 14),
-                              label: Text(
-                                _lastScore != null
-                                    ? context.l10n.karaokeScore(_lastScore!)
-                                    : context.l10n.karaokeTapRhythm,
-                                style: const TextStyle(
-                                    fontSize: AppFontSize.caption),
-                              ),
-                            ),
+                          BlocSelector<PlayerCubit, PlayerState, LyricsLine?>(
+                            selector: (s) {
+                              if (effectiveLyrics.isEmpty) return null;
+                              final rawPos = s.position - audibleOffset;
+                              final pPos =
+                                  rawPos.isNegative ? Duration.zero : rawPos;
+                              for (int i = effectiveLyrics.length - 1;
+                                  i >= 0;
+                                  i--) {
+                                if (pPos >= effectiveLyrics[i].timestamp) {
+                                  return effectiveLyrics[i];
+                                }
+                              }
+                              return null;
+                            },
+                            builder: (context, activeLine) {
+                              if (activeLine == null) {
+                                return const SizedBox.shrink();
+                              }
+                              return ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: p.warningSoft,
+                                  foregroundColor: p.warning,
+                                  elevation: 0,
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: AppSpacing.xs,
+                                      vertical: AppSpacing.xxs),
+                                ),
+                                onPressed: () {
+                                  final raw = context
+                                          .read<PlayerCubit>()
+                                          .state
+                                          .position -
+                                      audibleOffset;
+                                  final pPos =
+                                      raw.isNegative ? Duration.zero : raw;
+                                  _recordTapTiming(pPos, activeLine.timestamp);
+                                },
+                                icon: const Icon(Icons.touch_app_rounded,
+                                    size: 14),
+                                label: Text(
+                                  _lastScore != null
+                                      ? context.l10n.karaokeScore(_lastScore!)
+                                      : context.l10n.karaokeTapRhythm,
+                                  style: const TextStyle(
+                                      fontSize: AppFontSize.caption),
+                                ),
+                              );
+                            },
+                          ),
                         ],
                       ),
                     );
@@ -638,12 +730,11 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
                     return Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        // Interactive Seek Bar
+                        // Interactive Seek Bar (position: null delegates to internal BlocSelector)
                         Padding(
                           padding: const EdgeInsets.symmetric(
                               horizontal: AppSpacing.md),
                           child: PlayerSeekBar(
-                            position: pos,
                             duration: state.duration,
                             activeColor: p.primary,
                             songId: song?.id,
@@ -678,6 +769,34 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
                     );
                   }
 
+                  Widget buildPitchHighwayWidget({required double height}) {
+                    return BlocSelector<PlayerCubit, PlayerState,
+                        ({Duration pos, int activeIdx})>(
+                      selector: (s) {
+                        final rawPos = s.position - audibleOffset;
+                        final pPos =
+                            rawPos.isNegative ? Duration.zero : rawPos;
+                        int activeIdx = -1;
+                        for (int i = 0; i < effectiveLyrics.length; i++) {
+                          if (pPos >= effectiveLyrics[i].timestamp) {
+                            activeIdx = i;
+                          } else {
+                            break;
+                          }
+                        }
+                        return (pos: pPos, activeIdx: activeIdx);
+                      },
+                      builder: (context, data) => KaraokePitchHighway(
+                        isPlaying: state.isPlaying,
+                        currentPosition: data.pos,
+                        accentColor: p.primary,
+                        height: height,
+                        lyrics: effectiveLyrics,
+                        activeLineIndex: data.activeIdx,
+                      ),
+                    );
+                  }
+
                   if (isLandscape) {
                     return SafeArea(
                       child: Row(
@@ -690,14 +809,14 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: AppSpacing.md,
                                     vertical: AppSpacing.xs),
-                                child: lyricsWidget,
+                                child: buildLyricsWidget(isLandscape: true),
                               ),
                             ),
                           ),
-                          const VerticalDivider(
+                          VerticalDivider(
                             width: 1,
                             thickness: 1,
-                            color: Colors.white12,
+                            color: p.hairline,
                           ),
                           // Right Pane: Tools + Visualizer + Transport Controls
                           Expanded(
@@ -716,14 +835,7 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
                                       padding: const EdgeInsets.symmetric(
                                           horizontal: AppSpacing.md),
                                       child: _showPitchHighway
-                                          ? KaraokePitchHighway(
-                                              isPlaying: state.isPlaying,
-                                              currentPosition: pos,
-                                              accentColor: p.primary,
-                                              height: 36,
-                                              lyrics: effectiveLyrics,
-                                              activeLineIndex: activeIdx,
-                                            )
+                                          ? buildPitchHighwayWidget(height: 36)
                                           : AudioVisualizer(
                                               style: VisualizerStyle.wave,
                                               color: p.primary,
@@ -754,7 +866,7 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
                               padding: const EdgeInsets.symmetric(
                                   horizontal: AppSpacing.md,
                                   vertical: AppSpacing.sm),
-                              child: lyricsWidget,
+                              child: buildLyricsWidget(isLandscape: false),
                             ),
                           ),
                         ),
@@ -764,14 +876,7 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
                           padding: const EdgeInsets.symmetric(
                               horizontal: AppSpacing.lg),
                           child: _showPitchHighway
-                              ? KaraokePitchHighway(
-                                  isPlaying: state.isPlaying,
-                                  currentPosition: pos,
-                                  accentColor: p.primary,
-                                  height: 52,
-                                  lyrics: effectiveLyrics,
-                                  activeLineIndex: activeIdx,
-                                )
+                              ? buildPitchHighwayWidget(height: 52)
                               : AudioVisualizer(
                                   style: VisualizerStyle.wave,
                                   color: p.primary,

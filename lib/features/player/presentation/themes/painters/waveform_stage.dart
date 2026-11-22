@@ -560,6 +560,11 @@ class _StudioOscilloscopeBayState extends State<_StudioOscilloscopeBay> {
 /// Paints studio oscilloscope dB reference lines, vertical time-division
 /// reticle ticks, center 0-axis hairline, and subtle dB scale calibrations.
 class _OscilloscopeGridPainter extends CustomPainter {
+  static final Paint _gridPaint = Paint()..strokeWidth = 0.75;
+  static final Paint _axisPaint = Paint()..strokeWidth = 1.0;
+  static final Map<String, TextPainter> _labelPainters = {};
+  static Color? _cachedLabelColor;
+
   final Color gridColor;
   final Color axisColor;
   final Color labelColor;
@@ -572,16 +577,34 @@ class _OscilloscopeGridPainter extends CustomPainter {
     required this.isCompact,
   });
 
+  static TextPainter _getTextPainter(String text, Color color) {
+    if (_cachedLabelColor != color) {
+      _labelPainters.clear();
+      _cachedLabelColor = color;
+    }
+    return _labelPainters.putIfAbsent(
+      text,
+      () => TextPainter(
+        text: TextSpan(
+          text: text,
+          style: TextStyle(
+            fontFamily: 'monospace',
+            fontSize: AppFontSize.caption,
+            fontWeight: FontWeight.w700,
+            color: color,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout(),
+    );
+  }
+
   @override
   void paint(Canvas canvas, Size size) {
     if (size.width <= 0 || size.height <= 0) return;
 
-    final gridPaint = Paint()
-      ..color = gridColor
-      ..strokeWidth = 0.75;
-    final axisPaint = Paint()
-      ..color = axisColor
-      ..strokeWidth = 1.0;
+    final gridPaint = _gridPaint..color = gridColor;
+    final axisPaint = _axisPaint..color = axisColor;
 
     // 1. Horizontal amplitude / dB reference lines (top +0dB, ±6dB, center 0).
     final double midY = size.height / 2;
@@ -614,18 +637,7 @@ class _OscilloscopeGridPainter extends CustomPainter {
         (size.height * 0.67, '-6 dB'),
       ];
       for (final (y, text) in labels) {
-        final painter = TextPainter(
-          text: TextSpan(
-            text: text,
-            style: TextStyle(
-              fontFamily: 'monospace',
-              fontSize: AppFontSize.caption,
-              fontWeight: FontWeight.w700,
-              color: labelColor,
-            ),
-          ),
-          textDirection: TextDirection.ltr,
-        )..layout();
+        final painter = _getTextPainter(text, labelColor);
         painter.paint(canvas, Offset(AppSpacing.xs, y - painter.height - 1));
       }
     }
@@ -642,6 +654,29 @@ class _OscilloscopeGridPainter extends CustomPainter {
 /// Paints the studio oscilloscope waveform peaks, luminous played crest line,
 /// A/B loop shaded region + pins, and glowing vertical playhead cursor.
 class _OscilloscopeWaveformPainter extends CustomPainter {
+  static final Path _topEnvelope = Path();
+  static final Path _bottomEnvelope = Path();
+  static final Path _topCap = Path();
+  static final Path _bottomCap = Path();
+
+  static final Paint _loopShadePaint = Paint();
+  static final Paint _loopPinLinePaint = Paint()..strokeWidth = 1.4;
+  static final Paint _loopBadgePaint = Paint();
+  static final Paint _unplayedPaint = Paint();
+  static final Paint _playedPaint = Paint();
+  static final Paint _crestPaint = Paint()
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 1.4
+    ..strokeJoin = StrokeJoin.round;
+  static final Paint _playheadGlowPaint = Paint()
+    ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5.0);
+  static final Paint _playheadCorePaint = Paint()
+    ..strokeCap = StrokeCap.round;
+  static final Paint _markerPaint = Paint();
+
+  static final Map<String, TextPainter> _pinTextPainters = {};
+  static Color? _lastPinTextColor;
+
   final List<double> samples;
   final double progress;
   final Color activeColor;
@@ -671,6 +706,29 @@ class _OscilloscopeWaveformPainter extends CustomPainter {
     required this.isRtl,
     required this.isDark,
   });
+
+  static TextPainter _getPinTextPainter(String tag, Color activeColor) {
+    final textColor = AppColors.textOnAccent(activeColor);
+    if (_lastPinTextColor != textColor) {
+      _pinTextPainters.clear();
+      _lastPinTextColor = textColor;
+    }
+    return _pinTextPainters.putIfAbsent(
+      tag,
+      () => TextPainter(
+        text: TextSpan(
+          text: tag,
+          style: TextStyle(
+            fontFamily: 'monospace',
+            fontSize: AppFontSize.caption,
+            fontWeight: FontWeight.w900,
+            color: textColor,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout(),
+    );
+  }
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -707,7 +765,7 @@ class _OscilloscopeWaveformPainter extends CustomPainter {
         final right = math.max(ax, bx);
         canvas.drawRect(
           Rect.fromLTRB(left, 0, right, size.height),
-          Paint()
+          _loopShadePaint
             ..color = activeColor.withValues(
               alpha: abLoopEnabled ? 0.16 : 0.08,
             ),
@@ -718,7 +776,7 @@ class _OscilloscopeWaveformPainter extends CustomPainter {
         canvas.drawLine(
           Offset(x, 0),
           Offset(x, size.height),
-          Paint()
+          _loopPinLinePaint
             ..color = activeColor.withValues(alpha: abLoopEnabled ? 0.85 : 0.55)
             ..strokeWidth = 1.4,
         );
@@ -728,20 +786,9 @@ class _OscilloscopeWaveformPainter extends CustomPainter {
         );
         canvas.drawRRect(
           badgeRect,
-          Paint()..color = activeColor,
+          _loopBadgePaint..color = activeColor,
         );
-        final tp = TextPainter(
-          text: TextSpan(
-            text: tag,
-            style: TextStyle(
-              fontFamily: 'monospace',
-              fontSize: AppFontSize.caption,
-              fontWeight: FontWeight.w900,
-              color: AppColors.textOnAccent(activeColor),
-            ),
-          ),
-          textDirection: TextDirection.ltr,
-        )..layout();
+        final tp = _getPinTextPainter(tag, activeColor);
         tp.paint(canvas, Offset(x - tp.width / 2, 12 - tp.height / 2));
       }
 
@@ -764,8 +811,8 @@ class _OscilloscopeWaveformPainter extends CustomPainter {
     final double barW = math.max(1.8, slot * 0.56);
     final double ampScale = isDragging ? 1.08 : 0.96;
 
-    final unplayedPaint = Paint()..color = unplayedColor;
-    final playedPaint = Paint()
+    final unplayedPaint = _unplayedPaint..color = unplayedColor;
+    final playedPaint = _playedPaint
       ..shader = LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
@@ -776,8 +823,8 @@ class _OscilloscopeWaveformPainter extends CustomPainter {
         ],
       ).createShader(Rect.fromLTWH(padX, 0, usableW, size.height));
 
-    final topEnvelope = Path();
-    final bottomEnvelope = Path();
+    final topEnvelope = _topEnvelope..reset();
+    final bottomEnvelope = _bottomEnvelope..reset();
 
     for (int i = 0; i < targetBars; i++) {
       final double cx = padX + slot * (i + 0.5);
@@ -809,12 +856,9 @@ class _OscilloscopeWaveformPainter extends CustomPainter {
     if (progress > 0.005) {
       canvas.save();
       canvas.clipRect(Rect.fromLTRB(padX, 0, playheadX, size.height));
-      final crestPaint = Paint()
+      final crestPaint = _crestPaint
         ..color = Color.lerp(activeColor, playheadCoreColor, 0.45)!
-            .withValues(alpha: isDark ? 0.72 : 0.55)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.4
-        ..strokeJoin = StrokeJoin.round;
+            .withValues(alpha: isDark ? 0.72 : 0.55);
       canvas.drawPath(topEnvelope, crestPaint);
       canvas.drawPath(bottomEnvelope, crestPaint);
       canvas.restore();
@@ -825,30 +869,30 @@ class _OscilloscopeWaveformPainter extends CustomPainter {
       canvas.drawLine(
         Offset(playheadX, 2),
         Offset(playheadX, size.height - 2),
-        Paint()
+        _playheadGlowPaint
           ..color = activeColor.withValues(alpha: isDragging ? 0.65 : 0.45)
-          ..strokeWidth = isDragging ? 7.0 : 5.5
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5.0),
+          ..strokeWidth = isDragging ? 7.0 : 5.5,
       );
     }
 
     canvas.drawLine(
       Offset(playheadX, 0),
       Offset(playheadX, size.height),
-      Paint()
+      _playheadCorePaint
         ..color = playheadCoreColor
-        ..strokeWidth = isDragging ? 2.2 : 1.8
-        ..strokeCap = StrokeCap.round,
+        ..strokeWidth = isDragging ? 2.2 : 1.8,
     );
 
     // Top & bottom precision triangular reticle markers.
-    final markerPaint = Paint()..color = activeColor;
-    final topCap = Path()
+    final markerPaint = _markerPaint..color = activeColor;
+    final topCap = _topCap
+      ..reset()
       ..moveTo(playheadX, 8)
       ..lineTo(playheadX - 5, 0)
       ..lineTo(playheadX + 5, 0)
       ..close();
-    final bottomCap = Path()
+    final bottomCap = _bottomCap
+      ..reset()
       ..moveTo(playheadX, size.height - 8)
       ..lineTo(playheadX - 5, size.height)
       ..lineTo(playheadX + 5, size.height)

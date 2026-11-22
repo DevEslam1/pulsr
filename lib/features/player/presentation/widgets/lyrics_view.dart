@@ -37,7 +37,7 @@ class LyricsView extends StatefulWidget {
   final Duration? currentPosition;
   final List<LyricsLine> lyrics;
   final bool isLoading;
-  final Color activeColor;
+  final Color? activeColor;
   final LyricsSource source;
   final ValueChanged<Duration>? onLineTapped;
   final bool transparentBackground;
@@ -53,7 +53,7 @@ class LyricsView extends StatefulWidget {
     this.currentPosition,
     required this.lyrics,
     this.isLoading = false,
-    this.activeColor = Colors.white,
+    this.activeColor,
     this.source = LyricsSource.none,
     this.onLineTapped,
     this.transparentBackground = false,
@@ -90,6 +90,8 @@ class _LyricsViewState extends State<LyricsView> {
       (_translationMode > 0 && _translatedLyrics != null)
           ? _translatedLyrics!
           : widget.lyrics;
+
+  Color get _activeColor => widget.activeColor ?? context.palette.accent;
 
   // Cached synced check. Freezed player states hand this widget an equal but
   // distinct `lyrics` list on every emission, so an identity (`identical`)
@@ -449,17 +451,17 @@ class _LyricsViewState extends State<LyricsView> {
       padding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.s10, vertical: AppSpacing.xxs),
       decoration: BoxDecoration(
-        color: widget.activeColor.withValues(alpha: 0.15),
+        color: _activeColor.withValues(alpha: 0.15),
         borderRadius: AppRadii.r12All,
         border: Border.all(
-          color: widget.activeColor.withValues(alpha: 0.3),
+          color: _activeColor.withValues(alpha: 0.3),
           width: 1,
         ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 12, color: widget.activeColor),
+          Icon(icon, size: 12, color: _activeColor),
           const SizedBox(width: AppSpacing.xxs),
           Text(
             label,
@@ -608,9 +610,7 @@ class _LyricsViewState extends State<LyricsView> {
     final song = cubit?.state.currentSong;
     final effective = _displayLyrics;
     if (effective.isEmpty) return;
-    final activeCol = widget.activeColor == Colors.white
-        ? context.palette.accent
-        : widget.activeColor;
+    final activeCol = widget.activeColor ?? context.palette.accent;
     unawaited(LyricsShareSheet.show(
       context: context,
       lyrics: effective,
@@ -622,8 +622,7 @@ class _LyricsViewState extends State<LyricsView> {
   }
 
   Widget _buildPersistentOffsetChip(PulsrPalette p) {
-    final activeCol =
-        widget.activeColor == Colors.white ? p.accent : widget.activeColor;
+    final activeCol = widget.activeColor ?? p.accent;
     final label = _formatOffsetMs(_manualOffsetMs);
     return Semantics(
       button: true,
@@ -787,9 +786,11 @@ class _LyricsViewState extends State<LyricsView> {
               style: TextStyle(
                 fontSize: isInSplit ? 20.0 : AppFontSize.bodyLarge,
                 fontWeight: FontWeight.w500,
-                color: isInSplit
-                    ? Colors.white.withValues(alpha: 0.88)
-                    : p.textPrimary,
+                color: (isInSplit && !p.isDark)
+                    ? p.textPrimary
+                    : (isInSplit
+                        ? p.textPrimary.withValues(alpha: 0.88)
+                        : p.textPrimary),
                 height: 1.4,
               ),
             ),
@@ -802,21 +803,24 @@ class _LyricsViewState extends State<LyricsView> {
   Widget _buildSyncedLyricView(PulsrPalette p) {
     final isInSplit = PlayerSplitViewScope.of(context);
     final isSeamless = isInSplit || widget.transparentBackground;
-    final activeCol =
-        widget.activeColor == Colors.white ? p.accent : widget.activeColor;
+    final activeCol = widget.activeColor ?? p.accent;
     final preset = LyricPreset(
       textStyle: TextStyle(
         fontSize: isSeamless ? AppFontSize.titleLarge : AppFontSize.title,
         fontWeight: FontWeight.w600,
-        color: isSeamless
-            ? Colors.white.withValues(alpha: 0.46)
-            : p.textSecondary.withValues(alpha: 0.7),
+        color: (isSeamless && !p.isDark)
+            ? p.textSecondary.withValues(alpha: 0.65)
+            : (isSeamless
+                ? p.textPrimary.withValues(alpha: 0.46)
+                : p.textSecondary.withValues(alpha: 0.7)),
         height: isSeamless ? 1.42 : 1.4,
       ),
       activeTextStyle: TextStyle(
         fontSize: isSeamless ? AppFontSize.display : AppFontSize.headline,
         fontWeight: FontWeight.w800,
-        color: isSeamless ? Colors.white : activeCol,
+        color: (isSeamless && !p.isDark)
+            ? p.textPrimary
+            : (isSeamless ? p.textPrimary : activeCol),
         height: 1.35,
         shadows: [
           Shadow(
@@ -1064,9 +1068,9 @@ class _LyricsViewState extends State<LyricsView> {
                       label: Text(context.l10n.searchLyrics,
                           style: TextStyle(fontSize: AppFontSize.label)),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: widget.activeColor,
+                        foregroundColor: _activeColor,
                         side: BorderSide(
-                            color: widget.activeColor.withValues(alpha: 0.4)),
+                            color: _activeColor.withValues(alpha: 0.4)),
                         shape: RoundedRectangleBorder(
                             borderRadius: AppRadii.r10All),
                         padding: const EdgeInsets.symmetric(

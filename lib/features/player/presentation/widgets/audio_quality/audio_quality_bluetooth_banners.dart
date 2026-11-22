@@ -67,33 +67,32 @@ extension _BluetoothStatusBanners on AudioQualitySheet {
               ),
               const Spacer(),
               Row(
+                mainAxisSize: MainAxisSize.min,
                 children: List.generate(
                   4,
-                  (i) => Padding(
-                    padding: const EdgeInsetsDirectional.only(start: 3),
-                    child: GestureDetector(
-                      onTap: !canConfigure
-                          ? null
-                          : () async {
-                              PulsrHaptics.selectionClick();
-                              final ok =
-                                  await cubit?.setBluetoothLdacQuality(i) ??
-                                      false;
-                              if (!ok && context.mounted) {
+                  (i) => GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: !canConfigure
+                        ? null
+                        : () async {
+                            PulsrHaptics.selectionClick();
+                            final ok =
+                                await cubit?.setBluetoothLdacQuality(i) ??
+                                    false;
+                            if (!ok && context.mounted) {
                                 _showBtRefused(context, cubit);
                               }
                             },
+                    child: Container(
+                      width: AppSpacing.minTouchTarget,
+                      height: AppSpacing.minTouchTarget,
+                      alignment: Alignment.center,
                       child: Container(
-                        width: 20,
-                        height: 20,
-                        alignment: Alignment.center,
-                        child: Container(
-                          width: 8,
-                          height: 8,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: i <= ldacMode ? _ldacAccent : p.hairline,
-                          ),
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: i <= ldacMode ? _ldacAccent : p.hairline,
                         ),
                       ),
                     ),
@@ -302,11 +301,17 @@ extension _BluetoothStatusBanners on AudioQualitySheet {
           ),
           const SizedBox(height: AppSpacing.sm),
           GestureDetector(
+            behavior: HitTestBehavior.opaque,
             onTap: () async {
               unawaited(PulsrHaptics.mediumImpact());
               await _requestBluetoothPermission(context, cubit);
             },
             child: Container(
+              constraints: const BoxConstraints(
+                minHeight: AppSpacing.minTouchTarget,
+                minWidth: AppSpacing.minTouchTarget,
+              ),
+              alignment: Alignment.center,
               padding: const EdgeInsets.symmetric(
                   horizontal: AppSpacing.md, vertical: AppSpacing.xs),
               decoration: BoxDecoration(
@@ -364,12 +369,21 @@ extension _BluetoothStatusBanners on AudioQualitySheet {
             ),
             const Spacer(),
             GestureDetector(
+              behavior: HitTestBehavior.opaque,
               onTap: () {
                 PulsrHaptics.selectionClick();
                 cubit?.refreshOutputDevice();
               },
-              child:
-                  Icon(Icons.refresh_rounded, size: 16, color: p.textTertiary),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  minWidth: AppSpacing.minTouchTarget,
+                  minHeight: AppSpacing.minTouchTarget,
+                ),
+                child: Center(
+                  child: Icon(Icons.refresh_rounded,
+                      size: 16, color: p.textTertiary),
+                ),
+              ),
             ),
           ],
         ),
@@ -454,16 +468,25 @@ extension _BluetoothStatusBanners on AudioQualitySheet {
             ),
           ),
           GestureDetector(
+            behavior: HitTestBehavior.opaque,
             onTap: () {
               PulsrHaptics.selectionClick();
               cubit?.refreshOutputDevice();
             },
-            child: Text(
-              context.l10n.retry,
-              style: const TextStyle(
-                color: _btAccent,
-                fontSize: AppFontSize.label,
-                fontWeight: FontWeight.w700,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(
+                minWidth: AppSpacing.minTouchTarget,
+                minHeight: AppSpacing.minTouchTarget,
+              ),
+              child: Center(
+                child: Text(
+                  context.l10n.retry,
+                  style: const TextStyle(
+                    color: _btAccent,
+                    fontSize: AppFontSize.label,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ),
             ),
           ),

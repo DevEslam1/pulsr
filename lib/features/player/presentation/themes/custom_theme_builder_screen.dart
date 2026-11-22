@@ -1,6 +1,7 @@
 import 'package:pulsr/core/responsive/pulsr_layout_metrics.dart';
 // lib/features/player/presentation/themes/custom_theme_builder_screen.dart
 import 'dart:convert';
+import 'dart:math' as math;
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:share_plus/share_plus.dart';
@@ -289,7 +290,10 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
                 const SizedBox(height: AppSpacing.xs),
                 if (_showPlayerPreview) ...[
                   SizedBox(
-                    height: 38,
+                    height: math.max(
+                      AppSpacing.minTouchTarget,
+                      MediaQuery.textScalerOf(context).scale(38.0),
+                    ),
                     child: ListView.separated(
                       scrollDirection: Axis.horizontal,
                       itemCount: PlayerThemeMode.values.length,
@@ -395,7 +399,7 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
                     constraints: const BoxConstraints(minHeight: 220),
                     padding: const EdgeInsets.all(AppSpacing.md),
                     decoration: BoxDecoration(
-                      color: AppColors.darkSurface,
+                      color: p.surfaceCard,
                       borderRadius: AppRadii.circular(_cornerRadius),
                       border: Border.all(
                           color: Color(_accentColor).withValues(alpha: 0.4),
@@ -434,7 +438,7 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
                                   Text(
                                     context.l10n.livePreview,
                                     style: TextStyle(
-                                        color: Colors.white,
+                                        color: p.textPrimary,
                                         fontSize: AppFontSize.bodyLarge,
                                         fontWeight: FontWeight.w700),
                                   ),
@@ -442,7 +446,7 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
                                   Text(
                                     context.l10n.dspPulsrAudiophileEdition,
                                     style: TextStyle(
-                                        color: AppColors.specularAt(0.7),
+                                        color: p.textSecondary,
                                         fontSize: AppFontSize.label),
                                   ),
                                 ],
@@ -453,7 +457,7 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
                         const SizedBox(height: AppSpacing.lg),
                         LinearProgressIndicator(
                           value: 0.65,
-                          backgroundColor: Colors.white12,
+                          backgroundColor: p.hairline,
                           valueColor: AlwaysStoppedAnimation<Color>(
                               Color(_accentColor)),
                         ),
@@ -461,8 +465,8 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Icon(Icons.skip_previous_rounded,
-                                color: Colors.white, size: 28),
+                            Icon(Icons.skip_previous_rounded,
+                                color: p.textPrimary, size: 28),
                             const SizedBox(width: AppSpacing.lg),
                             Container(
                               padding: const EdgeInsets.all(AppSpacing.s10),
@@ -470,12 +474,16 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
                                 color: Color(_accentColor),
                                 shape: BoxShape.circle,
                               ),
-                              child: const Icon(Icons.play_arrow_rounded,
-                                  color: Colors.black, size: 28),
+                              child: Icon(
+                                Icons.play_arrow_rounded,
+                                color: AppColors.textOnAccent(
+                                    Color(_accentColor)),
+                                size: 28,
+                              ),
                             ),
                             const SizedBox(width: AppSpacing.lg),
-                            const Icon(Icons.skip_next_rounded,
-                                color: Colors.white, size: 28),
+                            Icon(Icons.skip_next_rounded,
+                                color: p.textPrimary, size: 28),
                           ],
                         ),
                       ],
@@ -510,14 +518,18 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
                           color: Color(colorVal),
                           shape: BoxShape.circle,
                           border: Border.all(
-                            color:
-                                isSelected ? Colors.white : Colors.transparent,
+                            color: isSelected
+                                ? AppColors.textOnAccent(Color(colorVal))
+                                : Colors.transparent,
                             width: 3,
                           ),
                         ),
                         child: isSelected
-                            ? const Icon(Icons.check_rounded,
-                                color: Colors.black, size: 22)
+                            ? Icon(
+                                Icons.check_rounded,
+                                color: AppColors.textOnAccent(Color(colorVal)),
+                                size: 22,
+                              )
                             : null,
                       ),
                     );

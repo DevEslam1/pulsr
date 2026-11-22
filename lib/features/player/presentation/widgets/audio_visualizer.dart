@@ -779,7 +779,8 @@ class _BarVisualizerPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _BarVisualizerPainter oldDelegate) => true;
+  bool shouldRepaint(covariant _BarVisualizerPainter oldDelegate) =>
+      oldDelegate.color != color || !listEquals(oldDelegate.data, data);
 }
 
 // --- PAINTER 2: WAVE VISUALIZER ---
@@ -863,7 +864,8 @@ class _WaveVisualizerPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _WaveVisualizerPainter oldDelegate) => true;
+  bool shouldRepaint(covariant _WaveVisualizerPainter oldDelegate) =>
+      oldDelegate.color != color || !listEquals(oldDelegate.data, data);
 }
 
 // --- PAINTER 3: CIRCULAR VISUALIZER ---
@@ -914,7 +916,8 @@ class _CircularVisualizerPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _CircularVisualizerPainter oldDelegate) => true;
+  bool shouldRepaint(covariant _CircularVisualizerPainter oldDelegate) =>
+      oldDelegate.color != color || !listEquals(oldDelegate.data, data);
 }
 
 // --- PAINTER 4: PARTICLES VISUALIZER ---
@@ -945,7 +948,8 @@ class _ParticlesVisualizerPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _ParticlesVisualizerPainter oldDelegate) => true;
+  bool shouldRepaint(covariant _ParticlesVisualizerPainter oldDelegate) =>
+      oldDelegate.color != color || !listEquals(oldDelegate.data, data);
 }
 
 // --- PAINTER 5: 3D TERRAIN VISUALIZER ---
@@ -986,7 +990,8 @@ class _Terrain3DVisualizerPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _Terrain3DVisualizerPainter oldDelegate) => true;
+  bool shouldRepaint(covariant _Terrain3DVisualizerPainter oldDelegate) =>
+      oldDelegate.color != color || !listEquals(oldDelegate.data, data);
 }
 
 // --- PAINTER 6: ALBUM ART REACTIVE ---
@@ -1014,7 +1019,8 @@ class _AlbumArtReactivePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _AlbumArtReactivePainter oldDelegate) => true;
+  bool shouldRepaint(covariant _AlbumArtReactivePainter oldDelegate) =>
+      oldDelegate.color != color || !listEquals(oldDelegate.data, data);
 }
 
 // --- PAINTER 7: CUSTOM JSON VISUALIZER ---
@@ -1223,7 +1229,9 @@ class _CustomJsonVisualizerPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _CustomJsonVisualizerPainter oldDelegate) =>
-      true;
+      oldDelegate.color != color ||
+      oldDelegate.preset != preset ||
+      !listEquals(oldDelegate.data, data);
 }
 
 // --- PAINTER 8: MILKDROP PRESET VISUALIZER ---

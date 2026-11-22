@@ -16,6 +16,7 @@ import '../../../../core/constants/audio_feature_info.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../cubit/player_cubit.dart';
 import '../../cubit/player_state.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
@@ -661,7 +662,7 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
                                         : Icons.volume_up_rounded,
                                     size: 16,
                                     color: _isPlayingTone
-                                        ? Colors.redAccent
+                                        ? p.error
                                         : p.primary,
                                   ),
                                   label: Text(
@@ -674,7 +675,7 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
                                   style: OutlinedButton.styleFrom(
                                     side: BorderSide(
                                       color: _isPlayingTone
-                                          ? Colors.redAccent
+                                          ? p.error
                                           : p.hairline,
                                     ),
                                     shape: RoundedRectangleBorder(
@@ -831,7 +832,7 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
                                   child: Text(
                                     context.l10n.activeLabel,
                                     style: TextStyle(
-                                      color: Colors.white,
+                                      color: AppColors.textOnAccent(p.primary),
                                       fontSize: AppFontSize.caption,
                                       fontWeight: FontWeight.w700,
                                     ),

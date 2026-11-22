@@ -99,38 +99,40 @@ class _CleanAmbientBackdrop extends StatelessWidget {
 
           // 3. Smooth multi-point mesh wash (enhances depth with blur and acts
           //    as a rich blurred-feel fallback when blur is disabled).
-          DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: RadialGradient(
-                center: const Alignment(-0.7, -0.65),
-                radius: 1.05,
-                colors: [
-                  activeColor.withValues(
-                    alpha: canBlur
-                        ? (isDark ? 0.24 : 0.14)
-                        : (isDark ? 0.32 : 0.18),
-                  ),
-                  Colors.transparent,
-                ],
+          if (!p.isCalmDensity) ...[
+            DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: RadialGradient(
+                  center: const Alignment(-0.7, -0.65),
+                  radius: 1.05,
+                  colors: [
+                    activeColor.withValues(
+                      alpha: canBlur
+                          ? (isDark ? 0.24 : 0.14)
+                          : (isDark ? 0.32 : 0.18),
+                    ),
+                    Colors.transparent,
+                  ],
+                ),
               ),
             ),
-          ),
-          DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: RadialGradient(
-                center: const Alignment(0.8, 0.25),
-                radius: 1.0,
-                colors: [
-                  secondaryGlow.withValues(
-                    alpha: canBlur
-                        ? (isDark ? 0.18 : 0.10)
-                        : (isDark ? 0.24 : 0.14),
-                  ),
-                  Colors.transparent,
-                ],
+            DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: RadialGradient(
+                  center: const Alignment(0.8, 0.25),
+                  radius: 1.0,
+                  colors: [
+                    secondaryGlow.withValues(
+                      alpha: canBlur
+                          ? (isDark ? 0.18 : 0.10)
+                          : (isDark ? 0.24 : 0.14),
+                    ),
+                    Colors.transparent,
+                  ],
+                ),
               ),
             ),
-          ),
+          ],
 
           // 4. Subtle top & bottom legibility scrims.
           DecoratedBox(
@@ -246,29 +248,31 @@ class _CleanArtworkStage extends StatelessWidget {
                       )
                     : fallbackArt;
 
-            final List<BoxShadow> shadows = [
-              BoxShadow(
-                color: AppColors.scrimAt(
-                  isDark
-                      ? (isPlaying ? 0.56 : 0.34)
-                      : (isPlaying ? 0.24 : 0.14),
-                ),
-                blurRadius: isPlaying ? 38 : 16,
-                spreadRadius: isPlaying ? -4 : -6,
-                offset: Offset(0, isPlaying ? 18 : 8),
-              ),
-              if (customGlow || isPlaying)
-                BoxShadow(
-                  color: activeColor.withValues(
-                    alpha: customGlow
-                        ? (isPlaying ? 0.38 : 0.24)
-                        : (isDark ? 0.22 : 0.12),
-                  ),
-                  blurRadius: customGlow ? 42 : 28,
-                  spreadRadius: customGlow ? -2 : -8,
-                  offset: Offset(0, isPlaying ? 10 : 4),
-                ),
-            ];
+            final List<BoxShadow> shadows = p.isCalmDensity
+                ? const []
+                : [
+                    BoxShadow(
+                      color: AppColors.scrimAt(
+                        isDark
+                            ? (isPlaying ? 0.56 : 0.34)
+                            : (isPlaying ? 0.24 : 0.14),
+                      ),
+                      blurRadius: isPlaying ? 38 : 16,
+                      spreadRadius: isPlaying ? -4 : -6,
+                      offset: Offset(0, isPlaying ? 18 : 8),
+                    ),
+                    if (customGlow || isPlaying)
+                      BoxShadow(
+                        color: activeColor.withValues(
+                          alpha: customGlow
+                              ? (isPlaying ? 0.38 : 0.24)
+                              : (isDark ? 0.22 : 0.12),
+                        ),
+                        blurRadius: customGlow ? 42 : 28,
+                        spreadRadius: customGlow ? -2 : -8,
+                        offset: Offset(0, isPlaying ? 10 : 4),
+                      ),
+                  ];
 
             return Center(
               child: AnimatedScale(

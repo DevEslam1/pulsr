@@ -83,14 +83,23 @@ extension _BluetoothCodecSection on AudioQualitySheet {
             ),
             const Spacer(),
             GestureDetector(
+              behavior: HitTestBehavior.opaque,
               onTap: () {
                 PulsrHaptics.selectionClick();
                 cubit?.refreshOutputDevice();
               },
-              child: Icon(
-                Icons.refresh_rounded,
-                size: 16,
-                color: p.textTertiary,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  minWidth: AppSpacing.minTouchTarget,
+                  minHeight: AppSpacing.minTouchTarget,
+                ),
+                child: Center(
+                  child: Icon(
+                    Icons.refresh_rounded,
+                    size: 16,
+                    color: p.textTertiary,
+                  ),
+                ),
               ),
             ),
           ],
@@ -228,6 +237,7 @@ extension _BluetoothCodecSection on AudioQualitySheet {
                     padding:
                         const EdgeInsetsDirectional.only(end: AppSpacing.xs),
                     child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
                       onTap: isActive ||
                               !canConfigure ||
                               !selectableCodecs.contains(c)
@@ -240,48 +250,56 @@ extension _BluetoothCodecSection on AudioQualitySheet {
                                 _showBtRefused(context, cubit);
                               }
                             },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.s14,
-                          vertical: AppSpacing.xs,
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(
+                          minWidth: AppSpacing.minTouchTarget,
+                          minHeight: AppSpacing.minTouchTarget,
                         ),
-                        decoration: BoxDecoration(
-                          color: isActive
-                              ? accent.withValues(alpha: 0.18)
-                              : p.surfaceContainer,
-                          borderRadius: AppRadii.r10All,
-                          border: Border.all(
-                            color: isActive ? accent : p.hairline,
-                            width: isActive ? 1.5 : 1.0,
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (isActive) ...[
-                              Icon(
-                                Icons.check_rounded,
-                                color: accent,
-                                size: 11,
-                              ),
-                              const SizedBox(width: AppSpacing.xxs),
-                            ],
-                            Text(
-                              c,
-                              style: TextStyle(
-                                fontSize: AppFontSize.label,
-                                fontWeight: isActive
-                                    ? FontWeight.w800
-                                    : FontWeight.w500,
-                                color: isActive
-                                    ? accent
-                                    : canConfigure
-                                        ? p.textSecondary
-                                        : p.textTertiary,
-                                letterSpacing: AppTracking.label,
+                        child: Center(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.s14,
+                              vertical: AppSpacing.xs,
+                            ),
+                            decoration: BoxDecoration(
+                              color: isActive
+                                  ? accent.withValues(alpha: 0.18)
+                                  : p.surfaceContainer,
+                              borderRadius: AppRadii.r10All,
+                              border: Border.all(
+                                color: isActive ? accent : p.hairline,
+                                width: isActive ? 1.5 : 1.0,
                               ),
                             ),
-                          ],
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (isActive) ...[
+                                  Icon(
+                                    Icons.check_rounded,
+                                    color: accent,
+                                    size: 11,
+                                  ),
+                                  const SizedBox(width: AppSpacing.xxs),
+                                ],
+                                Text(
+                                  c,
+                                  style: TextStyle(
+                                    fontSize: AppFontSize.label,
+                                    fontWeight: isActive
+                                        ? FontWeight.w800
+                                        : FontWeight.w500,
+                                    color: isActive
+                                        ? accent
+                                        : canConfigure
+                                            ? p.textSecondary
+                                            : p.textTertiary,
+                                    letterSpacing: AppTracking.label,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -339,6 +357,9 @@ extension _BluetoothCodecSection on AudioQualitySheet {
                               ),
                       child: Container(
                         width: double.infinity,
+                        constraints: const BoxConstraints(
+                          minHeight: AppSpacing.minTouchTarget,
+                        ),
                         padding: const EdgeInsets.symmetric(
                           horizontal: AppSpacing.s14,
                           vertical: AppSpacing.xs,
@@ -410,6 +431,9 @@ extension _BluetoothCodecSection on AudioQualitySheet {
                               ),
                       child: Container(
                         width: double.infinity,
+                        constraints: const BoxConstraints(
+                          minHeight: AppSpacing.minTouchTarget,
+                        ),
                         padding: const EdgeInsets.symmetric(
                           horizontal: AppSpacing.s14,
                           vertical: AppSpacing.xs,

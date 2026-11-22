@@ -575,10 +575,15 @@ class _QuranModePanelState extends State<QuranModePanel> {
                   GestureDetector(
                     onTap: _refreshCaps,
                     behavior: HitTestBehavior.opaque,
-                    child: Padding(
-                      padding: const EdgeInsets.all(AppSpacing.xxs),
-                      child: Icon(Icons.refresh_rounded,
-                          size: 14, color: p.textSecondary),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(
+                        minWidth: AppSpacing.minTouchTarget,
+                        minHeight: AppSpacing.minTouchTarget,
+                      ),
+                      child: Center(
+                        child: Icon(Icons.refresh_rounded,
+                            size: 16, color: p.textSecondary),
+                      ),
                     ),
                   ),
                 ],

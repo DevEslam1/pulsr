@@ -1089,17 +1089,19 @@ class _QuranHeroCard extends StatelessWidget {
                     colors: [surfaceStart, surfaceEnd],
                   ),
                   borderRadius: AppRadii.r24All,
-                  boxShadow: isPlaying
-                      ? [
-                          BoxShadow(
-                            color: p.accent.withValues(alpha: 0.24),
-                            blurRadius: 22,
-                            spreadRadius: -2,
-                            offset: const Offset(0, 6),
-                          ),
-                          ...PulsrElevation.level2(context),
-                        ]
-                      : PulsrElevation.level2(context),
+                  boxShadow: p.isCalmDensity
+                      ? null
+                      : (isPlaying
+                          ? [
+                              BoxShadow(
+                                color: p.accent.withValues(alpha: 0.24),
+                                blurRadius: 22,
+                                spreadRadius: -2,
+                                offset: const Offset(0, 6),
+                              ),
+                              ...PulsrElevation.level2(context),
+                            ]
+                          : PulsrElevation.level2(context)),
                 ),
                 child: LayoutBuilder(
                   builder: (context, constraints) {
@@ -1137,28 +1139,27 @@ class _QuranHeroCard extends StatelessWidget {
                           ),
                         ),
                         // Warm ambient aura behind the niche.
-                        PositionedDirectional(
-                          end: -16,
-                          top: -16,
-                          bottom: -16,
-                          width: archWidth + 36,
-                          child: IgnorePointer(
-                            child: DecoratedBox(
-                              decoration: BoxDecoration(
-                                gradient: RadialGradient(
-                                  colors: [
-                                    gilt.withValues(
-                                      alpha: p.isCalmDensity
-                                          ? (isPlaying ? 0.12 : 0.05)
-                                          : (isPlaying ? 0.24 : 0.13),
-                                    ),
-                                    AppColors.fadeStopTransparent,
-                                  ],
+                        if (!p.isCalmDensity)
+                          PositionedDirectional(
+                            end: -16,
+                            top: -16,
+                            bottom: -16,
+                            width: archWidth + 36,
+                            child: IgnorePointer(
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  gradient: RadialGradient(
+                                    colors: [
+                                      gilt.withValues(
+                                        alpha: isPlaying ? 0.24 : 0.13,
+                                      ),
+                                      AppColors.fadeStopTransparent,
+                                    ],
+                                  ),
                                 ),
                               ),
                             ),
                           ),
-                        ),
                         // ── Mihrab niche: arch-clipped artwork + gilt rim ────
                         PositionedDirectional(
                           end: archEndInset,
@@ -1286,7 +1287,7 @@ class _QuranHeroCard extends StatelessWidget {
                                     return CustomPaint(
                                       painter: _MihrabRimPainter(
                                         color: gilt,
-                                        glow: glow,
+                                        glow: p.isCalmDensity ? 0.0 : glow,
                                         textDirection: textDir,
                                       ),
                                     );
@@ -1552,24 +1553,26 @@ class _QuranHeroCard extends StatelessWidget {
                                                   stops: const [0.0, 0.48, 1.0],
                                                 ),
                                                 borderRadius: ctaRadius,
-                                                boxShadow: [
-                                                  BoxShadow(
-                                                    color: gilt.withValues(
-                                                      alpha: isPlaying
-                                                          ? 0.34
-                                                          : 0.22,
-                                                    ),
-                                                    blurRadius: 10,
-                                                    offset: const Offset(0, 3),
-                                                  ),
-                                                  BoxShadow(
-                                                    color: AppColors.scrimAt(
-                                                      p.isDark ? 0.28 : 0.12,
-                                                    ),
-                                                    blurRadius: 4,
-                                                    offset: const Offset(0, 1),
-                                                  ),
-                                                ],
+                                                boxShadow: p.isCalmDensity
+                                                    ? null
+                                                    : [
+                                                        BoxShadow(
+                                                          color: gilt.withValues(
+                                                            alpha: isPlaying
+                                                                ? 0.34
+                                                                : 0.22,
+                                                          ),
+                                                          blurRadius: 10,
+                                                          offset: const Offset(0, 3),
+                                                        ),
+                                                        BoxShadow(
+                                                          color: AppColors.scrimAt(
+                                                            p.isDark ? 0.28 : 0.12,
+                                                          ),
+                                                          blurRadius: 4,
+                                                          offset: const Offset(0, 1),
+                                                        ),
+                                                      ],
                                                 border: Border.all(
                                                   color: onGilt.withValues(
                                                     alpha: isPlaying

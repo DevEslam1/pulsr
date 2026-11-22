@@ -1,5 +1,6 @@
 // lib/features/player/presentation/themes/cd_player_theme.dart
 import 'dart:math' as math;
+import 'package:flutter/scheduler.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';
@@ -61,6 +62,9 @@ class _CdPlayerThemeState extends State<CdPlayerTheme>
   late final AnimationController _pickupController;
   late final CurvedAnimation _pickupAnimation;
   late final AnimationController _glossController;
+  late final Ticker _ticker;
+  Duration? _lastTick;
+  double _phase = 0.0;
   bool? _lastAllowMotion;
 
   @override
@@ -95,6 +99,27 @@ class _CdPlayerThemeState extends State<CdPlayerTheme>
       duration: const Duration(milliseconds: 900),
       value: 1.0,
     );
+
+    _ticker = createTicker(_onTick);
+  }
+
+  void _onTick(Duration elapsed) {
+    final last = _lastTick;
+    _lastTick = elapsed;
+    if (last == null) return;
+    final dt = (elapsed - last).inMicroseconds / 1000000.0;
+    if (dt <= 0.0 || dt > 0.5) return;
+
+    final velocity = _velocityController.value;
+    if (velocity > 0.0) {
+      // 12 seconds per revolution at full velocity (1.0)
+      final delta = (dt / 12.0) * velocity;
+      _phase = (_phase + delta) % 1.0;
+      _rotationController.value = _phase;
+    } else if (!_velocityController.isAnimating) {
+      _ticker.stop();
+      _lastTick = null;
+    }
   }
 
   bool _allowMotion(BuildContext context) =>
@@ -115,8 +140,9 @@ class _CdPlayerThemeState extends State<CdPlayerTheme>
     final allowMotion = allowMotionOverride ?? _allowMotion(context);
     final shouldSpin = widget.props.state.isPlaying && allowMotion;
     if (shouldSpin) {
-      if (!_rotationController.isAnimating) {
-        _rotationController.repeat();
+      if (!_ticker.isActive) {
+        _lastTick = null;
+        _ticker.start();
       }
       _velocityController.animateTo(
         1.0,
@@ -125,11 +151,17 @@ class _CdPlayerThemeState extends State<CdPlayerTheme>
       );
     } else {
       if (!allowMotion) {
+        _velocityController.stop();
         _velocityController.value = 0.0;
-        if (_rotationController.isAnimating) {
-          _rotationController.stop();
+        if (_ticker.isActive) {
+          _ticker.stop();
+          _lastTick = null;
         }
-      } else if (_rotationController.isAnimating) {
+      } else if (_ticker.isActive || _velocityController.value > 0.0) {
+        if (!_ticker.isActive) {
+          _lastTick = null;
+          _ticker.start();
+        }
         _velocityController
             .animateTo(
           0.0,
@@ -140,7 +172,10 @@ class _CdPlayerThemeState extends State<CdPlayerTheme>
           if (mounted &&
               !widget.props.state.isPlaying &&
               _velocityController.value == 0.0) {
-            _rotationController.stop();
+            if (_ticker.isActive) {
+              _ticker.stop();
+              _lastTick = null;
+            }
           }
         });
       }
@@ -181,6 +216,7 @@ class _CdPlayerThemeState extends State<CdPlayerTheme>
 
   @override
   void dispose() {
+    _ticker.dispose();
     _pickupAnimation.dispose();
     _glossController.dispose();
     _velocityController.dispose();
@@ -195,11 +231,15 @@ class _CdPlayerThemeState extends State<CdPlayerTheme>
     if (_lastAllowMotion != allowMotion) {
       _lastAllowMotion = allowMotion;
       if (!allowMotion) {
-        if (_rotationController.isAnimating) {
-          _rotationController.stop();
+        if (_ticker.isActive) {
+          _ticker.stop();
+          _lastTick = null;
         }
+        _velocityController.stop();
         _velocityController.value = 0.0;
+        _pickupController.stop();
         _pickupController.value = widget.props.state.isPlaying ? 1.0 : 0.0;
+        _glossController.stop();
         _glossController.value = 1.0;
       } else {
         WidgetsBinding.instance.addPostFrameCallback((_) {

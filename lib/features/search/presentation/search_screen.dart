@@ -1373,15 +1373,233 @@ class _UnifiedSearchResultsState extends State<_UnifiedSearchResults> {
                 ? entities.albums.take(8).toList()
                 : const <_DerivedEntity>[];
 
+            final localPaneChildren = <Widget>[
+              if (artists.isNotEmpty) ...[
+                _buildSectionHeader(
+                  context: context,
+                  icon: Icons.person_rounded,
+                  title: context.l10n.artists,
+                  count: entities.artists.length,
+                  isLoading: false,
+                  p: p,
+                ),
+                _EntityRail(
+                  entities: artists,
+                  query: widget.query,
+                  round: true,
+                  onTap: widget.onOpenArtist,
+                ),
+                const SizedBox(height: AppSpacing.xs),
+              ],
+              if (albums.isNotEmpty) ...[
+                _buildSectionHeader(
+                  context: context,
+                  icon: Icons.album_rounded,
+                  title: context.l10n.albums,
+                  count: entities.albums.length,
+                  isLoading: false,
+                  p: p,
+                ),
+                _EntityRail(
+                  entities: albums,
+                  query: widget.query,
+                  round: false,
+                  onTap: widget.onOpenAlbum,
+                ),
+                const SizedBox(height: AppSpacing.xs),
+              ],
+              _buildSectionHeader(
+                context: context,
+                icon: Icons.library_music_rounded,
+                title: context.l10n.localMusic,
+                count: localSongs.length,
+                isLoading: local.isLoading,
+                p: p,
+              ),
+              const SizedBox(height: AppSpacing.xxs),
+              if (local.errorMessage != null && localSongs.isEmpty)
+                _buildErrorSectionCard(
+                  context: context,
+                  errorMessage:
+                      resolveUiErrorMessage(context, local.errorMessage!),
+                  onRetry: context.read<SearchCubit>().retry,
+                  p: p,
+                )
+              else if ((local.isLoading || localPending) &&
+                  localSongs.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                  child: SkeletonList(itemCount: 3),
+                )
+              else if (localSongs.isEmpty && !localPending)
+                _buildEmptySectionCard(
+                  context: context,
+                  icon: Icons.library_music_outlined,
+                  message: context.l10n.noLocalSongsMatch(widget.query),
+                  p: p,
+                )
+              else ...[
+                for (final song in localShown)
+                  HighlightedSongTile(
+                    song: song,
+                    query: widget.query,
+                    subtitleOverride: '${song.artist} • ${song.album}',
+                    onTap: () {
+                      widget.onCommit();
+                      context.read<SearchCubit>().recordPlayedSong(song);
+                      player.playSong(song, queue: localSongs);
+                    },
+                    onMorePressed: () =>
+                        SongOptionsSheet.show(context, song: song),
+                  ),
+                if (localSongs.length > _localPreview)
+                  _ShowMoreButton(
+                    expanded: _expandLocal,
+                    onPressed: () =>
+                        setState(() => _expandLocal = !_expandLocal),
+                  ),
+                if (_expandLocal)
+                  ValueListenableBuilder<bool>(
+                    valueListenable:
+                        context.read<SearchCubit>().hasMoreResults,
+                    builder: (context, hasMore, _) => hasMore
+                        ? _ShowMoreButton(
+                            expanded: false,
+                            onPressed: () => context
+                                .read<SearchCubit>()
+                                .showMoreResults(),
+                          )
+                        : const SizedBox.shrink(),
+                  ),
+              ],
+            ];
+
+            final onlinePaneChildren = <Widget>[
+              _buildSectionHeader(
+                context: context,
+                icon: Icons.public_rounded,
+                title: context.l10n.onlineStream,
+                count: onlineTracks.length,
+                isLoading: ytm.isLoading,
+                p: p,
+              ),
+              const SizedBox(height: AppSpacing.xxs),
+              if (isOffline)
+                _buildEmptySectionCard(
+                  context: context,
+                  icon: Icons.wifi_off_rounded,
+                  message: context.l10n.offlineOnlyMode,
+                  p: p,
+                )
+              else if ((ytm.isLoading || onlinePending) &&
+                  onlineTracks.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                  child: SkeletonList(itemCount: 4),
+                )
+              else if (ytm.errorMessage != null)
+                _buildErrorSectionCard(
+                  context: context,
+                  errorMessage:
+                      resolveUiErrorMessage(context, ytm.errorMessage!),
+                  onRetry: context.read<YtmSearchCubit>().retry,
+                  p: p,
+                )
+              else if (onlineTracks.isEmpty &&
+                  ytm.hasSearched &&
+                  !onlinePending)
+                _buildEmptySectionCard(
+                  context: context,
+                  icon: Icons.search_off_rounded,
+                  message: context.l10n.noOnlineSongsMatch(widget.query),
+                  p: p,
+                )
+              else ...[
+                for (var i = 0; i < onlineShown; i++)
+                  HighlightedSongTile(
+                    song: onlineSongs[i],
+                    query: widget.query,
+                    subtitleOverride: onlineTracks[i].artist,
+                    onTap: () {
+                      context
+                          .read<SearchCubit>()
+                          .recordPlayedSong(onlineSongs[i]);
+                      player.playSong(onlineSongs[i], queue: onlineSongs);
+                    },
+                    onLongPress: () => SongOptionsSheet.show(
+                      context,
+                      song: onlineSongs[i],
+                    ),
+                    trailing: YtmDownloadButton(song: onlineSongs[i]),
+                  ),
+                if (onlineSongs.length > _onlinePreview)
+                  _ShowMoreButton(
+                    expanded: _expandOnline,
+                    onPressed: () =>
+                        setState(() => _expandOnline = !_expandOnline),
+                  ),
+              ],
+            ];
+
+            Future<void> handleRefresh() async {
+              if (!isOffline) {
+                context.read<YtmSearchCubit>().onQueryChanged(widget.query);
+              }
+              await context.read<SearchCubit>().refresh();
+            }
+
+            final isSplit = PulsrLayoutMetrics.isSplitView(context);
+
+            if (isSplit) {
+              return RefreshIndicator(
+                color: p.accent,
+                backgroundColor: p.surfaceContainer,
+                onRefresh: handleRefresh,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: ListView(
+                        physics: const AlwaysScrollableScrollPhysics(
+                          parent: BouncingScrollPhysics(),
+                        ),
+                        keyboardDismissBehavior:
+                            ScrollViewKeyboardDismissBehavior.onDrag,
+                        padding: EdgeInsets.only(
+                          bottom: PulsrLayoutMetrics.scrollBottom(context),
+                          top: AppSpacing.xxs,
+                        ),
+                        children: localPaneChildren,
+                      ),
+                    ),
+                    VerticalDivider(
+                      color: p.hairline,
+                      width: 1,
+                      thickness: 1,
+                    ),
+                    Expanded(
+                      child: ListView(
+                        physics: const AlwaysScrollableScrollPhysics(
+                          parent: BouncingScrollPhysics(),
+                        ),
+                        keyboardDismissBehavior:
+                            ScrollViewKeyboardDismissBehavior.onDrag,
+                        padding: EdgeInsets.only(
+                          bottom: PulsrLayoutMetrics.scrollBottom(context),
+                          top: AppSpacing.xxs,
+                        ),
+                        children: onlinePaneChildren,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+
             return RefreshIndicator(
               color: p.accent,
               backgroundColor: p.surfaceContainer,
-              onRefresh: () async {
-                if (!isOffline) {
-                  context.read<YtmSearchCubit>().onQueryChanged(widget.query);
-                }
-                await context.read<SearchCubit>().refresh();
-              },
+              onRefresh: handleRefresh,
               child: ListView(
                 physics: const AlwaysScrollableScrollPhysics(
                   parent: BouncingScrollPhysics(),
@@ -1393,104 +1611,7 @@ class _UnifiedSearchResultsState extends State<_UnifiedSearchResults> {
                   top: AppSpacing.xxs,
                 ),
                 children: [
-                  if (artists.isNotEmpty) ...[
-                    _buildSectionHeader(
-                      context: context,
-                      icon: Icons.person_rounded,
-                      title: context.l10n.artists,
-                      count: entities.artists.length,
-                      isLoading: false,
-                      p: p,
-                    ),
-                    _EntityRail(
-                      entities: artists,
-                      query: widget.query,
-                      round: true,
-                      onTap: widget.onOpenArtist,
-                    ),
-                    const SizedBox(height: AppSpacing.xs),
-                  ],
-                  if (albums.isNotEmpty) ...[
-                    _buildSectionHeader(
-                      context: context,
-                      icon: Icons.album_rounded,
-                      title: context.l10n.albums,
-                      count: entities.albums.length,
-                      isLoading: false,
-                      p: p,
-                    ),
-                    _EntityRail(
-                      entities: albums,
-                      query: widget.query,
-                      round: false,
-                      onTap: widget.onOpenAlbum,
-                    ),
-                    const SizedBox(height: AppSpacing.xs),
-                  ],
-                  _buildSectionHeader(
-                    context: context,
-                    icon: Icons.library_music_rounded,
-                    title: context.l10n.localMusic,
-                    count: localSongs.length,
-                    isLoading: local.isLoading,
-                    p: p,
-                  ),
-                  const SizedBox(height: AppSpacing.xxs),
-                  if (local.errorMessage != null && localSongs.isEmpty)
-                    _buildErrorSectionCard(
-                      context: context,
-                      errorMessage:
-                          resolveUiErrorMessage(context, local.errorMessage!),
-                      onRetry: context.read<SearchCubit>().retry,
-                      p: p,
-                    )
-                  else if ((local.isLoading || localPending) &&
-                      localSongs.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: AppSpacing.md),
-                      child: SkeletonList(itemCount: 3),
-                    )
-                  else if (localSongs.isEmpty && !localPending)
-                    _buildEmptySectionCard(
-                      context: context,
-                      icon: Icons.library_music_outlined,
-                      message: context.l10n.noLocalSongsMatch(widget.query),
-                      p: p,
-                    )
-                  else ...[
-                    for (final song in localShown)
-                      HighlightedSongTile(
-                        song: song,
-                        query: widget.query,
-                        subtitleOverride: '${song.artist} • ${song.album}',
-                        onTap: () {
-                          widget.onCommit();
-                          context.read<SearchCubit>().recordPlayedSong(song);
-                          player.playSong(song, queue: localSongs);
-                        },
-                        onMorePressed: () =>
-                            SongOptionsSheet.show(context, song: song),
-                      ),
-                    if (localSongs.length > _localPreview)
-                      _ShowMoreButton(
-                        expanded: _expandLocal,
-                        onPressed: () =>
-                            setState(() => _expandLocal = !_expandLocal),
-                      ),
-                    if (_expandLocal)
-                      ValueListenableBuilder<bool>(
-                        valueListenable:
-                            context.read<SearchCubit>().hasMoreResults,
-                        builder: (context, hasMore, _) => hasMore
-                            ? _ShowMoreButton(
-                                expanded: false,
-                                onPressed: () => context
-                                    .read<SearchCubit>()
-                                    .showMoreResults(),
-                              )
-                            : const SizedBox.shrink(),
-                      ),
-                  ],
+                  ...localPaneChildren,
                   Padding(
                     padding: const EdgeInsets.symmetric(
                       horizontal: AppSpacing.md,
@@ -1498,70 +1619,7 @@ class _UnifiedSearchResultsState extends State<_UnifiedSearchResults> {
                     ),
                     child: Divider(color: p.hairline, height: 1),
                   ),
-                  _buildSectionHeader(
-                    context: context,
-                    icon: Icons.public_rounded,
-                    title: context.l10n.onlineStream,
-                    count: onlineTracks.length,
-                    isLoading: ytm.isLoading,
-                    p: p,
-                  ),
-                  const SizedBox(height: AppSpacing.xxs),
-                  if (isOffline)
-                    _buildEmptySectionCard(
-                      context: context,
-                      icon: Icons.wifi_off_rounded,
-                      message: context.l10n.offlineOnlyMode,
-                      p: p,
-                    )
-                  else if ((ytm.isLoading || onlinePending) &&
-                      onlineTracks.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: AppSpacing.md),
-                      child: SkeletonList(itemCount: 4),
-                    )
-                  else if (ytm.errorMessage != null)
-                    _buildErrorSectionCard(
-                      context: context,
-                      errorMessage:
-                          resolveUiErrorMessage(context, ytm.errorMessage!),
-                      onRetry: context.read<YtmSearchCubit>().retry,
-                      p: p,
-                    )
-                  else if (onlineTracks.isEmpty &&
-                      ytm.hasSearched &&
-                      !onlinePending)
-                    _buildEmptySectionCard(
-                      context: context,
-                      icon: Icons.search_off_rounded,
-                      message: context.l10n.noOnlineSongsMatch(widget.query),
-                      p: p,
-                    )
-                  else ...[
-                    for (var i = 0; i < onlineShown; i++)
-                      HighlightedSongTile(
-                        song: onlineSongs[i],
-                        query: widget.query,
-                        subtitleOverride: onlineTracks[i].artist,
-                        onTap: () {
-                          context
-                              .read<SearchCubit>()
-                              .recordPlayedSong(onlineSongs[i]);
-                          player.playSong(onlineSongs[i], queue: onlineSongs);
-                        },
-                        onLongPress: () => SongOptionsSheet.show(
-                          context,
-                          song: onlineSongs[i],
-                        ),
-                        trailing: YtmDownloadButton(song: onlineSongs[i]),
-                      ),
-                    if (onlineSongs.length > _onlinePreview)
-                      _ShowMoreButton(
-                        expanded: _expandOnline,
-                        onPressed: () =>
-                            setState(() => _expandOnline = !_expandOnline),
-                      ),
-                  ],
+                  ...onlinePaneChildren,
                 ],
               ),
             );

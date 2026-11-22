@@ -1000,117 +1000,178 @@ class _CassetteStereoVuMeterState extends State<_CassetteStereoVuMeter>
   @override
   Widget build(BuildContext context) {
     final allowMotion = _allowMotion(context);
-    return AnimatedBuilder(
-      animation: _vuController,
-      builder: (context, _) {
-        final double leftLevel;
-        final double rightLevel;
-        if (!widget.isPlaying) {
-          leftLevel = 0.08;
-          rightLevel = 0.08;
-        } else if (!allowMotion) {
-          leftLevel = 0.58;
-          rightLevel = 0.48;
-          _leftPeak = 0.72;
-          _rightPeak = 0.64;
-        } else {
-          final val = _vuController.value;
-          final theta = val * 2 * math.pi;
+    final surface = context.playerSurfacePalette;
 
-          final beatBase = math.sin(theta).abs() * 0.45 +
-              (math.sin(theta * 2.0).abs() * 0.22);
-
-          final leftHarmonic = math.sin(theta * 3.0 + 0.4).abs() * 0.18 +
-              math.cos(theta * 7.0).abs() * 0.08;
-          final rightHarmonic = math.cos(theta * 5.0 - 0.5).abs() * 0.18 +
-              math.sin(theta * 11.0).abs() * 0.08;
-
-          leftLevel = (0.16 + beatBase + leftHarmonic).clamp(0.08, 0.98);
-          rightLevel = (0.16 + beatBase + rightHarmonic).clamp(0.08, 0.98);
-          _updatePeaks(leftLevel, rightLevel);
-        }
-
-        return Column(
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            _buildVuBar('L', leftLevel, _leftPeak),
+            SizedBox(
+              height: 6.0,
+              child: Center(
+                child: ExcludeSemantics(
+                  child: Text(
+                    'L',
+                    style: TextStyle(
+                      fontSize: AppFontSize.nano,
+                      fontWeight: FontWeight.w800,
+                      color: surface.mutedInk,
+                    ),
+                  ),
+                ),
+              ),
+            ),
             const SizedBox(height: 2.5),
-            _buildVuBar('R', rightLevel, _rightPeak),
+            SizedBox(
+              height: 6.0,
+              child: Center(
+                child: ExcludeSemantics(
+                  child: Text(
+                    'R',
+                    style: TextStyle(
+                      fontSize: AppFontSize.nano,
+                      fontWeight: FontWeight.w800,
+                      color: surface.mutedInk,
+                    ),
+                  ),
+                ),
+              ),
+            ),
           ],
-        );
-      },
+        ),
+        const SizedBox(width: 4),
+        CustomPaint(
+          size: const Size(56.0, 14.5),
+          painter: _CassetteStereoVuMeterPainter(
+            controller: _vuController,
+            isPlaying: widget.isPlaying,
+            allowMotion: allowMotion,
+            surface: surface,
+            state: this,
+          ),
+        ),
+      ],
     );
   }
+}
 
-  Widget _buildVuBar(String channel, double level, double peak) {
-    final surface = context.playerSurfacePalette;
+class _CassetteStereoVuMeterPainter extends CustomPainter {
+  final AnimationController controller;
+  final bool isPlaying;
+  final bool allowMotion;
+  final PlayerSurfacePalette surface;
+  final _CassetteStereoVuMeterState state;
+
+  _CassetteStereoVuMeterPainter({
+    required this.controller,
+    required this.isPlaying,
+    required this.allowMotion,
+    required this.surface,
+    required this.state,
+  }) : super(repaint: controller);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final double leftLevel;
+    final double rightLevel;
+    if (!isPlaying) {
+      leftLevel = 0.08;
+      rightLevel = 0.08;
+    } else if (!allowMotion) {
+      leftLevel = 0.58;
+      rightLevel = 0.48;
+      state._leftPeak = 0.72;
+      state._rightPeak = 0.64;
+    } else {
+      final val = controller.value;
+      final theta = val * 2 * math.pi;
+
+      final beatBase = math.sin(theta).abs() * 0.45 +
+          (math.sin(theta * 2.0).abs() * 0.22);
+
+      final leftHarmonic = math.sin(theta * 3.0 + 0.4).abs() * 0.18 +
+          math.cos(theta * 7.0).abs() * 0.08;
+      final rightHarmonic = math.cos(theta * 5.0 - 0.5).abs() * 0.18 +
+          math.sin(theta * 11.0).abs() * 0.08;
+
+      leftLevel = (0.16 + beatBase + leftHarmonic).clamp(0.08, 0.98);
+      rightLevel = (0.16 + beatBase + rightHarmonic).clamp(0.08, 0.98);
+      state._updatePeaks(leftLevel, rightLevel);
+    }
+
+    _paintChannel(canvas, 0.0, leftLevel, state._leftPeak);
+    _paintChannel(canvas, 8.5, rightLevel, state._rightPeak);
+  }
+
+  void _paintChannel(Canvas canvas, double top, double level, double peak) {
     const int totalSegments = 10;
+    const double barWidth = 56.0;
+    const double barHeight = 6.0;
+
+    final bgRect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(0, top, barWidth, barHeight),
+      const Radius.circular(2),
+    );
+    final bgPaint = Paint()
+      ..color = surface.tapeWindow
+      ..style = PaintingStyle.fill;
+    final borderPaint = Paint()
+      ..color = surface.specularAt(0.12)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.6;
+    canvas.drawRRect(bgRect, bgPaint);
+    canvas.drawRRect(bgRect, borderPaint);
+
     final int activeSegCount =
         (level * totalSegments).clamp(0, totalSegments).round();
     final int peakSegIndex =
         (peak * totalSegments).clamp(1, totalSegments).round() - 1;
 
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        ExcludeSemantics(
-          child: Text(
-            channel,
-            style: TextStyle(
-              fontSize: AppFontSize.nano,
-              fontWeight: FontWeight.w800,
-              color: surface.mutedInk,
-            ),
-          ),
-        ),
-        const SizedBox(width: 4),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 2.0, vertical: 1.0),
-          decoration: BoxDecoration(
-            color: surface.tapeWindow,
-            borderRadius: AppRadii.circular(2),
-            border: Border.all(color: surface.specularAt(0.12), width: 0.6),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: List.generate(totalSegments, (idx) {
-              final isLit = idx < activeSegCount;
-              final isPeak = idx == peakSegIndex && idx >= activeSegCount;
-              final Color baseColor = idx >= 8
-                  ? PlayerMaterialColors.cassetteVuPeak
-                  : (idx >= 6
-                      ? PlayerMaterialColors.cassetteVuWarn
-                      : PlayerMaterialColors.cassetteVuNormal);
+    for (int idx = 0; idx < totalSegments; idx++) {
+      final isLit = idx < activeSegCount;
+      final isPeak = idx == peakSegIndex && idx >= activeSegCount;
+      final Color baseColor = idx >= 8
+          ? PlayerMaterialColors.cassetteVuPeak
+          : (idx >= 6
+              ? PlayerMaterialColors.cassetteVuWarn
+              : PlayerMaterialColors.cassetteVuNormal);
 
-              final Color segColor = isLit
-                  ? baseColor
-                  : (isPeak
-                      ? baseColor.withValues(alpha: 0.95)
-                      : surface.specularAt(0.08));
+      final Color segColor = isLit
+          ? baseColor
+          : (isPeak
+              ? baseColor.withValues(alpha: 0.95)
+              : surface.specularAt(0.08));
 
-              return Container(
-                width: 4.2,
-                height: 4.0,
-                margin: const EdgeInsets.symmetric(horizontal: 0.5),
-                decoration: BoxDecoration(
-                  color: segColor,
-                  borderRadius: AppRadii.circular(0.8),
-                  boxShadow: (isLit || isPeak)
-                      ? [
-                          BoxShadow(
-                            color: baseColor.withValues(alpha: 0.65),
-                            blurRadius: 2.5,
-                          ),
-                        ]
-                      : null,
-                ),
-              );
-            }),
-          ),
-        ),
-      ],
-    );
+      final segX = 2.5 + idx * 5.2;
+      final segY = top + 1.0;
+      final segRect = RRect.fromRectAndRadius(
+        Rect.fromLTWH(segX, segY, 4.2, 4.0),
+        const Radius.circular(0.8),
+      );
+
+      if (isLit || isPeak) {
+        final shadowPaint = Paint()
+          ..color = baseColor.withValues(alpha: 0.65)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.5);
+        canvas.drawRRect(segRect, shadowPaint);
+      }
+
+      final segPaint = Paint()
+        ..color = segColor
+        ..style = PaintingStyle.fill;
+      canvas.drawRRect(segRect, segPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _CassetteStereoVuMeterPainter oldDelegate) {
+    return oldDelegate.isPlaying != isPlaying ||
+        oldDelegate.allowMotion != allowMotion ||
+        oldDelegate.surface != surface;
   }
 }
 

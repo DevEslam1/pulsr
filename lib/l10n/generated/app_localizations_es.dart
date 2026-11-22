@@ -11298,4 +11298,63 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get extrasRemoteAlbumLabel => 'Biblioteca de red';
+
+  @override
+  String get selectTracks => 'Seleccionar pistas';
+
+  @override
+  String get moreRecoveryOptions => 'Más opciones de recuperación';
+
+  @override
+  String get retryingCleanSession =>
+      'Reintentando inicio de sesión con una sesión limpia…';
+
+  @override
+  String reloadingIdentity(String identity) {
+    return 'Recargando con la identidad de navegador $identity…';
+  }
+
+  @override
+  String get browserIdentityChromeDesktop => 'Chrome para escritorio';
+
+  @override
+  String get browserIdentityChromeMobile => 'Chrome móvil';
+
+  @override
+  String get browserIdentitySafariMobile => 'Safari móvil';
+
+  @override
+  String get browserIdentityFirefoxDesktop => 'Firefox para escritorio';
+
+  @override
+  String get copyCodeAndOpenBrowser => 'Copiar código y abrir navegador';
+
+  @override
+  String get partyServerUrlEmpty => 'La URL del servidor no puede estar vacía';
+
+  @override
+  String get partyServerUrlInvalid =>
+      'Introduce una URL válida (http, https, ws o wss)';
+
+  @override
+  String get castDefaultDevice => 'dispositivo';
+
+  @override
+  String get paste => 'Pegar';
+
+  @override
+  String get spotifyInvalidUrl =>
+      'URL de lista de Spotify no válida. Comprueba el enlace e inténtalo de nuevo.';
+
+  @override
+  String get spotifyFetchingMetadata =>
+      'Obteniendo metadatos de la lista de Spotify...';
+
+  @override
+  String spotifyMatchingTracks(int completed, int total) {
+    return 'Buscando coincidencias en YouTube Music ($completed/$total)...';
+  }
+
+  @override
+  String get spotifyImportComplete => 'Importación completada';
 }

@@ -1,4 +1,4 @@
-﻿part of '../equalizer_sheet.dart';
+part of '../equalizer_sheet.dart';
 
 /// Pro Rack Tab 0: Parametric / Graphic EQ â€” presets carousel, A/B/C/D slots,
 /// studio tool chips, live response curve, 10/32/64-band selector, vertical
@@ -170,7 +170,10 @@ extension _EqParametricTab on _EqualizerSheetState {
           children: [
             Expanded(
               child: SizedBox(
-                height: 36,
+                height: math.max(
+                  AppSpacing.minTouchTarget,
+                  MediaQuery.textScalerOf(context).scale(38.0),
+                ),
                 child: ListView.builder(
                   scrollDirection: Axis.horizontal,
                   addAutomaticKeepAlives: false,
@@ -256,6 +259,9 @@ extension _EqParametricTab on _EqualizerSheetState {
     );
   }
 
+  static final ValueNotifier<bool> _dspToolsExpanded =
+      ValueNotifier<bool>(false);
+
   Widget _buildStudioToolsRow({
     required BuildContext context,
     required PlayerCubit cubit,
@@ -263,198 +269,342 @@ extension _EqParametricTab on _EqualizerSheetState {
     required PulsrPalette p,
     required String? dspBlocked,
   }) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: [
-          _buildAbSlotSelector(cubit: cubit, p: p),
-          const SizedBox(width: AppSpacing.xs),
-          ActionChip(
-            avatar: Icon(Icons.search_rounded, size: 14, color: p.accent),
-            label: Text(context.l10n.autoEqSearch,
-                style: const TextStyle(
-                    fontSize: AppFontSize.caption,
-                    fontWeight: FontWeight.w700)),
-            backgroundColor: p.surfaceContainer,
-            side: BorderSide(color: p.hairline),
-            shape: RoundedRectangleBorder(borderRadius: AppRadii.r10All),
-            onPressed: () {
-              PulsrSheetHelper.showPulsrSheet<void>(
-                context: context,
-                wrapWithContainer: false,
-                builder: (_) => const AutoEqSearchSheet(),
-              );
-            },
-          ),
-          const SizedBox(width: AppSpacing.xs),
-          ActionChip(
-            avatar: Icon(Icons.compress_rounded, size: 14, color: p.primary),
-            label: Text(context.l10n.dynamicsCompressor,
-                style: const TextStyle(
-                    fontSize: AppFontSize.caption,
-                    fontWeight: FontWeight.w700)),
-            backgroundColor: p.surfaceContainer,
-            side: BorderSide(color: p.hairline),
-            shape: RoundedRectangleBorder(borderRadius: AppRadii.r10All),
-            onPressed: () {
-              final blocked = _dspBlockedReason(context);
-              if (blocked != null) {
-                PulsrToast.show(
-                  context,
-                  message: blocked,
-                  icon: Icons.error_outline_rounded,
-                  isError: true,
-                );
-                return;
-              }
-              if (!getIt.isRegistered<EqualizerManager>()) return;
-              CompressorLimiterSheet.show(
-                context,
-                equalizerManager: getIt<EqualizerManager>(),
-              );
-            },
-          ),
-          const SizedBox(width: AppSpacing.xs),
-          ActionChip(
-            avatar: Icon(Icons.graphic_eq_rounded, size: 14, color: p.accent),
-            label: Text(context.l10n.roomCorrection,
-                style: const TextStyle(
-                    fontSize: AppFontSize.caption,
-                    fontWeight: FontWeight.w700)),
-            backgroundColor: p.surfaceContainer,
-            side: BorderSide(color: p.hairline),
-            shape: RoundedRectangleBorder(borderRadius: AppRadii.r10All),
-            onPressed: dspBlocked != null
-                ? null
-                : () => _showRoomCorrectionActions(cubit),
-          ),
-          const SizedBox(width: AppSpacing.xs),
-          ActionChip(
-            avatar: Icon(Icons.headphones_rounded,
-                size: 14,
-                color: state.isViperDdcEnabled ? p.accent : p.textSecondary),
-            label: Text(
-              state.isViperDdcEnabled && state.viperDdcProfileName.isNotEmpty
-                  ? 'DDC: ${state.viperDdcProfileName}'
-                  : 'ViPER-DDC',
-              style: TextStyle(
-                fontSize: AppFontSize.caption,
-                fontWeight: FontWeight.w700,
-                color: state.isViperDdcEnabled ? p.accent : p.textPrimary,
+    int activeCount = 0;
+    if (state.isViperDdcEnabled) activeCount++;
+    if (state.isArbitraryEqEnabled) activeCount++;
+    if (state.isLiveProgEnabled) activeCount++;
+    if (state.isDynamicBassEnabled) activeCount++;
+    if (state.isLimiterEnabled || state.isDynamicsEnabled) activeCount++;
+    if (state.selectedHeadphoneProfile != null) activeCount++;
+
+    return ValueListenableBuilder<bool>(
+      valueListenable: _dspToolsExpanded,
+      builder: (context, isExpanded, _) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                _buildAbSlotSelector(cubit: cubit, p: p),
+                const SizedBox(width: AppSpacing.xs),
+                ActionChip(
+                  avatar: Icon(
+                    isExpanded ? Icons.tune_rounded : Icons.handyman_outlined,
+                    size: 14,
+                    color: isExpanded || activeCount > 0
+                        ? p.accent
+                        : p.textSecondary,
+                  ),
+                  label: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'DSP Tools',
+                        style: TextStyle(
+                          fontSize: AppFontSize.caption,
+                          fontWeight: FontWeight.w700,
+                          color: isExpanded || activeCount > 0
+                              ? p.accent
+                              : p.textPrimary,
+                        ),
+                      ),
+                      if (activeCount > 0) ...[
+                        const SizedBox(width: AppSpacing.xxs),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 5, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: p.accent,
+                            borderRadius: AppRadii.r10All,
+                          ),
+                          child: Text(
+                            '$activeCount',
+                            style: TextStyle(
+                              fontSize: AppFontSize.tiny,
+                              fontWeight: FontWeight.w900,
+                              color: AppColors.textOnAccent(p.accent),
+                            ),
+                          ),
+                        ),
+                      ],
+                      const SizedBox(width: AppSpacing.xxs),
+                      Icon(
+                        isExpanded
+                            ? Icons.expand_less_rounded
+                            : Icons.expand_more_rounded,
+                        size: 14,
+                        color: isExpanded ? p.accent : p.textSecondary,
+                      ),
+                    ],
+                  ),
+                  backgroundColor: isExpanded
+                      ? p.accent.withValues(alpha: 0.15)
+                      : p.surfaceContainer,
+                  side: BorderSide(
+                    color: isExpanded ? p.accent : p.hairline,
+                  ),
+                  shape: RoundedRectangleBorder(borderRadius: AppRadii.r10All),
+                  onPressed: () =>
+                      _dspToolsExpanded.value = !_dspToolsExpanded.value,
+                ),
+              ],
+            ),
+            if (isExpanded) ...[
+              const SizedBox(height: AppSpacing.xs),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(AppSpacing.xs),
+                decoration: BoxDecoration(
+                  color: p.surfaceContainer.withValues(alpha: 0.65),
+                  borderRadius: AppRadii.cardRadius,
+                  border: Border.all(color: p.hairline),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Row 1: Correction & Profiles
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          _buildAutoEqChip(context, p),
+                          const SizedBox(width: AppSpacing.xs),
+                          _buildRoomCorrectionChip(
+                              context, cubit, p, dspBlocked),
+                          const SizedBox(width: AppSpacing.xs),
+                          _buildViperDdcChip(context, state, p),
+                          const SizedBox(width: AppSpacing.xs),
+                          _buildArbitraryEqChip(context, state, p),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    // Row 2: Dynamics & Chain
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          _buildCompressorChip(context, p),
+                          const SizedBox(width: AppSpacing.xs),
+                          _buildLiveProgChip(context, state, p),
+                          const SizedBox(width: AppSpacing.xs),
+                          _buildDynamicBassChip(
+                              context, cubit, state, p, dspBlocked),
+                          const SizedBox(width: AppSpacing.xs),
+                          _buildDspChainChip(context, p),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            backgroundColor: state.isViperDdcEnabled
-                ? p.accent.withValues(alpha: 0.15)
-                : p.surfaceContainer,
-            side: BorderSide(
-              color: state.isViperDdcEnabled ? p.accent : p.hairline,
-            ),
-            shape: RoundedRectangleBorder(borderRadius: AppRadii.r10All),
-            onPressed: () {
-              PulsrSheetHelper.showPulsrSheet<void>(
-                context: context,
-                wrapWithContainer: false,
-                builder: (_) => const ViperDdcSheet(),
-              );
-            },
-          ),
-          const SizedBox(width: AppSpacing.xs),
-          ActionChip(
-            avatar: Icon(Icons.auto_graph_rounded,
-                size: 14,
-                color: state.isArbitraryEqEnabled ? p.accent : p.textSecondary),
-            label: Text(
-              context.l10n.arbitraryEq,
-              style: TextStyle(
-                fontSize: AppFontSize.caption,
-                fontWeight: FontWeight.w700,
-                color: state.isArbitraryEqEnabled ? p.accent : p.textPrimary,
-              ),
-            ),
-            backgroundColor: state.isArbitraryEqEnabled
-                ? p.accent.withValues(alpha: 0.15)
-                : p.surfaceContainer,
-            side: BorderSide(
-              color: state.isArbitraryEqEnabled ? p.accent : p.hairline,
-            ),
-            shape: RoundedRectangleBorder(borderRadius: AppRadii.r10All),
-            onPressed: () {
-              PulsrSheetHelper.showPulsrSheet<void>(
-                context: context,
-                wrapWithContainer: false,
-                builder: (_) => const ArbitraryEqSheet(),
-              );
-            },
-          ),
-          const SizedBox(width: AppSpacing.xs),
-          ActionChip(
-            avatar: Icon(Icons.terminal_rounded,
-                size: 14,
-                color: state.isLiveProgEnabled ? p.accent : p.textSecondary),
-            label: Text(
-              context.l10n.liveProgDsp,
-              style: TextStyle(
-                fontSize: AppFontSize.caption,
-                fontWeight: FontWeight.w700,
-                color: state.isLiveProgEnabled ? p.accent : p.textPrimary,
-              ),
-            ),
-            backgroundColor: state.isLiveProgEnabled
-                ? p.accent.withValues(alpha: 0.15)
-                : p.surfaceContainer,
-            side: BorderSide(
-              color: state.isLiveProgEnabled ? p.accent : p.hairline,
-            ),
-            shape: RoundedRectangleBorder(borderRadius: AppRadii.r10All),
-            onPressed: () {
-              PulsrSheetHelper.showPulsrSheet<void>(
-                context: context,
-                wrapWithContainer: false,
-                builder: (_) => const LiveProgSheet(),
-              );
-            },
-          ),
-          const SizedBox(width: AppSpacing.xs),
-          ActionChip(
-            avatar: Icon(Icons.speaker_group_rounded,
-                size: 14,
-                color: state.isDynamicBassEnabled ? p.accent : p.textSecondary),
-            label: Text(
-              context.l10n.dynamicBass,
-              style: TextStyle(
-                fontSize: AppFontSize.caption,
-                fontWeight: FontWeight.w700,
-                color: state.isDynamicBassEnabled ? p.accent : p.textPrimary,
-              ),
-            ),
-            backgroundColor: state.isDynamicBassEnabled
-                ? p.accent.withValues(alpha: 0.15)
-                : p.surfaceContainer,
-            side: BorderSide(
-              color: state.isDynamicBassEnabled ? p.accent : p.hairline,
-            ),
-            shape: RoundedRectangleBorder(borderRadius: AppRadii.r10All),
-            onPressed: dspBlocked != null || !_nativePcmEffectsAvailable
-                ? null
-                : () {
-                    _tabController.animateTo(3);
-                    cubit.setDynamicBass(!state.isDynamicBassEnabled);
-                  },
-          ),
-          const SizedBox(width: AppSpacing.xs),
-          ActionChip(
-            avatar: Icon(Icons.insights_rounded, size: 14, color: p.accent),
-            label: Text(context.l10n.dspChain,
-                style: const TextStyle(
-                    fontSize: AppFontSize.caption,
-                    fontWeight: FontWeight.w700)),
-            backgroundColor: p.surfaceContainer,
-            side: BorderSide(color: p.hairline),
-            shape: RoundedRectangleBorder(borderRadius: AppRadii.r10All),
-            onPressed: () => DspInspectorSheet.show(context),
-          ),
-        ],
+            ],
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildAutoEqChip(BuildContext context, PulsrPalette p) {
+    return ActionChip(
+      avatar: Icon(Icons.search_rounded, size: 14, color: p.accent),
+      label: Text(context.l10n.autoEqSearch,
+          style: const TextStyle(
+              fontSize: AppFontSize.caption, fontWeight: FontWeight.w700)),
+      backgroundColor: p.surfaceContainer,
+      side: BorderSide(color: p.hairline),
+      shape: RoundedRectangleBorder(borderRadius: AppRadii.r10All),
+      onPressed: () {
+        PulsrSheetHelper.showPulsrSheet<void>(
+          context: context,
+          wrapWithContainer: false,
+          builder: (_) => const AutoEqSearchSheet(),
+        );
+      },
+    );
+  }
+
+  Widget _buildRoomCorrectionChip(BuildContext context, PlayerCubit cubit,
+      PulsrPalette p, String? dspBlocked) {
+    return ActionChip(
+      avatar: Icon(Icons.graphic_eq_rounded, size: 14, color: p.accent),
+      label: Text(context.l10n.roomCorrection,
+          style: const TextStyle(
+              fontSize: AppFontSize.caption, fontWeight: FontWeight.w700)),
+      backgroundColor: p.surfaceContainer,
+      side: BorderSide(color: p.hairline),
+      shape: RoundedRectangleBorder(borderRadius: AppRadii.r10All),
+      onPressed:
+          dspBlocked != null ? null : () => _showRoomCorrectionActions(cubit),
+    );
+  }
+
+  Widget _buildViperDdcChip(
+      BuildContext context, PlayerState state, PulsrPalette p) {
+    return ActionChip(
+      avatar: Icon(Icons.headphones_rounded,
+          size: 14,
+          color: state.isViperDdcEnabled ? p.accent : p.textSecondary),
+      label: Text(
+        state.isViperDdcEnabled && state.viperDdcProfileName.isNotEmpty
+            ? 'DDC: ${state.viperDdcProfileName}'
+            : 'ViPER-DDC',
+        style: TextStyle(
+          fontSize: AppFontSize.caption,
+          fontWeight: FontWeight.w700,
+          color: state.isViperDdcEnabled ? p.accent : p.textPrimary,
+        ),
       ),
+      backgroundColor: state.isViperDdcEnabled
+          ? p.accent.withValues(alpha: 0.15)
+          : p.surfaceContainer,
+      side: BorderSide(
+        color: state.isViperDdcEnabled ? p.accent : p.hairline,
+      ),
+      shape: RoundedRectangleBorder(borderRadius: AppRadii.r10All),
+      onPressed: () {
+        PulsrSheetHelper.showPulsrSheet<void>(
+          context: context,
+          wrapWithContainer: false,
+          builder: (_) => const ViperDdcSheet(),
+        );
+      },
+    );
+  }
+
+  Widget _buildArbitraryEqChip(
+      BuildContext context, PlayerState state, PulsrPalette p) {
+    return ActionChip(
+      avatar: Icon(Icons.auto_graph_rounded,
+          size: 14,
+          color: state.isArbitraryEqEnabled ? p.accent : p.textSecondary),
+      label: Text(
+        context.l10n.arbitraryEq,
+        style: TextStyle(
+          fontSize: AppFontSize.caption,
+          fontWeight: FontWeight.w700,
+          color: state.isArbitraryEqEnabled ? p.accent : p.textPrimary,
+        ),
+      ),
+      backgroundColor: state.isArbitraryEqEnabled
+          ? p.accent.withValues(alpha: 0.15)
+          : p.surfaceContainer,
+      side: BorderSide(
+        color: state.isArbitraryEqEnabled ? p.accent : p.hairline,
+      ),
+      shape: RoundedRectangleBorder(borderRadius: AppRadii.r10All),
+      onPressed: () {
+        PulsrSheetHelper.showPulsrSheet<void>(
+          context: context,
+          wrapWithContainer: false,
+          builder: (_) => const ArbitraryEqSheet(),
+        );
+      },
+    );
+  }
+
+  Widget _buildCompressorChip(BuildContext context, PulsrPalette p) {
+    return ActionChip(
+      avatar: Icon(Icons.compress_rounded, size: 14, color: p.primary),
+      label: Text(context.l10n.dynamicsCompressor,
+          style: const TextStyle(
+              fontSize: AppFontSize.caption, fontWeight: FontWeight.w700)),
+      backgroundColor: p.surfaceContainer,
+      side: BorderSide(color: p.hairline),
+      shape: RoundedRectangleBorder(borderRadius: AppRadii.r10All),
+      onPressed: () {
+        final blocked = _dspBlockedReason(context);
+        if (blocked != null) {
+          PulsrToast.show(
+            context,
+            message: blocked,
+            icon: Icons.error_outline_rounded,
+            isError: true,
+          );
+          return;
+        }
+        if (!getIt.isRegistered<EqualizerManager>()) return;
+        CompressorLimiterSheet.show(
+          context,
+          equalizerManager: getIt<EqualizerManager>(),
+        );
+      },
+    );
+  }
+
+  Widget _buildLiveProgChip(
+      BuildContext context, PlayerState state, PulsrPalette p) {
+    return ActionChip(
+      avatar: Icon(Icons.terminal_rounded,
+          size: 14,
+          color: state.isLiveProgEnabled ? p.accent : p.textSecondary),
+      label: Text(
+        context.l10n.liveProgDsp,
+        style: TextStyle(
+          fontSize: AppFontSize.caption,
+          fontWeight: FontWeight.w700,
+          color: state.isLiveProgEnabled ? p.accent : p.textPrimary,
+        ),
+      ),
+      backgroundColor: state.isLiveProgEnabled
+          ? p.accent.withValues(alpha: 0.15)
+          : p.surfaceContainer,
+      side: BorderSide(
+        color: state.isLiveProgEnabled ? p.accent : p.hairline,
+      ),
+      shape: RoundedRectangleBorder(borderRadius: AppRadii.r10All),
+      onPressed: () {
+        PulsrSheetHelper.showPulsrSheet<void>(
+          context: context,
+          wrapWithContainer: false,
+          builder: (_) => const LiveProgSheet(),
+        );
+      },
+    );
+  }
+
+  Widget _buildDynamicBassChip(BuildContext context, PlayerCubit cubit,
+      PlayerState state, PulsrPalette p, String? dspBlocked) {
+    return ActionChip(
+      avatar: Icon(Icons.speaker_group_rounded,
+          size: 14,
+          color: state.isDynamicBassEnabled ? p.accent : p.textSecondary),
+      label: Text(
+        context.l10n.dynamicBass,
+        style: TextStyle(
+          fontSize: AppFontSize.caption,
+          fontWeight: FontWeight.w700,
+          color: state.isDynamicBassEnabled ? p.accent : p.textPrimary,
+        ),
+      ),
+      backgroundColor: state.isDynamicBassEnabled
+          ? p.accent.withValues(alpha: 0.15)
+          : p.surfaceContainer,
+      side: BorderSide(
+        color: state.isDynamicBassEnabled ? p.accent : p.hairline,
+      ),
+      shape: RoundedRectangleBorder(borderRadius: AppRadii.r10All),
+      onPressed: dspBlocked != null || !_nativePcmEffectsAvailable
+          ? null
+          : () {
+              _tabController.animateTo(3);
+              cubit.setDynamicBass(!state.isDynamicBassEnabled);
+            },
+    );
+  }
+
+  Widget _buildDspChainChip(BuildContext context, PulsrPalette p) {
+    return ActionChip(
+      avatar: Icon(Icons.insights_rounded, size: 14, color: p.accent),
+      label: Text(context.l10n.dspChain,
+          style: const TextStyle(
+              fontSize: AppFontSize.caption, fontWeight: FontWeight.w700)),
+      backgroundColor: p.surfaceContainer,
+      side: BorderSide(color: p.hairline),
+      shape: RoundedRectangleBorder(borderRadius: AppRadii.r10All),
+      onPressed: () => DspInspectorSheet.show(context),
     );
   }
 

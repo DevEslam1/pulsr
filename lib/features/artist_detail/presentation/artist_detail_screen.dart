@@ -30,9 +30,10 @@ import '../../../core/utils/pulsr_haptics.dart';
 class ArtistDetailScreen extends StatefulWidget {
   final ArtistsTableData artist;
   final GetArtistsUseCase? getArtistsUseCase;
+  final String? heroTag;
 
   const ArtistDetailScreen(
-      {super.key, required this.artist, this.getArtistsUseCase});
+      {super.key, required this.artist, this.getArtistsUseCase, this.heroTag});
 
   @override
   State<ArtistDetailScreen> createState() => _ArtistDetailScreenState();
@@ -206,12 +207,15 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
                           offset: const Offset(0, 8)),
                     ],
                   ),
-                  child: CachedArtwork(
-                    id: artist.id,
-                    type: ArtworkType.ARTIST,
-                    size: isTablet ? 160 : 130,
-                    borderRadius: 999,
-                    fallbackIcon: Icons.person_rounded,
+                  child: Hero(
+                    tag: widget.heroTag ?? 'artist_${artist.id}',
+                    child: CachedArtwork(
+                      id: artist.id,
+                      type: ArtworkType.ARTIST,
+                      size: isTablet ? 160 : 130,
+                      borderRadius: 999,
+                      fallbackIcon: Icons.person_rounded,
+                    ),
                   ),
                 ),
               ),
@@ -511,8 +515,11 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       PulsrSectionHeader(title: context.l10n.browseTopTracks),
-                      for (int i = 0; i < songs.length; i++)
-                        SongTile(
+                      ListView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: songs.length,
+                        itemBuilder: (context, i) => SongTile(
                           song: songs[i],
                           index: i,
                           subtitleOverride: songs[i].album,
@@ -527,6 +534,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
                             SongOptionsSheet.show(context, song: songs[i]);
                           },
                         ),
+                      ),
                     ],
                   ),
                 ),

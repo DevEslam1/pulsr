@@ -62,6 +62,7 @@ class KaraokePitchHighway extends StatefulWidget {
 class _KaraokePitchHighwayState extends State<KaraokePitchHighway>
     with SingleTickerProviderStateMixin {
   late final AnimationController _animController;
+  late final ValueNotifier<PitchResult> _pitchNotifier;
   final EmaPitchSmoother _pitchSmoother = EmaPitchSmoother(alpha: 0.28);
   final List<_PitchPoint> _trail = [];
   PitchResult _lastSmoothed = PitchResult.unvoiced;
@@ -74,16 +75,17 @@ class _KaraokePitchHighwayState extends State<KaraokePitchHighway>
   @override
   void initState() {
     super.initState();
-    _animController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 1),
-    )..addListener(_onTick);
-
     // Initial pitch calculation for first frame
     final initialRaw = _generateSimulatedPitch();
     if (initialRaw.isVoiced) {
       _lastSmoothed = _pitchSmoother.smooth(initialRaw);
     }
+    _pitchNotifier = ValueNotifier<PitchResult>(_lastSmoothed);
+
+    _animController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 1),
+    )..addListener(_onTick);
   }
 
   @override
@@ -100,9 +102,8 @@ class _KaraokePitchHighwayState extends State<KaraokePitchHighway>
       if (!widget.isPlaying) {
         _pitchSmoother.reset();
         _trail.clear();
-        setState(() {
-          _lastSmoothed = PitchResult.unvoiced;
-        });
+        _lastSmoothed = PitchResult.unvoiced;
+        _pitchNotifier.value = PitchResult.unvoiced;
       }
     } else if (KaraokePitchHighway.isTesting && widget.isPlaying) {
       // In tests, update simulated frame synchronously when position changes
@@ -152,9 +153,8 @@ class _KaraokePitchHighwayState extends State<KaraokePitchHighway>
       _trail.removeAt(0);
     }
 
-    setState(() {
-      _lastSmoothed = smoothed;
-    });
+    _lastSmoothed = smoothed;
+    _pitchNotifier.value = smoothed;
   }
 
   PitchResult _generateSimulatedPitch() {
@@ -213,7 +213,9 @@ class _KaraokePitchHighwayState extends State<KaraokePitchHighway>
 
   @override
   void dispose() {
+    _animController.removeListener(_onTick);
     _animController.dispose();
+    _pitchNotifier.dispose();
     super.dispose();
   }
 
@@ -239,7 +241,8 @@ class _KaraokePitchHighwayState extends State<KaraokePitchHighway>
           Positioned.fill(
             child: CustomPaint(
               painter: _PitchHighwayPainter(
-                smoothedResult: _lastSmoothed,
+                controller: _animController,
+                pitchNotifier: _pitchNotifier,
                 trail: _trail,
                 accentColor: accent,
                 hairlineColor: p.hairline,
@@ -280,54 +283,59 @@ class _KaraokePitchHighwayState extends State<KaraokePitchHighway>
               ),
             ),
           // Pitch & Note Readout Chip
-          if (_lastSmoothed.isVoiced)
-            PositionedDirectional(
-              top: AppSpacing.xxs,
-              end: AppSpacing.xs,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.s6,
-                  vertical: 2,
-                ),
-                decoration: BoxDecoration(
-                  color: p.surfaceContainerHigh.withValues(alpha: 0.8),
-                  borderRadius: AppRadii.r6All,
-                  border: Border.all(
-                    color: accent.withValues(alpha: 0.4),
-                    width: 0.8,
+          PositionedDirectional(
+            top: AppSpacing.xxs,
+            end: AppSpacing.xs,
+            child: ValueListenableBuilder<PitchResult>(
+              valueListenable: _pitchNotifier,
+              builder: (context, smoothed, _) {
+                if (!smoothed.isVoiced) return const SizedBox.shrink();
+                return Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.s6,
+                    vertical: 2,
                   ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 6,
-                      height: 6,
-                      decoration: BoxDecoration(
-                        color: accent,
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: accent.withValues(alpha: 0.6),
-                            blurRadius: 4,
-                          ),
-                        ],
-                      ),
+                  decoration: BoxDecoration(
+                    color: p.surfaceContainerHigh.withValues(alpha: 0.8),
+                    borderRadius: AppRadii.r6All,
+                    border: Border.all(
+                      color: accent.withValues(alpha: 0.4),
+                      width: 0.8,
                     ),
-                    const SizedBox(width: AppSpacing.xxs),
-                    Text(
-                      '${_lastSmoothed.noteName} • ${_lastSmoothed.frequencyHz.toStringAsFixed(0)} Hz',
-                      style: TextStyle(
-                        fontSize: AppFontSize.caption,
-                        fontWeight: FontWeight.w700,
-                        color: p.textPrimary,
-                        fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: BoxDecoration(
+                          color: accent,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: accent.withValues(alpha: 0.6),
+                              blurRadius: 4,
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-              ),
+                      const SizedBox(width: AppSpacing.xxs),
+                      Text(
+                        '${smoothed.noteName} • ${smoothed.frequencyHz.toStringAsFixed(0)} Hz',
+                        style: TextStyle(
+                          fontSize: AppFontSize.caption,
+                          fontWeight: FontWeight.w700,
+                          color: p.textPrimary,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
             ),
+          ),
         ],
       ),
     );
@@ -342,7 +350,7 @@ class _PitchPoint {
 }
 
 class _PitchHighwayPainter extends CustomPainter {
-  final PitchResult smoothedResult;
+  final ValueNotifier<PitchResult> pitchNotifier;
   final List<_PitchPoint> trail;
   final Color accentColor;
   final Color hairlineColor;
@@ -351,17 +359,19 @@ class _PitchHighwayPainter extends CustomPainter {
   final bool gpuSaver;
 
   _PitchHighwayPainter({
-    required this.smoothedResult,
+    required AnimationController controller,
+    required this.pitchNotifier,
     required this.trail,
     required this.accentColor,
     required this.hairlineColor,
     required this.minMidi,
     required this.maxMidi,
     required this.gpuSaver,
-  });
+  }) : super(repaint: controller);
 
   @override
   void paint(Canvas canvas, Size size) {
+    final smoothedResult = pitchNotifier.value;
     final w = size.width;
     final h = size.height;
     if (w <= 0 || h <= 0) return;
@@ -473,8 +483,11 @@ class _PitchHighwayPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _PitchHighwayPainter oldDelegate) {
-    return oldDelegate.smoothedResult != smoothedResult ||
-        oldDelegate.trail.length != trail.length ||
-        oldDelegate.accentColor != accentColor;
+    return oldDelegate.accentColor != accentColor ||
+        oldDelegate.hairlineColor != hairlineColor ||
+        oldDelegate.minMidi != minMidi ||
+        oldDelegate.maxMidi != maxMidi ||
+        oldDelegate.gpuSaver != gpuSaver ||
+        oldDelegate.pitchNotifier != pitchNotifier;
   }
 }

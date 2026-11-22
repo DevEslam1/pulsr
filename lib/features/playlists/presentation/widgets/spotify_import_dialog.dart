@@ -73,15 +73,14 @@ class _SpotifyImportDialogState extends State<SpotifyImportDialog> {
     if (id == null) {
       setState(() {
         _stage = _ImportStage.error;
-        _errorMessage =
-            'Invalid Spotify playlist URL. Please check the link and try again.';
+        _errorMessage = context.l10n.spotifyInvalidUrl;
       });
       return;
     }
 
     setState(() {
       _stage = _ImportStage.loading;
-      _statusMessage = 'Fetching Spotify playlist metadata...';
+      _statusMessage = context.l10n.spotifyFetchingMetadata;
       _progressFraction = null;
       _errorMessage = null;
     });
@@ -96,8 +95,7 @@ class _SpotifyImportDialogState extends State<SpotifyImportDialog> {
         onProgress: (completed, total) {
           if (!mounted) return;
           setState(() {
-            _statusMessage =
-                'Matching tracks on YouTube Music ($completed/$total)...';
+            _statusMessage = context.l10n.spotifyMatchingTracks(completed, total);
             _progressFraction = total > 0 ? completed / total : null;
           });
         },
@@ -145,7 +143,7 @@ class _SpotifyImportDialogState extends State<SpotifyImportDialog> {
       ),
       title: Text(
         _stage == _ImportStage.result
-            ? 'Import Complete'
+            ? context.l10n.spotifyImportComplete
             : context.l10n.playlistImportSpotify,
         style: const TextStyle(
           fontWeight: FontWeight.w800,
@@ -205,7 +203,7 @@ class _SpotifyImportDialogState extends State<SpotifyImportDialog> {
                         size: 18,
                         color: p.textSecondary,
                       ),
-                      tooltip: hasText ? context.l10n.clear : 'Paste',
+                      tooltip: hasText ? context.l10n.clear : context.l10n.paste,
                       onPressed: () {
                         if (hasText) {
                           _urlController.clear();

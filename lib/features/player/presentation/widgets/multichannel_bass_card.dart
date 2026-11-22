@@ -941,8 +941,9 @@ class _MultichannelBassCardState extends State<MultichannelBassCard> {
                   ),
                   tooltip: context.l10n.reset,
                   padding: EdgeInsets.zero,
-                  constraints:
-                      const BoxConstraints(minWidth: 36, minHeight: 36),
+                  constraints: const BoxConstraints(
+                      minWidth: AppSpacing.minTouchTarget,
+                      minHeight: AppSpacing.minTouchTarget),
                   onPressed: (value - defaultValue).abs() < 0.01
                       ? null
                       : () => onChanged(defaultValue),

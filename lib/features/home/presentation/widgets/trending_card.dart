@@ -1,11 +1,8 @@
-import 'dart:ui' show ImageFilter;
-
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 
 import '../../../../core/config/app_config.dart';
-import '../../../../core/constants/app_blur.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_radii.dart';
 import '../../../../core/constants/app_spacing.dart';
@@ -53,17 +50,15 @@ class TrendingCard extends StatelessWidget {
     final size = context.responsive
         .value(compact: 138.0, medium: 150.0, expanded: 158.0);
     final showDownload = _hasDownloadControl(context);
-    final canBlur = AppBlur.canBlur(context);
-    final sigma = AppBlur.clampSigma(AppBlur.chip);
 
     Widget? downloadBadge;
     if (showDownload) {
-      Widget badgeContent = DecoratedBox(
+      final badgeContent = DecoratedBox(
         decoration: BoxDecoration(
-          color: AppColors.scrimAt(canBlur ? 0.54 : 0.80),
+          color: AppColors.scrimAt(0.70),
           shape: BoxShape.circle,
           border: Border.all(
-            color: AppColors.specularAt(canBlur ? 0.22 : 0.30),
+            color: AppColors.specularAt(0.30),
             width: 1.0,
           ),
         ),
@@ -80,12 +75,6 @@ class TrendingCard extends StatelessWidget {
           ),
         ),
       );
-      if (canBlur && sigma > 0) {
-        badgeContent = BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
-          child: badgeContent,
-        );
-      }
       downloadBadge = PositionedDirectional(
         top: AppSpacing.s6,
         end: AppSpacing.s6,

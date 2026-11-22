@@ -19681,6 +19681,108 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Network library'**
   String get extrasRemoteAlbumLabel;
+
+  /// Menu action to enter track selection mode in album detail
+  ///
+  /// In en, this message translates to:
+  /// **'Select tracks'**
+  String get selectTracks;
+
+  /// Title for expandable secondary recovery actions in the YTM block screen
+  ///
+  /// In en, this message translates to:
+  /// **'More recovery options'**
+  String get moreRecoveryOptions;
+
+  /// Status text while clearing cookies and restarting login
+  ///
+  /// In en, this message translates to:
+  /// **'Retrying sign-in with a clean session…'**
+  String get retryingCleanSession;
+
+  /// Status text while switching user agent and reloading login
+  ///
+  /// In en, this message translates to:
+  /// **'Reloading with {identity} browser identity…'**
+  String reloadingIdentity(String identity);
+
+  /// Desktop Chrome browser identity label
+  ///
+  /// In en, this message translates to:
+  /// **'Chrome Desktop'**
+  String get browserIdentityChromeDesktop;
+
+  /// Mobile Chrome browser identity label
+  ///
+  /// In en, this message translates to:
+  /// **'Chrome Mobile'**
+  String get browserIdentityChromeMobile;
+
+  /// Mobile Safari browser identity label
+  ///
+  /// In en, this message translates to:
+  /// **'Safari Mobile'**
+  String get browserIdentitySafariMobile;
+
+  /// Desktop Firefox browser identity label
+  ///
+  /// In en, this message translates to:
+  /// **'Firefox Desktop'**
+  String get browserIdentityFirefoxDesktop;
+
+  /// Button label to copy user code and launch browser for OAuth login
+  ///
+  /// In en, this message translates to:
+  /// **'Copy code & open browser'**
+  String get copyCodeAndOpenBrowser;
+
+  /// Validation error when party server URL is empty
+  ///
+  /// In en, this message translates to:
+  /// **'Server URL cannot be empty'**
+  String get partyServerUrlEmpty;
+
+  /// Validation error when party server URL scheme or host is invalid
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid URL (http, https, ws, or wss)'**
+  String get partyServerUrlInvalid;
+
+  /// Fallback name for a cast target when device name is unavailable
+  ///
+  /// In en, this message translates to:
+  /// **'device'**
+  String get castDefaultDevice;
+
+  /// Tooltip and button label to paste text from clipboard
+  ///
+  /// In en, this message translates to:
+  /// **'Paste'**
+  String get paste;
+
+  /// Error message when the entered Spotify playlist link is invalid
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid Spotify playlist URL. Please check the link and try again.'**
+  String get spotifyInvalidUrl;
+
+  /// Status message while fetching playlist info from Spotify
+  ///
+  /// In en, this message translates to:
+  /// **'Fetching Spotify playlist metadata...'**
+  String get spotifyFetchingMetadata;
+
+  /// Progress status while searching and matching Spotify tracks on YouTube Music
+  ///
+  /// In en, this message translates to:
+  /// **'Matching tracks on YouTube Music ({completed}/{total})...'**
+  String spotifyMatchingTracks(int completed, int total);
+
+  /// Title of the Spotify import dialog when the import finished
+  ///
+  /// In en, this message translates to:
+  /// **'Import Complete'**
+  String get spotifyImportComplete;
 }
 
 class _AppLocalizationsDelegate

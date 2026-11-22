@@ -268,11 +268,15 @@ class _RecentlyAddedSectionState extends State<RecentlyAddedSection> {
                 },
               )
             else
-              for (int index = 0; index < totalItemCount; index++)
-                if (index >= songs.length)
-                  _buildAutoLoadIndicator(context)
-                else
-                  StaggeredReveal(
+              ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: totalItemCount,
+                itemBuilder: (context, index) {
+                  if (index >= songs.length) {
+                    return _buildAutoLoadIndicator(context);
+                  }
+                  return StaggeredReveal(
                     index: index,
                     groupKey: songs.isEmpty ? '' : '${songs.first.id}',
                     child: SongTile(
@@ -285,7 +289,9 @@ class _RecentlyAddedSectionState extends State<RecentlyAddedSection> {
                       onMorePressed: () =>
                           SongOptionsSheet.show(context, song: songs[index]),
                     ),
-                  ),
+                  );
+                },
+              ),
           ],
         );
       },

@@ -8,6 +8,7 @@ import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/utils/platform_capabilities.dart';
 import '../../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../../core/widgets/pulsr_progress.dart';
+import '../../../../core/widgets/pulsr_toast.dart';
 import '../../../../data/db/app_database.dart';
 import '../../../../data/services/cast_service.dart';
 import '../../cubit/player_cubit.dart';
@@ -303,7 +304,7 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
         startPositionMs: selection.startPositionMs,
       );
       _showToast(result.success
-          ? l10n.settingsCastingQueueTo(_session.deviceName ?? 'device')
+          ? l10n.settingsCastingQueueTo(_session.deviceName ?? l10n.castDefaultDevice)
           : (result.error ?? l10n.settingsCastFailed));
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -343,12 +344,7 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
 
   void _showToast(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-      SnackBar(
-        content: Text(message),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    PulsrToast.show(context, message: message);
   }
 
   @override
@@ -659,13 +655,13 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 IconButton(
-                                  tooltip: 'Previous',
+                                  tooltip: context.l10n.previous,
                                   icon: const Icon(Icons.skip_previous_rounded),
                                   onPressed: _busy ? null : () => _service.previous(),
                                 ),
                                 const SizedBox(width: AppSpacing.xs),
                                 IconButton(
-                                  tooltip: _session.playing ? 'Pause' : 'Play',
+                                  tooltip: _session.playing ? context.l10n.pause : context.l10n.play,
                                   iconSize: 36,
                                   color: p.accent,
                                   icon: Icon(_session.playing
@@ -677,13 +673,13 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
                                 ),
                                 const SizedBox(width: AppSpacing.xs),
                                 IconButton(
-                                  tooltip: 'Stop',
+                                  tooltip: context.l10n.stopCast,
                                   icon: const Icon(Icons.stop_rounded),
                                   onPressed: _busy ? null : () => _service.stop(),
                                 ),
                                 const SizedBox(width: AppSpacing.xs),
                                 IconButton(
-                                  tooltip: 'Next',
+                                  tooltip: context.l10n.next,
                                   icon: const Icon(Icons.skip_next_rounded),
                                   onPressed: _busy ? null : () => _service.next(),
                                 ),

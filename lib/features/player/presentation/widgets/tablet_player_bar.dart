@@ -198,15 +198,13 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                           borderRadius: barRadius,
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black
-                                  .withValues(alpha: p.isDark ? 0.35 : 0.08),
+                              color: AppColors.scrimAt(p.isDark ? 0.35 : 0.08),
                               blurRadius: 18,
                               spreadRadius: 0,
                               offset: const Offset(0, 6),
                             ),
                             BoxShadow(
-                              color: Colors.black
-                                  .withValues(alpha: p.isDark ? 0.15 : 0.04),
+                              color: AppColors.scrimAt(p.isDark ? 0.15 : 0.04),
                               blurRadius: 6,
                               spreadRadius: 0,
                               offset: const Offset(0, 2),
@@ -255,195 +253,170 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                               : (totalWidth * 0.34)
                                                   .clamp(140.0, 360.0));
 
+                                       // Responsive flex hiding thresholds:
+                                       // 1. Progressively hide the 80dp volume slider on narrower screens, keeping the mute button.
+                                       final showVolumeSlider =
+                                           !isShortHeight && totalWidth >= 680 && rightMaxWidth >= 160;
+                                       // 2. Progressively hide secondary badges before shrinking title typography.
+                                       final showSecondaryBadges =
+                                           !isShortHeight && totalWidth >= 600 && leftMaxWidth >= 140;
+                                       // 3. Progressively hide the favorite button on compact widths to prioritize track typography.
+                                       final showFavoriteButton =
+                                           isShortHeight ? leftMaxWidth >= 140 : (!isCompactBar && leftMaxWidth >= 130);
+
                                       return Row(
                                         children: [
-                                          // ── Left: Track Info & Artwork ──────────────────────────
-                                          ConstrainedBox(
-                                            constraints: BoxConstraints(
-                                              minWidth: 0,
-                                              maxWidth: leftMaxWidth,
-                                            ),
-                                            child: FittedBox(
-                                              fit: BoxFit.scaleDown,
-                                              alignment: AlignmentDirectional
-                                                  .centerStart,
-                                              child: Row(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  GestureDetector(
-                                                    onTap:
-                                                        widget.onOpenNowPlaying,
-                                                    child: ClipRRect(
-                                                      borderRadius:
-                                                          AppRadii.circular(
-                                                              isShortHeight
-                                                                  ? AppRadii.r8
-                                                                  : AppRadii
-                                                                      .r12),
-                                                      child: Hero(
-                                                        tag: nowPlayingArtHeroTag(
-                                                            playerThemeMode),
-                                                        child: CachedArtwork(
-                                                          id: song.id,
-                                                          albumId: song.albumId,
-                                                          remoteUrl: song
-                                                                  .remoteArtworkUrl ??
-                                                              song.artworkUri,
-                                                          type:
-                                                              ArtworkType.AUDIO,
-                                                          size: isShortHeight
-                                                              ? 40
-                                                              : (isCompactBar
-                                                                  ? 42
-                                                                  : 54),
-                                                          borderRadius:
-                                                              isShortHeight
-                                                                  ? 8
-                                                                  : 12,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  ),
-                                                  SizedBox(
-                                                      width: (isCompactBar ||
-                                                              isShortHeight)
-                                                          ? AppSpacing.xs
-                                                          : AppSpacing.s10),
-                                                  ConstrainedBox(
-                                                    constraints: BoxConstraints(
-                                                      maxWidth: isShortHeight
-                                                          ? (leftMaxWidth - 64)
-                                                              .clamp(
-                                                                  80.0, 190.0)
-                                                          : (leftMaxWidth - 72)
-                                                              .clamp(
-                                                                  80.0, 240.0),
-                                                    ),
-                                                    child: GestureDetector(
-                                                      onTap: widget
-                                                          .onOpenNowPlaying,
-                                                      child: Column(
-                                                        mainAxisAlignment:
-                                                            MainAxisAlignment
-                                                                .center,
-                                                        crossAxisAlignment:
-                                                            CrossAxisAlignment
-                                                                .start,
-                                                        mainAxisSize:
-                                                            MainAxisSize.min,
-                                                        children: [
-                                                          Text(
-                                                            song.title,
-                                                            maxLines: 1,
-                                                            overflow:
-                                                                TextOverflow
-                                                                    .ellipsis,
-                                                            style: TextStyle(
-                                                              color:
-                                                                  p.textPrimary,
-                                                              fontWeight:
-                                                                  FontWeight
-                                                                      .w800,
-                                                              fontSize: isShortHeight
-                                                                  ? AppFontSize
-                                                                      .label
-                                                                  : AppFontSize
-                                                                      .bodySmall,
-                                                            ),
-                                                          ),
-                                                          const SizedBox(
-                                                              height: AppSpacing
-                                                                  .s2),
-                                                          Text(
-                                                            song.artist,
-                                                            maxLines: 1,
-                                                            overflow:
-                                                                TextOverflow
-                                                                    .ellipsis,
-                                                            style: TextStyle(
-                                                              color: p
-                                                                  .textSecondary,
-                                                              fontWeight:
-                                                                  FontWeight
-                                                                      .w500,
-                                                              fontSize: isShortHeight
-                                                                  ? AppFontSize
-                                                                      .tiny
-                                                                  : AppFontSize
-                                                                      .label,
-                                                            ),
-                                                          ),
-                                                          if (!isShortHeight) ...[
-                                                            const SizedBox(
-                                                                height: 5.0),
-                                                            FittedBox(
-                                                              fit: BoxFit
-                                                                  .scaleDown,
-                                                              alignment:
-                                                                  AlignmentDirectional
-                                                                      .centerStart,
-                                                              child: Row(
-                                                                mainAxisSize:
-                                                                    MainAxisSize
-                                                                        .min,
-                                                                children: [
-                                                                  AudioQualityBadge(
-                                                                    song: song,
-                                                                    activeColor:
-                                                                        activeColor,
-                                                                    compact:
-                                                                        true,
-                                                                    showDevice:
-                                                                        false,
-                                                                  ),
-                                                                ],
-                                                              ),
-                                                            ),
-                                                          ],
-                                                        ],
-                                                      ),
-                                                    ),
-                                                  ),
-                                                  if (!isCompactBar ||
-                                                      leftMaxWidth >= 110 ||
-                                                      isShortHeight)
-                                                    IconButton(
-                                                      visualDensity:
-                                                          VisualDensity.compact,
-                                                      padding: EdgeInsets.zero,
-                                                      constraints: BoxConstraints(
-                                                          minWidth: isShortHeight
-                                                              ? 32
-                                                              : AppSpacing
-                                                                  .minTouchTarget,
-                                                          minHeight: isShortHeight
-                                                              ? 32
-                                                              : AppSpacing
-                                                                  .minTouchTarget),
-                                                      icon: Icon(
-                                                        song.isFavorite
-                                                            ? Icons
-                                                                .favorite_rounded
-                                                            : Icons
-                                                                .favorite_border_rounded,
-                                                        color: song.isFavorite
-                                                            ? p.favorite
-                                                            : p.textSecondary,
-                                                        size: isShortHeight
-                                                            ? 18
-                                                            : 20,
-                                                      ),
-                                                      tooltip: song.isFavorite
-                                                          ? l10n.unlike
-                                                          : l10n.like,
-                                                      onPressed: () =>
-                                                          cubit.toggleFavorite(
-                                                              song.id),
-                                                    ),
-                                                ],
-                                              ),
-                                            ),
-                                          ),
+                                           // ── Left: Track Info & Artwork ──────────────────────────
+                                           ConstrainedBox(
+                                             constraints: BoxConstraints(
+                                               minWidth: 0,
+                                               maxWidth: leftMaxWidth,
+                                             ),
+                                             child: Row(
+                                               mainAxisSize: MainAxisSize.min,
+                                               children: [
+                                                 GestureDetector(
+                                                   onTap:
+                                                       widget.onOpenNowPlaying,
+                                                   child: ClipRRect(
+                                                     borderRadius:
+                                                         AppRadii.circular(
+                                                             isShortHeight
+                                                                 ? AppRadii.r8
+                                                                 : AppRadii
+                                                                     .r12),
+                                                     child: Hero(
+                                                       tag: nowPlayingArtHeroTag(
+                                                           playerThemeMode),
+                                                       child: CachedArtwork(
+                                                         id: song.id,
+                                                         albumId: song.albumId,
+                                                         remoteUrl: song
+                                                                 .remoteArtworkUrl ??
+                                                             song.artworkUri,
+                                                         type:
+                                                             ArtworkType.AUDIO,
+                                                         size: isShortHeight
+                                                             ? 40
+                                                             : (isCompactBar
+                                                                 ? 42
+                                                                 : 54),
+                                                         borderRadius:
+                                                             isShortHeight
+                                                                 ? 8
+                                                                 : 12,
+                                                       ),
+                                                     ),
+                                                   ),
+                                                 ),
+                                                 SizedBox(
+                                                     width: (isCompactBar ||
+                                                             isShortHeight)
+                                                         ? AppSpacing.xs
+                                                         : AppSpacing.s10),
+                                                 Flexible(
+                                                   child: GestureDetector(
+                                                     onTap: widget
+                                                         .onOpenNowPlaying,
+                                                     child: Column(
+                                                       mainAxisAlignment:
+                                                           MainAxisAlignment
+                                                               .center,
+                                                       crossAxisAlignment:
+                                                           CrossAxisAlignment
+                                                               .start,
+                                                       mainAxisSize:
+                                                           MainAxisSize.min,
+                                                       children: [
+                                                         Text(
+                                                           song.title,
+                                                           maxLines: 1,
+                                                           overflow:
+                                                               TextOverflow
+                                                                   .ellipsis,
+                                                           style: TextStyle(
+                                                             color:
+                                                                 p.textPrimary,
+                                                             fontWeight:
+                                                                 FontWeight
+                                                                     .w800,
+                                                             fontSize: isShortHeight
+                                                                 ? AppFontSize
+                                                                     .label
+                                                                 : AppFontSize
+                                                                     .bodySmall,
+                                                           ),
+                                                         ),
+                                                         const SizedBox(
+                                                             height: AppSpacing
+                                                                 .s2),
+                                                         Text(
+                                                           song.artist,
+                                                           maxLines: 1,
+                                                           overflow:
+                                                               TextOverflow
+                                                                   .ellipsis,
+                                                           style: TextStyle(
+                                                             color: p
+                                                                 .textSecondary,
+                                                             fontWeight:
+                                                                 FontWeight
+                                                                     .w500,
+                                                             fontSize: isShortHeight
+                                                                 ? AppFontSize
+                                                                     .tiny
+                                                                 : AppFontSize
+                                                                     .label,
+                                                           ),
+                                                         ),
+                                                         if (showSecondaryBadges) ...[
+                                                           const SizedBox(
+                                                               height: 5.0),
+                                                           AudioQualityBadge(
+                                                             song: song,
+                                                             activeColor:
+                                                                 activeColor,
+                                                             compact: true,
+                                                             showDevice: false,
+                                                           ),
+                                                         ],
+                                                       ],
+                                                     ),
+                                                   ),
+                                                 ),
+                                                 if (showFavoriteButton)
+                                                   IconButton(
+                                                     visualDensity:
+                                                         VisualDensity.compact,
+                                                     padding: EdgeInsets.zero,
+                                                     constraints: const BoxConstraints(
+                                                         minWidth: AppSpacing
+                                                             .minTouchTarget,
+                                                         minHeight: AppSpacing
+                                                             .minTouchTarget),
+                                                     icon: Icon(
+                                                       song.isFavorite
+                                                           ? Icons
+                                                               .favorite_rounded
+                                                           : Icons
+                                                               .favorite_border_rounded,
+                                                       color: song.isFavorite
+                                                           ? p.favorite
+                                                           : p.textSecondary,
+                                                       size: isShortHeight
+                                                           ? 18
+                                                           : 20,
+                                                     ),
+                                                     tooltip: song.isFavorite
+                                                         ? l10n.unlike
+                                                         : l10n.like,
+                                                     onPressed: () =>
+                                                         cubit.toggleFavorite(
+                                                             song.id),
+                                                   ),
+                                               ],
+                                             ),
+                                           ),
 
                                           SizedBox(
                                               width: isCompactBar
@@ -518,15 +491,21 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                                               .toggleShuffle();
                                                                         },
                                                                         child:
-                                                                            AnimatedContainer(
-                                                                          duration:
-                                                                              context.motionMs(200),
-                                                                          width: isShortHeight
-                                                                              ? 30
-                                                                              : 36,
-                                                                          height: isShortHeight
-                                                                              ? 30
-                                                                              : 36,
+                                                                            ConstrainedBox(
+                                                                          constraints: const BoxConstraints(
+                                                                            minWidth: AppSpacing.minTouchTarget,
+                                                                            minHeight: AppSpacing.minTouchTarget,
+                                                                          ),
+                                                                          child: Center(
+                                                                            child: AnimatedContainer(
+                                                                              duration:
+                                                                                  context.motionMs(200),
+                                                                              width: isShortHeight
+                                                                                  ? 30
+                                                                                  : 36,
+                                                                              height: isShortHeight
+                                                                                  ? 30
+                                                                                  : 36,
                                                                           decoration:
                                                                               BoxDecoration(
                                                                             shape:
@@ -555,12 +534,14 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                                     ),
                                                                   ),
                                                                 ),
+                                                              ),
+                                                                ),
                                                                 SizedBox(
                                                                     width: isShortHeight
                                                                         ? AppSpacing
-                                                                            .s10
+                                                                            .xxs
                                                                         : AppSpacing
-                                                                            .s14),
+                                                                            .xs),
                                                                 // Previous Button
                                                                 Semantics(
                                                                   label: l10n
@@ -588,13 +569,19 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                                               .previous();
                                                                         },
                                                                         child:
-                                                                            Container(
-                                                                          width: isShortHeight
-                                                                              ? 34
-                                                                              : 40,
-                                                                          height: isShortHeight
-                                                                              ? 34
-                                                                              : 40,
+                                                                            ConstrainedBox(
+                                                                          constraints: const BoxConstraints(
+                                                                            minWidth: AppSpacing.minTouchTarget,
+                                                                            minHeight: AppSpacing.minTouchTarget,
+                                                                          ),
+                                                                          child: Center(
+                                                                            child: Container(
+                                                                              width: isShortHeight
+                                                                                  ? 34
+                                                                                  : 40,
+                                                                              height: isShortHeight
+                                                                                  ? 34
+                                                                                  : 40,
                                                                           decoration:
                                                                               BoxDecoration(
                                                                             shape:
@@ -621,12 +608,14 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                                     ),
                                                                   ),
                                                                 ),
+                                                              ),
+                                                                ),
                                                                 SizedBox(
                                                                     width: isShortHeight
                                                                         ? AppSpacing
-                                                                            .s10
+                                                                            .xxs
                                                                         : AppSpacing
-                                                                            .s14),
+                                                                            .xs),
                                                                 // Main Play / Pause Button
                                                                 Semantics(
                                                                   label: state
@@ -657,15 +646,21 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                                             .togglePlayPause();
                                                                       },
                                                                       child:
-                                                                          AnimatedContainer(
-                                                                        duration:
-                                                                            context.motionMs(200),
-                                                                        width: isShortHeight
-                                                                            ? 40
-                                                                            : 48,
-                                                                        height: isShortHeight
-                                                                            ? 40
-                                                                            : 48,
+                                                                          ConstrainedBox(
+                                                                        constraints: const BoxConstraints(
+                                                                          minWidth: AppSpacing.minTouchTarget,
+                                                                          minHeight: AppSpacing.minTouchTarget,
+                                                                        ),
+                                                                        child: Center(
+                                                                          child: AnimatedContainer(
+                                                                            duration:
+                                                                                context.motionMs(200),
+                                                                            width: isShortHeight
+                                                                                ? 40
+                                                                                : 48,
+                                                                            height: isShortHeight
+                                                                                ? 40
+                                                                                : 48,
                                                                         decoration:
                                                                             BoxDecoration(
                                                                           shape:
@@ -677,7 +672,7 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                                             end:
                                                                                 Alignment.bottomRight,
                                                                             colors: [
-                                                                              Color.lerp(activeColor, Colors.white, 0.22) ?? activeColor,
+                                                                              Color.lerp(activeColor, AppColors.specularAt(1.0), 0.22) ?? activeColor,
                                                                               activeColor,
                                                                             ],
                                                                           ),
@@ -692,7 +687,7 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                                           border:
                                                                               Border.all(
                                                                             color:
-                                                                                Colors.white.withValues(alpha: 0.30),
+                                                                                AppColors.specularAt(0.30),
                                                                             width:
                                                                                 1.2,
                                                                           ),
@@ -712,7 +707,7 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                                                 Icon(
                                                                               state.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
                                                                               key: ValueKey<bool>(state.isPlaying),
-                                                                              color: activeColor.computeLuminance() > 0.5 ? AppColors.controlInk : Colors.white,
+                                                                              color: AppColors.textOnAccent(activeColor),
                                                                               size: isShortHeight ? 22 : 26,
                                                                             ),
                                                                           ),
@@ -721,12 +716,14 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                                     ),
                                                                   ),
                                                                 ),
+                                                              ),
+                                                            ),
                                                                 SizedBox(
                                                                     width: isShortHeight
                                                                         ? AppSpacing
-                                                                            .s10
+                                                                            .xxs
                                                                         : AppSpacing
-                                                                            .s14),
+                                                                            .xs),
                                                                 // Next Button
                                                                 Semantics(
                                                                   label:
@@ -753,13 +750,19 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                                               }
                                                                             : null,
                                                                         child:
-                                                                            Container(
-                                                                          width: isShortHeight
-                                                                              ? 34
-                                                                              : 40,
-                                                                          height: isShortHeight
-                                                                              ? 34
-                                                                              : 40,
+                                                                            ConstrainedBox(
+                                                                          constraints: const BoxConstraints(
+                                                                            minWidth: AppSpacing.minTouchTarget,
+                                                                            minHeight: AppSpacing.minTouchTarget,
+                                                                          ),
+                                                                          child: Center(
+                                                                            child: Container(
+                                                                              width: isShortHeight
+                                                                                  ? 34
+                                                                                  : 40,
+                                                                              height: isShortHeight
+                                                                                  ? 34
+                                                                                  : 40,
                                                                           decoration:
                                                                               BoxDecoration(
                                                                             shape:
@@ -786,12 +789,14 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                                     ),
                                                                   ),
                                                                 ),
+                                                              ),
+                                                                ),
                                                                 SizedBox(
                                                                     width: isShortHeight
                                                                         ? AppSpacing
-                                                                            .s10
+                                                                            .xxs
                                                                         : AppSpacing
-                                                                            .s14),
+                                                                            .xs),
                                                                 // Repeat
                                                                 Semantics(
                                                                   label: state.repeatMode ==
@@ -836,15 +841,21 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                                               .toggleRepeat();
                                                                         },
                                                                         child:
-                                                                            AnimatedContainer(
-                                                                          duration:
-                                                                              context.motionMs(200),
-                                                                          width: isShortHeight
-                                                                              ? 30
-                                                                              : 36,
-                                                                          height: isShortHeight
-                                                                              ? 30
-                                                                              : 36,
+                                                                            ConstrainedBox(
+                                                                          constraints: const BoxConstraints(
+                                                                            minWidth: AppSpacing.minTouchTarget,
+                                                                            minHeight: AppSpacing.minTouchTarget,
+                                                                          ),
+                                                                          child: Center(
+                                                                            child: AnimatedContainer(
+                                                                              duration:
+                                                                                  context.motionMs(200),
+                                                                              width: isShortHeight
+                                                                                  ? 30
+                                                                                  : 36,
+                                                                              height: isShortHeight
+                                                                                  ? 30
+                                                                                  : 36,
                                                                           decoration:
                                                                               BoxDecoration(
                                                                             shape:
@@ -872,6 +883,8 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                                       ),
                                                                     ),
                                                                   ),
+                                                                ),
+                                                              ),
                                                                 ),
                                                               ],
                                                             ),
@@ -942,7 +955,7 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                                               ),
                                                                               semanticLabel: context.l10n.seekLabel,
                                                                               activeColor: activeColor,
-                                                                              inactiveColor: Theme.of(context).brightness == Brightness.dark ? (playerSliderStyle == PlayerSliderStyle.capsule ? Colors.white.withValues(alpha: 0.22) : AppColors.specularStrong) : (playerSliderStyle == PlayerSliderStyle.capsule ? Colors.black.withValues(alpha: 0.15) : p.hairline.withValues(alpha: 0.8)),
+                                                                              inactiveColor: Theme.of(context).brightness == Brightness.dark ? (playerSliderStyle == PlayerSliderStyle.capsule ? AppColors.specularAt(0.22) : AppColors.specularStrong) : (playerSliderStyle == PlayerSliderStyle.capsule ? AppColors.scrimAt(0.15) : p.hairline.withValues(alpha: 0.8)),
                                                                               sliderStyle: playerSliderStyle,
                                                                               isWavy: playerSliderStyle == PlayerSliderStyle.wavy,
                                                                               animateWave: state.isPlaying,
@@ -1080,6 +1093,7 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                                           .toggleMute();
                                                                     },
                                                                   ),
+                                                                    if (showVolumeSlider)
                                                                   SizedBox(
                                                                     width: 80,
                                                                     child:
@@ -1201,15 +1215,11 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                         padding:
                                                             EdgeInsets.zero,
                                                         constraints:
-                                                            BoxConstraints(
-                                                                minWidth:
-                                                                    isShortHeight
-                                                                        ? 36
-                                                                        : 48,
-                                                                minHeight:
-                                                                    isShortHeight
-                                                                        ? 36
-                                                                        : 48),
+                                                            const BoxConstraints(
+                                                                minWidth: AppSpacing
+                                                                    .minTouchTarget,
+                                                                minHeight: AppSpacing
+                                                                    .minTouchTarget),
                                                         icon: Icon(
                                                           Icons
                                                               .queue_music_rounded,
@@ -1233,15 +1243,11 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                           VisualDensity.compact,
                                                       padding: EdgeInsets.zero,
                                                       constraints:
-                                                          BoxConstraints(
-                                                              minWidth:
-                                                                  isShortHeight
-                                                                      ? 36
-                                                                      : 48,
-                                                              minHeight:
-                                                                  isShortHeight
-                                                                      ? 36
-                                                                      : 48),
+                                                          const BoxConstraints(
+                                                              minWidth: AppSpacing
+                                                                  .minTouchTarget,
+                                                              minHeight: AppSpacing
+                                                                  .minTouchTarget),
                                                       icon: Icon(
                                                         Icons
                                                             .open_in_full_rounded,

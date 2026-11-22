@@ -495,14 +495,14 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
 
   Widget _buildBody(PulsrPalette p) {
     if (_isScanning) {
-      return const SingleChildScrollView(
-        physics: AlwaysScrollableScrollPhysics(),
+      return SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
         child: SkeletonList(
           padding: EdgeInsetsDirectional.fromSTEB(
             AppSpacing.md,
             AppSpacing.xs,
             AppSpacing.md,
-            120,
+            PulsrLayoutMetrics.scrollBottom(context),
           ),
         ),
       );
@@ -511,6 +511,12 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
     if (_scanFailed) {
       return ListView(
         physics: const AlwaysScrollableScrollPhysics(),
+        padding: EdgeInsetsDirectional.fromSTEB(
+          0,
+          0,
+          0,
+          PulsrLayoutMetrics.scrollBottom(context),
+        ),
         children: [
           const SizedBox(height: AppSpacing.xxl),
           PulsrEmptyState(
@@ -529,6 +535,12 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
     if (_duplicateGroups.isEmpty) {
       return ListView(
         physics: const AlwaysScrollableScrollPhysics(),
+        padding: EdgeInsetsDirectional.fromSTEB(
+          0,
+          0,
+          0,
+          PulsrLayoutMetrics.scrollBottom(context),
+        ),
         children: [
           const SizedBox(height: AppSpacing.xxl),
           PulsrEmptyState(

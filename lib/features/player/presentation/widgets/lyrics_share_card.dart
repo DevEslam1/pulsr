@@ -166,7 +166,7 @@ class LyricsShareCardRenderer {
     );
 
     final bgPaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.08)
+      ..color = AppColors.specularAt(0.08)
       ..style = PaintingStyle.fill;
     canvas.drawRRect(badgeRect, bgPaint);
 
@@ -181,7 +181,7 @@ class LyricsShareCardRenderer {
       text: TextSpan(
         text: brandText,
         style: TextStyle(
-          color: Colors.white.withValues(alpha: 0.95),
+          color: AppColors.specularAt(0.95),
           fontSize: AppFontSize.titleMedium,
           fontWeight: FontWeight.w800,
           letterSpacing: 3.5,
@@ -228,7 +228,7 @@ class LyricsShareCardRenderer {
         text: TextSpan(
           text: line.text,
           style: TextStyle(
-            color: Colors.white,
+            color: AppColors.fadeStopOpaque,
             fontSize: fontSize,
             fontWeight: FontWeight.w800,
             height: 1.35,
@@ -239,7 +239,7 @@ class LyricsShareCardRenderer {
                 blurRadius: 28,
               ),
               Shadow(
-                color: Colors.black.withValues(alpha: 0.8),
+                color: AppColors.scrimAt(0.8),
                 blurRadius: 10,
               ),
             ],
@@ -258,7 +258,7 @@ class LyricsShareCardRenderer {
           text: TextSpan(
             text: sub,
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.72),
+              color: AppColors.specularAt(0.72),
               fontSize: subFontSize,
               fontWeight: FontWeight.w500,
               fontStyle: FontStyle.italic,
@@ -352,7 +352,7 @@ class LyricsShareCardRenderer {
 
     // Border around artwork thumbnail
     final borderPaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.15)
+      ..color = AppColors.specularAt(0.15)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.0;
     canvas.drawRRect(thumbRect, borderPaint);
@@ -368,7 +368,7 @@ class LyricsShareCardRenderer {
       text: TextSpan(
         text: title,
         style: const TextStyle(
-          color: Colors.white,
+          color: AppColors.fadeStopOpaque,
           fontSize: AppFontSize.heroXL,
           fontWeight: FontWeight.w800,
         ),
@@ -384,7 +384,7 @@ class LyricsShareCardRenderer {
       text: TextSpan(
         text: artist,
         style: TextStyle(
-          color: Colors.white.withValues(alpha: 0.75),
+          color: AppColors.specularAt(0.75),
           fontSize: AppFontSize.heroLarge,
           fontWeight: FontWeight.w600,
         ),
@@ -645,7 +645,7 @@ class _LyricsShareSheetState extends State<LyricsShareSheet> {
                   return CheckboxListTile(
                     value: isSelected,
                     activeColor: widget.activeColor,
-                    checkColor: Colors.black,
+                    checkColor: AppColors.textOnAccent(widget.activeColor),
                     contentPadding: EdgeInsets.zero,
                     onChanged: (_) => _toggleIndex(index),
                     title: Text(
@@ -696,19 +696,21 @@ class _LyricsShareSheetState extends State<LyricsShareSheet> {
                   child: FilledButton.icon(
                     onPressed: _isGenerating ? null : _shareImage,
                     icon: _isGenerating
-                        ? const SizedBox(
+                        ? SizedBox(
                             width: 18,
                             height: 18,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              color: Colors.white,
+                              color:
+                                  AppColors.textOnAccent(widget.activeColor),
                             ),
                           )
                         : const Icon(Icons.share_rounded, size: 20),
                     label: Text(context.l10n.share),
                     style: FilledButton.styleFrom(
                       backgroundColor: widget.activeColor,
-                      foregroundColor: Colors.black,
+                      foregroundColor:
+                          AppColors.textOnAccent(widget.activeColor),
                       padding:
                           const EdgeInsets.symmetric(vertical: AppSpacing.sm),
                       shape:

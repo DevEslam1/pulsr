@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:material_ui/material_ui.dart';
 import 'package:pulsr/core/constants/app_blur.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
@@ -239,10 +240,10 @@ class _AdvancedLyricsViewState extends State<AdvancedLyricsView> {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Colors.transparent,
-              Colors.white,
-              Colors.white,
-              Colors.transparent,
+              AppColors.fadeStopTransparent,
+              AppColors.fadeStopOpaque,
+              AppColors.fadeStopOpaque,
+              AppColors.fadeStopTransparent,
             ],
             stops: [0.0, 0.08, 0.88, 1.0],
           ).createShader(bounds);
@@ -400,10 +401,12 @@ class _LyricLineWidget extends StatelessWidget {
       fontStyle: isBackground ? FontStyle.italic : FontStyle.normal,
       height: isInSplit ? 1.40 : 1.35,
       color: isActive
-          ? (isInSplit ? Colors.white : palette.textPrimary)
-          : (isInSplit
-              ? Colors.white.withValues(alpha: 0.46)
-              : palette.textSecondary.withValues(alpha: 0.45)),
+          ? palette.textPrimary
+          : (palette.isDark
+              ? (isInSplit
+                  ? palette.textPrimary.withValues(alpha: 0.46)
+                  : palette.textSecondary.withValues(alpha: 0.45))
+              : palette.textSecondary.withValues(alpha: 0.65)),
       shadows: isActive
           ? [
               Shadow(
@@ -529,7 +532,7 @@ class _KaraokeWordView extends StatelessWidget {
           },
           child: Text(
             word.word,
-            style: style.copyWith(color: Colors.white),
+            style: style.copyWith(color: AppColors.fadeStopOpaque),
           ),
         );
       }

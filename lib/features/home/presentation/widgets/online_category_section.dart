@@ -242,8 +242,11 @@ class _OnlineCategorySectionState extends State<OnlineCategorySection> {
                     ),
                   )
                 else
-                  for (int i = 0; i < songs.length; i++)
-                    StaggeredReveal(
+                  ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: songs.length,
+                    itemBuilder: (context, i) => StaggeredReveal(
                       index: i,
                       groupKey: songs.isEmpty ? '' : '${songs.first.id}',
                       child: SongTile(
@@ -256,6 +259,7 @@ class _OnlineCategorySectionState extends State<OnlineCategorySection> {
                             SongOptionsSheet.show(context, song: songs[i]),
                       ),
                     ),
+                  ),
               ],
             );
             if (ytmCubit != null) {

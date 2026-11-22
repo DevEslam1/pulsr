@@ -852,111 +852,135 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
             },
           ),
           const SizedBox(height: AppSpacing.md),
-          if (_scope == SourceScope.local) ...[
-            if (state.playlists.isEmpty && state.isLoading)
-              Padding(
-                padding: EdgeInsets.symmetric(
-                  horizontal: Adaptive.pagePadding(context),
-                ),
-                child: SkeletonGrid(
-                  columns: isTabletLandscape ? 2 : columns,
-                  itemCount: (isTabletLandscape ? 2 : columns) * 2,
-                  padding: EdgeInsets.zero,
-                ),
-              )
-            else if (state.playlists.isEmpty && state.errorMessage != null)
-              PulsrEmptyState(
-                icon: Icons.error_outline_rounded,
-                title: context.l10n.playlistLoadFailed,
-                subtitle: resolveUiErrorMessage(context, state.errorMessage!),
-                primaryActionLabel: context.l10n.retry,
-                onPrimaryAction: cubit.reloadPlaylists,
-              )
-            else if (userPlaylists.isEmpty)
-              PulsrEmptyState(
-                icon: Icons.playlist_add_rounded,
-                title: context.l10n.emptyPlaylists,
-                subtitle: context.l10n.emptyPlaylistsSubtitle,
-                primaryActionLabel: context.l10n.createPlaylist,
-                primaryActionIcon: Icons.add_rounded,
-                onPrimaryAction: () => _showCreateDialog(context, cubit),
-                secondaryActionLabel: context.l10n.importM3u,
-                secondaryActionIcon: Icons.file_upload_rounded,
-                onSecondaryAction: () => _importPlaylist(context),
-              )
-            else
-              Padding(
-                padding: EdgeInsets.symmetric(
-                  horizontal: Adaptive.pagePadding(context),
-                ),
-                child: PulsrStaticGrid(
-                  crossAxisCount: isTabletLandscape ? 2 : columns,
-                  crossAxisSpacing: 14,
-                  mainAxisSpacing: 14,
-                  childAspectRatio: 1.0,
-                  itemCount: userPlaylists.length,
-                  itemBuilder: (context, index) {
-                    final pl = userPlaylists[index];
-                    return StaggeredReveal(
-                      index: index,
-                      groupKey: 'user_playlists',
-                      child: _PlaylistCard(
-                        name: pl.name,
-                        subtitle: context.l10n.browseOfflinePlaylist,
-                        icon: Icons.queue_music_rounded,
-                        gradient: [
-                          p.surfaceContainerHigh,
-                          p.surfaceContainer,
-                        ],
-                        muted: true,
-                        isSelected:
-                            isTabletLandscape && _selectedPlaylist?.id == pl.id,
-                        onTap: () => _onSelectPlaylist(pl),
-                        onLongPress: () => _onSelectPlaylist(pl),
-                        menuItems: (_) => [
-                          PopupMenuItem(
-                            value: 'export',
-                            child: Text(context.l10n.export),
-                          ),
-                          PopupMenuItem(
-                            value: 'share',
-                            child: Text(context.l10n.share),
-                          ),
-                          PopupMenuItem(
-                            value: 'rename',
-                            child: Text(context.l10n.rename),
-                          ),
-                          PopupMenuItem(
-                            value: 'delete',
-                            child: Text(
-                              context.l10n.delete,
-                              style: TextStyle(color: p.error),
+          AnimatedSwitcher(
+            duration: context.motion(PulsrMotion.state),
+            switchInCurve: context.motionCurve(Curves.easeOutCubic),
+            switchOutCurve: context.motionCurve(Curves.easeInCubic),
+            transitionBuilder: (child, animation) => FadeTransition(
+              opacity: animation,
+              child: child,
+            ),
+            child: KeyedSubtree(
+              key: ValueKey(_scope),
+              child: _scope == SourceScope.local
+                  ? Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        if (state.playlists.isEmpty && state.isLoading)
+                          Padding(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: Adaptive.pagePadding(context),
+                            ),
+                            child: SkeletonGrid(
+                              columns: isTabletLandscape ? 2 : columns,
+                              itemCount: (isTabletLandscape ? 2 : columns) * 2,
+                              padding: EdgeInsets.zero,
+                            ),
+                          )
+                        else if (state.playlists.isEmpty &&
+                            state.errorMessage != null)
+                          PulsrEmptyState(
+                            icon: Icons.error_outline_rounded,
+                            title: context.l10n.playlistLoadFailed,
+                            subtitle: resolveUiErrorMessage(
+                                context, state.errorMessage!),
+                            primaryActionLabel: context.l10n.retry,
+                            onPrimaryAction: cubit.reloadPlaylists,
+                          )
+                        else if (userPlaylists.isEmpty)
+                          PulsrEmptyState(
+                            icon: Icons.playlist_add_rounded,
+                            title: context.l10n.emptyPlaylists,
+                            subtitle: context.l10n.emptyPlaylistsSubtitle,
+                            primaryActionLabel: context.l10n.createPlaylist,
+                            primaryActionIcon: Icons.add_rounded,
+                            onPrimaryAction: () =>
+                                _showCreateDialog(context, cubit),
+                            secondaryActionLabel: context.l10n.importM3u,
+                            secondaryActionIcon: Icons.file_upload_rounded,
+                            onSecondaryAction: () => _importPlaylist(context),
+                          )
+                        else
+                          Padding(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: Adaptive.pagePadding(context),
+                            ),
+                            child: PulsrStaticGrid(
+                              crossAxisCount: isTabletLandscape ? 2 : columns,
+                              crossAxisSpacing: 14,
+                              mainAxisSpacing: 14,
+                              childAspectRatio: 1.0,
+                              itemCount: userPlaylists.length,
+                              itemBuilder: (context, index) {
+                                final pl = userPlaylists[index];
+                                return StaggeredReveal(
+                                  index: index,
+                                  groupKey: 'user_playlists',
+                                  child: _PlaylistCard(
+                                    heroTag: isTabletLandscape
+                                        ? null
+                                        : 'playlist_${pl.id}',
+                                    name: pl.name,
+                                    subtitle: context.l10n.browseOfflinePlaylist,
+                                    icon: Icons.queue_music_rounded,
+                                    gradient: [
+                                      p.surfaceContainerHigh,
+                                      p.surfaceContainer,
+                                    ],
+                                    muted: true,
+                                    isSelected: isTabletLandscape &&
+                                        _selectedPlaylist?.id == pl.id,
+                                    onTap: () => _onSelectPlaylist(pl),
+                                    onLongPress: () => _onSelectPlaylist(pl),
+                                    menuItems: (_) => [
+                                      PopupMenuItem(
+                                        value: 'export',
+                                        child: Text(context.l10n.export),
+                                      ),
+                                      PopupMenuItem(
+                                        value: 'share',
+                                        child: Text(context.l10n.share),
+                                      ),
+                                      PopupMenuItem(
+                                        value: 'rename',
+                                        child: Text(context.l10n.rename),
+                                      ),
+                                      PopupMenuItem(
+                                        value: 'delete',
+                                        child: Text(
+                                          context.l10n.delete,
+                                          style: TextStyle(color: p.error),
+                                        ),
+                                      ),
+                                    ],
+                                    onMenuSelected: (v) {
+                                      if (v == 'export') {
+                                        _showExportFormatSheet(context, pl);
+                                      } else if (v == 'share') {
+                                        _exportPlaylistSongs(context, pl,
+                                            share: true);
+                                      } else if (v == 'rename') {
+                                        _showRenameDialog(context, cubit, pl);
+                                      } else if (v == 'delete') {
+                                        _confirmDelete(context, cubit, pl);
+                                      }
+                                    },
+                                  ),
+                                );
+                              },
                             ),
                           ),
-                        ],
-                        onMenuSelected: (v) {
-                          if (v == 'export') {
-                            _showExportFormatSheet(context, pl);
-                          } else if (v == 'share') {
-                            _exportPlaylistSongs(context, pl, share: true);
-                          } else if (v == 'rename') {
-                            _showRenameDialog(context, cubit, pl);
-                          } else if (v == 'delete') {
-                            _confirmDelete(context, cubit, pl);
-                          }
-                        },
-                      ),
-                    );
-                  },
-                ),
-              ),
-          ] else ...[
-            _OnlinePlaylistsContent(
-              cubit: cubit,
-              playerCubit: playerCubit,
-              onAddPlaylist: () => _showAddOnlinePlaylistDialog(context, cubit),
+                      ],
+                    )
+                  : _OnlinePlaylistsContent(
+                      cubit: cubit,
+                      playerCubit: playerCubit,
+                      onAddPlaylist: () =>
+                          _showAddOnlinePlaylistDialog(context, cubit),
+                    ),
             ),
-          ],
+          ),
         ],
       ),
     );
@@ -1900,16 +1924,19 @@ class _LikedMusicOnlineCard extends StatelessWidget {
           child: Row(
             children: [
               ExcludeSemantics(
-                child: Container(
-                  padding: const EdgeInsets.all(AppSpacing.sm),
-                  decoration: BoxDecoration(
-                    color: AppColors.specularAt(0.2),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.thumb_up_alt_rounded,
-                    color: onBrand,
-                    size: 26,
+                child: Hero(
+                  tag: 'online_playlist_VLLM',
+                  child: Container(
+                    padding: const EdgeInsets.all(AppSpacing.sm),
+                    decoration: BoxDecoration(
+                      color: AppColors.specularAt(0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.thumb_up_alt_rounded,
+                      color: onBrand,
+                      size: 26,
+                    ),
                   ),
                 ),
               ),
@@ -2082,16 +2109,19 @@ class _OnlinePlaylistCard extends StatelessWidget {
                   fit: StackFit.expand,
                   children: [
                     ExcludeSemantics(
-                      child: previewArt != null && previewArt.isNotEmpty
-                          ? Image.network(
-                              previewArt,
-                              fit: BoxFit.cover,
-                              cacheWidth: 360,
-                              cacheHeight: 360,
-                              errorBuilder: (_, __, ___) =>
-                                  _buildGradientCover(),
-                            )
-                          : _buildGradientCover(),
+                      child: Hero(
+                        tag: 'online_playlist_${entry.id}',
+                        child: previewArt != null && previewArt.isNotEmpty
+                            ? Image.network(
+                                previewArt,
+                                fit: BoxFit.cover,
+                                cacheWidth: 360,
+                                cacheHeight: 360,
+                                errorBuilder: (_, __, ___) =>
+                                    _buildGradientCover(),
+                              )
+                            : _buildGradientCover(),
+                      ),
                     ),
                     if (onDownload != null)
                       PositionedDirectional(

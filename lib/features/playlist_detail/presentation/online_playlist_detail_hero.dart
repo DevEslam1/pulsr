@@ -33,20 +33,24 @@ extension _OnlinePlaylistDetailHero on _OnlinePlaylistDetailScreenState {
               fit: StackFit.expand,
               children: [
                 ExcludeSemantics(
-                  child: _artworkUrl != null && _artworkUrl!.isNotEmpty
-                      ? Image.network(
-                          _artworkUrl!,
-                          fit: BoxFit.cover,
-                          cacheWidth: 600,
-                          cacheHeight: 360,
-                          loadingBuilder: (context, child, progress) =>
-                              progress == null
-                                  ? child
-                                  : _buildFallbackHeroGradient(ytGradient),
-                          errorBuilder: (_, __, ___) =>
-                              _buildFallbackHeroGradient(ytGradient),
-                        )
-                      : _buildFallbackHeroGradient(ytGradient),
+                  child: Hero(
+                    tag: widget.args.heroTag ??
+                        'online_playlist_${widget.args.playlistId}',
+                    child: _artworkUrl != null && _artworkUrl!.isNotEmpty
+                        ? Image.network(
+                            _artworkUrl!,
+                            fit: BoxFit.cover,
+                            cacheWidth: 600,
+                            cacheHeight: 360,
+                            loadingBuilder: (context, child, progress) =>
+                                progress == null
+                                    ? child
+                                    : _buildFallbackHeroGradient(ytGradient),
+                            errorBuilder: (_, __, ___) =>
+                                _buildFallbackHeroGradient(ytGradient),
+                          )
+                        : _buildFallbackHeroGradient(ytGradient),
+                  ),
                 ),
                 ExcludeSemantics(
                   child: Container(

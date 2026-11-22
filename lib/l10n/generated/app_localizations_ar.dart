@@ -11128,4 +11128,62 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get extrasRemoteAlbumLabel => 'مكتبة الشبكة';
+
+  @override
+  String get selectTracks => 'تحديد المقاطع';
+
+  @override
+  String get moreRecoveryOptions => 'المزيد من خيارات الاسترداد';
+
+  @override
+  String get retryingCleanSession => 'إعادة محاولة تسجيل الدخول بجلسة نظيفة…';
+
+  @override
+  String reloadingIdentity(String identity) {
+    return 'إعادة التحميل بهوية المتصفح $identity…';
+  }
+
+  @override
+  String get browserIdentityChromeDesktop => 'كروم للكمبيوتر';
+
+  @override
+  String get browserIdentityChromeMobile => 'كروم للجوال';
+
+  @override
+  String get browserIdentitySafariMobile => 'سفاري للجوال';
+
+  @override
+  String get browserIdentityFirefoxDesktop => 'فايرفوكس للكمبيوتر';
+
+  @override
+  String get copyCodeAndOpenBrowser => 'نسخ الرمز وفتح المتصفح';
+
+  @override
+  String get partyServerUrlEmpty => 'لا يمكن أن يكون عنوان URL للخادم فارغاً';
+
+  @override
+  String get partyServerUrlInvalid =>
+      'أدخل عنوان URL صالحاً (http أو https أو ws أو wss)';
+
+  @override
+  String get castDefaultDevice => 'الجهاز';
+
+  @override
+  String get paste => 'لصق';
+
+  @override
+  String get spotifyInvalidUrl =>
+      'رابط قائمة تشغيل سبوتيفاي غير صالح. يرجى التحقق من الرابط والمحاولة مجدداً.';
+
+  @override
+  String get spotifyFetchingMetadata =>
+      'جارٍ جلب البيانات الوصفية لقائمة تشغيل سبوتيفاي...';
+
+  @override
+  String spotifyMatchingTracks(int completed, int total) {
+    return 'جارٍ مطابقة المقاطع على يوتيوب ميوزك ($completed/$total)...';
+  }
+
+  @override
+  String get spotifyImportComplete => 'اكتمل الاستيراد';
 }

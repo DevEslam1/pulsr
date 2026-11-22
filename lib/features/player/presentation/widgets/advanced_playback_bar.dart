@@ -11,6 +11,7 @@ import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/widgets/pulsr_slider.dart';
 import '../../../../core/widgets/pulsr_bottom_sheet.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
@@ -126,8 +127,8 @@ class AdvancedPlaybackBar extends StatelessWidget {
                             ),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black
-                                    .withValues(alpha: p.isDark ? 0.20 : 0.05),
+                                color:
+                                    AppColors.scrimAt(p.isDark ? 0.20 : 0.05),
                                 blurRadius: 6,
                                 offset: const Offset(0, 2),
                               ),
@@ -252,8 +253,8 @@ class AdvancedPlaybackBar extends StatelessWidget {
                                     decoration: BoxDecoration(
                                       shape: BoxShape.circle,
                                       color: (p.isDark
-                                              ? Colors.white
-                                              : Colors.black)
+                                              ? p.textPrimary
+                                              : AppColors.scrimAt(1.0))
                                           .withValues(alpha: 0.08),
                                     ),
                                     child: Icon(Icons.close_rounded,
@@ -300,8 +301,7 @@ class AdvancedPlaybackBar extends StatelessWidget {
                                 height: 18,
                                 margin: const EdgeInsets.symmetric(
                                     horizontal: AppSpacing.xxs),
-                                color: (p.isDark ? Colors.white : Colors.black)
-                                    .withValues(alpha: 0.14),
+                                color: p.hairline,
                               ),
                               // F2: per-track delay
                               IconButton(
@@ -366,8 +366,9 @@ class AdvancedPlaybackBar extends StatelessWidget {
                                           ),
                                           child: Text(
                                             '${state.trackDelayMs > 0 ? '+' : ''}${state.trackDelayMs}ms',
-                                            style: const TextStyle(
-                                              color: Colors.black,
+                                            style: TextStyle(
+                                              color: AppColors.textOnAccent(
+                                                  resolvedActiveColor),
                                               fontSize: AppFontSize.caption,
                                               fontWeight: FontWeight.w900,
                                             ),

@@ -172,7 +172,9 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    // Tap Import button in app bar
+    // Tap overflow menu then Import
+    await tester.tap(find.byType(PopupMenuButton<String>));
+    await tester.pumpAndSettle();
     await tester.tap(find.byIcon(Icons.playlist_add_rounded));
     await tester.pumpAndSettle();
 

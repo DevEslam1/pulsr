@@ -39,8 +39,7 @@ import 'player_track_header.dart';
 
 /// Readable foreground for a badge painted with an arbitrary (possibly
 /// artwork-derived) accent, instead of assuming every accent is dark.
-Color _readableOn(Color background) =>
-    background.computeLuminance() > 0.179 ? AppColors.onBright : Colors.white;
+Color _readableOn(Color background) => AppColors.textOnAccent(background);
 
 /// Human-readable remaining sleep-timer time: seconds below a minute, whole
 /// minutes below an hour, then `h`/`m` so a 90-minute timer never reads "90m".
@@ -109,7 +108,7 @@ class PlayerDockIconStyle {
     badgeHPadding: 3.5,
     badgeRadius: 6,
     badgeShadow: false,
-    badgeFontSize: 8,
+    badgeFontSize: 10,
   );
 
   static const PlayerDockIconStyle cd = common;
@@ -415,7 +414,7 @@ class PlayerBottomActionDock extends StatelessWidget {
                   colors: [
                     Color.lerp(
                           p.surfaceContainer,
-                          Colors.white,
+                          AppColors.specularAt(1.0),
                           p.isDark ? 0.03 : 0.0,
                         ) ??
                         p.surfaceContainer,
@@ -432,7 +431,7 @@ class PlayerBottomActionDock extends StatelessWidget {
                 boxShadow: [
                   BoxShadow(
                     color:
-                        Colors.black.withValues(alpha: p.isDark ? 0.28 : 0.06),
+                        AppColors.scrimAt(p.isDark ? 0.28 : 0.06),
                     blurRadius: 12,
                     offset: const Offset(0, 4),
                   ),

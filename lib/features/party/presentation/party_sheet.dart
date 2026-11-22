@@ -275,7 +275,7 @@ class _PartySheetState extends State<PartySheet> {
   bool _validateServerUrl(String raw) {
     final text = raw.trim();
     if (text.isEmpty) {
-      setState(() => _serverUrlError = 'Server URL cannot be empty');
+      setState(() => _serverUrlError = context.l10n.partyServerUrlEmpty);
       return false;
     }
     final uri = Uri.tryParse(text);
@@ -285,7 +285,7 @@ class _PartySheetState extends State<PartySheet> {
         scheme == 'ws' ||
         scheme == 'wss';
     if (uri == null || !validScheme || uri.host.isEmpty) {
-      setState(() => _serverUrlError = 'Enter a valid URL (http, https, ws, or wss)');
+      setState(() => _serverUrlError = context.l10n.partyServerUrlInvalid);
       return false;
     }
     setState(() => _serverUrlError = null);

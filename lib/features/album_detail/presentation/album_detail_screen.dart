@@ -96,6 +96,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
       _useCase = widget.getAlbumsUseCase ?? getIt<GetAlbumsUseCase>();
       setState(() {
         _selectedIds.clear();
+        _cachedRawSongs = null;
         _sort = _AlbumSort.track;
         _sortAscending = true;
         _updateStream();
@@ -156,6 +157,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
     } finally {
       if (mounted) {
         setState(() {
+          _cachedRawSongs = null;
           _cachedSort = null;
           _cachedSortAscending = null;
         });
@@ -178,19 +180,13 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
     }
   }
 
-  int? _cachedSongsHash;
+  List<SongsTableData>? _cachedRawSongs;
   _AlbumSort? _cachedSort;
   bool? _cachedSortAscending;
   List<SongsTableData> _cachedSortedSongs = const [];
 
   List<SongsTableData> _sorted(List<SongsTableData> songs) {
-    // FIX-M1 / H7 / H-07 / C-05: Hash every song's identity AND its sort-relevant
-    // fields. Only serve cached result when prefs have finished loading.
-    final songsHash = Object.hashAll([
-      for (final s in songs)
-        Object.hash(s.id, s.title, s.durationMs, s.discNumber, s.trackNumber),
-    ]);
-    if (_cachedSongsHash == songsHash &&
+    if (identical(_cachedRawSongs, songs) &&
         _cachedSort == _sort &&
         _cachedSortAscending == _sortAscending) {
       return _cachedSortedSongs;
@@ -220,7 +216,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
         }
         break;
     }
-    _cachedSongsHash = songsHash;
+    _cachedRawSongs = songs;
     _cachedSort = _sort;
     _cachedSortAscending = _sortAscending;
     _cachedSortedSongs = out;
@@ -880,7 +876,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                         color: p.accent,
                       ),
                       const SizedBox(width: AppSpacing.sm),
-                      const Text('Select tracks'),
+                      Text(context.l10n.selectTracks),
                     ],
                   ),
                 )
@@ -966,94 +962,109 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
     final selectedSongs =
         allSongs.where((s) => _selectedIds.contains(s.id)).toList();
 
-    return AnimatedSlide(
-      offset: Offset.zero,
+    return AnimatedSwitcher(
       duration: context.motion(PulsrDurations.layout),
-      curve: Curves.easeOutCubic,
-      child: AnimatedOpacity(
-        opacity: 1.0,
-        duration: context.motion(PulsrMotion.state),
-        child: SafeArea(
-          key: const ValueKey('album_bulk_actions_bar'),
-          child: Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.md,
-              vertical: AppSpacing.sm,
+      reverseDuration: context.motion(PulsrDurations.layout),
+      switchInCurve: context.motionCurve(Curves.easeOutCubic),
+      switchOutCurve: context.motionCurve(Curves.easeInCubic),
+      transitionBuilder: (child, animation) {
+        return SizeTransition(
+          sizeFactor: animation,
+          child: FadeTransition(
+            opacity: animation,
+            child: SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(0, 1),
+                end: Offset.zero,
+              ).animate(animation),
+              child: child,
             ),
-            decoration: BoxDecoration(
-              color: p.surfaceContainer,
-              border: Border(top: BorderSide(color: p.hairline)),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.scrimAt(0.1),
-                  blurRadius: 8,
-                  offset: const Offset(0, -2),
-                ),
-              ],
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                TextButton.icon(
-                  style: TextButton.styleFrom(foregroundColor: p.accent),
-                  icon: const Icon(Icons.playlist_play_rounded, size: 20),
-                  label: Text(l10n.playNext),
-                  onPressed: selectedSongs.isEmpty
-                      ? null
-                      : () async {
-                          PulsrHaptics.mediumImpact();
-                          final cubit = context.read<PlayerCubit>();
-                          for (final s in selectedSongs.reversed) {
-                            await cubit.playNext(s);
-                          }
-                          if (mounted) {
-                            setState(() => _selectedIds.clear());
-                          }
-                        },
-                ),
-                TextButton.icon(
-                  style: TextButton.styleFrom(foregroundColor: p.textPrimary),
-                  icon: const Icon(Icons.queue_music_rounded, size: 20),
-                  label: Text(l10n.addToQueue),
-                  onPressed: selectedSongs.isEmpty
-                      ? null
-                      : () async {
-                          PulsrHaptics.mediumImpact();
-                          final cubit = context.read<PlayerCubit>();
-                          await cubit.addAllToQueue(selectedSongs);
-                          if (mounted) {
-                            setState(() => _selectedIds.clear());
-                          }
-                        },
-                ),
-                TextButton.icon(
-                  style: TextButton.styleFrom(foregroundColor: p.textPrimary),
-                  icon: const Icon(Icons.playlist_add_rounded, size: 20),
-                  label: Text(l10n.addToPlaylist),
-                  onPressed: selectedSongs.isEmpty
-                      ? null
-                      : () async {
-                          PulsrHaptics.lightImpact();
-                          await AddToPlaylistSheet.show(
-                            context,
-                            song: selectedSongs.first,
-                            songs: selectedSongs,
-                          );
-                          if (mounted) {
-                            setState(() => _selectedIds.clear());
-                          }
-                        },
-                ),
-                IconButton(
-                  tooltip: l10n.cancel,
-                  icon: Icon(Icons.close_rounded, size: 20, color: p.textSecondary),
-                  onPressed: () {
-                    PulsrHaptics.lightImpact();
-                    setState(() => _selectedIds.clear());
-                  },
-                ),
-              ],
-            ),
+          ),
+        );
+      },
+      child: SafeArea(
+        key: const ValueKey('album_bulk_actions_bar'),
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: AppSpacing.sm,
+          ),
+          decoration: BoxDecoration(
+            color: p.surfaceContainer,
+            border: Border(top: BorderSide(color: p.hairline)),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.scrimAt(0.1),
+                blurRadius: 8,
+                offset: const Offset(0, -2),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              TextButton.icon(
+                style: TextButton.styleFrom(foregroundColor: p.accent),
+                icon: const Icon(Icons.playlist_play_rounded, size: 20),
+                label: Text(l10n.playNext),
+                onPressed: selectedSongs.isEmpty
+                    ? null
+                    : () async {
+                        PulsrHaptics.mediumImpact();
+                        final cubit = context.read<PlayerCubit>();
+                        for (final s in selectedSongs.reversed) {
+                          await cubit.playNext(s);
+                        }
+                        if (mounted) {
+                          setState(() => _selectedIds.clear());
+                        }
+                      },
+              ),
+              TextButton.icon(
+                style:
+                    TextButton.styleFrom(foregroundColor: p.textPrimary),
+                icon: const Icon(Icons.queue_music_rounded, size: 20),
+                label: Text(l10n.addToQueue),
+                onPressed: selectedSongs.isEmpty
+                    ? null
+                    : () async {
+                        PulsrHaptics.mediumImpact();
+                        final cubit = context.read<PlayerCubit>();
+                        await cubit.addAllToQueue(selectedSongs);
+                        if (mounted) {
+                          setState(() => _selectedIds.clear());
+                        }
+                      },
+              ),
+              TextButton.icon(
+                style:
+                    TextButton.styleFrom(foregroundColor: p.textPrimary),
+                icon: const Icon(Icons.playlist_add_rounded, size: 20),
+                label: Text(l10n.addToPlaylist),
+                onPressed: selectedSongs.isEmpty
+                    ? null
+                    : () async {
+                        PulsrHaptics.lightImpact();
+                        await AddToPlaylistSheet.show(
+                          context,
+                          song: selectedSongs.first,
+                          songs: selectedSongs,
+                        );
+                        if (mounted) {
+                          setState(() => _selectedIds.clear());
+                        }
+                      },
+              ),
+              IconButton(
+                tooltip: l10n.cancel,
+                icon: Icon(Icons.close_rounded,
+                    size: 20, color: p.textSecondary),
+                onPressed: () {
+                  PulsrHaptics.lightImpact();
+                  setState(() => _selectedIds.clear());
+                },
+              ),
+            ],
           ),
         ),
       ),

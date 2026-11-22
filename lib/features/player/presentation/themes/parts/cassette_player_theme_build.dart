@@ -717,6 +717,9 @@ class _DeckSegmentedLedVuMeterState extends State<_DeckSegmentedLedVuMeter>
       }
     }
 
+    final segHeight = widget.isCompact ? 6.0 : 7.5;
+    final totalHeight = segHeight * 2 + AppSpacing.s4;
+
     return ExcludeSemantics(
       child: MediaQuery.withNoTextScaling(
         child: Container(
@@ -737,119 +740,176 @@ class _DeckSegmentedLedVuMeterState extends State<_DeckSegmentedLedVuMeter>
             ],
           ),
           child: RepaintBoundary(
-            child: AnimatedBuilder(
-              animation: _meterController,
-              builder: (context, _) {
-                final double leftLevel;
-                final double rightLevel;
-                final double leftPeak;
-                final double rightPeak;
-
-                if (!widget.isPlaying) {
-                  leftLevel = 0.0;
-                  rightLevel = 0.0;
-                  leftPeak = 0.0;
-                  rightPeak = 0.0;
-                } else if (!allowMotion) {
-                  // Crisp steady decorative meter readout in Reduce Motion / Preview
-                  leftLevel = 0.64;
-                  rightLevel = 0.56;
-                  leftPeak = 0.80;
-                  rightPeak = 0.72;
-                } else {
-                  final t = _meterController.value * 2 * math.pi;
-                  final base = math.sin(t).abs() * 0.42 +
-                      math.sin(t * 2.0 + 0.6).abs() * 0.22;
-                  final harmonicL = math.sin(t * 3.0 + 0.3).abs() * 0.20 +
-                      math.cos(t * 7.0).abs() * 0.10;
-                  final harmonicR = math.cos(t * 5.0 - 0.4).abs() * 0.20 +
-                      math.sin(t * 11.0).abs() * 0.10;
-                  leftLevel = (0.14 + base + harmonicL).clamp(0.06, 0.96);
-                  rightLevel = (0.14 + base + harmonicR).clamp(0.06, 0.96);
-                  _updatePeaks(leftLevel, rightLevel);
-                  leftPeak = _leftPeak;
-                  rightPeak = _rightPeak;
-                }
-
-                return Column(
+            child: Row(
+              children: [
+                Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    _buildChannelRow('L', leftLevel, leftPeak),
+                    Container(
+                      height: segHeight,
+                      width: 16,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'L',
+                        style: TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: AppFontSize.caption,
+                          fontWeight: FontWeight.w900,
+                          color: widget.isPlaying
+                              ? widget.palette.ledAmber
+                              : AppColors.onGiltLight.withValues(alpha: 0.45),
+                        ),
+                      ),
+                    ),
                     const SizedBox(height: AppSpacing.s4),
-                    _buildChannelRow('R', rightLevel, rightPeak),
+                    Container(
+                      height: segHeight,
+                      width: 16,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'R',
+                        style: TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: AppFontSize.caption,
+                          fontWeight: FontWeight.w900,
+                          color: widget.isPlaying
+                              ? widget.palette.ledAmber
+                              : AppColors.onGiltLight.withValues(alpha: 0.45),
+                        ),
+                      ),
+                    ),
                   ],
-                );
-              },
+                ),
+                const SizedBox(width: AppSpacing.s6),
+                Expanded(
+                  child: SizedBox(
+                    height: totalHeight,
+                    child: CustomPaint(
+                      painter: _DeckSegmentedLedVuPainter(
+                        controller: _meterController,
+                        isPlaying: widget.isPlaying,
+                        allowMotion: allowMotion,
+                        palette: widget.palette,
+                        isCompact: widget.isCompact,
+                        state: this,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ),
       ),
     );
   }
+}
 
-  Widget _buildChannelRow(String label, double level, double peak) {
+class _DeckSegmentedLedVuPainter extends CustomPainter {
+  final AnimationController controller;
+  final bool isPlaying;
+  final bool allowMotion;
+  final _CassetteDeckPalette palette;
+  final bool isCompact;
+  final _DeckSegmentedLedVuMeterState state;
+
+  _DeckSegmentedLedVuPainter({
+    required this.controller,
+    required this.isPlaying,
+    required this.allowMotion,
+    required this.palette,
+    required this.isCompact,
+    required this.state,
+  }) : super(repaint: controller);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final double leftLevel;
+    final double rightLevel;
+    final double leftPeak;
+    final double rightPeak;
+
+    if (!isPlaying) {
+      leftLevel = 0.0;
+      rightLevel = 0.0;
+      leftPeak = 0.0;
+      rightPeak = 0.0;
+    } else if (!allowMotion) {
+      leftLevel = 0.64;
+      rightLevel = 0.56;
+      leftPeak = 0.80;
+      rightPeak = 0.72;
+    } else {
+      final t = controller.value * 2 * math.pi;
+      final base = math.sin(t).abs() * 0.42 +
+          math.sin(t * 2.0 + 0.6).abs() * 0.22;
+      final harmonicL = math.sin(t * 3.0 + 0.3).abs() * 0.20 +
+          math.cos(t * 7.0).abs() * 0.10;
+      final harmonicR = math.cos(t * 5.0 - 0.4).abs() * 0.20 +
+          math.sin(t * 11.0).abs() * 0.10;
+      leftLevel = (0.14 + base + harmonicL).clamp(0.06, 0.96);
+      rightLevel = (0.14 + base + harmonicR).clamp(0.06, 0.96);
+      state._updatePeaks(leftLevel, rightLevel);
+      leftPeak = state._leftPeak;
+      rightPeak = state._rightPeak;
+    }
+
+    final segHeight = isCompact ? 6.0 : 7.5;
+    _paintRow(canvas, size.width, 0.0, segHeight, leftLevel, leftPeak);
+    _paintRow(canvas, size.width, segHeight + AppSpacing.s4, segHeight,
+        rightLevel, rightPeak);
+  }
+
+  void _paintRow(Canvas canvas, double width, double top, double height,
+      double level, double peak) {
     const int totalSegments = 16;
     final int activeCount =
         (level * totalSegments).clamp(0, totalSegments).round();
-    final int peakIdx =
-        peak > 0.05 ? (peak * totalSegments).clamp(1, totalSegments).round() - 1 : -1;
+    final int peakIdx = peak > 0.05
+        ? (peak * totalSegments).clamp(1, totalSegments).round() - 1
+        : -1;
 
-    return Row(
-      children: [
-        SizedBox(
-          width: 16,
-          child: Text(
-            label,
-            style: TextStyle(
-              fontFamily: 'monospace',
-              fontSize: AppFontSize.caption,
-              fontWeight: FontWeight.w900,
-              color: widget.isPlaying
-                  ? widget.palette.ledAmber
-                  : AppColors.onGiltLight.withValues(alpha: 0.45),
-            ),
-          ),
-        ),
-        const SizedBox(width: AppSpacing.s6),
-        Expanded(
-          child: Row(
-            children: List.generate(totalSegments, (idx) {
-              final bool isLit = idx < activeCount;
-              final bool isPeak = idx == peakIdx && idx >= activeCount;
-              final Color segAccent = idx >= 13
-                  ? widget.palette.ledRed
-                  : (idx >= 9
-                      ? widget.palette.ledAmber
-                      : widget.palette.ledGreen);
-              final Color cellColor = isLit
-                  ? segAccent
-                  : (isPeak
-                      ? segAccent.withValues(alpha: 0.92)
-                      : AppColors.specularAt(0.08));
+    final segSlotWidth = width / totalSegments;
+    final segWidth = segSlotWidth - 2.4;
 
-              return Expanded(
-                child: Container(
-                  height: widget.isCompact ? 6.0 : 7.5,
-                  margin: const EdgeInsets.symmetric(horizontal: 1.2),
-                  decoration: BoxDecoration(
-                    color: cellColor,
-                    borderRadius: AppRadii.r2All,
-                    boxShadow: (isLit || isPeak)
-                        ? [
-                            BoxShadow(
-                              color: segAccent.withValues(alpha: 0.55),
-                              blurRadius: 4,
-                            ),
-                          ]
-                        : null,
-                  ),
-                ),
-              );
-            }),
-          ),
-        ),
-      ],
-    );
+    for (int idx = 0; idx < totalSegments; idx++) {
+      final bool isLit = idx < activeCount;
+      final bool isPeak = idx == peakIdx && idx >= activeCount;
+      final Color segAccent = idx >= 13
+          ? palette.ledRed
+          : (idx >= 9 ? palette.ledAmber : palette.ledGreen);
+      final Color cellColor = isLit
+          ? segAccent
+          : (isPeak
+              ? segAccent.withValues(alpha: 0.92)
+              : AppColors.specularAt(0.08));
+
+      final segX = idx * segSlotWidth + 1.2;
+      final rect = RRect.fromRectAndRadius(
+        Rect.fromLTWH(segX, top, segWidth, height),
+        const Radius.circular(AppRadii.r2),
+      );
+
+      if (isLit || isPeak) {
+        final shadowPaint = Paint()
+          ..color = segAccent.withValues(alpha: 0.55)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.0);
+        canvas.drawRRect(rect, shadowPaint);
+      }
+
+      final cellPaint = Paint()
+        ..color = cellColor
+        ..style = PaintingStyle.fill;
+      canvas.drawRRect(rect, cellPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DeckSegmentedLedVuPainter oldDelegate) {
+    return oldDelegate.isPlaying != isPlaying ||
+        oldDelegate.allowMotion != allowMotion ||
+        oldDelegate.palette != palette ||
+        oldDelegate.isCompact != isCompact;
   }
 }
 

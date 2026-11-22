@@ -215,7 +215,7 @@ extension _YtmBlockRecoveryCard on _YtmWebLoginSheetState {
     if (mounted && !_disposed) {
       _setStateSafe(() {
         _blockExhausted = false;
-        _blockStatus = 'Retrying sign-in with a clean session…';
+        _blockStatus = context.l10n.retryingCleanSession;
       });
     }
     await _clearWebViewCookiesAndCache();
@@ -237,6 +237,19 @@ extension _YtmBlockRecoveryCard on _YtmWebLoginSheetState {
     if (mounted && !_disposed) _setStateSafe(() => _blockStatus = null);
   }
 
+  String _identityLabel(BrowserIdentity id) {
+    switch (id) {
+      case BrowserIdentity.chromeDesktop:
+        return context.l10n.browserIdentityChromeDesktop;
+      case BrowserIdentity.mobile:
+        return context.l10n.browserIdentityChromeMobile;
+      case BrowserIdentity.safariMobile:
+        return context.l10n.browserIdentitySafariMobile;
+      case BrowserIdentity.desktop:
+        return context.l10n.browserIdentityFirefoxDesktop;
+    }
+  }
+
   /// Recovery card identity toggle: switch UA mode and reload in place.
   Future<void> _switchIdentityManually(BrowserIdentity identity) async {
     if (!mounted || _disposed) return;
@@ -246,7 +259,7 @@ extension _YtmBlockRecoveryCard on _YtmWebLoginSheetState {
     if (mounted && !_disposed) {
       _setStateSafe(() {
         _blockExhausted = false;
-        _blockStatus = 'Reloading with ${identity.name} browser identity…';
+        _blockStatus = context.l10n.reloadingIdentity(_identityLabel(identity));
       });
     }
     await _clearWebViewCookiesAndCache();
@@ -284,18 +297,7 @@ extension _YtmBlockRecoveryCard on _YtmWebLoginSheetState {
     final currentIdx = ladder.indexOf(currentIdentity);
     final otherIdentity = ladder[(currentIdx + 1) % ladder.length];
 
-    String identityLabel(BrowserIdentity id) {
-      switch (id) {
-        case BrowserIdentity.chromeDesktop:
-          return 'Chrome Desktop';
-        case BrowserIdentity.mobile:
-          return 'Chrome Mobile';
-        case BrowserIdentity.safariMobile:
-          return 'Safari Mobile';
-        case BrowserIdentity.desktop:
-          return 'Firefox Desktop';
-      }
-    }
+    String identityLabel(BrowserIdentity id) => _identityLabel(id);
 
     IconData identityIcon(BrowserIdentity id) {
       switch (id) {
@@ -407,7 +409,7 @@ extension _YtmBlockRecoveryCard on _YtmWebLoginSheetState {
                 iconColor: p.textSecondary,
                 collapsedIconColor: p.textTertiary,
                 title: Text(
-                  'More recovery options',
+                  context.l10n.moreRecoveryOptions,
                   style: TextStyle(
                     color: p.textSecondary,
                     fontSize: AppFontSize.label,

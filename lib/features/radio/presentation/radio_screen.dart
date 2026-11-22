@@ -1017,47 +1017,6 @@ class _RadioScreenState extends State<RadioScreen> {
             child: Text(context.l10n.radioTitle),
           ),
           actions: [
-            ValueListenableBuilder<bool>(
-              valueListenable: RadioStationStore.heroCardsVisible,
-              builder: (context, visible, _) {
-                if (visible) return const SizedBox.shrink();
-                return IconButton(
-                  constraints: const BoxConstraints(
-                    minWidth: AppSpacing.minTouchTarget,
-                    minHeight: AppSpacing.minTouchTarget,
-                  ),
-                  tooltip: context.l10n.radioShowCardsTooltip,
-                  icon: Icon(Icons.visibility_rounded, color: p.accent),
-                  onPressed: () async {
-                    await RadioStationStore.setHeroCardsVisible(true);
-                    if (!context.mounted) return;
-                    PulsrToast.show(
-                      context,
-                      message: context.l10n.radioCardsRestoredToast,
-                      isSuccess: true,
-                    );
-                  },
-                );
-              },
-            ),
-            ValueListenableBuilder<String>(
-              valueListenable: RadioStationStore.radioSortBy,
-              builder: (context, activeSort, _) {
-                final isCustomSort = activeSort != 'default';
-                return IconButton(
-                  constraints: const BoxConstraints(
-                    minWidth: AppSpacing.minTouchTarget,
-                    minHeight: AppSpacing.minTouchTarget,
-                  ),
-                  tooltip: context.l10n.sortRadioCardsTitle,
-                  icon: Icon(
-                    Icons.sort_rounded,
-                    color: isCustomSort ? p.accent : null,
-                  ),
-                  onPressed: _openSortFilterSheet,
-                );
-              },
-            ),
             IconButton(
               constraints: const BoxConstraints(
                 minWidth: AppSpacing.minTouchTarget,
@@ -1075,27 +1034,107 @@ class _RadioScreenState extends State<RadioScreen> {
                 minWidth: AppSpacing.minTouchTarget,
                 minHeight: AppSpacing.minTouchTarget,
               ),
-              tooltip: context.l10n.radioCuratedBrowse,
-              icon: const Icon(Icons.explore_rounded),
-              onPressed: _importCurated,
-            ),
-            IconButton(
-              constraints: const BoxConstraints(
-                minWidth: AppSpacing.minTouchTarget,
-                minHeight: AppSpacing.minTouchTarget,
-              ),
-              tooltip: context.l10n.radioImportPlaylist,
-              icon: const Icon(Icons.playlist_add_rounded),
-              onPressed: _showImportDialog,
-            ),
-            IconButton(
-              constraints: const BoxConstraints(
-                minWidth: AppSpacing.minTouchTarget,
-                minHeight: AppSpacing.minTouchTarget,
-              ),
               tooltip: context.l10n.radioAddStation,
               icon: const Icon(Icons.add_rounded),
               onPressed: _showAddDialog,
+            ),
+            ValueListenableBuilder<bool>(
+              valueListenable: RadioStationStore.heroCardsVisible,
+              builder: (context, cardsVisible, _) {
+                return ValueListenableBuilder<String>(
+                  valueListenable: RadioStationStore.radioSortBy,
+                  builder: (context, activeSort, _) {
+                    final isCustomSort = activeSort != 'default';
+                    return PopupMenuButton<String>(
+                      constraints: const BoxConstraints(
+                        minWidth: AppSpacing.minTouchTarget,
+                        minHeight: AppSpacing.minTouchTarget,
+                      ),
+                      tooltip: context.l10n.moreOptions,
+                      icon: Icon(
+                        Icons.more_vert_rounded,
+                        color: isCustomSort ? p.accent : null,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: AppRadii.r12All,
+                        side: BorderSide(color: p.hairline),
+                      ),
+                      color: p.surfaceContainer,
+                      onSelected: (action) async {
+                        switch (action) {
+                          case 'sort':
+                            _openSortFilterSheet();
+                            break;
+                          case 'curated':
+                            _importCurated();
+                            break;
+                          case 'import':
+                            _showImportDialog();
+                            break;
+                          case 'restore_cards':
+                            await RadioStationStore.setHeroCardsVisible(true);
+                            if (!context.mounted) return;
+                            PulsrToast.show(
+                              context,
+                              message: context.l10n.radioCardsRestoredToast,
+                              isSuccess: true,
+                            );
+                            break;
+                        }
+                      },
+                      itemBuilder: (context) => [
+                        PopupMenuItem(
+                          value: 'sort',
+                          child: Row(
+                            children: [
+                              Icon(Icons.sort_rounded,
+                                  size: 20,
+                                  color:
+                                      isCustomSort ? p.accent : p.textPrimary),
+                              const SizedBox(width: AppSpacing.sm),
+                              Text(context.l10n.sortRadioCardsTitle),
+                            ],
+                          ),
+                        ),
+                        PopupMenuItem(
+                          value: 'curated',
+                          child: Row(
+                            children: [
+                              Icon(Icons.explore_rounded,
+                                  size: 20, color: p.textPrimary),
+                              const SizedBox(width: AppSpacing.sm),
+                              Text(context.l10n.radioCuratedBrowse),
+                            ],
+                          ),
+                        ),
+                        PopupMenuItem(
+                          value: 'import',
+                          child: Row(
+                            children: [
+                              Icon(Icons.playlist_add_rounded,
+                                  size: 20, color: p.textPrimary),
+                              const SizedBox(width: AppSpacing.sm),
+                              Text(context.l10n.radioImportPlaylist),
+                            ],
+                          ),
+                        ),
+                        if (!cardsVisible)
+                          PopupMenuItem(
+                            value: 'restore_cards',
+                            child: Row(
+                              children: [
+                                Icon(Icons.visibility_rounded,
+                                    size: 20, color: p.accent),
+                                const SizedBox(width: AppSpacing.sm),
+                                Text(context.l10n.radioShowCardsTooltip),
+                              ],
+                            ),
+                          ),
+                      ],
+                    );
+                  },
+                );
+              },
             ),
           ],
         ),

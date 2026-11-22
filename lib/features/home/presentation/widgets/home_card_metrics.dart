@@ -1,8 +1,6 @@
 import 'dart:math' as math;
-import 'dart:ui' show ImageFilter;
 
 import 'package:material_ui/material_ui.dart';
-import 'package:pulsr/core/constants/app_blur.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
@@ -74,8 +72,8 @@ class HomeCardArtworkFrame extends StatelessWidget {
 }
 
 /// Refined frosted/scrim-backed circular corner play badge for Home carousel
-/// cards. Uses [AppBlur] gating with a high-contrast translucent fallback,
-/// specular rim, and an animated accent equalizer when the track is playing.
+/// cards. Uses a zero-saveLayer translucent tinted surface with a crisp hairline
+/// specular border, and an animated accent equalizer when the track is playing.
 class HomeCardPlayBadge extends StatelessWidget {
   final bool isCurrent;
   final bool isPlaying;
@@ -91,8 +89,6 @@ class HomeCardPlayBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    final canBlur = AppBlur.canBlur(context);
-    final sigma = AppBlur.clampSigma(AppBlur.chip);
     final isActivePlaying = isCurrent && isPlaying;
 
     final Color fillColor;
@@ -101,8 +97,8 @@ class HomeCardPlayBadge extends StatelessWidget {
     final List<BoxShadow> shadows;
 
     if (isActivePlaying) {
-      fillColor = p.accent.withValues(alpha: canBlur ? 0.92 : 0.98);
-      borderColor = AppColors.specularAt(0.32);
+      fillColor = p.accent.withValues(alpha: 0.95);
+      borderColor = AppColors.specularAt(0.35);
       borderWidth = 1.0;
       shadows = [
         ...PulsrElevation.level1(context),
@@ -114,13 +110,13 @@ class HomeCardPlayBadge extends StatelessWidget {
           ),
       ];
     } else if (isCurrent) {
-      fillColor = AppColors.scrimAt(canBlur ? 0.72 : 0.88);
+      fillColor = AppColors.scrimAt(0.78);
       borderColor = p.accent.withValues(alpha: 0.90);
       borderWidth = 1.5;
       shadows = PulsrElevation.level1(context);
     } else {
-      fillColor = AppColors.scrimAt(canBlur ? 0.62 : 0.86);
-      borderColor = AppColors.specularAt(canBlur ? 0.28 : 0.36);
+      fillColor = AppColors.scrimAt(0.68);
+      borderColor = AppColors.specularAt(0.32);
       borderWidth = 1.0;
       shadows = PulsrElevation.level1(context);
     }
@@ -143,7 +139,7 @@ class HomeCardPlayBadge extends StatelessWidget {
             ),
     );
 
-    Widget badgeBody = AnimatedContainer(
+    final Widget badgeBody = AnimatedContainer(
       duration: context.motion(PulsrMotion.state),
       curve: context.motionCurve(PulsrMotion.move),
       width: size,
@@ -158,13 +154,6 @@ class HomeCardPlayBadge extends StatelessWidget {
       ),
       child: Center(child: glyph),
     );
-
-    if (canBlur && sigma > 0) {
-      badgeBody = BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
-        child: badgeBody,
-      );
-    }
 
     return ExcludeSemantics(
       child: DecoratedBox(

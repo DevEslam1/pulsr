@@ -101,6 +101,7 @@ class _PlaylistHeroCard extends StatelessWidget {
 }
 
 class _PlaylistCard extends StatelessWidget {
+  final String? heroTag;
   final String name;
   final String subtitle;
   final IconData icon;
@@ -113,6 +114,7 @@ class _PlaylistCard extends StatelessWidget {
   final void Function(String)? onMenuSelected;
 
   const _PlaylistCard({
+    this.heroTag,
     required this.name,
     required this.subtitle,
     required this.icon,
@@ -178,37 +180,70 @@ class _PlaylistCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Expanded(
-                child: Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: gradient,
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                  ),
-                  child: Stack(
-                    children: [
-                      Center(
+                child: heroTag != null
+                    ? Hero(
+                        tag: heroTag!,
                         child: Container(
-                          width: 56,
-                          height: 56,
                           decoration: BoxDecoration(
-                            color: muted
-                                ? p.accent.withValues(alpha: 0.12)
-                                : Colors.white.withValues(alpha: 0.16),
-                            shape: BoxShape.circle,
+                            gradient: LinearGradient(
+                              colors: gradient,
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
                           ),
-                          child: Icon(
-                            icon,
-                            color: muted ? p.accent : Colors.white,
-                            size: 30,
+                          child: Stack(
+                            children: [
+                              Center(
+                                child: Container(
+                                  width: 56,
+                                  height: 56,
+                                  decoration: BoxDecoration(
+                                    color: muted
+                                        ? p.accent.withValues(alpha: 0.12)
+                                        : Colors.white.withValues(alpha: 0.16),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    icon,
+                                    color: muted ? p.accent : Colors.white,
+                                    size: 30,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
+                      )
+                    : Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: gradient,
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                        ),
+                        child: Stack(
+                          children: [
+                            Center(
+                              child: Container(
+                                width: 56,
+                                height: 56,
+                                decoration: BoxDecoration(
+                                  color: muted
+                                      ? p.accent.withValues(alpha: 0.12)
+                                      : Colors.white.withValues(alpha: 0.16),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  icon,
+                                  color: muted ? p.accent : Colors.white,
+                                  size: 30,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-
-                    ],
-                  ),
-                ),
               ),
               Padding(
                 padding: const EdgeInsetsDirectional.fromSTEB(

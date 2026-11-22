@@ -313,8 +313,8 @@ class _YtmOAuthLoginSheetState extends State<YtmOAuthLoginSheet> {
           onPressed: () =>
               _copyCodeAndOpenBrowser(code.userCode, code.verificationUrl),
           icon: const Icon(Icons.open_in_browser_rounded, size: 18),
-          label: const Text('Copy code & open browser',
-              style: TextStyle(fontWeight: FontWeight.w700)),
+          label: Text(context.l10n.copyCodeAndOpenBrowser,
+              style: const TextStyle(fontWeight: FontWeight.w700)),
           style: FilledButton.styleFrom(
             backgroundColor: p.accent,
             foregroundColor: p.onAccent,

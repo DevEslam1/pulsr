@@ -59,12 +59,14 @@ class PlaylistDetailScreen extends StatefulWidget {
   final PlaylistsTableData playlist;
   final PlaylistUseCases? playlistUseCases;
   final bool isEmbedded;
+  final String? heroTag;
 
   const PlaylistDetailScreen({
     super.key,
     required this.playlist,
     this.playlistUseCases,
     this.isEmbedded = false,
+    this.heroTag,
   });
 
   @override
@@ -555,16 +557,25 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
       );
     }
 
+    final cover = Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        borderRadius: AppRadii.r16All,
+        border: Border.all(color: p.hairline),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: inner,
+    );
+
+    if (widget.isEmbedded) {
+      return ExcludeSemantics(child: cover);
+    }
+
     return ExcludeSemantics(
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          borderRadius: AppRadii.r16All,
-          border: Border.all(color: p.hairline),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: inner,
+      child: Hero(
+        tag: widget.heroTag ?? 'playlist_${playlist.id}',
+        child: cover,
       ),
     );
   }

@@ -64,6 +64,10 @@ class _AudioQualityTabbedScaffoldState
   Widget build(BuildContext context) {
     final p = context.palette;
     final surfacePalette = context.playerSurfacePalette;
+    final size = MediaQuery.sizeOf(context);
+    final isWide = (Adaptive.isTabletLandscape(context) ||
+            PulsrSheetMetrics.shouldPresentAsDialog(context)) &&
+        size.width > PulsrLayoutMetrics.splitViewBreakpoint;
     final diagnosticsVisible = widget.isProfessional || _showDiagnostics;
     final maxTab = diagnosticsVisible ? 2 : 1;
     final activeTab = _selectedTab.clamp(0, maxTab);
@@ -94,12 +98,52 @@ class _AudioQualityTabbedScaffoldState
         ? p.surface
         : surfacePalette.highContrastInk;
 
+    final Widget tabContent;
+    if (isWide && activeTab != 2) {
+      tabContent = IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: widget.nowPlayingChildren,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            VerticalDivider(
+              width: 1,
+              thickness: 1,
+              color: p.hairline,
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: widget.outputChildren,
+              ),
+            ),
+          ],
+        ),
+      );
+    } else {
+      tabContent = Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: activeChildren,
+      );
+    }
+
     return Align(
       alignment: Alignment.bottomCenter,
       child: ConstrainedBox(
         constraints: BoxConstraints(
-          maxWidth: Adaptive.sheetConstraints(context).maxWidth,
-          maxHeight: MediaQuery.of(context).size.height * 0.90,
+          maxWidth: isWide
+              ? PulsrLayoutMetrics.detailDialogMaxWidth
+              : Adaptive.sheetConstraints(context).maxWidth,
+          maxHeight: size.height * 0.90,
         ),
         child: Material(
           color: p.surface,
@@ -198,10 +242,20 @@ class _AudioQualityTabbedScaffoldState
                       AppSpacing.s20,
                       AppSpacing.md,
                     ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: activeChildren,
+                    child: AnimatedSwitcher(
+                      duration: context.motion(PulsrMotion.state),
+                      switchInCurve: context.motionCurve(Curves.easeOutCubic),
+                      switchOutCurve: context.motionCurve(Curves.easeInCubic),
+                      transitionBuilder: (child, animation) => FadeTransition(
+                        opacity: animation,
+                        child: child,
+                      ),
+                      child: KeyedSubtree(
+                        key: ValueKey(isWide && activeTab != 2
+                            ? 'wide_specs_output'
+                            : activeTab),
+                        child: tabContent,
+                      ),
                     ),
                   ),
                 ),

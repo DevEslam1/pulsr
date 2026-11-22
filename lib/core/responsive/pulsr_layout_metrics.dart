@@ -67,6 +67,22 @@ class PulsrSheetMetrics {
 /// Unified source of truth for responsive layout metrics, spacing,
 /// constraints, hero scaling, field sizing, and dock dimensions.
 class PulsrLayoutMetrics {
+  // ── Canonical Split-View & Multi-Pane Breakpoints ─────────────────────────
+  static const double splitViewBreakpoint = 800.0;
+  static const double defaultLeftPaneWidth = 380.0;
+  static const double compactDialogMaxWidth = 680.0;
+  static const double detailDialogMaxWidth = 760.0;
+
+  /// Returns whether the current viewport should render a side-by-side 2-pane split.
+  /// Used by master-detail screens (Playlists, Downloads, Search, AudioQualitySheet).
+  static bool isSplitView(BuildContext context, [BoxConstraints? constraints]) {
+    final size = MediaQuery.sizeOf(context);
+    final width = constraints?.maxWidth ?? size.width;
+    // Short landscape phones cannot comfortably display two columns of rich content.
+    if (size.height < PulsrBreakpoint.shortHeightThreshold) return false;
+    return width >= splitViewBreakpoint;
+  }
+
   // ── Canonical Content Max-Widths (G1 single source of truth) ─────────────
   static double contentMaxWidth(BuildContext context) =>
       PulsrViewport.of(context).contentMaxWidth;
@@ -155,6 +171,8 @@ extension PulsrLayoutMetricsContextX on BuildContext {
   double get heroHeight => PulsrLayoutMetrics.heroHeight(this);
   double get fieldHeight => PulsrLayoutMetrics.fieldHeight(this);
   double get scrollBottomPadding => PulsrLayoutMetrics.scrollBottom(this);
+  bool isSplitView([BoxConstraints? constraints]) =>
+      PulsrLayoutMetrics.isSplitView(this, constraints);
   bool isPlayerSplit([BoxConstraints? constraints]) =>
       PulsrLayoutMetrics.isPlayerSplitMode(this, constraints);
 }

@@ -57,6 +57,7 @@ class OnlinePlaylistDetailArgs {
 
   /// One of [OnlineLibraryKind]; used to classify the local cache entry.
   final String kind;
+  final String? heroTag;
 
   const OnlinePlaylistDetailArgs({
     required this.playlistId,
@@ -65,6 +66,7 @@ class OnlinePlaylistDetailArgs {
     this.artworkUrl,
     this.initialTracks,
     this.kind = OnlineLibraryKind.custom,
+    this.heroTag,
   });
 }
 
@@ -1260,47 +1262,49 @@ class _OnlinePlaylistDetailScreenState
                           : context.l10n.browsePlaylistHasNoSongs,
                     )
                   else
-                    for (int index = 0; index < filtered.length; index++)
-                      Builder(
-                        builder: (context) {
-                          final track = filtered[index];
-                          final song = track.toSongData();
-                          return SongTile(
-                            key: ValueKey('online_${track.videoId}_$index'),
-                            song: song,
-                            index: index,
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                YtmDownloadButton(song: song, iconSize: 18),
-                                IconButton(
-                                  constraints: const BoxConstraints(
-                                    minWidth: AppSpacing.minTouchTarget,
-                                    minHeight: AppSpacing.minTouchTarget,
-                                  ),
-                                  icon: Icon(
-                                    Icons.more_vert_rounded,
-                                    size: 18,
-                                    color: p.textTertiary,
-                                  ),
-                                  tooltip: MaterialLocalizations.of(context)
-                                      .moreButtonTooltip,
-                                  onPressed: () => SongOptionsSheet.show(
-                                      context,
-                                      song: song),
+                    ListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: filtered.length,
+                      itemBuilder: (context, index) {
+                        final track = filtered[index];
+                        final song = track.toSongData();
+                        return SongTile(
+                          key: ValueKey('online_${track.videoId}_$index'),
+                          song: song,
+                          index: index,
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              YtmDownloadButton(song: song, iconSize: 18),
+                              IconButton(
+                                constraints: const BoxConstraints(
+                                  minWidth: AppSpacing.minTouchTarget,
+                                  minHeight: AppSpacing.minTouchTarget,
                                 ),
-                              ],
-                            ),
-                            onTap: () {
-                              final songs =
-                                  filtered.map((t) => t.toSongData()).toList();
-                              context
-                                  .read<PlayerCubit>()
-                                  .playSong(song, queue: songs);
-                            },
-                          );
-                        },
-                      ),
+                                icon: Icon(
+                                  Icons.more_vert_rounded,
+                                  size: 18,
+                                  color: p.textTertiary,
+                                ),
+                                tooltip: MaterialLocalizations.of(context)
+                                    .moreButtonTooltip,
+                                onPressed: () => SongOptionsSheet.show(
+                                    context,
+                                    song: song),
+                              ),
+                            ],
+                          ),
+                          onTap: () {
+                            final songs =
+                                filtered.map((t) => t.toSongData()).toList();
+                            context
+                                .read<PlayerCubit>()
+                                .playSong(song, queue: songs);
+                          },
+                        );
+                      },
+                    ),
                 ],
               ),
             ),
