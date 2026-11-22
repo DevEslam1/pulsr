@@ -61,6 +61,7 @@ int decideTapSrcTargetRate({
   required bool bitPerfectActive,
   required bool isBluetooth,
   required List<int> deviceSampleRates,
+  bool isSpeaker = false,
   int remasterMultiplier = 1,
   int trackSampleRate = 0,
 }) {
@@ -71,7 +72,11 @@ int decideTapSrcTargetRate({
   // phone's mixer rate would be a conversion the Bluetooth path never needs. (§9)
   if (isBluetooth) return 0;
 
-  if (remasterMultiplier > 1) {
+  // Built-in phone speakers run at the platform's primary mixer rate
+  // (nativeSampleRate). Oversampling above that rate on a built-in speaker
+  // (especially when deviceSampleRates is empty) forces AudioFlinger to
+  // downsample back down or causes underruns/noise.
+  if (remasterMultiplier > 1 && !isSpeaker) {
     // Remaster oversampling takes precedence and steps down 8-4-2-1 (§8.1).
     // An unknown track rate must not fall through to the mixer-rate branch:
     // that would convert to the mixer rate while the UI says "oversampling".

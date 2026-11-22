@@ -259,7 +259,7 @@ extension SettingsAudioOutputSync on SettingsAudioActions {
   /// of the chain, so the mixer becomes a 1:1 copy. A route whose rate cannot be
   /// verified keeps the historical platform path; this never throws.
   Future<void> _syncTapSrcRate(AudioOutputInfo? info,
-      {bool force = false}) async {
+      {bool force = false, int? trackSampleRate}) async {
     if (_suppressTapSrcSync) return;
     if (!getIt.isRegistered<PulsrAudioHandler>()) return;
     // PROPERTY_OUTPUT_SAMPLE_RATE (`nativeSampleRate`) describes the primary
@@ -270,8 +270,9 @@ extension SettingsAudioOutputSync on SettingsAudioActions {
     // across syncs.
     final isPrimaryOutput = info != null && !info.isUsbDac && !info.isBluetooth;
     final mixerRate = isPrimaryOutput ? (info.nativeSampleRate ?? 0) : 0;
-    final trackRate =
-        getIt<PulsrAudioHandler>().currentSong?.sampleRate ?? 0;
+    final trackRate = trackSampleRate ??
+        getIt<PulsrAudioHandler>().currentSong?.sampleRate ??
+        0;
     final rate = decideTapSrcTargetRate(
       enabled: state.outputFormatNegotiationEnabled,
       nativeSampleRate: mixerRate,
@@ -279,6 +280,7 @@ extension SettingsAudioOutputSync on SettingsAudioActions {
           _bitPerfectViaDirectStream ||
           (info?.isBitPerfectActive ?? false),
       isBluetooth: info?.isBluetooth ?? false,
+      isSpeaker: info?.isSpeaker ?? false,
       deviceSampleRates: info?.supportedSampleRates ?? const <int>[],
       remasterMultiplier: AudioEffectsChannel().currentOversampleMultiplier,
       trackSampleRate: trackRate,
@@ -298,8 +300,9 @@ extension SettingsAudioOutputSync on SettingsAudioActions {
   /// Explicitly re-synchronizes the tap-side SRC rate against the active output
   /// and remaster oversampling policy (§8.1). [force] re-applies an unchanged
   /// target so a new reconstruction kernel is picked up by the sink rebuild.
-  Future<void> syncTapSrcRate({bool force = false}) =>
-      _syncTapSrcRate(state.currentOutputDevice, force: force);
+  Future<void> syncTapSrcRate({bool force = false, int? trackSampleRate}) =>
+      _syncTapSrcRate(state.currentOutputDevice,
+          force: force, trackSampleRate: trackSampleRate);
 
   /// Dynamically raises the sink target buffer duration when streaming over a
   /// high-bitrate Bluetooth codec (LDAC 990kbps / aptX Lossless / LHDC) so the

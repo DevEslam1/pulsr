@@ -138,6 +138,10 @@ extension PlayerDspFollowRate on PlayerDspController {
         // _audioModeMutex so an in-flight bit-perfect enable transition that
         // just finished on that mutex is observed here.
         settings = _settingsCubit!.state;
+        // Re-evaluate tap-side SRC / Remaster target for the new track's rate
+        // so a previous track's oversampled target cannot stay latched onto a
+        // subsequent track (e.g. switching from 48 kHz music to radio).
+        await _settingsCubit!.syncTapSrcRate(trackSampleRate: song.sampleRate ?? 0);
         final following = settings.strictBitPerfect ||
             (settings.outputFormatNegotiationEnabled &&
                 settings.followTrackSampleRate);

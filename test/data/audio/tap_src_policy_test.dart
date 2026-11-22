@@ -171,5 +171,39 @@ void main() {
         0,
       );
     });
+
+    test('built-in speakers skip Remaster oversampling and stay at mixer rate',
+        () {
+      expect(
+        decideTapSrcTargetRate(
+          enabled: true,
+          nativeSampleRate: 48000,
+          bitPerfectActive: false,
+          isBluetooth: false,
+          isSpeaker: true,
+          deviceSampleRates: const <int>[],
+          remasterMultiplier: 4,
+          trackSampleRate: 44100,
+        ),
+        48000,
+      );
+    });
+
+    test('built-in speakers with negotiation off return 0 even with Remaster',
+        () {
+      expect(
+        decideTapSrcTargetRate(
+          enabled: false,
+          nativeSampleRate: 48000,
+          bitPerfectActive: false,
+          isBluetooth: false,
+          isSpeaker: true,
+          deviceSampleRates: const <int>[],
+          remasterMultiplier: 4,
+          trackSampleRate: 44100,
+        ),
+        0,
+      );
+    });
   });
 }
