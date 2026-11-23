@@ -31,8 +31,14 @@ extension EqualizerRestoreOps on EqualizerManager {
         presetName = 'Flat';
         isEnabled = false;
       }
-      final gainsJson =
-          isPersistedQuran ? null : prefs.getString(PrefsKeys.eqGains);
+      final rawGains = isPersistedQuran ? null : prefs.get(PrefsKeys.eqGains);
+      final gainsJson = switch (rawGains) {
+        String s => s,
+        List<String> list => json.encode(
+            list.map((e) => double.tryParse(e) ?? 0.0).toList(),
+          ),
+        _ => null,
+      };
       final bass = prefs.getDouble(PrefsKeys.eqBassBoost) ?? 0.0;
       volumeBoost = prefs.getDouble(PrefsKeys.eqVolumeBoost) ?? 0.0;
 

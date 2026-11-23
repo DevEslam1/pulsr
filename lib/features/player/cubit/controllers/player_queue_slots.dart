@@ -5,9 +5,10 @@ part of 'player_queue_controller.dart';
 /// entry (LRU-ish) and evicting the oldest beyond [_maxSlotLookupCacheEntries].
 void _cacheSlotSongs(
   Map<int, SongsTableData> cache,
-  List<SongsTableData> songs,
-) =>
-    cacheSlotSongs(cache, songs);
+  List<SongsTableData> songs, {
+  Set<int> pinnedSongIds = const <int>{},
+}) =>
+    cacheSlotSongs(cache, songs, pinnedSongIds: pinnedSongIds);
 
 extension PlayerQueueSlotsExtension on PlayerQueueController {
   void debouncedPersistQueueSlots() {
@@ -238,6 +239,7 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
       _onResetTrackChangeSideEffects?.call(null);
     }
     final retained = current != null ? [current] : <SongsTableData>[];
+    _undoTrackTiers = Map<int, QueueTier>.from(state.trackTiers);
     final retainedTiers = <int, QueueTier>{
       if (current != null && state.trackTiers.containsKey(current.id))
         current.id: state.trackTiers[current.id]!,
@@ -272,14 +274,17 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
 
   Future<void> restoreQueue(
           List<SongsTableData> previousQueue, int previousIndex,
-          {Duration? initialPosition}) =>
+          {Duration? initialPosition,
+          Map<int, QueueTier>? previousTrackTiers}) =>
       _queueMutex.protect(() => _restoreQueueLocked(
           previousQueue, previousIndex,
-          initialPosition: initialPosition));
+          initialPosition: initialPosition,
+          previousTrackTiers: previousTrackTiers));
 
   Future<void> _restoreQueueLocked(
       List<SongsTableData> previousQueue, int previousIndex,
-      {Duration? initialPosition}) async {
+      {Duration? initialPosition,
+      Map<int, QueueTier>? previousTrackTiers}) async {
     // Empty queue is a safe no-op: `clamp(0, previousQueue.length - 1)` would
     // be clamp(0, -1) and throw ArgumentError.
     if (previousQueue.isEmpty) return;
@@ -290,6 +295,13 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
     final preCallQueueSlice = state.queueSlice;
     final preCallPlayback = state.playback;
     final preSlot = _queueSlots[state.activeQueueSlot];
+    final targetIds = previousQueue.map((s) => s.id).toSet();
+    final tierSource = previousTrackTiers ?? _undoTrackTiers ?? state.trackTiers;
+    final restoredTiers = <int, QueueTier>{
+      for (final entry in tierSource.entries)
+        if (targetIds.contains(entry.key)) entry.key: entry.value,
+    };
+    _undoTrackTiers = null;
 
     setQueueSlot(
       state.activeQueueSlot,
@@ -297,7 +309,7 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
       currentIndex: validIndex,
       position: restorePosition,
       speed: state.playbackSpeed,
-      trackTiers: state.trackTiers,
+      trackTiers: restoredTiers,
     );
     debouncedPersistQueueSlots();
     _bumpQueueVersion();
@@ -305,18 +317,33 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
       queueSlice: state.queueSlice.copyWith(
         queue: List<SongsTableData>.unmodifiable(previousQueue),
         currentIndex: validIndex,
+        trackTiers: restoredTiers,
       ),
       playback: state.playback.copyWith(position: restorePosition),
     ));
     _invalidateQueueSyncResolution();
 
     try {
-      await _audioHandler.loadQueue(
-        previousQueue,
-        initialIndex: validIndex,
-        initialPosition: restorePosition,
-        autoPlay: state.isPlaying,
-      );
+      var syncedInPlace = false;
+      if (state.currentSong != null &&
+          _isSameTrack(state.currentSong, targetSong)) {
+        try {
+          syncedInPlace = await _audioHandler.syncQueuePreservingPlayback(
+            previousQueue,
+            validIndex,
+          );
+        } catch (_) {
+          syncedInPlace = false;
+        }
+      }
+      if (!syncedInPlace) {
+        await _audioHandler.loadQueue(
+          previousQueue,
+          initialIndex: validIndex,
+          initialPosition: restorePosition,
+          autoPlay: state.isPlaying,
+        );
+      }
       _invalidateQueueSyncResolution();
       if (_isClosed()) return;
     } catch (e, st) {
@@ -446,6 +473,7 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
     final state = _getState();
     if (index < 0 || index >= state.queue.length) return;
     if (state.queue.length <= 1) {
+      _undoTrackTiers = Map<int, QueueTier>.from(state.trackTiers);
       _onResetTrackChangeSideEffects?.call(null);
       setQueueSlot(
         state.activeQueueSlot,
@@ -488,6 +516,7 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
 
     final removingCurrent = index == state.currentIndex;
     final removedSong = state.queue[index];
+    _undoTrackTiers = Map<int, QueueTier>.from(state.trackTiers);
     final updatedQueue = List<SongsTableData>.from(state.queue)
       ..removeAt(index);
     final updatedTiers = Map<int, QueueTier>.from(state.trackTiers)
@@ -727,7 +756,10 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
         shouldProceed = false;
         return;
       }
-      _cacheSlotSongs(_slotLookupCache, [safeNewSong]);
+      final pinned = <int>{
+        for (final entry in _queueSlots.entries) ...entry.value.songIds,
+      };
+      _cacheSlotSongs(_slotLookupCache, [safeNewSong], pinnedSongIds: pinned);
       _slotLookupCache.remove(oldId);
       _queueSlots.updateAll((slot, data) {
         if (!data.songIds.contains(oldId)) return data;

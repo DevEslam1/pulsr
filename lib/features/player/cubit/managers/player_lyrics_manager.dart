@@ -64,86 +64,90 @@ class PlayerLyricsManager {
     // negative cache and block re-queries for the whole TTL.
     var hadError = false;
 
-    // 1. Local metadata and sidecar .lrc files
-    if (song.source == SongSource.local &&
-        !song.path.startsWith('http') &&
-        !song.path.startsWith('ytmusic://')) {
-      try {
-        result = await LrcParser.resolveLyrics(
-          song.path,
-          songId: song.id,
-        );
-      } catch (e, st) {
-        hadError = true;
-        ErrorLogger.log('Local lyrics resolution failed for ${song.path}',
-            error: e, stackTrace: st, category: 'PlayerLyricsManager');
-      }
-    }
-
-    if (isStale != null && isStale()) return null;
-
-    // 2. Query LRCLIB
-    final hasSynced =
-        result != null && result.lines.isNotEmpty && result.isSynced;
-    final lrclib = _lrclibService;
-    if (!hasSynced && !isOfflineOnly && lrclib != null) {
-      try {
-        final onlineResult = await lrclib.fetchLyrics(
-          trackName: song.title,
-          artistName: song.artist,
-          albumName: song.album,
-          durationSeconds: song.durationMs > 0 ? song.durationMs ~/ 1000 : null,
-        );
-        if (onlineResult != null && onlineResult.lines.isNotEmpty) {
-          result = onlineResult;
-          LrcParser.cacheLyricsResult(
-            onlineResult,
-            songId: song.id,
-            path: song.path,
-          );
-        }
-      } catch (e, st) {
-        hadError = true;
-        ErrorLogger.log('LRCLIB fetch failed for ${song.title}',
-            error: e, stackTrace: st, category: 'PlayerLyricsManager');
-      }
-    }
-
-    if (isStale != null && isStale()) return null;
-
-    // 3. Fallback to YTM lyrics
-    final ytmAccount = _ytmAccountService;
-    if ((result == null || result.lines.isEmpty) &&
-        !isOfflineOnly &&
-        ytmAccount != null) {
-      final remoteId = song.remoteId;
-      if (remoteId != null && remoteId.isNotEmpty) {
+    try {
+      // 1. Local metadata and sidecar .lrc files
+      if (song.source == SongSource.local &&
+          !song.path.startsWith('http') &&
+          !song.path.startsWith('ytmusic://')) {
         try {
-          final ytmResult = await ytmAccount.fetchYtmLyrics(remoteId);
-          if (ytmResult != null && ytmResult.lines.isNotEmpty) {
-            result = ytmResult;
+          result = await LrcParser.resolveLyrics(
+            song.path,
+            songId: song.id,
+          );
+        } catch (e, st) {
+          hadError = true;
+          ErrorLogger.log('Local lyrics resolution failed for ${song.path}',
+              error: e, stackTrace: st, category: 'PlayerLyricsManager');
+        }
+      }
+
+      if (isStale != null && isStale()) return null;
+
+      // 2. Query LRCLIB
+      final hasSynced =
+          result != null && result.lines.isNotEmpty && result.isSynced;
+      final lrclib = _lrclibService;
+      if (!hasSynced && !isOfflineOnly && lrclib != null) {
+        try {
+          final onlineResult = await lrclib.fetchLyrics(
+            trackName: song.title,
+            artistName: song.artist,
+            albumName: song.album,
+            durationSeconds: song.durationMs > 0 ? song.durationMs ~/ 1000 : null,
+          );
+          if (onlineResult != null && onlineResult.lines.isNotEmpty) {
+            result = onlineResult;
             LrcParser.cacheLyricsResult(
-              ytmResult,
+              onlineResult,
               songId: song.id,
               path: song.path,
             );
           }
         } catch (e, st) {
           hadError = true;
-          ErrorLogger.log('YTM lyrics fetch failed for $remoteId',
+          ErrorLogger.log('LRCLIB fetch failed for ${song.title}',
               error: e, stackTrace: st, category: 'PlayerLyricsManager');
         }
       }
+
+      if (isStale != null && isStale()) return null;
+
+      // 3. Fallback to YTM lyrics
+      final ytmAccount = _ytmAccountService;
+      if ((result == null || result.lines.isEmpty) &&
+          !isOfflineOnly &&
+          ytmAccount != null) {
+        final remoteId = song.remoteId;
+        if (remoteId != null && remoteId.isNotEmpty) {
+          try {
+            final ytmResult = await ytmAccount.fetchYtmLyrics(remoteId);
+            if (ytmResult != null && ytmResult.lines.isNotEmpty) {
+              result = ytmResult;
+              LrcParser.cacheLyricsResult(
+                ytmResult,
+                songId: song.id,
+                path: song.path,
+              );
+            }
+          } catch (e, st) {
+            hadError = true;
+            ErrorLogger.log('YTM lyrics fetch failed for $remoteId',
+                error: e, stackTrace: st, category: 'PlayerLyricsManager');
+          }
+        }
+      }
+
+      if (isStale != null && isStale()) return null;
+
+      return result;
+    } finally {
+      final stale = isStale != null && isStale();
+      if (!stale &&
+          !hadError &&
+          (result == null || result.lines.isEmpty) &&
+          !isOfflineOnly) {
+        cacheNegativeResult(song);
+      }
     }
-
-    if (isStale != null && isStale()) return null;
-
-    if (!hadError &&
-        (result == null || result.lines.isEmpty) &&
-        !isOfflineOnly) {
-      cacheNegativeResult(song);
-    }
-
-    return result;
   }
 }

@@ -1356,7 +1356,9 @@ class _CassetteMechanicalDeckKeys extends StatelessWidget {
               isPrimaryKey: true,
               onTap: () {
                 PulsrHaptics.light();
-                cubit.togglePlayPause();
+                if (!isPlaying) {
+                  cubit.play();
+                }
               },
             ),
           ),
@@ -1377,7 +1379,9 @@ class _CassetteMechanicalDeckKeys extends StatelessWidget {
               isPrimaryKey: true,
               onTap: () {
                 PulsrHaptics.light();
-                cubit.togglePlayPause();
+                if (isPlaying) {
+                  cubit.pause();
+                }
               },
             ),
           ),

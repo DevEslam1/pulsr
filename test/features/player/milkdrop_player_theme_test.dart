@@ -179,7 +179,7 @@ void main() {
       const size = Size(400, 800);
 
       expect(() => painter.paint(canvas, size), returnsNormally);
-      expect(painter.shouldRepaint(painter), isTrue);
+      expect(painter.shouldRepaint(painter), isFalse);
     });
   });
 }

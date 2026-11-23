@@ -162,7 +162,6 @@ class _MultichannelBassCardState extends State<MultichannelBassCard> {
   }
 
   Future<void> _setChannelManagerEnabled(bool enabled) async {
-    setState(() => _channelManagerEnabled = enabled);
     try {
       if (getIt.isRegistered<EqualizerManager>()) {
         await getIt<EqualizerManager>()
@@ -171,33 +170,21 @@ class _MultichannelBassCardState extends State<MultichannelBassCard> {
         await AudioEffectsChannel()
             .setChannelManagerEnabled(enabled, channelCount: _channelCount);
         final prefs = await SharedPreferences.getInstance();
-        if (!mounted) return;
         await prefs.setBool(PrefsKeys.channelManagerEnabled, enabled);
       }
+      if (!mounted) return;
+      setState(() => _channelManagerEnabled = enabled);
     } catch (e, st) {
       ErrorLogger.log('Failed to toggle channel manager',
           error: e, stackTrace: st, category: 'ChannelManager');
-      if (mounted) setState(() => _channelManagerEnabled = !enabled);
     }
   }
 
   Future<void> _selectLayout(AudioChannelLayout layout) async {
     if (!AudioChannelLayout.offered.contains(layout)) return;
-    final prevCount = _channelCount;
-    final prevLfeEnabled = _lfeCrossoverEnabled;
-    final prevLfeIndex = _lfeChannelIndex;
-    final prevSelected = _selectedChannel;
     final targetLfeEnabled = layout.hasLfe ? _lfeCrossoverEnabled : false;
     final targetLfeIndex = layout.lfeIndex < 0 ? 0 : layout.lfeIndex;
 
-    setState(() {
-      _channelCount = layout.channelCount;
-      _lfeChannelIndex = targetLfeIndex;
-      _lfeCrossoverEnabled = targetLfeEnabled;
-      if (_selectedChannel >= _channelCount) {
-        _selectedChannel = _channelCount - 1;
-      }
-    });
     try {
       if (getIt.isRegistered<EqualizerManager>()) {
         await getIt<EqualizerManager>().setChannelLayout(
@@ -229,21 +216,21 @@ class _MultichannelBassCardState extends State<MultichannelBassCard> {
         );
         await channel.setLfeCrossoverEnabled(targetLfeEnabled);
         final prefs = await SharedPreferences.getInstance();
-        if (!mounted) return;
         await prefs.setInt(
             PrefsKeys.channelManagerChannelCount, layout.channelCount);
         await prefs.setInt(PrefsKeys.lfeChannelIndex, targetLfeIndex);
         await prefs.setBool(PrefsKeys.lfeCrossoverEnabled, targetLfeEnabled);
       }
+      if (!mounted) return;
+      setState(() {
+        _channelCount = layout.channelCount;
+        _lfeChannelIndex = targetLfeIndex;
+        _lfeCrossoverEnabled = targetLfeEnabled;
+        if (_selectedChannel >= _channelCount) {
+          _selectedChannel = _channelCount - 1;
+        }
+      });
     } catch (e, st) {
-      if (mounted) {
-        setState(() {
-          _channelCount = prevCount;
-          _lfeCrossoverEnabled = prevLfeEnabled;
-          _lfeChannelIndex = prevLfeIndex;
-          _selectedChannel = prevSelected;
-        });
-      }
       ErrorLogger.log('Failed to apply channel layout',
           error: e, stackTrace: st);
     }
@@ -252,30 +239,35 @@ class _MultichannelBassCardState extends State<MultichannelBassCard> {
   Future<void> _setChannelParam(int channel,
       {double? trimDb, double? delayMs}) async {
     if (channel < 0 || channel >= 8) return;
-    setState(() {
-      if (trimDb != null) _channelTrims[channel] = trimDb;
-      if (delayMs != null) _channelDelays[channel] = delayMs;
-    });
+    final nextTrim = trimDb ?? _channelTrims[channel];
+    final nextDelay = delayMs ?? _channelDelays[channel];
+    final nextTrims = List<double>.from(_channelTrims)..[channel] = nextTrim;
+    final nextDelays = List<double>.from(_channelDelays)
+      ..[channel] = nextDelay;
     try {
       if (getIt.isRegistered<EqualizerManager>()) {
         await getIt<EqualizerManager>().setChannelManagerChannel(
           channel,
-          trimDb: trimDb ?? _channelTrims[channel],
-          delayMs: delayMs ?? _channelDelays[channel],
+          trimDb: nextTrim,
+          delayMs: nextDelay,
         );
       } else {
         await AudioEffectsChannel().setChannelManagerChannel(
           channel,
-          trimDb: trimDb ?? _channelTrims[channel],
-          delayMs: delayMs ?? _channelDelays[channel],
+          trimDb: nextTrim,
+          delayMs: nextDelay,
         );
         final prefs = await SharedPreferences.getInstance();
-        if (!mounted) return;
         await prefs.setString(
-            PrefsKeys.channelManagerTrims, json.encode(_channelTrims));
+            PrefsKeys.channelManagerTrims, json.encode(nextTrims));
         await prefs.setString(
-            PrefsKeys.channelManagerDelays, json.encode(_channelDelays));
+            PrefsKeys.channelManagerDelays, json.encode(nextDelays));
       }
+      if (!mounted) return;
+      setState(() {
+        _channelTrims = nextTrims;
+        _channelDelays = nextDelays;
+      });
     } catch (e, st) {
       ErrorLogger.log('Failed to set channel param',
           error: e, stackTrace: st, category: 'ChannelManager');
@@ -298,16 +290,6 @@ class _MultichannelBassCardState extends State<MultichannelBassCard> {
     final targetGain = lfeGainDb ?? _lfeGainDb;
     final targetLfeIndex = lfeChannelIndex ?? _lfeChannelIndex;
     final targetRedirect = redirectBass ?? _lfeRedirectBass;
-
-    setState(() {
-      _lfeCrossoverEnabled = targetEnabled;
-      _lfeCrossoverHz = targetCrossover;
-      _lfeLowPassHz = targetLowPass;
-      _lfeSlopeDbPerOct = targetSlope;
-      _lfeGainDb = targetGain;
-      _lfeChannelIndex = targetLfeIndex;
-      _lfeRedirectBass = targetRedirect;
-    });
 
     try {
       if (getIt.isRegistered<EqualizerManager>()) {
@@ -332,7 +314,6 @@ class _MultichannelBassCardState extends State<MultichannelBassCard> {
         await AudioEffectsChannel()
             .setLfeCrossoverEnabled(targetEnabled);
         final prefs = await SharedPreferences.getInstance();
-        if (!mounted) return;
         await prefs.setBool(PrefsKeys.lfeCrossoverEnabled, targetEnabled);
         await prefs.setDouble(PrefsKeys.lfeCrossoverHz, targetCrossover);
         await prefs.setDouble(PrefsKeys.lfeLowPassHz, targetLowPass);
@@ -341,6 +322,16 @@ class _MultichannelBassCardState extends State<MultichannelBassCard> {
         await prefs.setInt(PrefsKeys.lfeChannelIndex, targetLfeIndex);
         await prefs.setBool(PrefsKeys.lfeRedirectBass, targetRedirect);
       }
+      if (!mounted) return;
+      setState(() {
+        _lfeCrossoverEnabled = targetEnabled;
+        _lfeCrossoverHz = targetCrossover;
+        _lfeLowPassHz = targetLowPass;
+        _lfeSlopeDbPerOct = targetSlope;
+        _lfeGainDb = targetGain;
+        _lfeChannelIndex = targetLfeIndex;
+        _lfeRedirectBass = targetRedirect;
+      });
     } catch (e, st) {
       ErrorLogger.log('Failed to set LFE crossover',
           error: e, stackTrace: st, category: 'ChannelManager');

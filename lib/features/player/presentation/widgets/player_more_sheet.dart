@@ -1,3 +1,5 @@
+import 'dart:async' show FutureOr;
+
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
@@ -22,25 +24,35 @@ import 'ambient_sound_panel.dart' show iconForEffect;
 import 'ambient_sound_sheet.dart';
 import 'quran_mode_sheet.dart';
 
+enum _PlayerMoreAction {
+  addToPlaylist,
+  party,
+  quranMode,
+  ambientSound,
+  gestures,
+}
+
 /// Secondary player actions kept out of the primary transport dock.
 class PlayerMoreSheet extends StatelessWidget {
   final SongsTableData? song;
   final Color activeColor;
+  final bool popWithResult;
 
   const PlayerMoreSheet({
     super.key,
     required this.song,
     required this.activeColor,
+    this.popWithResult = false,
   });
 
   static Future<void> show(
     BuildContext context, {
     SongsTableData? song,
     required Color activeColor,
-  }) {
+  }) async {
     final playerCubit = context.read<PlayerCubit>();
     final settingsCubit = context.read<SettingsCubit>();
-    return PulsrSheetHelper.showPulsrSheet<void>(
+    final action = await PulsrSheetHelper.showPulsrSheet<_PlayerMoreAction>(
       context: context,
       wrapWithContainer: true,
       builder: (_) => MultiBlocProvider(
@@ -48,9 +60,45 @@ class PlayerMoreSheet extends StatelessWidget {
           BlocProvider<PlayerCubit>.value(value: playerCubit),
           BlocProvider<SettingsCubit>.value(value: settingsCubit),
         ],
-        child: PlayerMoreSheet(song: song, activeColor: activeColor),
+        child: PlayerMoreSheet(
+          song: song,
+          activeColor: activeColor,
+          popWithResult: true,
+        ),
       ),
     );
+    if (action == null || !context.mounted) return;
+    switch (action) {
+      case _PlayerMoreAction.addToPlaylist:
+        if (song != null) {
+          await AddToPlaylistSheet.show(context, song: song);
+        }
+      case _PlayerMoreAction.party:
+        await PartySheet.show(context);
+      case _PlayerMoreAction.quranMode:
+        await QuranModeSheet.show(context);
+      case _PlayerMoreAction.ambientSound:
+        await AmbientSoundSheet.show(context);
+      case _PlayerMoreAction.gestures:
+        await GesturesSheet.show(context);
+    }
+  }
+
+  void _triggerSecondarySheet(
+    BuildContext context,
+    _PlayerMoreAction action,
+    FutureOr<void> Function(BuildContext callerContext) launchFromCaller,
+  ) {
+    PulsrHaptics.selection();
+    if (popWithResult) {
+      Navigator.of(context).pop(action);
+      return;
+    }
+    final callerContext = Navigator.of(context).context;
+    Navigator.of(context).pop();
+    if (callerContext.mounted) {
+      launchFromCaller(callerContext);
+    }
   }
 
   @override
@@ -63,9 +111,6 @@ class PlayerMoreSheet extends StatelessWidget {
     final canvasEnabled = context.select<SettingsCubit, bool>(
       (c) => c.state.canvasEnabled,
     );
-    final hasDownload = song != null &&
-        (song!.source == SongSource.youtube ||
-            (song!.remoteId != null && song!.remoteId!.isNotEmpty));
 
     return PulsrBottomSheetContainer(
       title: Text(l10n.moreOptions),
@@ -86,27 +131,28 @@ class PlayerMoreSheet extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (hasDownload)
+            if (song != null)
               _MoreActionTile(
                 icon: Icons.playlist_add_rounded,
                 iconColor: activeColor,
                 title: l10n.addToPlaylist,
-                onTap: () {
-                  PulsrHaptics.selection();
-                  Navigator.of(context).pop();
-                  AddToPlaylistSheet.show(context, song: song!);
-                },
+                onTap: () => _triggerSecondarySheet(
+                  context,
+                  _PlayerMoreAction.addToPlaylist,
+                  (callerContext) =>
+                      AddToPlaylistSheet.show(callerContext, song: song!),
+                ),
               ),
             _MoreActionTile(
               icon: Icons.group_rounded,
               iconColor: AppColors.accentCyan,
               title: l10n.partyListenTogether,
               subtitle: l10n.partySyncDescription,
-              onTap: () {
-                PulsrHaptics.selection();
-                Navigator.of(context).pop();
-                PartySheet.show(context);
-              },
+              onTap: () => _triggerSecondarySheet(
+                context,
+                _PlayerMoreAction.party,
+                PartySheet.show,
+              ),
             ),
             _MoreActionTile(
               icon: Icons.menu_book_rounded,
@@ -115,11 +161,11 @@ class PlayerMoreSheet extends StatelessWidget {
               subtitle:
                   isQuranMode ? l10n.dspQuranModeOn : l10n.dspQuranModeOff,
               isActive: isQuranMode,
-              onTap: () {
-                PulsrHaptics.selection();
-                Navigator.of(context).pop();
-                QuranModeSheet.show(context);
-              },
+              onTap: () => _triggerSecondarySheet(
+                context,
+                _PlayerMoreAction.quranMode,
+                QuranModeSheet.show,
+              ),
             ),
             AnimatedBuilder(
               animation: AmbientSoundService(),
@@ -142,11 +188,11 @@ class PlayerMoreSheet extends StatelessWidget {
                   title: l10n.ambientSounds,
                   subtitle: subtitle,
                   isActive: isAmbientActive,
-                  onTap: () {
-                    PulsrHaptics.selection();
-                    Navigator.of(context).pop();
-                    AmbientSoundSheet.show(context);
-                  },
+                  onTap: () => _triggerSecondarySheet(
+                    context,
+                    _PlayerMoreAction.ambientSound,
+                    AmbientSoundSheet.show,
+                  ),
                 );
               },
             ),
@@ -198,11 +244,11 @@ class PlayerMoreSheet extends StatelessWidget {
               iconColor: activeColor,
               title: l10n.gesturesGuideTitle,
               subtitle: l10n.gesturesGuideSubtitleShort,
-              onTap: () {
-                PulsrHaptics.selection();
-                Navigator.of(context).pop();
-                GesturesSheet.show(context);
-              },
+              onTap: () => _triggerSecondarySheet(
+                context,
+                _PlayerMoreAction.gestures,
+                GesturesSheet.show,
+              ),
             ),
           ],
         ),

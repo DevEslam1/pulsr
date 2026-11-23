@@ -9,21 +9,27 @@ export '../../../../core/utils/playlist_reorder_utils.dart'
 const int maxSlotLookupCacheEntries = 4096;
 
 /// Caches [songs] for slot hydration, marking each as the most recently written
-/// entry (LRU-ish) and evicting the oldest beyond [maxSlotLookupCacheEntries].
+/// entry (LRU-ish) and evicting the oldest unpinned entries beyond
+/// [maxSlotLookupCacheEntries]. Songs in [pinnedSongIds] (for inactive slots Q2/Q3)
+/// are pinned and skipped during LRU eviction so switching back never drops
+/// tracks from another slot.
 void cacheSlotSongs(
   Map<int, SongsTableData> cache,
-  List<SongsTableData> songs,
-) {
+  List<SongsTableData> songs, {
+  Set<int> pinnedSongIds = const <int>{},
+}) {
   for (final s in songs) {
     cache.remove(s.id);
     cache[s.id] = s;
   }
-  final excess = cache.length - maxSlotLookupCacheEntries;
-  if (excess > 0) {
-    final oldest = cache.keys.take(excess).toList(growable: false);
-    for (final key in oldest) {
-      cache.remove(key);
-    }
+  var excess = cache.length - maxSlotLookupCacheEntries;
+  if (excess <= 0) return;
+  final keys = cache.keys.toList(growable: false);
+  for (final key in keys) {
+    if (excess <= 0) break;
+    if (pinnedSongIds.contains(key)) continue;
+    cache.remove(key);
+    excess--;
   }
 }
 

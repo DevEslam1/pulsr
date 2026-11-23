@@ -684,6 +684,9 @@ class AudioVisualizerState extends State<AudioVisualizer>
                                           transparentBackground:
                                               widget.transparentBackground,
                                           generation: gen,
+                                          elapsedSeconds:
+                                              _simClock.elapsedMicroseconds /
+                                                  1000000.0,
                                         )
                                       : MilkdropCanvasPainter(
                                           data: data,
@@ -693,6 +696,9 @@ class AudioVisualizerState extends State<AudioVisualizer>
                                           transparentBackground:
                                               widget.transparentBackground,
                                           generation: gen,
+                                          elapsedSeconds:
+                                              _simClock.elapsedMicroseconds /
+                                                  1000000.0,
                                         ),
                                 VisualizerStyle.off => null,
                               },
@@ -1086,8 +1092,9 @@ class _Terrain3DVisualizerPainter extends CustomPainter {
 
 // --- PAINTER 6: ALBUM ART REACTIVE ---
 class _AlbumArtReactivePainter extends CustomPainter {
-  static final Paint _glowPaint = Paint()
-    ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 24);
+  static const MaskFilter _glowBlurFilter =
+      MaskFilter.blur(BlurStyle.normal, 24);
+  static final Paint _glowPaint = Paint();
 
   final List<double> data;
   final Color color;
@@ -1107,7 +1114,9 @@ class _AlbumArtReactivePainter extends CustomPainter {
     final bassMag =
         (data.take(4).fold<double>(0, (s, e) => s + e) / 4.0).clamp(0.0, 1.0);
 
-    _glowPaint.color = color.withValues(alpha: (bassMag * 0.4).clamp(0.0, 0.6));
+    _glowPaint
+      ..color = color.withValues(alpha: (bassMag * 0.4).clamp(0.0, 0.6))
+      ..maskFilter = GpuBudget.isGpuSaverActive ? null : _glowBlurFilter;
 
     canvas.drawCircle(
         center, (size.width / 4) * (1.0 + bassMag * 0.2), _glowPaint);

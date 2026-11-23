@@ -310,6 +310,10 @@ class PlayerPlaybackOptionsController {
 
   Future<void> adjustVolume(double delta) => _volumeControl.adjustVolume(delta);
 
+  /// Step output volume according to the active system behavior step/curve.
+  Future<void> stepVolume(int direction) =>
+      _volumeControl.stepVolume(direction);
+
   /// A-06: Toggle output mute, remembering the pre-mute volume so unmuting
   /// restores it. Exposed for the global keyboard-shortcut layer.
   Future<void> toggleMute() => _volumeControl.toggleMute();

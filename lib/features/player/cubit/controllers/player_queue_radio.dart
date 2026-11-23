@@ -72,7 +72,11 @@ extension PlayerQueueRadio on PlayerQueueController {
     required double speed,
     Map<int, QueueTier>? trackTiers,
   }) {
-    _cacheSlotSongs(_slotLookupCache, songs);
+    final pinned = <int>{
+      for (final entry in _queueSlots.entries)
+        if (entry.key != slot) ...entry.value.songIds,
+    };
+    _cacheSlotSongs(_slotLookupCache, songs, pinnedSongIds: pinned);
     _queueSlots[slot] = QueueSlotData(
       songIds: songs.map((s) => s.id).toList(),
       currentIndex: currentIndex,
@@ -314,63 +318,64 @@ extension PlayerQueueRadio on PlayerQueueController {
   /// Tiered shuffle:
   /// - User-queued tracks stay pinned in order at the front of upcoming
   /// - Context tracks and autoplay tracks are shuffled in their respective partitions
-  Future<void> tieredShuffle() async {
-    final state = _getState();
-    if (state.queue.length <= 1) return;
+  Future<void> tieredShuffle() => _queueMutex.protect(() async {
+        final state = _getState();
+        if (state.queue.length <= 1) return;
 
-    final currIdx = state.currentIndex;
-    final currentSong = state.currentSong;
-    if (currentSong == null) return;
+        final currIdx = state.currentIndex;
+        final currentSong = state.currentSong;
+        if (currentSong == null) return;
 
-    final past = state.queue.sublist(0, currIdx);
-    final upcoming = state.queue.sublist(currIdx + 1);
+        final past = state.queue.sublist(0, currIdx);
+        final upcoming = state.queue.sublist(currIdx + 1);
 
-    if (upcoming.isEmpty) return;
+        if (upcoming.isEmpty) return;
 
-    final userQueued = <SongsTableData>[];
-    final contextTracks = <SongsTableData>[];
-    final autoplayTracks = <SongsTableData>[];
+        final userQueued = <SongsTableData>[];
+        final contextTracks = <SongsTableData>[];
+        final autoplayTracks = <SongsTableData>[];
 
-    for (final song in upcoming) {
-      final tier = state.trackTiers[song.id] ??
-          (song.isAutoplay ? QueueTier.autoplay : QueueTier.context);
-      switch (tier) {
-        case QueueTier.userQueue:
-          userQueued.add(song);
-          break;
-        case QueueTier.autoplay:
-          autoplayTracks.add(song);
-          break;
-        case QueueTier.context:
-          contextTracks.add(song);
-          break;
-      }
-    }
+        for (final song in upcoming) {
+          final tier = state.trackTiers[song.id] ??
+              (song.isAutoplay ? QueueTier.autoplay : QueueTier.context);
+          switch (tier) {
+            case QueueTier.userQueue:
+              userQueued.add(song);
+              break;
+            case QueueTier.autoplay:
+              autoplayTracks.add(song);
+              break;
+            case QueueTier.context:
+              contextTracks.add(song);
+              break;
+          }
+        }
 
-    final shuffledContext = List<SongsTableData>.from(contextTracks)..shuffle();
-    _avoidIdentityShuffle(contextTracks, shuffledContext);
+        final shuffledContext = List<SongsTableData>.from(contextTracks)
+          ..shuffle();
+        _avoidIdentityShuffle(contextTracks, shuffledContext);
 
-    final shuffledAutoplay = List<SongsTableData>.from(autoplayTracks)
-      ..shuffle();
-    _avoidIdentityShuffle(autoplayTracks, shuffledAutoplay);
+        final shuffledAutoplay = List<SongsTableData>.from(autoplayTracks)
+          ..shuffle();
+        _avoidIdentityShuffle(autoplayTracks, shuffledAutoplay);
 
-    final newUpcoming = [
-      ...userQueued,
-      ...shuffledContext,
-      ...shuffledAutoplay,
-    ];
+        final newUpcoming = [
+          ...userQueued,
+          ...shuffledContext,
+          ...shuffledAutoplay,
+        ];
 
-    final newQueue = [
-      ...past,
-      currentSong,
-      ...newUpcoming,
-    ];
+        final newQueue = [
+          ...past,
+          currentSong,
+          ...newUpcoming,
+        ];
 
-    await playSong(
-      currentSong,
-      queue: newQueue,
-      queueIndex: currIdx,
-      preservePlaybackState: true,
-    );
-  }
+        await _playSongLocked(
+          currentSong,
+          queue: newQueue,
+          queueIndex: currIdx,
+          preservePlaybackState: true,
+        );
+      });
 }

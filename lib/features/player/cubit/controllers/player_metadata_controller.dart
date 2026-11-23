@@ -71,31 +71,35 @@ class PlayerMetadataController {
     }
 
     final gen = _lyricsManager.bumpGeneration();
-    final result = await _lyricsManager
-        .resolveLyrics(
-          song,
-          isOfflineOnly: isOfflineOnly,
-          isStale: () =>
-              _isClosed() ||
-              gen != _lyricsManager.generation ||
-              !_isSameTrack(_getState().currentSong, song),
-        )
-        .timeout(PlayerConstants.lyricsTimeout, onTimeout: () => null);
-
-    if (_isClosed() ||
-        gen != _lyricsManager.generation ||
-        !_isSameTrack(_getState().currentSong, song)) {
-      return;
+    LyricsResult? result;
+    try {
+      result = await _lyricsManager
+          .resolveLyrics(
+            song,
+            isOfflineOnly: isOfflineOnly,
+            isStale: () =>
+                _isClosed() ||
+                gen != _lyricsManager.generation ||
+                !_isSameTrack(_getState().currentSong, song),
+          )
+          .timeout(PlayerConstants.lyricsTimeout, onTimeout: () => null);
+    } catch (e, st) {
+      ErrorLogger.log('Failed to resolve lyrics for ${song.id}',
+          error: e, stackTrace: st, category: 'PlayerMetadataController');
+    } finally {
+      if (!_isClosed() &&
+          gen == _lyricsManager.generation &&
+          _isSameTrack(_getState().currentSong, song)) {
+        final s = _getState();
+        _emit(s.copyWith(
+          lyricsSlice: s.lyricsSlice.copyWith(
+            lyrics: result?.lines ?? const [],
+            lyricsSource: result?.source ?? LyricsSource.none,
+            isLoadingLyrics: false,
+          ),
+        ));
+      }
     }
-
-    final s = _getState();
-    _emit(s.copyWith(
-      lyricsSlice: s.lyricsSlice.copyWith(
-        lyrics: result?.lines ?? const [],
-        lyricsSource: result?.source ?? LyricsSource.none,
-        isLoadingLyrics: false,
-      ),
-    ));
   }
 
   Future<void> loadSponsorBlock(SongsTableData song,

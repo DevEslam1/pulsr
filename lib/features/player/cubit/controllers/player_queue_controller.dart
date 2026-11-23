@@ -112,6 +112,7 @@ class PlayerQueueController {
       _onResetTrackChangeSideEffects;
 
   Timer? _persistQueueDebounce;
+  Map<int, QueueTier>? _undoTrackTiers;
 
   // Async guards for coordination
   final AsyncGuard _mediaItemResolutionGuard = AsyncGuard();

@@ -74,13 +74,18 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
     return s;
   }
 
-  SafeModeController? get _effectiveSafeMode =>
-      widget.safeMode ?? _localSafeMode;
+  SafeModeController? get _effectiveSafeMode {
+    if (widget.safeMode != null) return widget.safeMode;
+    if (_localSafeMode != null) return _localSafeMode;
+    return getIt.isRegistered<SafeModeController>()
+        ? getIt<SafeModeController>()
+        : null;
+  }
 
   @override
   void initState() {
     super.initState();
-    if (widget.safeMode != null) {
+    if (_effectiveSafeMode != null) {
       _syncSafeMode();
     }
     _refresh();
@@ -107,10 +112,21 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
     };
   }
 
+  String? _resolvedDeviceLabel() {
+    final explicit = widget.deviceLabel?.call();
+    if (explicit != null && explicit.trim().isNotEmpty) return explicit;
+    if (getIt.isRegistered<SettingsCubit>()) {
+      final name =
+          getIt<SettingsCubit>().state.currentOutputDevice?.deviceName;
+      if (name != null && name.trim().isNotEmpty) return name;
+    }
+    return null;
+  }
+
   String _currentDeviceKey() {
     final explicit = widget.deviceKey?.call();
     if (explicit != null && explicit.trim().isNotEmpty) return explicit;
-    final label = widget.deviceLabel?.call();
+    final label = _resolvedDeviceLabel();
     if (label != null && label.trim().isNotEmpty) return label;
     return 'default';
   }
@@ -348,7 +364,7 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
     return ListView(
       padding: const EdgeInsetsDirectional.all(AppSpacing.md),
       children: <Widget>[
-        _SummaryCard(bundle: bundle, deviceLabel: widget.deviceLabel),
+        _SummaryCard(bundle: bundle, deviceLabel: _resolvedDeviceLabel),
         const SizedBox(height: AppSpacing.sm),
         _CountersCard(bundle: bundle),
         const SizedBox(height: AppSpacing.sm),

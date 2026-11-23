@@ -1,5 +1,6 @@
 // lib/features/player/presentation/widgets/canvas_backdrop.dart
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:ui';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -336,41 +337,53 @@ class _CanvasBackdropState extends State<CanvasBackdrop>
                     final rawSigma = AppBlur.canBlur(context)
                         ? AppBlur.clampSigma(widget.blurSigma)
                         : AppBlur.none;
-                    final videoBox = FittedBox(
-                      fit: BoxFit.cover,
-                      clipBehavior: Clip.hardEdge,
-                      child: SizedBox(
-                        width: _controller!.value.size.width > 0
-                            ? _controller!.value.size.width
-                            : 720,
-                        height: _controller!.value.size.height > 0
-                            ? _controller!.value.size.height
-                            : 1280,
-                        child: VideoPlayer(_controller!),
-                      ),
-                    );
-                    if (rawSigma <= 0) {
+                    final videoWidth = _controller!.value.size.width > 0
+                        ? _controller!.value.size.width
+                        : 720.0;
+                    final videoHeight = _controller!.value.size.height > 0
+                        ? _controller!.value.size.height
+                        : 1280.0;
+                    Widget buildVideoBox() => FittedBox(
+                          fit: BoxFit.cover,
+                          clipBehavior: Clip.hardEdge,
+                          child: SizedBox(
+                            width: videoWidth,
+                            height: videoHeight,
+                            child: VideoPlayer(_controller!),
+                          ),
+                        );
+                    final hasFiniteBounds = constraints.maxWidth.isFinite &&
+                        constraints.maxHeight.isFinite &&
+                        constraints.maxWidth > 0 &&
+                        constraints.maxHeight > 0;
+                    if (rawSigma <= 0 || !hasFiniteBounds) {
                       return SizedBox(
                         width: constraints.maxWidth,
                         height: constraints.maxHeight,
-                        child: videoBox,
+                        child: buildVideoBox(),
                       );
                     }
-                    final smallWidth = constraints.maxWidth / downscale;
-                    final smallHeight = constraints.maxHeight / downscale;
+                    final smallWidth = math.max(1.0, constraints.maxWidth / downscale);
+                    final smallHeight =
+                        math.max(1.0, constraints.maxHeight / downscale);
                     final effectiveSigma =
                         AppBlur.clampSigma(widget.blurSigma / downscale);
-                    return Transform.scale(
-                      scale: downscale,
-                      child: ImageFiltered(
-                        imageFilter: ImageFilter.blur(
-                          sigmaX: effectiveSigma,
-                          sigmaY: effectiveSigma,
-                        ),
-                        child: SizedBox(
-                          width: smallWidth,
-                          height: smallHeight,
-                          child: videoBox,
+                    return SizedBox(
+                      width: constraints.maxWidth,
+                      height: constraints.maxHeight,
+                      child: FittedBox(
+                        fit: BoxFit.cover,
+                        clipBehavior: Clip.hardEdge,
+                        child: ImageFiltered(
+                          imageFilter: ImageFilter.blur(
+                            sigmaX: effectiveSigma,
+                            sigmaY: effectiveSigma,
+                          ),
+                          child: SizedBox(
+                            width: smallWidth,
+                            height: smallHeight,
+                            child: buildVideoBox(),
+                          ),
                         ),
                       ),
                     );

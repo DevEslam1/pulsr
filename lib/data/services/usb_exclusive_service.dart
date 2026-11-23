@@ -593,7 +593,9 @@ class UsbExclusiveService {
           'setExclusive',
           {'enabled': enabled}).timeout(const Duration(seconds: 8));
       await getStatus();
-      if (res is Map) return res['error'] == null;
+      if (res is Map) {
+        return res['error'] == null && res['success'] != false;
+      }
       return res == true;
     } catch (e, st) {
       ErrorLogger.log('Failed to set USB exclusive($enabled)',

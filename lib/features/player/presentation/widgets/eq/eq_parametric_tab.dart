@@ -286,7 +286,12 @@ extension _EqParametricTab on _EqualizerSheetState {
           children: [
             Row(
               children: [
-                _buildAbSlotSelector(cubit: cubit, p: p),
+                Expanded(
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: _buildAbSlotSelector(cubit: cubit, p: p),
+                  ),
+                ),
                 const SizedBox(width: AppSpacing.xs),
                 ActionChip(
                   avatar: Icon(

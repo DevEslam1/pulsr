@@ -95,6 +95,24 @@ class PlaybackQueueStateMachine {
     _queueDirty = true;
   }
 
+  /// Replaces the queue while keeping the active playback index at [currentIndex]
+  /// (e.g. an undo restore that inserts removed neighbours back around the
+  /// playing track).
+  void setQueuePreservingPlayback(
+    List<SongsTableData> newSongs, {
+    required int currentIndex,
+  }) {
+    _songs
+      ..clear()
+      ..addAll(newSongs);
+    _currentIndex =
+        _songs.isEmpty ? 0 : currentIndex.clamp(0, _songs.length - 1);
+    _shuffleHistory.removeWhere((i) => i < 0 || i >= _songs.length);
+    _pendingShuffleNext = null;
+    _pendingShuffleSecondNext = null;
+    _queueDirty = true;
+  }
+
   /// Updates current track index within bounds.
   void setCurrentIndex(int index) {
     // A current-index change (a manual jump, a load, a crossfade swap) voids

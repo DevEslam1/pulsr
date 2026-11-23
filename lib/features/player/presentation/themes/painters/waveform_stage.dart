@@ -794,7 +794,15 @@ class _OscilloscopeWaveformPainter extends CustomPainter {
           _loopBadgePaint..color = activeColor,
         );
         final tp = _getPinTextPainter(tag, activeColor);
-        tp.paint(canvas, Offset(x - tp.width / 2, 12 - tp.height / 2));
+        if (isRtl) {
+          canvas.save();
+          canvas.translate(x, 12);
+          canvas.scale(-1, 1);
+          tp.paint(canvas, Offset(-tp.width / 2, -tp.height / 2));
+          canvas.restore();
+        } else {
+          tp.paint(canvas, Offset(x - tp.width / 2, 12 - tp.height / 2));
+        }
       }
 
       if (ax != null) drawPin(ax, 'A');

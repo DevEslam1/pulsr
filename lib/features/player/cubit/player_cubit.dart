@@ -996,23 +996,30 @@ class PlayerCubit extends PulsrCubit<PlayerState>
                 isBuffering: false)));
         return;
       }
-      if (err.startsWith(PulsrAudioHandler.failureCascadeHaltPrefix)) {
-        // The audio handler's circuit breaker already halted the cascade;
-        // reset Cubit-level failure tracking so displaying the notice never
-        // restarts playback with another next().
-        final msg =
-            err.substring(PulsrAudioHandler.failureCascadeHaltPrefix.length);
-        _lastFailedSongId = null;
-        _consecutiveErrorCount = 0;
-        widgetBridge.onPlaybackError(msg);
-        safeEmit(state.copyWith(
-            playback: state.playback
-                .copyWith(error: uiError(msg), isBuffering: false)));
-        return;
+      for (final prefix in const [
+        PulsrAudioHandler.failureCascadeHaltPrefix,
+        PulsrAudioHandler.autoSkippedNoticePrefix,
+      ]) {
+        if (err.startsWith(prefix)) {
+          final msg = err.substring(prefix.length);
+          _lastFailedSongId = null;
+          _consecutiveErrorCount = 0;
+          widgetBridge.onPlaybackError(msg);
+          safeEmit(state.copyWith(
+              playback: state.playback
+                  .copyWith(error: uiError(msg), isBuffering: false)));
+          return;
+        }
       }
       widgetBridge.onPlaybackError(err);
       final failed = state.currentSong;
-      if (failed == null) {
+      var handlerOwnsAutoSkip = false;
+      try {
+        handlerOwnsAutoSkip = _audioHandler.ownsAutoSkipOnError;
+      } catch (_) {
+        // Test fakes that omit ownsAutoSkipOnError fall back to cubit-side skip.
+      }
+      if (failed == null || handlerOwnsAutoSkip) {
         safeEmit(state.copyWith(
             playback: state.playback
                 .copyWith(error: uiError(err), isBuffering: false)));

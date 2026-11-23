@@ -926,6 +926,92 @@ mixin PulsrAudioTransport on BaseAudioHandler {
     _saveCurrentPosition();
   }
 
+  /// Syncs the queue back to [targetQueue] around the already-playing track at
+  /// [targetIndex] without calling `loadQueue` / restarting playback. Returns
+  /// false if the playing track differs or gapless source rebuilding fails.
+  Future<bool> syncQueuePreservingPlayback(
+    List<SongsTableData> targetQueue,
+    int targetIndex,
+  ) async {
+    if (targetQueue.isEmpty ||
+        targetIndex < 0 ||
+        targetIndex >= targetQueue.length) {
+      return false;
+    }
+    if (_songs.isEmpty ||
+        _currentIndex < 0 ||
+        _currentIndex >= _songs.length ||
+        _songs[_currentIndex].id != targetQueue[targetIndex].id) {
+      return false;
+    }
+    final oldCurrentIndex = _currentIndex;
+    if (_gaplessMode && _gaplessLoaded) {
+      final beforeSources = <AudioSource>[];
+      final afterSources = <AudioSource>[];
+      try {
+        for (int i = 0; i < targetQueue.length; i++) {
+          if (i == targetIndex) continue;
+          final src = await _buildGaplessChildAsync(targetQueue[i]);
+          if (i < targetIndex) {
+            beforeSources.add(src);
+          } else {
+            afterSources.add(src);
+          }
+        }
+      } catch (e, st) {
+        ErrorLogger.log(
+            'syncQueuePreservingPlayback source build failed; falling back to loadQueue',
+            error: e,
+            stackTrace: st,
+            category: 'AudioHandler');
+        return false;
+      }
+      _queueStateMachine.setQueuePreservingPlayback(
+        targetQueue,
+        currentIndex: targetIndex,
+      );
+      _queueDirty = true;
+      _lastGaplessIndex = targetIndex;
+      try {
+        final sources = _activePlayer.audioSources;
+        if (oldCurrentIndex < sources.length) {
+          for (int i = sources.length - 1; i >= 0; i--) {
+            if (i != oldCurrentIndex) {
+              await _activePlayer.removeAudioSourceAt(i);
+            }
+          }
+          for (int i = 0; i < beforeSources.length; i++) {
+            await _activePlayer.insertAudioSource(i, beforeSources[i]);
+          }
+          for (int i = 0; i < afterSources.length; i++) {
+            await _activePlayer.insertAudioSource(
+              targetIndex + 1 + i,
+              afterSources[i],
+            );
+          }
+        } else {
+          return false;
+        }
+      } catch (e, st) {
+        ErrorLogger.log(
+            'syncQueuePreservingPlayback playlist sync failed; reloading',
+            error: e,
+            stackTrace: st,
+            category: 'AudioHandler');
+        return false;
+      }
+    } else {
+      _queueStateMachine.setQueuePreservingPlayback(
+        targetQueue,
+        currentIndex: targetIndex,
+      );
+      _queueDirty = true;
+    }
+    queue.add(_songs.map(PulsrAudioHandler._songToMediaItem).toList());
+    _saveCurrentPosition();
+    return true;
+  }
+
   @override
   Future<void> removeQueueItemAt(int index) async {
     if (index < 0 || index >= _songs.length) return;

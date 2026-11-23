@@ -419,11 +419,22 @@ spl1 = spl1 + lp1 * amount;''',
                   return Padding(
                     padding: const EdgeInsets.only(bottom: AppSpacing.xs),
                     child: InkWell(
-                      onTap: () {
-                        setState(() {
-                          _codeController.text = entry.value;
-                        });
-                        cubit.setLiveProgEnabled(true, code: entry.value);
+                      onTap: () async {
+                        final prevState = cubit.state;
+                        await cubit.setLiveProgEnabled(true, code: entry.value);
+                        if (!mounted) return;
+                        final after = cubit.state;
+                        final newError = after.errorMessage != null &&
+                            after.errorMessage != prevState.errorMessage;
+                        final status = after.liveProgStatus.toLowerCase();
+                        final isStatusError = status.contains('error') ||
+                            status.contains('fail') ||
+                            status.contains('invalid');
+                        if (!newError && !isStatusError) {
+                          setState(() {
+                            _codeController.text = entry.value;
+                          });
+                        }
                       },
                       borderRadius: AppRadii.r14All,
                       child: Container(

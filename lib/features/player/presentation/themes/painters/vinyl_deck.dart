@@ -49,6 +49,7 @@ class _VinylTurntableDeckState extends State<_VinylTurntableDeck> {
   @override
   Widget build(BuildContext context) {
     final surface = context.playerSurfacePalette;
+    final isRtl = Directionality.of(context) == TextDirection.rtl;
     final props = widget.props;
     final state = props.state;
     final cubit = props.cubit;
@@ -419,6 +420,7 @@ class _VinylTurntableDeckState extends State<_VinylTurntableDeck> {
                                           liftProgress:
                                               widget.tonearmAnimation.value,
                                           surface: surface,
+                                          isRtl: isRtl,
                                         ),
                                       );
                                     },

@@ -52,6 +52,7 @@ class _CdJewelStageState extends State<_CdJewelStage> {
   Widget build(BuildContext context) {
     final surface = context.playerSurfacePalette;
     final p = context.palette;
+    final isRtl = Directionality.of(context) == TextDirection.rtl;
     final props = widget.props;
     final state = props.state;
     final cubit = props.cubit;
@@ -191,6 +192,7 @@ class _CdJewelStageState extends State<_CdJewelStage> {
                               isDark: p.isDark,
                               customGlow: widget.customGlow,
                               surface: surface,
+                              isRtl: isRtl,
                             ),
                           ),
                         ),
@@ -305,6 +307,7 @@ class _CdJewelStageState extends State<_CdJewelStage> {
                                         discCenter: cdCenter,
                                         discRadius: cdSize / 2,
                                         surface: surface,
+                                        isRtl: isRtl,
                                       ),
                                     );
                                   },
@@ -326,6 +329,7 @@ class _CdJewelStageState extends State<_CdJewelStage> {
                                 caseRadius: caseRadius,
                                 spineWidth: spineWidth,
                                 surface: surface,
+                                isRtl: isRtl,
                               ),
                             ),
                           ),

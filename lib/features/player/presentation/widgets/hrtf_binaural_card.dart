@@ -75,46 +75,88 @@ class _HrtfBinauralCardState extends State<HrtfBinauralCard> {
     }
   }
 
+  Future<bool> _applyHrtf(
+    BuildContext context, {
+    required bool enabled,
+    required double azimuth,
+    required double elevation,
+    required String? sofaPath,
+    bool verifyDatasetPath = false,
+  }) async {
+    final cubit = context.read<PlayerCubit>();
+    final prevState = cubit.state;
+    await cubit.setHrtfBinaural(
+      enabled,
+      azimuth: azimuth,
+      elevation: elevation,
+      sofaPath: sofaPath,
+    );
+    if (!mounted) return false;
+    final after = cubit.state;
+    final newError =
+        after.errorMessage != null && after.errorMessage != prevState.errorMessage;
+    final acknowledged = !verifyDatasetPath ||
+        ((sofaPath == null || sofaPath.isEmpty)
+            ? _hrtfDatasetAcknowledged('')
+            : _hrtfDatasetAcknowledged(sofaPath));
+    if (newError || !acknowledged) {
+      _restoreState();
+      setState(() {});
+      return false;
+    }
+    final didEmitChange = !identical(after, prevState);
+    setState(() {
+      if (didEmitChange) {
+        _enabled = after.isHrtfEnabled;
+        _azimuth = after.hrtfAzimuth;
+        _elevation = after.hrtfElevation;
+        _sofaPath =
+            (after.hrtfSofaPath?.isEmpty ?? true) ? null : after.hrtfSofaPath;
+      } else {
+        _enabled = enabled;
+        _azimuth = azimuth;
+        _elevation = elevation;
+        _sofaPath = (sofaPath?.isEmpty ?? true) ? null : sofaPath;
+      }
+    });
+    return true;
+  }
+
   Future<void> _toggleEnabled(BuildContext context, bool enabled) async {
-    final prev = _enabled;
-    setState(() => _enabled = enabled);
     try {
-      await context.read<PlayerCubit>().setHrtfBinaural(
-            enabled,
-            azimuth: _azimuth,
-            elevation: _elevation,
-            sofaPath: _sofaPath,
-          );
-      if (!mounted) return;
+      await _applyHrtf(
+        context,
+        enabled: enabled,
+        azimuth: _azimuth,
+        elevation: _elevation,
+        sofaPath: _sofaPath,
+      );
     } catch (e, st) {
-      if (mounted) setState(() => _enabled = prev);
       ErrorLogger.log('Failed to toggle HRTF', error: e, stackTrace: st);
     }
   }
 
   Future<void> _updateAzimuth(BuildContext context, double val) async {
-    setState(() => _azimuth = val);
     try {
-      await context.read<PlayerCubit>().setHrtfBinaural(
-            _enabled,
-            azimuth: val,
-            elevation: _elevation,
-            sofaPath: _sofaPath,
-          );
-      if (!mounted) return;
+      await _applyHrtf(
+        context,
+        enabled: _enabled,
+        azimuth: val,
+        elevation: _elevation,
+        sofaPath: _sofaPath,
+      );
     } catch (_) {}
   }
 
   Future<void> _updateElevation(BuildContext context, double val) async {
-    setState(() => _elevation = val);
     try {
-      await context.read<PlayerCubit>().setHrtfBinaural(
-            _enabled,
-            azimuth: _azimuth,
-            elevation: val,
-            sofaPath: _sofaPath,
-          );
-      if (!mounted) return;
+      await _applyHrtf(
+        context,
+        enabled: _enabled,
+        azimuth: _azimuth,
+        elevation: val,
+        sofaPath: _sofaPath,
+      );
     } catch (_) {}
   }
 
@@ -124,7 +166,9 @@ class _HrtfBinauralCardState extends State<HrtfBinauralCard> {
   /// rejected SOFA/HRIR file.
   bool _hrtfDatasetAcknowledged(String path) {
     if (!getIt.isRegistered<EqualizerManager>()) return true;
-    return getIt<EqualizerManager>().hrtfSofaPath == path;
+    final stored = getIt<EqualizerManager>().hrtfSofaPath;
+    if (path.isEmpty) return stored == null || stored.isEmpty;
+    return stored == path;
   }
 
   Future<void> _pickSofaFile(BuildContext context) async {
@@ -147,21 +191,16 @@ class _HrtfBinauralCardState extends State<HrtfBinauralCard> {
       final path = file.path;
 
       if (context.mounted) {
-        await context.read<PlayerCubit>().setHrtfBinaural(
-              _enabled,
-              azimuth: _azimuth,
-              elevation: _elevation,
-              sofaPath: path,
-            );
-        if (!mounted) return;
-        // Success is defined by the manager adopting the path; a rejected file
-        // leaves the previous path in place. Only then adopt it locally and
-        // report success.
-        if (!_hrtfDatasetAcknowledged(path)) {
+        final confirmed = await _applyHrtf(
+          context,
+          enabled: _enabled,
+          azimuth: _azimuth,
+          elevation: _elevation,
+          sofaPath: path,
+          verifyDatasetPath: true,
+        );
+        if (!confirmed) {
           throw StateError('Native HRTF dataset load was rejected');
-        }
-        if (mounted) {
-          setState(() => _sofaPath = path);
         }
         if (context.mounted) {
           PulsrToast.show(
@@ -185,20 +224,14 @@ class _HrtfBinauralCardState extends State<HrtfBinauralCard> {
 
   Future<void> _resetToDefault(BuildContext context) async {
     try {
-      await context.read<PlayerCubit>().setHrtfBinaural(
-            _enabled,
-            azimuth: 30.0,
-            elevation: 0.0,
-            sofaPath: '',
-          );
-      if (!mounted) return;
-      if (_hrtfDatasetAcknowledged('') && mounted) {
-        setState(() {
-          _azimuth = 30.0;
-          _elevation = 0.0;
-          _sofaPath = null;
-        });
-      }
+      await _applyHrtf(
+        context,
+        enabled: _enabled,
+        azimuth: 30.0,
+        elevation: 0.0,
+        sofaPath: '',
+        verifyDatasetPath: true,
+      );
     } catch (e, st) {
       ErrorLogger.log('Failed to reset HRTF dataset', error: e, stackTrace: st);
     }

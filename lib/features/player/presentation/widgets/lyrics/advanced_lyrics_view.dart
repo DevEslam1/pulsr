@@ -166,11 +166,15 @@ class _AdvancedLyricsViewState extends State<AdvancedLyricsView> {
             0.0,
             _scrollController.position.maxScrollExtent,
           );
-          _scrollController.animateTo(
-            targetOffset,
-            duration: context.motionMs(320),
-            curve: context.motionCurve(Curves.easeOutCubic),
-          );
+          if (!PulsrMotion.shouldAnimate(context)) {
+            _scrollController.jumpTo(targetOffset);
+          } else {
+            _scrollController.animateTo(
+              targetOffset,
+              duration: context.motionMs(320),
+              curve: context.motionCurve(Curves.easeOutCubic),
+            );
+          }
         }
       });
     }

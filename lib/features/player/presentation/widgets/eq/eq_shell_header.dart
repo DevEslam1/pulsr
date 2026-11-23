@@ -328,32 +328,36 @@ extension _EqShellHeader on _EqualizerSheetState {
                             ),
                           ),
                           const SizedBox(width: AppSpacing.s6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: AppSpacing.s6,
-                                vertical: AppSpacing.s2),
-                            decoration: BoxDecoration(
-                              color: state.isEqEnabled
-                                  ? (dspBlockedGlobal != null
-                                      ? p.error.withValues(alpha: 0.15)
-                                      : p.accent.withValues(alpha: 0.2))
-                                  : p.surfaceContainerHigh,
-                              borderRadius: AppRadii.r4All,
-                            ),
-                            child: Text(
-                              dspBlockedGlobal != null
-                                  ? context.l10n.dspBlocked
-                                  : (state.isEqEnabled
-                                      ? context.l10n.dspStatOn
-                                      : context.l10n.dspStatOff),
-                              style: TextStyle(
-                                fontSize: AppFontSize.caption,
-                                fontWeight: FontWeight.w800,
-                                color: dspBlockedGlobal != null
-                                    ? p.error
+                          Flexible(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: AppSpacing.s6,
+                                  vertical: AppSpacing.s2),
+                              decoration: BoxDecoration(
+                                color: state.isEqEnabled
+                                    ? (dspBlockedGlobal != null
+                                        ? p.error.withValues(alpha: 0.15)
+                                        : p.accent.withValues(alpha: 0.2))
+                                    : p.surfaceContainerHigh,
+                                borderRadius: AppRadii.r4All,
+                              ),
+                              child: Text(
+                                dspBlockedGlobal != null
+                                    ? context.l10n.dspBlocked
                                     : (state.isEqEnabled
-                                        ? p.accent
-                                        : p.textTertiary),
+                                        ? context.l10n.dspStatOn
+                                        : context.l10n.dspStatOff),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: AppFontSize.caption,
+                                  fontWeight: FontWeight.w800,
+                                  color: dspBlockedGlobal != null
+                                      ? p.error
+                                      : (state.isEqEnabled
+                                          ? p.accent
+                                          : p.textTertiary),
+                                ),
                               ),
                             ),
                           ),
@@ -396,7 +400,7 @@ extension _EqShellHeader on _EqualizerSheetState {
                       ? 0.45
                       : 1.0,
                   child: Switch.adaptive(
-                    value: dspBlockedGlobal == null && state.isEqEnabled,
+                    value: state.isEqEnabled,
                     activeTrackColor: p.accent,
                     activeThumbColor: p.onAccent,
                     onChanged: dspBlockedGlobal != null && !state.isEqEnabled
@@ -481,32 +485,36 @@ extension _EqShellHeader on _EqualizerSheetState {
                             ),
                           ),
                           const SizedBox(width: AppSpacing.s6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: AppSpacing.s6,
-                                vertical: AppSpacing.s2),
-                            decoration: BoxDecoration(
-                              color: state.isDspEffectsActive
-                                  ? (dspBlockedGlobal != null
-                                      ? p.error.withValues(alpha: 0.15)
-                                      : p.accent.withValues(alpha: 0.2))
-                                  : p.surfaceContainerHigh,
-                              borderRadius: AppRadii.r4All,
-                            ),
-                            child: Text(
-                              dspBlockedGlobal != null
-                                  ? context.l10n.dspBlocked
-                                  : (state.isDspEffectsActive
-                                      ? context.l10n.dspStatOn
-                                      : context.l10n.dspStatOff),
-                              style: TextStyle(
-                                fontSize: AppFontSize.caption,
-                                fontWeight: FontWeight.w800,
-                                color: dspBlockedGlobal != null
-                                    ? p.error
+                          Flexible(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: AppSpacing.s6,
+                                  vertical: AppSpacing.s2),
+                              decoration: BoxDecoration(
+                                color: state.isDspEffectsActive
+                                    ? (dspBlockedGlobal != null
+                                        ? p.error.withValues(alpha: 0.15)
+                                        : p.accent.withValues(alpha: 0.2))
+                                    : p.surfaceContainerHigh,
+                                borderRadius: AppRadii.r4All,
+                              ),
+                              child: Text(
+                                dspBlockedGlobal != null
+                                    ? context.l10n.dspBlocked
                                     : (state.isDspEffectsActive
-                                        ? p.accent
-                                        : p.textTertiary),
+                                        ? context.l10n.dspStatOn
+                                        : context.l10n.dspStatOff),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: AppFontSize.caption,
+                                  fontWeight: FontWeight.w800,
+                                  color: dspBlockedGlobal != null
+                                      ? p.error
+                                      : (state.isDspEffectsActive
+                                          ? p.accent
+                                          : p.textTertiary),
+                                ),
                               ),
                             ),
                           ),
@@ -547,7 +555,7 @@ extension _EqShellHeader on _EqualizerSheetState {
                       ? 0.45
                       : 1.0,
                   child: Switch.adaptive(
-                    value: dspBlockedGlobal == null && state.isDspEffectsActive,
+                    value: state.isDspEffectsActive,
                     activeTrackColor: p.accent,
                     activeThumbColor: p.onAccent,
                     onChanged:

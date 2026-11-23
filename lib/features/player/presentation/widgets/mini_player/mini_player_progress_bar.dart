@@ -8,6 +8,7 @@ import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 
 import '../../../../../core/motion/pulsr_motion.dart';
+import '../../../../../core/performance/gpu_budget.dart';
 import '../../../../../core/theme/aura_theme.dart';
 import '../../../../../core/utils/formatters.dart';
 import '../../../../../core/utils/l10n_extensions.dart';
@@ -497,7 +498,9 @@ class _MiniProgressWavePainter extends CustomPainter {
       ..strokeWidth = trackHeight + 3.0
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.0);
+      ..maskFilter = GpuBudget.isGpuSaverActive
+          ? null
+          : const MaskFilter.blur(BlurStyle.normal, 3.0);
     canvas.drawPath(wavePath, glowPaint);
 
     final activePaint = Paint()
@@ -513,10 +516,12 @@ class _MiniProgressWavePainter extends CustomPainter {
     // Subtle radiant leading glow bead matching activeColor when playing.
     if (isPlaying && !isDragging && endX > 2.0 && endX <= size.width) {
       final beadCenter = Offset(endX, centerY);
-      final haloPaint = Paint()
-        ..color = activeColor.withValues(alpha: 0.42)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4.0);
-      canvas.drawCircle(beadCenter, 4.0, haloPaint);
+      if (!GpuBudget.isGpuSaverActive) {
+        final haloPaint = Paint()
+          ..color = activeColor.withValues(alpha: 0.42)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4.0);
+        canvas.drawCircle(beadCenter, 4.0, haloPaint);
+      }
 
       final corePaint = Paint()
         ..color = activeColor

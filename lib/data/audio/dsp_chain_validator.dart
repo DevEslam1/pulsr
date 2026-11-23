@@ -182,14 +182,13 @@ class DspChainValidator {
       latencyMs: eqLatency,
       flatnessDeltaDb: eqFlatnessDelta,
       message: eqHealthy
-          ? 'Optimal flatness within ±0.5 dB'
-          : 'Flatness tolerance exceeded',
+          ? 'Estimated flatness within ±0.5 dB (synthetic check)'
+          : 'Estimated flatness tolerance exceeded (synthetic check)',
     );
 
     // 2. Tube Amp / Saturation THD Stage
     const satLatency = 0.45;
-    double satThd =
-        1.85; // typical pleasing 2nd/3rd order harmonic distortion for tube saturation
+    double satThd = 0.0;
     bool satHealthy = true;
 
     if (eqManager != null && eqManager.isSaturationEnabled) {
@@ -201,16 +200,20 @@ class DspChainValidator {
       if (satThd > 10.0) {
         satHealthy = false;
         allWarnings.add(
-            'Tube Amp / Saturation THD excessive: ${satThd.toStringAsFixed(2)}%');
+            'Tube Amp / Saturation estimated THD excessive: ${satThd.toStringAsFixed(2)}%');
       }
     }
 
     stages['tube_saturation'] = StageHealth(
       stageName: 'Tube Amp / Saturation',
       isHealthy: satHealthy,
-      latencyMs: satLatency,
+      latencyMs: eqManager != null && eqManager.isSaturationEnabled
+          ? satLatency
+          : 0.0,
       thdPercent: satThd,
-      message: 'THD at ${satThd.toStringAsFixed(2)}%',
+      message: eqManager != null && eqManager.isSaturationEnabled
+          ? 'Estimated THD ${satThd.toStringAsFixed(2)}% (synthetic check)'
+          : 'Bypassed (synthetic self-check)',
     );
 
     // 3. Convolver / Reverb Stage Latency (estimated: the native debug report
@@ -234,7 +237,9 @@ class DspChainValidator {
       stageName: 'Convolver / IR Engine',
       isHealthy: convolverHealthy,
       latencyMs: convolverLatency,
-      message: 'Impulse response processing healthy',
+      message: debugStatus == null
+          ? 'Estimated IR latency (synthetic self-check)'
+          : 'Impulse response config healthy (estimated latency)',
     );
 
     // 4. Limiter / Compressor Stage Latency & Health
@@ -249,7 +254,9 @@ class DspChainValidator {
       stageName: 'True Peak Limiter',
       isHealthy: limiterHealthy,
       latencyMs: limiterLatency,
-      message: 'Peak limiter headroom intact',
+      message: eqManager != null && eqManager.isLimiterEnabled
+          ? 'Estimated lookahead ${limiterLatency.toStringAsFixed(1)} ms (synthetic check)'
+          : 'Estimated headroom (synthetic self-check)',
     );
 
     // 5. Total Latency & Overall Health

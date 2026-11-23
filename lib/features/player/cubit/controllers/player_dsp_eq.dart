@@ -122,7 +122,7 @@ extension PlayerDspEqExtension on PlayerDspController {
               showErrorOnGuard: false,
             )
           : await applyPreset(backup, isPerSongRestore: true);
-      if (gen != _perSongEqApplyGen) return;
+      if (_isClosed() || gen != _perSongEqApplyGen) return;
       if (restored) {
         perSongOverrideActive = false;
         globalEqBackup = null;
@@ -164,9 +164,15 @@ extension PlayerDspEqExtension on PlayerDspController {
     // untouched rather than silently flattening it.
     if (preset == null && profile == null) return;
     if (!guardDsp('Equalizer Preset', showError: false)) return;
-    if (_getState().currentSong?.id != songId) return;
+    if (_isClosed() ||
+        gen != _perSongEqApplyGen ||
+        _getState().currentSong?.id != songId) {
+      return;
+    }
 
     final wasActive = perSongOverrideActive;
+    final prevEqBackup = globalEqBackup;
+    final prevHpBackup = globalHeadphoneProfileBackup;
     if (!wasActive) {
       final s = _getState();
       globalEqBackup = s.eqPreset;
@@ -180,10 +186,11 @@ extension PlayerDspEqExtension on PlayerDspController {
             showErrorOnGuard: false,
           )
         : await applyPreset(preset!, isPerSongRestore: true);
+    if (_isClosed() || gen != _perSongEqApplyGen) return;
     if (!applied && !wasActive) {
       perSongOverrideActive = false;
-      globalEqBackup = null;
-      globalHeadphoneProfileBackup = null;
+      globalEqBackup = prevEqBackup;
+      globalHeadphoneProfileBackup = prevHpBackup;
     }
   }
 

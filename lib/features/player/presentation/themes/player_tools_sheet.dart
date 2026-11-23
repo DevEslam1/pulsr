@@ -1,4 +1,6 @@
 // lib/features/player/presentation/themes/player_tools_sheet.dart
+import 'dart:async' show FutureOr;
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
@@ -100,21 +102,33 @@ int countActiveSecondaryTools(
 ///
 /// Presents via [PulsrSheetHelper.showPulsrSheet], which automatically adapts
 /// to a centered dialog on Tablet and Desktop screens.
+enum _PlayerToolAction {
+  equalizer,
+  audioQuality,
+  speedPicker,
+  quranMode,
+  ambientSound,
+  sleepTimer,
+  more,
+}
+
 class PlayerToolsSheet extends StatelessWidget {
   final PlayerThemeProps props;
+  final bool popWithResult;
 
   const PlayerToolsSheet({
     super.key,
     required this.props,
+    this.popWithResult = false,
   });
 
   static Future<void> show(
     BuildContext context, {
     required PlayerThemeProps props,
-  }) {
+  }) async {
     final playerCubit = context.read<PlayerCubit>();
     final settingsCubit = context.read<SettingsCubit>();
-    return PulsrSheetHelper.showPulsrSheet<void>(
+    final action = await PulsrSheetHelper.showPulsrSheet<_PlayerToolAction>(
       context: context,
       wrapWithContainer: true,
       builder: (_) => MultiBlocProvider(
@@ -122,9 +136,50 @@ class PlayerToolsSheet extends StatelessWidget {
           BlocProvider<PlayerCubit>.value(value: playerCubit),
           BlocProvider<SettingsCubit>.value(value: settingsCubit),
         ],
-        child: PlayerToolsSheet(props: props),
+        child: PlayerToolsSheet(props: props, popWithResult: true),
       ),
     );
+    if (action == null || !context.mounted) return;
+    final currentSong = playerCubit.state.currentSong ?? props.state.currentSong;
+    switch (action) {
+      case _PlayerToolAction.equalizer:
+        await EqualizerSheet.show(context);
+      case _PlayerToolAction.audioQuality:
+        if (currentSong != null) {
+          AudioQualitySheet.show(context, currentSong, props.activeColor);
+        }
+      case _PlayerToolAction.speedPicker:
+        await SpeedPickerSheet.show(context);
+      case _PlayerToolAction.quranMode:
+        await QuranModeSheet.show(context);
+      case _PlayerToolAction.ambientSound:
+        await AmbientSoundSheet.show(context);
+      case _PlayerToolAction.sleepTimer:
+        await SleepTimerSheet.show(context);
+      case _PlayerToolAction.more:
+        await PlayerMoreSheet.show(
+          context,
+          song: currentSong,
+          activeColor: props.activeColor,
+        );
+    }
+  }
+
+  void _triggerSecondarySheet(
+    BuildContext context,
+    _PlayerToolAction action,
+    FutureOr<void> Function(BuildContext callerContext) launchFromCaller,
+  ) {
+    PulsrHaptics.selection();
+    if (popWithResult) {
+      Navigator.of(context).pop(action);
+      return;
+    }
+    final callerContext = Navigator.of(context).context;
+    Navigator.of(context).pop();
+    if (callerContext.mounted) {
+      launchFromCaller(callerContext);
+    }
   }
 
   @override
@@ -213,11 +268,11 @@ class PlayerToolsSheet extends StatelessWidget {
               title: l10n.equalizer,
               subtitle: l10n.equalizerSubtitle,
               isActive: isEqActive,
-              onTap: () {
-                PulsrHaptics.selection();
-                Navigator.of(context).pop();
-                EqualizerSheet.show(context);
-              },
+              onTap: () => _triggerSecondarySheet(
+                context,
+                _PlayerToolAction.equalizer,
+                EqualizerSheet.show,
+              ),
             ),
 
             // 2. Audio Quality / Output / DAC / Cast
@@ -241,9 +296,15 @@ class PlayerToolsSheet extends StatelessWidget {
                   onTap: () {
                     final currentSong = props.state.currentSong;
                     if (currentSong != null) {
-                      PulsrHaptics.selection();
-                      Navigator.of(context).pop();
-                      AudioQualitySheet.show(context, currentSong, activeColor);
+                      _triggerSecondarySheet(
+                        context,
+                        _PlayerToolAction.audioQuality,
+                        (callerContext) => AudioQualitySheet.show(
+                          callerContext,
+                          currentSong,
+                          activeColor,
+                        ),
+                      );
                     }
                   },
                 );
@@ -260,11 +321,11 @@ class PlayerToolsSheet extends StatelessWidget {
                   ? '${speed.toStringAsFixed(1)}x'
                   : null,
               isActive: (speed - 1.0).abs() > 0.01,
-              onTap: () {
-                PulsrHaptics.selection();
-                Navigator.of(context).pop();
-                SpeedPickerSheet.show(context);
-              },
+              onTap: () => _triggerSecondarySheet(
+                context,
+                _PlayerToolAction.speedPicker,
+                SpeedPickerSheet.show,
+              ),
             ),
 
             // 4. Quran Mode
@@ -275,11 +336,11 @@ class PlayerToolsSheet extends StatelessWidget {
               subtitle:
                   isQuranMode ? l10n.dspQuranModeOn : l10n.dspQuranModeOff,
               isActive: isQuranMode,
-              onTap: () {
-                PulsrHaptics.selection();
-                Navigator.of(context).pop();
-                QuranModeSheet.show(context);
-              },
+              onTap: () => _triggerSecondarySheet(
+                context,
+                _PlayerToolAction.quranMode,
+                QuranModeSheet.show,
+              ),
             ),
 
             // 5. Ambient Soundscape
@@ -294,11 +355,11 @@ class PlayerToolsSheet extends StatelessWidget {
                   title: l10n.ambientSounds,
                   subtitle: l10n.ambientSoundsDesc,
                   isActive: isAmbientActive,
-                  onTap: () {
-                    PulsrHaptics.selection();
-                    Navigator.of(context).pop();
-                    AmbientSoundSheet.show(context);
-                  },
+                  onTap: () => _triggerSecondarySheet(
+                    context,
+                    _PlayerToolAction.ambientSound,
+                    AmbientSoundSheet.show,
+                  ),
                 );
               },
             ),
@@ -319,11 +380,11 @@ class PlayerToolsSheet extends StatelessWidget {
                               : null)))
                   : null,
               isActive: hasTimer,
-              onTap: () {
-                PulsrHaptics.selection();
-                Navigator.of(context).pop();
-                SleepTimerSheet.show(context);
-              },
+              onTap: () => _triggerSecondarySheet(
+                context,
+                _PlayerToolAction.sleepTimer,
+                SleepTimerSheet.show,
+              ),
             ),
 
             // 7. More (Party, Playlist, Canvas, Gestures)
@@ -331,6 +392,15 @@ class PlayerToolsSheet extends StatelessWidget {
               props: props,
               activeColor: activeColor,
               dividerColor: p.hairline,
+              onTap: () => _triggerSecondarySheet(
+                context,
+                _PlayerToolAction.more,
+                (callerContext) => PlayerMoreSheet.show(
+                  callerContext,
+                  song: props.state.currentSong,
+                  activeColor: activeColor,
+                ),
+              ),
             ),
           ],
         ),
@@ -620,22 +690,14 @@ class _PartyAwareMoreTile extends StatelessWidget {
   final PlayerThemeProps props;
   final Color activeColor;
   final Color dividerColor;
+  final VoidCallback onTap;
 
   const _PartyAwareMoreTile({
     required this.props,
     required this.activeColor,
     required this.dividerColor,
+    required this.onTap,
   });
-
-  void _open(BuildContext context) {
-    PulsrHaptics.selection();
-    Navigator.of(context).pop();
-    PlayerMoreSheet.show(
-      context,
-      song: props.state.currentSong,
-      activeColor: activeColor,
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -655,7 +717,7 @@ class _PartyAwareMoreTile extends StatelessWidget {
         iconColor: activeColor,
         title: l10n.moreOptions,
         subtitle: l10n.partyListenTogether,
-        onTap: () => _open(context),
+        onTap: onTap,
       );
     }
 
@@ -671,7 +733,7 @@ class _PartyAwareMoreTile extends StatelessWidget {
           subtitle: l10n.partyListenTogether,
           badgeText: isLive ? 'LIVE' : (isConnecting ? '...' : null),
           isActive: isLive || isConnecting,
-          onTap: () => _open(context),
+          onTap: onTap,
         );
       },
     );

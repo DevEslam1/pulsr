@@ -337,6 +337,21 @@ class AudioProfile {
   }
 
   static Object? _normalizeValue(String key, Object? value) {
+    if (AudioProfileKeys.isWhitelisted(key)) {
+      final verdict = AudioProfileKeys.validate(key, value);
+      if (!verdict.valid) {
+        final code = value is double && !value.isFinite
+            ? 'audio-profile-non-finite-double'
+            : value is List
+                ? 'audio-profile-invalid-list'
+                : 'audio-profile-invalid-type';
+        throw ProfileFormatError(
+          code: code,
+          userMessage: AudioProfileStrings.formatInvalidValue(key),
+        );
+      }
+      return verdict.normalized;
+    }
     if (value is bool || value is int || value is String) return value;
     if (value is double) {
       if (!value.isFinite) {

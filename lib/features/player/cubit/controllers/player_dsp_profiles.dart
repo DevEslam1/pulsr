@@ -317,12 +317,28 @@ extension PlayerDspProfilesExtension on PlayerDspController {
           }
           final okEq = await setEqualizerEnabled(true);
           final okPreset = await applyPreset(preset);
+          await setPreamp(0.0);
+          await setBassBoost(0.0);
           await setVolumeBoost(profile.volumeBoost);
+          await setVirtualizerEnabled(false);
+          await setDynamicsPreset(DynamicsPreset.off, enabled: false);
+          await setSpatializerEnabled(false);
+          await setLookaheadLimiter(false);
+          await setReverb(false);
           await setSaturation(profile.saturationEnabled ?? false);
           await setStereoWidth(profile.stereoWidthEnabled ?? false);
           await setLoudnessContour(profile.loudnessContourEnabled ?? false);
           await setSubCrossover(profile.subCrossoverEnabled ?? false);
           await setDynamicEq(profile.dynamicEqEnabled ?? false);
+          await setStereoBalance(0.0);
+          await setMonoMix(false);
+          await setSincResampler(false);
+          await setDither(false);
+          await setDynamicBass(false);
+          await setViperDdcEnabled(false);
+          await setArbitraryEqEnabled(false);
+          await setLiveProgEnabled(false);
+          await setMultibandCompressor(false);
           if (profile.crossfeedEnabled != null) {
             await setCrossfeed(
               profile.crossfeedEnabled!,

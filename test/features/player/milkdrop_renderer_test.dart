@@ -59,14 +59,25 @@ void main() {
     });
 
     test(
-        'MilkdropCanvasPainter shouldRepaint always returns true for animation',
+        'MilkdropCanvasPainter shouldRepaint uses dirty flags for monotonic time and inputs',
         () {
       final painter = MilkdropCanvasPainter(
         data: const [0.5, 0.5],
         color: Colors.blue,
         preset: testPreset,
+        generation: 1,
+        elapsedSeconds: 1.0,
       );
-      expect(painter.shouldRepaint(painter), isTrue);
+      expect(painter.shouldRepaint(painter), isFalse);
+
+      final nextFrame = MilkdropCanvasPainter(
+        data: const [0.5, 0.5],
+        color: Colors.blue,
+        preset: testPreset,
+        generation: 2,
+        elapsedSeconds: 1.016,
+      );
+      expect(nextFrame.shouldRepaint(painter), isTrue);
     });
 
     test(
