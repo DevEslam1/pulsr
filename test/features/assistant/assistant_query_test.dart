@@ -231,4 +231,53 @@ void main() {
       expect(request.field, AssistantExtraField.query);
     });
   });
+
+  group('M-08 NLU multi-locale & favorites routing', () {
+    test('routes "play favorites" unshuffled and "shuffle favorites" shuffled', () {
+      final playFav = parseAssistantText('play favorites');
+      expect(playFav.kind, AssistantIntentKind.shuffleFavorites);
+      expect(playFav.wantsShuffle, isFalse);
+
+      final playFavUk = parseAssistantText('play my favourites');
+      expect(playFavUk.kind, AssistantIntentKind.shuffleFavorites);
+      expect(playFavUk.wantsShuffle, isFalse);
+
+      final shuffleFav = parseAssistantText('shuffle favorites');
+      expect(shuffleFav.kind, AssistantIntentKind.shuffleFavorites);
+      expect(shuffleFav.wantsShuffle, isTrue);
+    });
+
+    test('parses Spanish and Arabic assistant phrases accurately', () {
+      final esPlaylist = parseAssistantText('reproduce Chill Mix');
+      expect(esPlaylist.kind, AssistantIntentKind.playPlaylist);
+      expect(esPlaylist.term, 'chill mix');
+      expect(esPlaylist.wantsShuffle, isFalse);
+
+      final esShuffleFav = parseAssistantText('mezcla mis favoritas');
+      expect(esShuffleFav.kind, AssistantIntentKind.shuffleFavorites);
+      expect(esShuffleFav.wantsShuffle, isTrue);
+
+      final esResume = parseAssistantText('reanudar el último álbum');
+      expect(esResume.kind, AssistantIntentKind.resumeLastAlbum);
+
+      final esRadio = parseAssistantText('radio de Miles Davis');
+      expect(esRadio.kind, AssistantIntentKind.playArtistRadio);
+      expect(esRadio.term, 'miles davis');
+
+      final arPlayFav = parseAssistantText('شغل المفضلة');
+      expect(arPlayFav.kind, AssistantIntentKind.shuffleFavorites);
+      expect(arPlayFav.wantsShuffle, isFalse);
+
+      final arShuffleFav = parseAssistantText('عشوائي المفضلة');
+      expect(arShuffleFav.kind, AssistantIntentKind.shuffleFavorites);
+      expect(arShuffleFav.wantsShuffle, isTrue);
+
+      final arResume = parseAssistantText('استأنف آخر ألبوم');
+      expect(arResume.kind, AssistantIntentKind.resumeLastAlbum);
+
+      final arPlaylist = parseAssistantText('تشغيل موسيقى هادئة');
+      expect(arPlaylist.kind, AssistantIntentKind.playPlaylist);
+      expect(arPlaylist.term, 'موسيقى هادئة');
+    });
+  });
 }

@@ -150,4 +150,41 @@ void main() {
     await tester.pump();
     await tester.binding.setSurfaceSize(null);
   });
+
+  testWidgets(
+      'H-50 divider resize handle does not overlap segmented tab controls in LTR or RTL',
+      (tester) async {
+    for (final locale in const [Locale('en'), Locale('ar')]) {
+      await tester.binding.setSurfaceSize(const Size(1000, 700));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      await tester.pumpWidget(
+        BlocProvider<PlayerCubit>.value(
+          value: mockPlayerCubit,
+          child: MaterialApp(
+            locale: locale,
+            localizationsDelegates: appLocalizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: const MediaQuery(
+              data: MediaQueryData(size: Size(1000, 700)),
+              child: Scaffold(
+                body: TabletSideInspector(onClose: _noop),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final firstTabRect = tester.getRect(find.byType(GestureDetector).first);
+      final handleRect = tester.getRect(find.byType(GestureDetector).last);
+      expect(
+        firstTabRect.overlaps(handleRect),
+        isFalse,
+        reason: 'resize handle must not overlap header tabs in ${locale.languageCode}',
+      );
+    }
+  });
 }
+
+void _noop() {}

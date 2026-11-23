@@ -303,6 +303,11 @@ class WidgetService {
             _artworkCache.remove(song.id);
             _roundedArtworkCache.remove(song.id);
           }
+          _lastSavedArtworkSongId = null;
+          await Future.wait([
+            HomeWidget.saveWidgetData<String>('artwork', ''),
+            HomeWidget.saveWidgetData<bool>('artworkFailed', false),
+          ]);
           _pendingArtworkQueue.removeWhere((s) => s.id == song.id);
           // C-04: Cap queue at 3 entries, drop oldest on rapid track changes
           while (_pendingArtworkQueue.length >= _maxPendingArtworkQueue) {
@@ -377,6 +382,11 @@ class WidgetService {
         stackTrace: st,
         category: 'WidgetService',
       );
+      if (generation != _artworkGeneration) return;
+      if (_pendingArtworkQueue.isNotEmpty &&
+          _pendingArtworkQueue.any((s) => s.id != song.id)) {
+        return;
+      }
       // FIX-G03 / I12: Reset artwork and flag error on error
       try {
         await Future.wait([

@@ -111,6 +111,7 @@ class MethodChannelTtsEngine implements TtsEngine {
   bool _permanentlyUnavailable = false;
   int _consecutiveFailures = 0;
   DateTime? _nextRetryAt;
+  Future<bool>? _initInFlight;
 
   /// Whether [dispose] has been called on this engine.
   @visibleForTesting
@@ -150,7 +151,18 @@ class MethodChannelTtsEngine implements TtsEngine {
   bool get isAvailable => _available;
 
   @override
-  Future<bool> init() async {
+  Future<bool> init() {
+    if (_disposed || _permanentlyUnavailable) return Future.value(false);
+    final inFlight = _initInFlight;
+    if (inFlight != null) return inFlight;
+    final future = _performInit().whenComplete(() {
+      _initInFlight = null;
+    });
+    _initInFlight = future;
+    return future;
+  }
+
+  Future<bool> _performInit() async {
     if (_disposed || _permanentlyUnavailable) return false;
     try {
       final ready = await _channel

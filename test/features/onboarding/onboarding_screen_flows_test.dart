@@ -267,4 +267,56 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
     verify(() => settingsCubit.setCustomAccentColor(any())).called(1);
   });
+
+  testWidgets(
+      'M-08 Step 1 limited access advances to Step 2 instead of finishing onboarding, Notification Not Now preserves denied pref, and hi-res spec is localized',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({
+      'notification_permission_denied': true,
+    });
+    when(() => scanner.requestPermission()).thenAnswer((_) async => false);
+
+    await tester.pumpWidget(buildApp());
+    await tester.pump();
+
+    // Tap 'Not now' on notification dialog after tapping notification permission tile.
+    final notifBtn =
+        find.byKey(const ValueKey('onboarding_notification_permission_btn'));
+    await tester.ensureVisible(notifBtn);
+    await tester.pump();
+    await tester.tap(notifBtn);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(l10n.notificationPermissionNotNow));
+    await tester.pumpAndSettle();
+
+    final prefsAfterNotNow = await SharedPreferences.getInstance();
+    expect(prefsAfterNotNow.getBool('notification_permission_denied'), isTrue);
+
+    // Step 1 storage denied -> 'Continue with limited access' must go to Step 2, not HOME_SCREEN.
+    final grantBtn =
+        find.byKey(const ValueKey('onboarding_step1_grant_access_btn'));
+    await tester.ensureVisible(grantBtn);
+    await tester.pump();
+    await tester.tap(grantBtn);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(find.text(l10n.continueLimitedAccess), findsOneWidget);
+
+    await tester.tap(find.text(l10n.continueLimitedAccess));
+    await tester.pump();
+    for (var i = 0; i < 2; i++) {
+      await tester.pump(const Duration(milliseconds: 400));
+    }
+
+    expect(find.text('HOME_SCREEN'), findsNothing);
+    expect(find.text(l10n.experienceModeProfessional), findsOneWidget);
+
+    // Advance from Step 2 to Step 3 and verify localized '24-bit / 192kHz • FLAC'.
+    await tester.tap(find.text(l10n.next));
+    await tester.pump();
+    for (var i = 0; i < 2; i++) {
+      await tester.pump(const Duration(milliseconds: 400));
+    }
+    expect(find.text(l10n.onboardingHiResSampleSpec), findsOneWidget);
+  });
 }

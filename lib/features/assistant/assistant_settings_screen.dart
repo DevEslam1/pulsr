@@ -10,13 +10,32 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../core/constants/app_spacing.dart';
 import '../../core/constants/app_typography.dart';
+import '../../core/di/injection.dart';
 import '../../core/theme/aura_theme.dart';
 import '../../core/utils/error_logger.dart';
 import '../../core/widgets/pulsr_adaptive_sheet.dart';
+import '../../domain/repositories/music_repository_interface.dart';
 import 'assistant_search_channel.dart';
 import 'assistant_settings.dart';
 import 'assistant_strings.dart';
 import 'assistant_suggestion_sync.dart';
+
+AssistantSuggestionSync? _resolveSuggestionSync(
+  AssistantSettings settings,
+  AssistantSuggestionSync? provided,
+) {
+  if (provided != null) return provided;
+  if (getIt.isRegistered<AssistantSuggestionSync>()) {
+    return getIt<AssistantSuggestionSync>();
+  }
+  if (getIt.isRegistered<IMusicRepository>()) {
+    return AssistantSuggestionSync(
+      repository: getIt<IMusicRepository>(),
+      settings: settings,
+    );
+  }
+  return null;
+}
 
 /// Screen with the assistant suggestion toggle.
 class AssistantSettingsScreen extends StatelessWidget {
@@ -35,6 +54,7 @@ class AssistantSettingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    final effectiveSync = _resolveSuggestionSync(settings, suggestionSync);
     return Scaffold(
       backgroundColor: palette.bg,
       appBar: AppBar(
@@ -43,7 +63,9 @@ class AssistantSettingsScreen extends StatelessWidget {
         elevation: 0,
         title: Text(
           AssistantStrings.settingsTitle,
-          style: TextStyle(fontWeight: FontWeight.w800),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontWeight: FontWeight.w800),
         ),
       ),
       body: ListenableBuilder(
@@ -68,9 +90,9 @@ class AssistantSettingsScreen extends StatelessWidget {
                 onChanged: (value) {
                   settings.setSuggestionsEnabled(value);
                   if (value) {
-                    unawaited(suggestionSync?.pushRecent());
+                    unawaited(effectiveSync?.pushRecent());
                   } else {
-                    _clearSuggestionCache(suggestionSync);
+                    _clearSuggestionCache(effectiveSync);
                   }
                 },
               ),
@@ -120,6 +142,7 @@ Future<void> showAssistantSettingsSheet(
   required AssistantSettings settings,
   AssistantSuggestionSync? suggestionSync,
 }) {
+  final effectiveSync = _resolveSuggestionSync(settings, suggestionSync);
   return PulsrAdaptiveSheet.show<void>(
     context: context,
     title: Text(AssistantStrings.settingsTitle),
@@ -141,9 +164,9 @@ Future<void> showAssistantSettingsSheet(
             onChanged: (value) {
               settings.setSuggestionsEnabled(value);
               if (value) {
-                unawaited(suggestionSync?.pushRecent());
+                unawaited(effectiveSync?.pushRecent());
               } else {
-                _clearSuggestionCache(suggestionSync);
+                _clearSuggestionCache(effectiveSync);
               }
             },
           ),

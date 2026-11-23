@@ -1,9 +1,7 @@
 // lib/features/sheets/song_options_sheet.dart
 import 'dart:io';
 import 'package:material_ui/material_ui.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:go_router/go_router.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -11,26 +9,23 @@ import '../../core/config/app_config.dart';
 import '../../core/constants/app_radii.dart';
 import '../../core/constants/app_spacing.dart';
 import '../../core/constants/app_typography.dart';
-import '../../core/constants/channels.dart';
 import '../../core/di/injection.dart';
 import '../../core/errors/error_message_resolver.dart';
-import '../../core/router/app_router.dart';
 import '../../core/services/ytm_service.dart';
 import '../../core/theme/aura_theme.dart';
 import '../../core/utils/error_logger.dart';
 import '../../core/utils/l10n_extensions.dart';
 import '../../core/widgets/cached_artwork.dart';
 import '../../core/widgets/pulsr_bottom_sheet.dart';
-import '../../core/widgets/pulsr_dialog.dart';
 import '../../core/widgets/pulsr_toast.dart';
 import '../../data/db/app_database.dart';
 import '../../domain/repositories/music_repository_interface.dart';
 import '../../domain/usecases/playlist_usecases.dart';
 import '../../domain/usecases/toggle_favorite_usecase.dart';
 import '../library/cubit/library_cubit.dart';
-import '../player/cubit/player_cubit.dart';
 import '../ytm_search/cubit/ytm_download_cubit.dart';
 import 'add_to_playlist_sheet.dart';
+import 'ringtone_retry_controller.dart';
 import 'song_info_sheet.dart';
 
 import '../../core/utils/pulsr_haptics.dart';
@@ -56,6 +51,7 @@ class SongOptionsSheet extends StatefulWidget {
   final PlaylistsTableData? playlist;
   final VoidCallback? onRemoveFromPlaylist;
   final bool isFavoriteScreen;
+  final BuildContext? parentContext;
 
   const SongOptionsSheet({
     super.key,
@@ -63,6 +59,7 @@ class SongOptionsSheet extends StatefulWidget {
     this.playlist,
     this.onRemoveFromPlaylist,
     this.isFavoriteScreen = false,
+    this.parentContext,
   });
 
   /// Opens the unified song options bottom sheet.
@@ -81,6 +78,7 @@ class SongOptionsSheet extends StatefulWidget {
         playlist: playlist,
         onRemoveFromPlaylist: onRemoveFromPlaylist,
         isFavoriteScreen: isFavoriteScreen,
+        parentContext: context,
       ),
     );
   }
@@ -91,7 +89,6 @@ class SongOptionsSheet extends StatefulWidget {
 
 class _SongOptionsSheetState extends State<SongOptionsSheet> {
   SongsTableData get song => widget.song;
-  AppLifecycleListener? _settingsRetryListener;
   late bool _isFavorite;
 
   @override
@@ -100,18 +97,11 @@ class _SongOptionsSheetState extends State<SongOptionsSheet> {
     _isFavorite = widget.song.isFavorite;
   }
 
-  @override
-  void dispose() {
-    _settingsRetryListener?.dispose();
-    _settingsRetryListener = null;
-    super.dispose();
-  }
-
   // --- ACTIONS ---
 
-  Future<void> _shareSong(BuildContext context) async {
+  Future<void> _shareSong(CapturedSheetContext env) async {
     final text =
-        '${context.l10n.browseCheckOut} "${song.title}" ${context.l10n.browseBy} ${song.artist} ${context.l10n.browseOnPulsr}';
+        '${env.l10n.browseCheckOut} "${song.title}" ${env.l10n.browseBy} ${song.artist} ${env.l10n.browseOnPulsr}';
     try {
       if (song.path.isNotEmpty && !song.path.startsWith('ytmusic://')) {
         final exists = await File(song.path).exists();
@@ -126,33 +116,38 @@ class _SongOptionsSheetState extends State<SongOptionsSheet> {
     } catch (e, st) {
       ErrorLogger.log('Failed to share song',
           error: e, stackTrace: st, category: 'SongOptionsSheet');
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).clearSnackBars();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(context.l10n.somethingWentWrong)),
-        );
-      }
+      env.showSnackBar(
+        SnackBar(content: Text(env.l10n.somethingWentWrong)),
+      );
     }
   }
 
-  void _playNext(BuildContext context) {
-    context.read<PlayerCubit>().playNext(song);
-    ScaffoldMessenger.of(context).clearSnackBars();
-    ScaffoldMessenger.of(context).showSnackBar(
+  void _playNext(CapturedSheetContext env) {
+    final playerCubit = env.playerCubit;
+    if (playerCubit == null) {
+      env.showSnackBar(SnackBar(content: Text(env.l10n.somethingWentWrong)));
+      return;
+    }
+    playerCubit.playNext(song);
+    env.showSnackBar(
       SnackBar(
-        content: Text(context.l10n.songPlayingNext(song.title)),
+        content: Text(env.l10n.songPlayingNext(song.title)),
         behavior: SnackBarBehavior.floating,
         duration: const Duration(seconds: 2),
       ),
     );
   }
 
-  void _addToQueue(BuildContext context) {
-    context.read<PlayerCubit>().addToQueue(song);
-    ScaffoldMessenger.of(context).clearSnackBars();
-    ScaffoldMessenger.of(context).showSnackBar(
+  void _addToQueue(CapturedSheetContext env) {
+    final playerCubit = env.playerCubit;
+    if (playerCubit == null) {
+      env.showSnackBar(SnackBar(content: Text(env.l10n.somethingWentWrong)));
+      return;
+    }
+    playerCubit.addToQueue(song);
+    env.showSnackBar(
       SnackBar(
-        content: Text(context.l10n.songAddedToQueue(song.title)),
+        content: Text(env.l10n.songAddedToQueue(song.title)),
         behavior: SnackBarBehavior.floating,
         duration: const Duration(seconds: 2),
       ),
@@ -173,7 +168,7 @@ class _SongOptionsSheetState extends State<SongOptionsSheet> {
     }
   }
 
-  Future<void> _removeFromPlaylist(BuildContext context) async {
+  Future<void> _removeFromPlaylist(CapturedSheetContext env) async {
     if (widget.onRemoveFromPlaylist != null) {
       widget.onRemoveFromPlaylist!();
       return;
@@ -197,36 +192,50 @@ class _SongOptionsSheetState extends State<SongOptionsSheet> {
     }
     final result =
         await playlistUseCases.removeSongFromPlaylist(pl.id, song.id);
+    final hostContext = env.liveHostContext;
     if (result.isLeft()) {
-      if (context.mounted) {
-        PulsrToast.show(
-          context,
-          message: result.fold(
-            (failure) => resolveUiErrorMessage(context, failure.message),
-            (_) => context.l10n.somethingWentWrong,
-          ),
-          isError: true,
-        );
+      final msg = result.fold(
+        (failure) => (hostContext != null && hostContext.mounted)
+            ? resolveUiErrorMessage(hostContext, failure.message)
+            : env.l10n.somethingWentWrong,
+        (_) => env.l10n.somethingWentWrong,
+      );
+      if (hostContext != null && hostContext.mounted) {
+        PulsrToast.show(hostContext, message: msg, isError: true);
+      } else {
+        env.showSnackBar(SnackBar(content: Text(msg)));
       }
       return;
     }
-    if (context.mounted) {
+    final removedMsg = env.l10n.songRemovedFromPlaylist(song.title, pl.name);
+    Future<void> undoRemove() async {
+      final added = await playlistUseCases.addSongsToPlaylist(pl.id, [song.id]);
+      if (added.isRight() && originalOrder.isNotEmpty) {
+        await playlistUseCases.reorderPlaylistSongs(pl.id, originalOrder);
+      }
+    }
+
+    if (hostContext != null && hostContext.mounted) {
       PulsrToast.show(
-        context,
-        message: context.l10n.songRemovedFromPlaylist(song.title, pl.name),
-        actionLabel: context.l10n.undo,
-        onActionPressed: () async {
-          final added =
-              await playlistUseCases.addSongsToPlaylist(pl.id, [song.id]);
-          if (added.isRight() && originalOrder.isNotEmpty) {
-            await playlistUseCases.reorderPlaylistSongs(pl.id, originalOrder);
-          }
-        },
+        hostContext,
+        message: removedMsg,
+        actionLabel: env.l10n.undo,
+        onActionPressed: undoRemove,
+      );
+    } else {
+      env.showSnackBar(
+        SnackBar(
+          content: Text(removedMsg),
+          action: SnackBarAction(
+            label: env.l10n.undo,
+            onPressed: undoRemove,
+          ),
+        ),
       );
     }
   }
 
-  Future<void> _goToAlbum(BuildContext context) async {
+  Future<void> _goToAlbum(CapturedSheetContext env) async {
     try {
       final repo = getIt<IMusicRepository>();
       AlbumsTableData? targetAlbum;
@@ -242,18 +251,15 @@ class _SongOptionsSheetState extends State<SongOptionsSheet> {
                 a.title.trim().toLowerCase() == song.album.trim().toLowerCase())
             .firstOrNull;
       }
-      if (context.mounted) {
-        if (targetAlbum != null) {
-          context.push('/album?id=${targetAlbum.id}', extra: targetAlbum);
-        } else {
-          ScaffoldMessenger.of(context).clearSnackBars();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(context.l10n.albumNotFoundHint),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        }
+      if (targetAlbum != null) {
+        env.pushRoute('/album?id=${targetAlbum.id}', extra: targetAlbum);
+      } else {
+        env.showSnackBar(
+          SnackBar(
+            content: Text(env.l10n.albumNotFoundHint),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
       }
     } catch (e, st) {
       ErrorLogger.log('Failed to go to album',
@@ -261,7 +267,7 @@ class _SongOptionsSheetState extends State<SongOptionsSheet> {
     }
   }
 
-  Future<void> _goToArtist(BuildContext context) async {
+  Future<void> _goToArtist(CapturedSheetContext env) async {
     try {
       final repo = getIt<IMusicRepository>();
       ArtistsTableData? targetArtist;
@@ -277,18 +283,15 @@ class _SongOptionsSheetState extends State<SongOptionsSheet> {
                 a.name.trim().toLowerCase() == song.artist.trim().toLowerCase())
             .firstOrNull;
       }
-      if (context.mounted) {
-        if (targetArtist != null) {
-          context.push('/artist?id=${targetArtist.id}', extra: targetArtist);
-        } else {
-          ScaffoldMessenger.of(context).clearSnackBars();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(context.l10n.artistNotFoundHint),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        }
+      if (targetArtist != null) {
+        env.pushRoute('/artist?id=${targetArtist.id}', extra: targetArtist);
+      } else {
+        env.showSnackBar(
+          SnackBar(
+            content: Text(env.l10n.artistNotFoundHint),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
       }
     } catch (e, st) {
       ErrorLogger.log('Failed to go to artist',
@@ -296,8 +299,12 @@ class _SongOptionsSheetState extends State<SongOptionsSheet> {
     }
   }
 
-  Future<void> _startSongRadio(BuildContext context) async {
-    final playerCubit = context.read<PlayerCubit>();
+  Future<void> _startSongRadio(CapturedSheetContext env) async {
+    final playerCubit = env.playerCubit;
+    if (playerCubit == null) {
+      env.showSnackBar(SnackBar(content: Text(env.l10n.somethingWentWrong)));
+      return;
+    }
     final videoId = song.remoteId;
     if (videoId != null &&
         videoId.isNotEmpty &&
@@ -306,7 +313,7 @@ class _SongOptionsSheetState extends State<SongOptionsSheet> {
       try {
         final radioTracks =
             await getIt<YtmService>().getRadioTracks(videoId, limit: 20);
-        if (radioTracks.isNotEmpty && context.mounted) {
+        if (radioTracks.isNotEmpty) {
           final songs = radioTracks.map((t) => t.toSongData()).toList();
           await playerCubit.addAllToQueue(songs);
         }
@@ -330,143 +337,14 @@ class _SongOptionsSheetState extends State<SongOptionsSheet> {
     }
   }
 
-  Future<void> _setRingtone(BuildContext context, String type) async {
-    const channel = MethodChannel(PulsrChannels.ringtone);
-    final label = type == 'notification'
-        ? context.l10n.browseNotificationSound
-        : type == 'alarm'
-            ? context.l10n.browseAlarmSound
-            : context.l10n.ringtone;
-
-    try {
-      if (Platform.isAndroid) {
-        final canWrite =
-            await channel.invokeMethod<bool>('checkWriteSettingsPermission') ??
-                true;
-        if (!canWrite) {
-          if (!context.mounted) return;
-          final proceed = await PulsrDialogHelper.showConfirmDialog(
-            context,
-            title: context.l10n.permissionRequired,
-            message:
-                '${context.l10n.browseToSet} $label ${context.l10n.browseRequiresModifySettings}',
-            icon: Icons.security_rounded,
-            confirmLabel: context.l10n.openSettings,
-            cancelLabel: context.l10n.cancel,
-          );
-          if (!context.mounted) return;
-          if (proceed == true) {
-            _openSettingsAndListenForRetry(channel, type);
-          }
-          return;
-        }
-      }
-
-      final success = await channel.invokeMethod<bool>('setRingtone', {
-        'filePath': song.path,
-        'type': type,
-      });
-      if (!context.mounted) return;
-      if (success ?? false) {
-        ScaffoldMessenger.of(context).clearSnackBars();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(context.l10n.ringtoneSet)),
-        );
-      } else {
-        ScaffoldMessenger.of(context).clearSnackBars();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(context.l10n.ringtoneFailed)),
-        );
-      }
-    } catch (e) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).clearSnackBars();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${context.l10n.ringtoneFailed} $e')),
-      );
-    }
-  }
-
-  void _openSettingsAndListenForRetry(MethodChannel channel, String type) {
-    _settingsRetryListener?.dispose();
-    _settingsRetryListener = AppLifecycleListener(
-      onResume: () async {
-        final listener = _settingsRetryListener;
-        _settingsRetryListener = null;
-        listener?.dispose();
-        try {
-          final canWrite = await channel
-                  .invokeMethod<bool>('checkWriteSettingsPermission') ??
-              false;
-          if (canWrite) {
-            final activeContext = rootNavigatorKey.currentContext;
-            if (activeContext != null && activeContext.mounted) {
-              await _setRingtone(activeContext, type);
-            }
-          }
-        } catch (e, st) {
-          ErrorLogger.log(
-            'Auto-retry setRingtone failed after returning from settings',
-            error: e,
-            stackTrace: st,
-            category: 'SongOptionsSheet',
-          );
-        }
-      },
-    );
-    channel.invokeMethod('openWriteSettings');
-  }
-
-  void _showRingtoneSheet(BuildContext context) {
-    final p = context.palette;
-    PulsrSheetHelper.showPulsrSheet(
-      context: context,
-      builder: (sheetContext) {
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-              child: Text(
-                context.l10n.setAudioAs,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      color: p.textPrimary,
-                    ),
-              ),
-            ),
-            ListTile(
-              leading: Icon(Icons.ring_volume_rounded, color: p.accent),
-              title: Text(context.l10n.phoneRingtone,
-                  style: TextStyle(color: p.textPrimary)),
-              onTap: () {
-                Navigator.of(sheetContext).pop();
-                _setRingtone(context, 'ringtone');
-              },
-            ),
-            ListTile(
-              leading:
-                  Icon(Icons.notifications_active_rounded, color: p.accent),
-              title: Text(context.l10n.notificationSound,
-                  style: TextStyle(color: p.textPrimary)),
-              onTap: () {
-                Navigator.of(sheetContext).pop();
-                _setRingtone(context, 'notification');
-              },
-            ),
-            ListTile(
-              leading: Icon(Icons.alarm_rounded, color: p.accent),
-              title: Text(context.l10n.alarmSound,
-                  style: TextStyle(color: p.textPrimary)),
-              onTap: () {
-                Navigator.of(sheetContext).pop();
-                _setRingtone(context, 'alarm');
-              },
-            ),
-            const SizedBox(height: AppSpacing.sm),
-          ],
-        );
-      },
+  void _showRingtoneSheet(CapturedSheetContext env) {
+    final hostContext = env.liveHostContext;
+    if (hostContext == null) return;
+    RingtoneRetryController.showOptionsSheet(
+      hostContext: hostContext,
+      songPath: song.path,
+      messenger: env.liveMessenger,
+      l10n: env.l10n,
     );
   }
 
@@ -571,8 +449,12 @@ class _SongOptionsSheetState extends State<SongOptionsSheet> {
                   icon: Icons.playlist_play_rounded,
                   label: context.l10n.playNext,
                   onTap: () {
-                    Navigator.of(context).pop();
-                    _playNext(context);
+                    final env = CapturedSheetContext.capture(
+                      context,
+                      parentContext: widget.parentContext,
+                    );
+                    env.popSheet();
+                    _playNext(env);
                   },
                 ),
                 _buildQuickActionButton(
@@ -580,8 +462,12 @@ class _SongOptionsSheetState extends State<SongOptionsSheet> {
                   icon: Icons.queue_music_rounded,
                   label: context.l10n.queueTab,
                   onTap: () {
-                    Navigator.of(context).pop();
-                    _addToQueue(context);
+                    final env = CapturedSheetContext.capture(
+                      context,
+                      parentContext: widget.parentContext,
+                    );
+                    env.popSheet();
+                    _addToQueue(env);
                   },
                 ),
                 _buildQuickActionButton(
@@ -589,8 +475,15 @@ class _SongOptionsSheetState extends State<SongOptionsSheet> {
                   icon: Icons.playlist_add_rounded,
                   label: context.l10n.addToPlaylist,
                   onTap: () {
-                    Navigator.of(context).pop();
-                    AddToPlaylistSheet.show(context, song: song);
+                    final env = CapturedSheetContext.capture(
+                      context,
+                      parentContext: widget.parentContext,
+                    );
+                    env.popSheet();
+                    final host = env.liveHostContext;
+                    if (host != null) {
+                      AddToPlaylistSheet.show(host, song: song);
+                    }
                   },
                 ),
                 _buildQuickActionButton(
@@ -598,8 +491,12 @@ class _SongOptionsSheetState extends State<SongOptionsSheet> {
                   icon: Icons.share_rounded,
                   label: context.l10n.share,
                   onTap: () {
-                    Navigator.of(context).pop();
-                    _shareSong(context);
+                    final env = CapturedSheetContext.capture(
+                      context,
+                      parentContext: widget.parentContext,
+                    );
+                    env.popSheet();
+                    _shareSong(env);
                   },
                 ),
               ],
@@ -617,33 +514,33 @@ class _SongOptionsSheetState extends State<SongOptionsSheet> {
               title: context.l10n.removeFromPlaylist,
               iconColor: p.error,
               textColor: p.error,
-              onTap: () => _removeFromPlaylist(context),
+              onTap: _removeFromPlaylist,
             ),
           _buildActionTile(
             context: context,
             icon: Icons.format_list_bulleted_rounded,
             title: context.l10n.goToQueue,
-            onTap: () => context.push('/queue'),
+            onTap: (env) => env.pushRoute('/queue'),
           ),
           if (hasValidAlbum)
             _buildActionTile(
               context: context,
               icon: Icons.album_outlined,
               title: context.l10n.goToAlbum,
-              onTap: () => _goToAlbum(context),
+              onTap: _goToAlbum,
             ),
           if (hasValidArtist)
             _buildActionTile(
               context: context,
               icon: Icons.person_outline_rounded,
               title: context.l10n.goToArtist,
-              onTap: () => _goToArtist(context),
+              onTap: _goToArtist,
             ),
           _buildActionTile(
             context: context,
             icon: Icons.radio_rounded,
             title: context.l10n.songRadio,
-            onTap: () => _startSongRadio(context),
+            onTap: _startSongRadio,
           ),
           if (isYtm)
             _buildActionTile(
@@ -655,10 +552,34 @@ class _SongOptionsSheetState extends State<SongOptionsSheet> {
               title: song.isDownloaded == true
                   ? context.l10n.downloaded
                   : context.l10n.browseDownloadOffline,
-              onTap: () {
+              onTap: (env) {
+                final downloadCubit = env.downloadCubit ??
+                    (getIt.isRegistered<YtmDownloadCubit>()
+                        ? getIt<YtmDownloadCubit>()
+                        : null);
+                if (downloadCubit == null) {
+                  ErrorLogger.log(
+                    'YtmDownloadCubit unavailable for offline download',
+                    category: 'SongOptionsSheet',
+                  );
+                  env.showSnackBar(
+                    SnackBar(content: Text(env.l10n.somethingWentWrong)),
+                  );
+                  return;
+                }
                 try {
-                  context.read<YtmDownloadCubit>().download(song);
-                } catch (_) {}
+                  downloadCubit.download(song);
+                } catch (e, st) {
+                  ErrorLogger.log(
+                    'Failed to start offline download',
+                    error: e,
+                    stackTrace: st,
+                    category: 'SongOptionsSheet',
+                  );
+                  env.showSnackBar(
+                    SnackBar(content: Text(env.l10n.somethingWentWrong)),
+                  );
+                }
               },
             ),
           if (isLocal)
@@ -666,20 +587,25 @@ class _SongOptionsSheetState extends State<SongOptionsSheet> {
               context: context,
               icon: Icons.edit_note_rounded,
               title: context.l10n.tagEditor,
-              onTap: () => context.push('/tag-editor', extra: song),
+              onTap: (env) => env.pushRoute('/tag-editor', extra: song),
             ),
           if (Platform.isAndroid && isLocal)
             _buildActionTile(
               context: context,
               icon: Icons.ring_volume_rounded,
               title: context.l10n.setAsRingtone,
-              onTap: () => _showRingtoneSheet(context),
+              onTap: _showRingtoneSheet,
             ),
           _buildActionTile(
             context: context,
             icon: Icons.info_outline_rounded,
             title: context.l10n.songDetails,
-            onTap: () => SongInfoSheet.show(context, song: song),
+            onTap: (env) {
+              final host = env.liveHostContext;
+              if (host != null) {
+                SongInfoSheet.show(host, song: song);
+              }
+            },
           ),
         ],
       ),
@@ -766,7 +692,7 @@ class _SongOptionsSheetState extends State<SongOptionsSheet> {
     required BuildContext context,
     required IconData icon,
     required String title,
-    required VoidCallback onTap,
+    required void Function(CapturedSheetContext env) onTap,
     Color? iconColor,
     Color? textColor,
   }) {
@@ -777,8 +703,12 @@ class _SongOptionsSheetState extends State<SongOptionsSheet> {
       child: InkWell(
         onTap: () {
           PulsrHaptics.lightImpact();
-          Navigator.of(context).pop();
-          onTap();
+          final env = CapturedSheetContext.capture(
+            context,
+            parentContext: widget.parentContext,
+          );
+          env.popSheet();
+          onTap(env);
         },
         child: Container(
           padding: const EdgeInsets.symmetric(

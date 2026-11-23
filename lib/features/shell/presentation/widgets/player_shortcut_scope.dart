@@ -1,10 +1,12 @@
 // lib/features/shell/presentation/widgets/player_shortcut_scope.dart
-import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/pulsr_toast.dart';
 import '../../../command_palette/presentation/command_palette_sheet.dart';
+import '../../../player/cubit/player_cubit.dart';
 import 'shortcut_help_sheet.dart';
 
 import '../../../../core/utils/pulsr_haptics.dart';
@@ -59,6 +61,37 @@ class PlayerShortcutScope extends StatelessWidget {
     this.onToggleFavorite,
     this.onOpenCommandPalette,
   });
+
+  static PlayerCubit? _maybeReadPlayer(BuildContext context) {
+    try {
+      return context.read<PlayerCubit>();
+    } on ProviderNotFoundException {
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Wraps [child] in a [PlayerShortcutScope] wired to the nearest
+  /// [PlayerCubit] when present in [context], safely no-oping if absent.
+  static Widget wrapPlayer({required Widget child}) => Builder(
+        builder: (context) => PlayerShortcutScope(
+          onTogglePlayPause: () => _maybeReadPlayer(context)?.togglePlayPause(),
+          onSeekForward: () => _maybeReadPlayer(context)
+              ?.fastForward(const Duration(seconds: 10)),
+          onSeekBackward: () =>
+              _maybeReadPlayer(context)?.rewind(const Duration(seconds: 10)),
+          onVolumeUp: () => _maybeReadPlayer(context)?.adjustVolume(0.05),
+          onVolumeDown: () => _maybeReadPlayer(context)?.adjustVolume(-0.05),
+          onNext: () => _maybeReadPlayer(context)?.next(),
+          onPrevious: () => _maybeReadPlayer(context)?.previous(),
+          onToggleFavorite: () => _maybeReadPlayer(context)?.toggleFavorite(),
+          onToggleMute: () => _maybeReadPlayer(context)?.toggleMute(),
+          onToggleLyrics: () => _maybeReadPlayer(context)?.toggleLyrics(),
+          onToggleQueue: () => _maybeReadPlayer(context)?.toggleQueue(),
+          child: child,
+        ),
+      );
 
   /// True when the primary focus belongs to a text input, in which case
   /// single-letter/space shortcuts must not fire.
@@ -150,6 +183,7 @@ class PlayerShortcutScope extends StatelessWidget {
       ),
       const SingleActivator(LogicalKeyboardKey.slash, shift: true):
           _guardHelp(context),
+      const CharacterActivator('?'): _guardHelp(context),
       const SingleActivator(LogicalKeyboardKey.keyK, control: true):
           _guardPalette(context),
       const SingleActivator(LogicalKeyboardKey.keyK, meta: true):

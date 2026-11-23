@@ -126,7 +126,12 @@ class TabletSideInspectorState extends State<TabletSideInspector> {
           },
         ),
         builder: (context) => const Padding(
-          padding: EdgeInsets.all(AppSpacing.xs),
+          padding: EdgeInsetsDirectional.only(
+            start: AppSpacing.xxs,
+            end: AppSpacing.xs,
+            top: AppSpacing.xs,
+            bottom: AppSpacing.xs,
+          ),
           child: NowPlayingQueueView(),
         ),
       ),
@@ -135,7 +140,12 @@ class TabletSideInspectorState extends State<TabletSideInspector> {
         label: (context) => context.l10n.lyricsLabel,
         icon: Icons.lyrics_rounded,
         builder: (context) => Padding(
-          padding: const EdgeInsets.all(AppSpacing.xs),
+          padding: const EdgeInsetsDirectional.only(
+            start: AppSpacing.xxs,
+            end: AppSpacing.xs,
+            top: AppSpacing.xs,
+            bottom: AppSpacing.xs,
+          ),
           child: BlocSelector<PlayerCubit, PlayerState, _TabletLyricsData>(
             selector: (state) => _TabletLyricsData(
               songId: state.currentSong?.id,
@@ -200,6 +210,7 @@ class TabletSideInspectorState extends State<TabletSideInspector> {
         .clamp(TabletSideInspector.minWidth, TabletSideInspector.maxWidth);
 
     final safeTabIndex = _selectedTabIndex.clamp(0, tabs.length - 1);
+    final dir = Directionality.of(context);
 
     return Container(
       width: inspectorWidth,
@@ -221,17 +232,27 @@ class TabletSideInspectorState extends State<TabletSideInspector> {
         ),
       ),
       child: ClipRect(
-        child: Stack(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          // Place the dedicated resize divider gutter on the start edge without
+          // overlapping inspector content while keeping GestureDetector last.
+          textDirection:
+              dir == TextDirection.rtl ? TextDirection.ltr : TextDirection.rtl,
           children: [
-            Column(
-              children: [
-                // Header with Recessed Segmented Tabs & Close Button
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.s14,
-                    vertical: AppSpacing.s10,
-                  ),
-                  child: Row(
+            Expanded(
+              child: Directionality(
+                textDirection: dir,
+                child: Column(
+                  children: [
+                    // Header with Recessed Segmented Tabs & Close Button
+                    Padding(
+                      padding: const EdgeInsetsDirectional.only(
+                        start: AppSpacing.xs,
+                        end: AppSpacing.s14,
+                        top: AppSpacing.s10,
+                        bottom: AppSpacing.s10,
+                      ),
+                      child: Row(
                     children: [
                       // Data-driven Segmented Selector
                       Expanded(
@@ -374,13 +395,12 @@ class TabletSideInspectorState extends State<TabletSideInspector> {
                 ),
               ],
             ),
+              ),
+            ),
 
-            // Left edge drag-to-resize handle (48dp hit target, 24px visual zone)
-            PositionedDirectional(
-              start: 0,
-              top: 0,
-              bottom: 0,
-              width: 48,
+            // Start-edge non-overlapping drag-to-resize divider handle (12dp strip)
+            SizedBox(
+              width: 12,
               child: MouseRegion(
                 cursor: SystemMouseCursors.resizeLeftRight,
                 child: Listener(
@@ -459,29 +479,26 @@ class TabletSideInspectorState extends State<TabletSideInspector> {
                       _dragDeltaAccumulator = 0.0;
                       setState(() => _isDragging = false);
                     },
-                    child: Align(
-                      alignment: AlignmentDirectional.centerStart,
-                      child: SizedBox(
-                        width: 24,
-                        child: Center(
-                          child: AnimatedContainer(
-                            duration: context.motionMs(120),
-                            width: _isDragging ? 4.5 : 3.0,
-                            height: _isDragging ? 52.0 : 32.0,
-                            decoration: BoxDecoration(
-                              color: _isDragging
-                                  ? p.accent
-                                  : p.textTertiary.withValues(alpha: 0.32),
-                              borderRadius: AppRadii.r4All,
-                              boxShadow: _isDragging
-                                  ? [
-                                      BoxShadow(
-                                        color: p.accent.withValues(alpha: 0.45),
-                                        blurRadius: 8,
-                                      ),
-                                    ]
-                                  : null,
-                            ),
+                    child: SizedBox(
+                      width: 12,
+                      child: Center(
+                        child: AnimatedContainer(
+                          duration: context.motionMs(120),
+                          width: _isDragging ? 4.5 : 3.0,
+                          height: _isDragging ? 52.0 : 32.0,
+                          decoration: BoxDecoration(
+                            color: _isDragging
+                                ? p.accent
+                                : p.textTertiary.withValues(alpha: 0.32),
+                            borderRadius: AppRadii.r4All,
+                            boxShadow: _isDragging
+                                ? [
+                                    BoxShadow(
+                                      color: p.accent.withValues(alpha: 0.45),
+                                      blurRadius: 8,
+                                    ),
+                                  ]
+                                : null,
                           ),
                         ),
                       ),

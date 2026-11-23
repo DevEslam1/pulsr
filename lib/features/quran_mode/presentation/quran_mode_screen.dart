@@ -23,8 +23,12 @@ class QuranModeScreen extends StatelessWidget {
           backgroundColor: p.bg,
           foregroundColor: p.textPrimary,
           elevation: 0,
-          title: Text(context.l10n.quranMode,
-              style: TextStyle(fontWeight: FontWeight.w800)),
+          title: Text(
+            context.l10n.quranMode,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontWeight: FontWeight.w800),
+          ),
         ),
         body: Center(
           child: ConstrainedBox(

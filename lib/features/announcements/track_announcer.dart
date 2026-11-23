@@ -7,6 +7,7 @@ import 'package:audio_service/audio_service.dart';
 import '../../core/utils/error_logger.dart';
 import 'announcement_composer.dart';
 import 'announcement_settings.dart';
+import 'announcement_strings.dart';
 import 'tts_engine.dart';
 
 /// Maps an audio_service [MediaItem] onto the metadata an announcement needs.
@@ -247,6 +248,8 @@ class TrackAnnouncer {
       settings.elements,
       announcementTrackForMediaItem(item),
       maxLength: settings.maxLength,
+      formatYear: AnnouncementStrings.yearLabel,
+      formatTrackNumber: AnnouncementStrings.trackNumberLabel,
     );
     if (text.isEmpty) {
       // Nothing to say for this track (no elements selected, or every chosen

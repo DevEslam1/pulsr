@@ -948,6 +948,9 @@ class SettingsCubit extends PulsrCubit<SettingsState>
             proxyList: previous.proxyList,
           );
         }
+        if (reconciledDirty.contains('proxyList')) {
+          loadedState = loadedState.copyWith(proxyList: previous.proxyList);
+        }
         if (reconciledDirty.contains('themeMode')) {
           loadedState = loadedState.copyWith(themeMode: previous.themeMode);
         }
@@ -986,6 +989,14 @@ class SettingsCubit extends PulsrCubit<SettingsState>
         if (reconciledDirty.contains('waveformSeekBarEnabled')) {
           loadedState = loadedState.copyWith(
               waveformSeekBarEnabled: previous.waveformSeekBarEnabled);
+        }
+        if (reconciledDirty.contains('canvasEnabled')) {
+          loadedState =
+              loadedState.copyWith(canvasEnabled: previous.canvasEnabled);
+        }
+        if (reconciledDirty.contains('canvasAsBackdrop')) {
+          loadedState =
+              loadedState.copyWith(canvasAsBackdrop: previous.canvasAsBackdrop);
         }
         if (reconciledDirty.contains('autoThemeByTime')) {
           loadedState =
@@ -1026,6 +1037,14 @@ class SettingsCubit extends PulsrCubit<SettingsState>
         if (reconciledDirty.contains('playerThemeMode')) {
           loadedState =
               loadedState.copyWith(playerThemeMode: previous.playerThemeMode);
+        }
+        if (reconciledDirty.contains('playerSliderStyle')) {
+          loadedState = loadedState.copyWith(
+              playerSliderStyle: previous.playerSliderStyle);
+        }
+        if (reconciledDirty.contains('appButtonStyle')) {
+          loadedState =
+              loadedState.copyWith(appButtonStyle: previous.appButtonStyle);
         }
         if (reconciledDirty.contains('visualizerStyle')) {
           loadedState =
@@ -1205,12 +1224,21 @@ class SettingsCubit extends PulsrCubit<SettingsState>
 
         // Emit before the platform round-trips below: main.dart drives themeMode,
         // accent and locale from this state, so deferring it renders the default
-        // theme and locale for as long as the native calls take.
+        // theme and locale for as long as the native calls take. Defer enabling
+        // bitPerfectOutput / strictBitPerfect until the active output route is
+        // verified to be a USB DAC so speakers/BT boots never flash Bit-Perfect ON.
         if (isClosed || gen != _loadPreferencesGen) {
           _markPrefsLoaded();
           return;
         }
-        safeEmit(loadedState);
+        final requestedBitPerfect = loadedState.bitPerfectOutput;
+        final requestedStrictBitPerfect = loadedState.strictBitPerfect;
+        safeEmit(requestedBitPerfect
+            ? loadedState.copyWith(
+                bitPerfectOutput: false,
+                strictBitPerfect: false,
+              )
+            : loadedState);
         PulsrHaptics.setEnabled(loadedState.hapticsEnabled);
         _dirtyFields.removeAll(reconciledDirty);
 
@@ -1224,19 +1252,18 @@ class SettingsCubit extends PulsrCubit<SettingsState>
         try {
           final status = await AudioEffectsChannel().setSystemEffectsPolicy(
             loadedState.systemEffectsPolicy,
-            isHiResOrBitPerfect: loadedState.bitPerfectOutput,
+            isHiResOrBitPerfect: requestedBitPerfect,
           );
           safeEmit(state.copyWith(systemEffectsStatus: status));
         } catch (_) {}
-        if (loadedState.strictBitPerfect || loadedState.bitPerfectOutput) {
+        if (requestedStrictBitPerfect || requestedBitPerfect) {
           await setFloatOutputEnabled(true);
         }
         // A saved Bit-Perfect choice outlives this boot even when no DAC is
         // attached: the runtime transport below may stay off, but the intent is
         // what the route handler re-arms from when a USB DAC appears.
-        _bitPerfectPreferred =
-            loadedState.strictBitPerfect || loadedState.bitPerfectOutput;
-        if (loadedState.bitPerfectOutput) {
+        _bitPerfectPreferred = requestedStrictBitPerfect || requestedBitPerfect;
+        if (requestedBitPerfect) {
           // Resolve the current route before touching exclusive output. A
           // merely attached DAC must not steal a Bluetooth/speaker session;
           // on an unknown route the saved preference stays off.
@@ -1249,8 +1276,10 @@ class SettingsCubit extends PulsrCubit<SettingsState>
               bitPerfectOutput: false,
               strictBitPerfect: false,
             );
-            safeEmit(state.copyWith(
-                bitPerfectOutput: false, strictBitPerfect: false));
+            if (state.bitPerfectOutput || state.strictBitPerfect) {
+              safeEmit(state.copyWith(
+                  bitPerfectOutput: false, strictBitPerfect: false));
+            }
           } else {
             await _disarmTapSrcRate();
             if (!state.aaudioOutputEnabled) {
@@ -1269,13 +1298,13 @@ class SettingsCubit extends PulsrCubit<SettingsState>
               isRadio: song?.source == SongSource.radio,
               integer32DirectUsbEligible: _integer32DirectUsbEligible,
               requireConfirmedCodec:
-                  loadedState.strictBitPerfect && song != null,
+                  requestedStrictBitPerfect && song != null,
             );
             final effectiveRate = effectiveSourceSampleRate(
               tagged: song?.sampleRate ?? 0,
               decoded: state.currentOutputDevice?.decodedSampleRate ?? 0,
             );
-            final unknownRate = loadedState.strictBitPerfect &&
+            final unknownRate = requestedStrictBitPerfect &&
                 song != null &&
                 (effectiveRate <= 0 ||
                     !HiResAudioService.validTargetSampleRates
@@ -1287,12 +1316,22 @@ class SettingsCubit extends PulsrCubit<SettingsState>
             } else {
               final applied = !_currentSourceNeedsRawInteger &&
                   await _hiResAudioService.setBitPerfectMode(true);
-              if (!applied) {
+              if (applied) {
+                safeEmit(state.copyWith(
+                  bitPerfectOutput: true,
+                  strictBitPerfect: requestedStrictBitPerfect,
+                ));
+              } else {
                 // Same fallback as the manual toggle: DACs without platform
                 // exclusive mixer attributes can still run Pulsr's direct USB sink.
                 final direct = await _tryStartDirectUsbStreaming(
-                    strict: loadedState.strictBitPerfect);
-                if (!direct) {
+                    strict: requestedStrictBitPerfect);
+                if (direct) {
+                  safeEmit(state.copyWith(
+                    bitPerfectOutput: true,
+                    strictBitPerfect: requestedStrictBitPerfect,
+                  ));
+                } else {
                   // An unconfirmed start may still be holding the isochronous
                   // endpoint. Clearing the preference while it lives would
                   // orphan the stream, so keep the mode on unless teardown is
@@ -1301,6 +1340,8 @@ class SettingsCubit extends PulsrCubit<SettingsState>
                       !await _stopDirectUsbStreaming();
                   if (stillClaimed) {
                     safeEmit(state.copyWith(
+                      bitPerfectOutput: true,
+                      strictBitPerfect: requestedStrictBitPerfect,
                       error: uiError(
                           'The USB stream could not be confirmed or released. '
                           'Bit-Perfect stays enabled; turn it off to release the DAC.'),
@@ -1312,8 +1353,10 @@ class SettingsCubit extends PulsrCubit<SettingsState>
                       bitPerfectOutput: false,
                       strictBitPerfect: false,
                     );
-                    safeEmit(state.copyWith(
-                        bitPerfectOutput: false, strictBitPerfect: false));
+                    if (state.bitPerfectOutput || state.strictBitPerfect) {
+                      safeEmit(state.copyWith(
+                          bitPerfectOutput: false, strictBitPerfect: false));
+                    }
                   }
                 }
               }
@@ -1420,8 +1463,13 @@ class SettingsCubit extends PulsrCubit<SettingsState>
     }
   }
 
-  @override
-  Future<void> setCrossfade(double seconds) async {
+  /// Updates in-memory crossfade state during slider drags without disk IO.
+  void previewCrossfade(double seconds) {
+    _applyCrossfadePreview(seconds);
+  }
+
+  ({bool blocked, bool clearedGapless, double clamped}) _applyCrossfadePreview(
+      double seconds) {
     markDirty('crossfadeSeconds');
     final clamped = seconds.clamp(0.0, 12.0);
     final bitPerfectBlock = AudioConflicts.crossfadeBlockedByBitPerfect(
@@ -1432,10 +1480,9 @@ class SettingsCubit extends PulsrCubit<SettingsState>
     );
     if (clamped > 0.01 && bitPerfectBlock != null) {
       safeEmit(state.copyWith(error: uiError(bitPerfectBlock)));
-      return;
+      return (blocked: true, clearedGapless: false, clamped: clamped);
     }
     if (clamped > 0.01 && state.gaplessPlayback) {
-      // Crossfade needs gapless OFF — auto-disable gapless
       markDirty('gaplessPlayback');
       safeEmit(
         state.copyWith(
@@ -1445,14 +1492,27 @@ class SettingsCubit extends PulsrCubit<SettingsState>
               'Gapless disabled: crossfade requires gapless OFF.'),
         ),
       );
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setDouble(_keyCrossfade, clamped);
-      await prefs.setBool(_keyGapless, false);
-      return;
+      return (blocked: false, clearedGapless: true, clamped: clamped);
     }
     safeEmit(state.copyWith(crossfadeSeconds: clamped, error: null));
+    return (blocked: false, clearedGapless: false, clamped: clamped);
+  }
+
+  @override
+  Future<void> setCrossfade(double seconds) async {
+    final result = _applyCrossfadePreview(seconds);
+    if (result.blocked) return;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setDouble(_keyCrossfade, clamped);
+    await prefs.setDouble(_keyCrossfade, result.clamped);
+    if (result.clearedGapless) {
+      await prefs.setBool(_keyGapless, false);
+    }
+  }
+
+  /// Updates in-memory minimum duration filter during slider drags.
+  void previewMinDuration(int seconds) {
+    markDirty('minDurationSec');
+    safeEmit(state.copyWith(minDurationSec: seconds.clamp(0, 300)));
   }
 
   Future<void> setMinDuration(int seconds) async {
@@ -1578,6 +1638,12 @@ class SettingsCubit extends PulsrCubit<SettingsState>
     safeEmit(state.copyWith(dimWhitePoint: value));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_keyDimWhitePoint, value);
+  }
+
+  /// Updates in-memory liquid-glass tint during slider drags without disk IO.
+  void previewLiquidGlassTint(double value) {
+    markDirty('liquidGlassTint');
+    safeEmit(state.copyWith(liquidGlassTint: value.clamp(0.0, 1.0)));
   }
 
   Future<void> setLiquidGlassTint(double value) async {

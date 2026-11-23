@@ -105,15 +105,17 @@ class PlaybackSection extends StatelessWidget {
           divisions: 24,
           defaultValue: 0.0,
           formatValue: (v) => '${v.toStringAsFixed(1)}s',
-          onChanged: cubit.setCrossfade,
+          onChanged: cubit.previewCrossfade,
+          onChangeEnd: cubit.setCrossfade,
         ),
         Padding(
           padding: const EdgeInsetsDirectional.fromSTEB(
               AppSpacing.md, 0, AppSpacing.md, AppSpacing.xs),
           child: Text(
             state.crossfadeSeconds > 0.01
-                ? 'Songs will blend over ${state.crossfadeSeconds.toStringAsFixed(1)} seconds'
-                : 'Crossfade disabled (songs end naturally)',
+                ? context.l10n.crossfadeBlendDesc(
+                    state.crossfadeSeconds.toStringAsFixed(1))
+                : context.l10n.crossfadeDisabledDesc,
             style: TextStyle(
               fontSize: AppFontSize.caption,
               color: p.textSecondary,
@@ -222,15 +224,17 @@ class PlaybackSection extends StatelessWidget {
                   ? AudioConflicts.crossfadeBlockedByGapless(
                       state.gaplessPlayback)
                   : null),
-          onChanged: cubit.setCrossfade,
+          onChanged: cubit.previewCrossfade,
+          onChangeEnd: cubit.setCrossfade,
         ),
         Padding(
           padding: const EdgeInsetsDirectional.fromSTEB(
               AppSpacing.md, 0, AppSpacing.md, AppSpacing.xs),
           child: Text(
             state.crossfadeSeconds > 0.01
-                ? 'Songs will blend over ${state.crossfadeSeconds.toStringAsFixed(1)} seconds'
-                : 'Crossfade disabled (songs end naturally)',
+                ? context.l10n.crossfadeBlendDesc(
+                    state.crossfadeSeconds.toStringAsFixed(1))
+                : context.l10n.crossfadeDisabledDesc,
             style: TextStyle(
               fontSize: AppFontSize.caption,
               color: p.textSecondary,
@@ -252,8 +256,8 @@ class PlaybackSection extends StatelessWidget {
         _switchTile(
           context,
           Icons.auto_awesome_rounded,
-          'Automix / Smart Transitions',
-          'Confidence-aware DJ beatmatching, tempo stretching, and beat alignment',
+          context.l10n.speedPickerAutomixTitle,
+          context.l10n.automixDetailedSubtitle,
           value: state.automixEnabled,
           onChanged: cubit.setAutomixEnabled,
         ),

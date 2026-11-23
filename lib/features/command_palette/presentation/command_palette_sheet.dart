@@ -24,6 +24,7 @@ import '../../../core/widgets/pulsr_pressable.dart';
 import '../../../core/widgets/pulsr_search_field.dart';
 import '../../../domain/models/genre_item.dart';
 import '../../player/cubit/player_cubit.dart';
+import '../../player/cubit/player_state.dart';
 import '../../player/presentation/widgets/audio_quality_sheet.dart';
 import '../../player/presentation/widgets/equalizer_sheet.dart';
 import '../../settings/cubit/settings_cubit.dart';
@@ -142,6 +143,17 @@ class CommandPaletteSheet extends StatefulWidget {
     _recentLoadedFromPrefs = false;
   }
 
+  static bool _isPaletteOpen = false;
+  static int _paletteGeneration = 0;
+  static int? _activeShowGeneration;
+
+  @visibleForTesting
+  static void debugResetPaletteOpen() {
+    _isPaletteOpen = false;
+    _activeShowGeneration = null;
+    _paletteGeneration++;
+  }
+
   /// App-level context captured by [show] before the sheet is pushed.
   ///
   /// Item callbacks navigate, read cubits and open other sheets; they must not
@@ -152,12 +164,23 @@ class CommandPaletteSheet extends StatefulWidget {
 
   const CommandPaletteSheet({super.key, this.appContext});
 
-  static Future<void> show(BuildContext context) {
+  static Future<void> show(BuildContext context) async {
+    if (_isPaletteOpen) return;
+    _isPaletteOpen = true;
+    final gen = ++_paletteGeneration;
+    _activeShowGeneration = gen;
     PulsrHaptics.selectionClick();
-    return PulsrSheetHelper.showPulsrSheet<void>(
-      context: context,
-      builder: (_) => CommandPaletteSheet(appContext: context),
-    );
+    try {
+      await PulsrSheetHelper.showPulsrSheet<void>(
+        context: context,
+        builder: (_) => CommandPaletteSheet(appContext: context),
+      );
+    } finally {
+      if (_paletteGeneration == gen) {
+        _isPaletteOpen = false;
+        _activeShowGeneration = null;
+      }
+    }
   }
 
   @override
@@ -166,15 +189,21 @@ class CommandPaletteSheet extends StatefulWidget {
 
 class _CommandPaletteSheetState extends State<CommandPaletteSheet> {
   final TextEditingController _searchController = TextEditingController();
-  final FocusNode _focusNode = FocusNode();
+  late final FocusNode _focusNode = FocusNode(onKeyEvent: _handleKeyEvent);
   int _selectedIndex = 0;
   String _query = '';
   List<CommandPaletteItem>? _cachedAllItems;
+  PlayerState? _playerState;
+  StreamSubscription<PlayerState>? _playerSub;
   final Map<int, GlobalKey> _itemKeys = <int, GlobalKey>{};
+  int? _ownedShowGeneration;
 
   @override
   void initState() {
     super.initState();
+    if (widget.appContext != null && CommandPaletteSheet._isPaletteOpen) {
+      _ownedShowGeneration = CommandPaletteSheet._activeShowGeneration;
+    }
     _searchController.addListener(_onSearchChanged);
     unawaited(_loadPersistedRecents());
   }
@@ -191,7 +220,44 @@ class _CommandPaletteSheetState extends State<CommandPaletteSheet> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _cachedAllItems = _buildAllItems(context);
+    PlayerCubit? playerCubit;
+    try {
+      playerCubit = BlocProvider.of<PlayerCubit>(context, listen: false);
+    } catch (_) {}
+    if (playerCubit == null && widget.appContext != null) {
+      try {
+        playerCubit =
+            BlocProvider.of<PlayerCubit>(widget.appContext!, listen: false);
+      } catch (_) {}
+    }
+    if (playerCubit != null) {
+      _playerState ??= playerCubit.state;
+      if (_playerSub == null) {
+        try {
+          final dynamic stream = playerCubit.stream;
+          if (stream is Stream<PlayerState>) {
+            _playerSub = stream.listen((next) {
+              if (!mounted) return;
+              final prev = _playerState;
+              final changed = prev == null ||
+                  prev.isPlaying != next.isPlaying ||
+                  prev.isMuted != next.isMuted ||
+                  prev.isShuffle != next.isShuffle ||
+                  prev.currentSong?.isFavorite != next.currentSong?.isFavorite;
+              _playerState = next;
+              if (changed) {
+                setState(() {
+                  _cachedAllItems = null;
+                });
+              }
+            });
+          }
+        } catch (_) {
+          // Tests using mock PlayerCubit without a stubbed .stream keep initial snapshot.
+        }
+      }
+    }
+    _cachedAllItems = _buildAllItems(context, playerState: _playerState);
   }
 
   void _onSearchChanged() {
@@ -220,6 +286,13 @@ class _CommandPaletteSheetState extends State<CommandPaletteSheet> {
 
   @override
   void dispose() {
+    if (_ownedShowGeneration != null &&
+        CommandPaletteSheet._paletteGeneration == _ownedShowGeneration) {
+      CommandPaletteSheet._isPaletteOpen = false;
+      CommandPaletteSheet._activeShowGeneration = null;
+    }
+    _playerSub?.cancel();
+    _playerSub = null;
     _searchController.dispose();
     _focusNode.dispose();
     super.dispose();
@@ -238,10 +311,11 @@ class _CommandPaletteSheetState extends State<CommandPaletteSheet> {
       for (final item in allItems) item.id: item,
     };
     final entries = <_PaletteEntry>[];
+    final recentIdSet = <String>{};
     for (final recentId in CommandPaletteSheet._recentActionIds
         .take(CommandPaletteSheet.maxRecentActions)) {
       final match = byId[recentId];
-      if (match != null) {
+      if (match != null && recentIdSet.add(recentId)) {
         entries.add(
           _PaletteEntry(
             item: match,
@@ -251,13 +325,21 @@ class _CommandPaletteSheetState extends State<CommandPaletteSheet> {
       }
     }
     for (final item in allItems) {
+      if (recentIdSet.contains(item.id)) continue;
       entries.add(_PaletteEntry(item: item, displaySection: item.section));
     }
     return entries;
   }
 
-  List<CommandPaletteItem> _buildAllItems(BuildContext context) {
+  List<CommandPaletteItem> _buildAllItems(
+    BuildContext context, {
+    PlayerState? playerState,
+  }) {
     final l10n = context.l10n;
+    final isPlaying = playerState?.isPlaying ?? false;
+    final isFavorite = playerState?.currentSong?.isFavorite ?? false;
+    final isMuted = playerState?.isMuted ?? false;
+    final shuffleEnabled = playerState?.isShuffle ?? false;
 
     return [
       // 1. Navigation
@@ -428,7 +510,7 @@ class _CommandPaletteSheetState extends State<CommandPaletteSheet> {
         id: 'action_play_pause',
         title: l10n.commandPaletteActionPlay,
         subtitle: l10n.shortcutPlayPauseDesc,
-        icon: Icons.play_arrow_rounded,
+        icon: isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
         section: CommandPaletteSection.actions,
         shortcut: 'Space',
         keywords: ['playback', 'resume', 'stop'],
@@ -458,7 +540,7 @@ class _CommandPaletteSheetState extends State<CommandPaletteSheet> {
         id: 'action_favorite',
         title: l10n.shortcutFavorite,
         subtitle: l10n.shortcutFavoriteDesc,
-        icon: Icons.favorite_rounded,
+        icon: isFavorite ? Icons.favorite_rounded : Icons.favorite_border_rounded,
         section: CommandPaletteSection.actions,
         shortcut: 'F',
         keywords: ['like', 'heart', 'favorite', 'love'],
@@ -468,7 +550,7 @@ class _CommandPaletteSheetState extends State<CommandPaletteSheet> {
         id: 'action_mute',
         title: l10n.shortcutMute,
         subtitle: l10n.shortcutMuteDesc,
-        icon: Icons.volume_off_rounded,
+        icon: isMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
         section: CommandPaletteSection.actions,
         shortcut: 'M',
         keywords: ['silence', 'volume', 'mute', 'audio'],
@@ -488,7 +570,7 @@ class _CommandPaletteSheetState extends State<CommandPaletteSheet> {
         id: 'action_shuffle',
         title: l10n.commandPaletteActionShuffle,
         subtitle: l10n.shuffleAll,
-        icon: Icons.shuffle_rounded,
+        icon: shuffleEnabled ? Icons.shuffle_on_rounded : Icons.shuffle_rounded,
         section: CommandPaletteSection.actions,
         keywords: ['random', 'mix'],
         onSelect: (ctx) => ctx.read<PlayerCubit>().toggleShuffle(),
@@ -696,7 +778,8 @@ class _CommandPaletteSheetState extends State<CommandPaletteSheet> {
       return KeyEventResult.handled;
     }
 
-    final allItems = _cachedAllItems ?? _buildAllItems(context);
+    final allItems =
+        _cachedAllItems ??= _buildAllItems(context, playerState: _playerState);
     final entries = _buildVisibleEntries(allItems);
 
     if (entries.isEmpty) return KeyEventResult.ignored;
@@ -744,7 +827,8 @@ class _CommandPaletteSheetState extends State<CommandPaletteSheet> {
     final p = context.palette;
     final l10n = context.l10n;
     final shouldAnimate = PulsrMotion.shouldAnimate(context);
-    final allItems = _cachedAllItems ?? _buildAllItems(context);
+    final allItems =
+        _cachedAllItems ??= _buildAllItems(context, playerState: _playerState);
     final entries = _buildVisibleEntries(allItems);
 
     final maxH = math.min(
@@ -757,10 +841,7 @@ class _CommandPaletteSheetState extends State<CommandPaletteSheet> {
       explicitChildNodes: true,
       child: ConstrainedBox(
         constraints: BoxConstraints(maxHeight: maxH),
-        child: Focus(
-          focusNode: _focusNode,
-          onKeyEvent: _handleKeyEvent,
-          child: Column(
+        child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -777,6 +858,7 @@ class _CommandPaletteSheetState extends State<CommandPaletteSheet> {
                   label: l10n.commandPaletteHint,
                   child: PulsrSearchField(
                     controller: _searchController,
+                    focusNode: _focusNode,
                     hintText: l10n.commandPaletteHint,
                     autofocus: true,
                     onSubmitted: (_) {
@@ -1022,7 +1104,6 @@ class _CommandPaletteSheetState extends State<CommandPaletteSheet> {
                       ),
               ),
             ],
-          ),
         ),
       ),
     );

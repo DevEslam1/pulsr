@@ -170,4 +170,36 @@ void main() {
     expect(find.text('open'), findsOneWidget);
     expect(find.text(l10n.rcTitle), findsNothing);
   });
+
+  testWidgets(
+      'M-08 renders cleanly under narrow RTL Arabic with 1.5x text scale and localized multi-point CTA',
+      (tester) async {
+    tester.view.physicalSize = const Size(320, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    final arL10n = lookupAppLocalizations(const Locale('ar'));
+
+    await tester.pumpWidget(
+      BlocProvider<PlayerCubit>.value(
+        value: player,
+        child: MaterialApp(
+          locale: const Locale('ar'),
+          theme: AuraTheme.darkTheme,
+          localizationsDelegates: appLocalizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: const MediaQuery(
+            data: MediaQueryData(textScaler: TextScaler.linear(1.5)),
+            child: Scaffold(body: RoomCorrectionSheet()),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(tester.takeException(), isNull);
+    expect(find.text(arL10n.rcStartMultiPoint), findsOneWidget);
+  });
 }

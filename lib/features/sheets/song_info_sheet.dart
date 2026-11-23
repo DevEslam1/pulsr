@@ -1,15 +1,12 @@
 // lib/features/sheets/song_info_sheet.dart
 import 'dart:io';
 import 'package:material_ui/material_ui.dart';
-import 'package:flutter/services.dart';
-import 'package:go_router/go_router.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import 'package:share_plus/share_plus.dart';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../core/constants/channels.dart';
-import '../../core/router/app_router.dart';
 import '../../core/di/injection.dart';
+import 'ringtone_retry_controller.dart';
 import '../../core/theme/aura_theme.dart';
 import '../../core/utils/error_logger.dart';
 import '../../core/utils/formatters.dart';
@@ -39,15 +36,16 @@ import 'package:pulsr/core/constants/app_typography.dart';
 
 class SongInfoSheet extends StatefulWidget {
   final SongsTableData song;
+  final BuildContext? parentContext;
 
-  const SongInfoSheet({super.key, required this.song});
+  const SongInfoSheet({super.key, required this.song, this.parentContext});
 
   static Future<void> show(BuildContext context,
       {required SongsTableData song}) {
     return PulsrSheetHelper.showPulsrSheet<void>(
       context: context,
       wrapWithContainer: true,
-      builder: (_) => SongInfoSheet(song: song),
+      builder: (_) => SongInfoSheet(song: song, parentContext: context),
     );
   }
 
@@ -102,19 +100,6 @@ class _SongInfoSheetState extends State<SongInfoSheet> {
     }
   }
 
-  /// Live listener waiting for the user to return from the system write-settings
-  /// screen. Held as state so it is always disposed when the sheet unmounts;
-  /// the previous fire-and-forget local variable leaked when navigation never
-  /// resumed.
-  AppLifecycleListener? _settingsRetryListener;
-
-  @override
-  void dispose() {
-    _settingsRetryListener?.dispose();
-    _settingsRetryListener = null;
-    super.dispose();
-  }
-
   Future<void> _shareSong(BuildContext context) async {
     final text =
         '${context.l10n.browseCheckOut} "${song.title}" ${context.l10n.browseBy} ${song.artist} ${context.l10n.browseOnPulsr}';
@@ -141,172 +126,10 @@ class _SongInfoSheetState extends State<SongInfoSheet> {
     }
   }
 
-  Future<void> _setRingtone(BuildContext context, String type) async {
-    const channel = MethodChannel(PulsrChannels.ringtone);
-    final label = type == 'notification'
-        ? context.l10n.browseNotificationSound
-        : type == 'alarm'
-            ? context.l10n.browseAlarmSound
-            : context.l10n.ringtone;
-
-    try {
-      if (Platform.isAndroid) {
-        final canWrite =
-            await channel.invokeMethod<bool>('checkWriteSettingsPermission') ??
-                true;
-        if (!canWrite) {
-          if (!context.mounted) return;
-          final proceed = await PulsrDialogHelper.showConfirmDialog(
-            context,
-            title: context.l10n.permissionRequired,
-            message:
-                '${context.l10n.browseToSet} $label ${context.l10n.browseRequiresModifySettings}',
-            icon: Icons.security_rounded,
-            confirmLabel: context.l10n.openSettings,
-            cancelLabel: context.l10n.cancel,
-          );
-          if (!context.mounted) return;
-          if (proceed == true) {
-            _openSettingsAndListenForRetry(channel, type);
-          }
-          return;
-        }
-      }
-
-      final success = await channel.invokeMethod<bool>('setRingtone', {
-        'filePath': song.path,
-        'type': type,
-      });
-      if (!context.mounted) return;
-      if (success ?? false) {
-        ScaffoldMessenger.of(context).clearSnackBars();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(context.l10n.ringtoneSet)),
-        );
-      } else {
-        // The native side can refuse without throwing (e.g. no write
-        // permission): report that instead of staying silent.
-        ScaffoldMessenger.of(context).clearSnackBars();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(context.l10n.ringtoneFailed)),
-        );
-      }
-    } on PlatformException catch (e) {
-      if (!context.mounted) return;
-      if (e.code == 'PERMISSION_DENIED') {
-        ScaffoldMessenger.of(context).clearSnackBars();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(context.l10n.ringtoneFailed),
-            action: SnackBarAction(
-              label: context.l10n.settings,
-              onPressed: () {
-                _openSettingsAndListenForRetry(channel, type);
-              },
-            ),
-          ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).clearSnackBars();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text('${context.l10n.ringtoneFailed} ${e.message}')),
-        );
-      }
-    } catch (e) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).clearSnackBars();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${context.l10n.ringtoneFailed} $e')),
-      );
-    }
-  }
-
-  void _openSettingsAndListenForRetry(
-    MethodChannel channel,
-    String type,
-  ) {
-    // Dispose any prior pending listener so rapid retries cannot stack them.
-    _settingsRetryListener?.dispose();
-    _settingsRetryListener = AppLifecycleListener(
-      onResume: () async {
-        final listener = _settingsRetryListener;
-        _settingsRetryListener = null;
-        listener?.dispose();
-        try {
-          final canWrite = await channel
-                  .invokeMethod<bool>('checkWriteSettingsPermission') ??
-              false;
-          if (canWrite) {
-            final activeContext = rootNavigatorKey.currentContext;
-            if (activeContext != null && activeContext.mounted) {
-              await _setRingtone(activeContext, type);
-            }
-          }
-        } catch (e, st) {
-          ErrorLogger.log(
-            'Auto-retry setRingtone failed after returning from settings',
-            error: e,
-            stackTrace: st,
-            category: 'SongInfoSheet',
-          );
-        }
-      },
-    );
-    channel.invokeMethod('openWriteSettings');
-  }
-
   void _showRingtoneOptions(BuildContext context) {
-    final p = context.palette;
-    PulsrSheetHelper.showPulsrSheet(
-      context: context,
-      builder: (sheetContext) {
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-              child: Text(
-                context.l10n.setAudioAs,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      color: p.textPrimary,
-                    ),
-              ),
-            ),
-            const SizedBox(height: AppSpacing.xxs),
-            ListTile(
-              leading: Icon(Icons.ring_volume_rounded, color: p.accent),
-              title: Text(context.l10n.phoneRingtone,
-                  style: TextStyle(color: p.textPrimary)),
-              onTap: () {
-                Navigator.of(sheetContext).pop();
-                _setRingtone(context, 'ringtone');
-              },
-            ),
-            ListTile(
-              leading:
-                  Icon(Icons.notifications_active_rounded, color: p.accent),
-              title: Text(context.l10n.notificationSound,
-                  style: TextStyle(color: p.textPrimary)),
-              onTap: () {
-                Navigator.of(sheetContext).pop();
-                _setRingtone(context, 'notification');
-              },
-            ),
-            ListTile(
-              leading: Icon(Icons.alarm_rounded, color: p.accent),
-              title: Text(context.l10n.alarmSound,
-                  style: TextStyle(color: p.textPrimary)),
-              onTap: () {
-                Navigator.of(sheetContext).pop();
-                _setRingtone(context, 'alarm');
-              },
-            ),
-            const SizedBox(height: AppSpacing.sm),
-          ],
-        );
-      },
+    RingtoneRetryController.showOptionsSheet(
+      hostContext: context,
+      songPath: song.path,
     );
   }
 
@@ -513,12 +336,11 @@ class _SongInfoSheetState extends State<SongInfoSheet> {
                       onPressed: PlatformCapabilities.hasRingtoneManager
                           ? () => _showRingtoneOptions(context)
                           : () {
-                              const ringtoneWarning =
-                                  'Ringtone setting is only supported on Android';
                               ScaffoldMessenger.of(context).clearSnackBars();
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(ringtoneWarning),
+                                SnackBar(
+                                  content:
+                                      Text(context.l10n.ringtoneAndroidOnly),
                                 ),
                               );
                             },
@@ -554,8 +376,15 @@ class _SongInfoSheetState extends State<SongInfoSheet> {
                     side: BorderSide(color: p.hairline),
                   ),
                   onPressed: () {
-                    Navigator.of(context).pop();
-                    PartySheet.show(context);
+                    final env = CapturedSheetContext.capture(
+                      context,
+                      parentContext: widget.parentContext,
+                    );
+                    env.popSheet();
+                    final host = env.liveHostContext;
+                    if (host != null) {
+                      PartySheet.show(host);
+                    }
                   },
                   icon: Icon(Icons.group_rounded, size: 20, color: p.accent),
                   label: Text(
@@ -583,8 +412,12 @@ class _SongInfoSheetState extends State<SongInfoSheet> {
                       ),
                     ),
                     onPressed: () {
-                      Navigator.of(context).pop();
-                      context.push('/tag-editor', extra: song);
+                      final env = CapturedSheetContext.capture(
+                        context,
+                        parentContext: widget.parentContext,
+                      );
+                      env.popSheet();
+                      env.pushRoute('/tag-editor', extra: song);
                     },
                     icon: const Icon(Icons.edit_note_rounded, size: 20),
                     label: Text(

@@ -286,7 +286,8 @@ class StackedBottomDockState extends State<StackedBottomDock> {
   @override
   void didUpdateWidget(covariant StackedBottomDock oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.mode != widget.mode) {
+    if (oldWidget.mode != widget.mode ||
+        oldWidget.layoutMode != widget.layoutMode) {
       _dockSyncDebounceTimer?.cancel();
       _dockSyncDebounceTimer = null;
       try {

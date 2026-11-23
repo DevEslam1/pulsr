@@ -2,11 +2,15 @@
 import 'dart:async';
 
 import 'package:material_ui/material_ui.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/di/injection.dart';
 import 'package:pulsr/core/errors/app_error.dart';
 import 'package:pulsr/core/services/earbud_optimization_service.dart';
+import 'package:pulsr/core/theme/aura_theme.dart';
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
+import 'package:pulsr/l10n/generated/app_localizations.dart';
 import 'package:pulsr/core/widgets/pulsr_switch.dart';
 import 'package:pulsr/domain/models/quran_metadata.dart';
 import 'package:pulsr/domain/models/quran_mode_profile.dart';
@@ -14,6 +18,7 @@ import 'package:pulsr/domain/models/quran_surah.dart';
 import 'package:pulsr/domain/repositories/quran_repository.dart';
 import 'package:pulsr/features/player/cubit/controllers/player_playback_options_controller.dart'
     show kQuranModeErrorCode;
+import 'package:pulsr/features/player/cubit/player_cubit.dart';
 import 'package:pulsr/features/player/cubit/player_state.dart';
 import 'package:pulsr/features/player/presentation/widgets/quran_error_card.dart';
 import 'package:pulsr/features/player/presentation/widgets/quran_mode_sheet.dart';
@@ -612,6 +617,64 @@ void main() {
 
       expect(find.byType(QuranErrorCard), findsOneWidget);
       expect(find.text('فشل تطبيق ملف الصوت'), findsOneWidget);
+    });
+
+    testWidgets(
+        'M-08 localizes Ayah range label and refreshes/rolls back alwaysOnRadio',
+        (tester) async {
+      final repo = MockQuranRepository();
+      const meta = QuranMetadata(
+        surahNumber: 1,
+        surahName: 'الفاتحة',
+        ayahStart: 1,
+        ayahEnd: 7,
+        reciter: 'Al-Husary',
+      );
+      when(() => repo.getMetadataForTrack(any())).thenAnswer((_) async => meta);
+      when(() => repo.getBookmark(any())).thenAnswer((_) async => null);
+      when(() => repo.getAyahsForSurah(any())).thenReturn(const []);
+      getIt.registerSingleton<QuranRepository>(repo);
+
+      final arL10n = lookupAppLocalizations(const Locale('ar'));
+      const alwaysOn = false;
+      final cubit = quranCubit(
+        quranState(enabled: true).copyWith(
+          playback: PlaybackSlice(currentSong: testSong),
+        ),
+      );
+      when(() => cubit.isQuranAlwaysOnRadio()).thenAnswer((_) async => alwaysOn);
+      when(() => cubit.setQuranAlwaysOnRadio(true))
+          .thenAnswer((_) async => throw Exception('channel error'));
+
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: const Locale('ar'),
+          theme: AuraTheme.darkTheme,
+          localizationsDelegates: appLocalizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: BlocProvider<PlayerCubit>.value(
+              value: cubit,
+              child: const SingleChildScrollView(child: QuranModePanel()),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Localized Ayah range label (no hardcoded English 'Ayahs').
+      expect(find.textContaining(arL10n.quranAyahRange(1, 7)), findsOneWidget);
+      expect(find.textContaining('Ayahs'), findsNothing);
+
+      // Toggling Always-On Radio rolls back switch state when native update fails.
+      final switches = find.byType(PulsrSwitch);
+      expect(switches, findsWidgets);
+      await tester.ensureVisible(switches.at(1));
+      await tester.tap(switches.at(1));
+      await tester.pumpAndSettle();
+
+      final radioSwitch = tester.widget<PulsrSwitch>(switches.at(1));
+      expect(radioSwitch.value, isFalse);
     });
   });
 }

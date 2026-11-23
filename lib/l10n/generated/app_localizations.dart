@@ -17737,7 +17737,7 @@ abstract class AppLocalizations {
   /// **'Lossless'**
   String get badgeLossless;
 
-  /// Hi-Res audio quality badge label
+  /// Badge shown on the Hi-Res fidelity option in audio setup wizard
   ///
   /// In en, this message translates to:
   /// **'Hi-Res'**
@@ -22177,6 +22177,138 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'LRC File'**
   String get lyricsSourceExternalLrc;
+
+  /// Spoken track release year phrase in track announcements
+  ///
+  /// In en, this message translates to:
+  /// **'from {year}'**
+  String annFromYear(int year);
+
+  /// Spoken track number phrase in track announcements
+  ///
+  /// In en, this message translates to:
+  /// **'track {number}'**
+  String annTrackNumber(int number);
+
+  /// Ayah range displayed for a Quran surah segment
+  ///
+  /// In en, this message translates to:
+  /// **'Ayah {start}-{end}'**
+  String quranAyahRange(int start, int end);
+
+  /// Snackbar warning shown when attempting to set a ringtone on non-Android platforms
+  ///
+  /// In en, this message translates to:
+  /// **'Ringtone setting is only supported on Android'**
+  String get ringtoneAndroidOnly;
+
+  /// Sample Hi-Res format spec badge shown on the onboarding audio engine preview card
+  ///
+  /// In en, this message translates to:
+  /// **'24-bit / 192kHz • FLAC'**
+  String get onboardingHiResSampleSpec;
+
+  /// Primary button label when 3-point room averaging calibration is enabled
+  ///
+  /// In en, this message translates to:
+  /// **'Start 3-Point Calibration'**
+  String get rcStartMultiPoint;
+
+  /// Settings tile subtitle when Discord Rich Presence is actively sharing the playing track
+  ///
+  /// In en, this message translates to:
+  /// **'Active • Showing currently playing track'**
+  String get discordStatusActiveTrack;
+
+  /// Settings tile subtitle when Discord Rich Presence token is saved but disabled
+  ///
+  /// In en, this message translates to:
+  /// **'Configured • Tap to enable'**
+  String get discordStatusConfiguredTap;
+
+  /// Short trailing badge shown when Discord Rich Presence is active
+  ///
+  /// In en, this message translates to:
+  /// **'ACTIVE'**
+  String get discordActiveBadge;
+
+  /// Settings switch title for animated Canvas motion artwork
+  ///
+  /// In en, this message translates to:
+  /// **'Spotify Canvas / Motion Artwork'**
+  String get settingsCanvasTitle;
+
+  /// Settings switch subtitle for animated Canvas motion artwork
+  ///
+  /// In en, this message translates to:
+  /// **'Play looping video backdrops for supported tracks (Spotify, Apple Music, Tidal)'**
+  String get settingsCanvasSubtitle;
+
+  /// Settings switch title for blurring Canvas video behind Now Playing controls
+  ///
+  /// In en, this message translates to:
+  /// **'Full-Screen Ambient Backdrop'**
+  String get settingsCanvasBackdropTitle;
+
+  /// Settings switch subtitle for Full-Screen Ambient Backdrop
+  ///
+  /// In en, this message translates to:
+  /// **'Display looping video blurred behind Now Playing controls instead of inside artwork card'**
+  String get settingsCanvasBackdropSubtitle;
+
+  /// Description below crossfade slider when crossfade is enabled
+  ///
+  /// In en, this message translates to:
+  /// **'Songs will blend over {seconds} seconds'**
+  String crossfadeBlendDesc(String seconds);
+
+  /// Description below crossfade slider when crossfade is 0 seconds
+  ///
+  /// In en, this message translates to:
+  /// **'Crossfade disabled (songs end naturally)'**
+  String get crossfadeDisabledDesc;
+
+  /// Settings switch subtitle for Automix smart DJ transitions
+  ///
+  /// In en, this message translates to:
+  /// **'Confidence-aware DJ beatmatching, tempo stretching, and beat alignment'**
+  String get automixDetailedSubtitle;
+
+  /// Status tag shown when USB DAC sample clock verification succeeded
+  ///
+  /// In en, this message translates to:
+  /// **'Clock verified'**
+  String get usbClockVerified;
+
+  /// Tooltip for muting USB DAC hardware volume
+  ///
+  /// In en, this message translates to:
+  /// **'Mute DAC'**
+  String get usbMuteDac;
+
+  /// Tooltip for unmuting USB DAC hardware volume
+  ///
+  /// In en, this message translates to:
+  /// **'Unmute DAC'**
+  String get usbUnmuteDac;
+
+  /// About settings row title to check for newer releases
+  ///
+  /// In en, this message translates to:
+  /// **'Check for Updates'**
+  String get checkForUpdatesTitle;
+
+  /// About settings row subtitle explaining GitHub release update checks
+  ///
+  /// In en, this message translates to:
+  /// **'Check GitHub releases for new version'**
+  String get checkForUpdatesSubtitle;
+
+  /// Heading above the Settings Quick Controls strip
+  ///
+  /// In en, this message translates to:
+  /// **'Quick Controls'**
+  String get settingsQuickControls;
 }
 
 class _AppLocalizationsDelegate

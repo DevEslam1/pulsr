@@ -546,7 +546,7 @@ extension _OnboardingStepsPart on _OnboardingScreenState {
                       ),
                     ),
                     Text(
-                      '24-bit / 192kHz • FLAC',
+                      l10n.onboardingHiResSampleSpec,
                       style: TextStyle(
                         fontSize: AppFontSize.caption,
                         fontWeight: FontWeight.w700,

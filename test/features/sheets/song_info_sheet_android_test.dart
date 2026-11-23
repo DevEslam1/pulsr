@@ -12,7 +12,9 @@ import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/constants/channels.dart';
 import 'package:pulsr/features/player/cubit/player_cubit.dart';
 import 'package:pulsr/features/player/cubit/player_state.dart';
+import 'package:pulsr/features/sheets/ringtone_retry_controller.dart';
 import 'package:pulsr/features/sheets/song_info_sheet.dart';
+import 'package:pulsr/l10n/generated/app_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../player/widgets/player_sheet_test_support.dart';
@@ -205,6 +207,70 @@ void main() {
     await pumpSheet(tester);
     expect(find.text('Playback Tools'), findsNothing);
     expect(find.text('Track Rating'), findsOneWidget);
+    debugDefaultTargetPlatformOverride = null;
+  });
+
+  testWidgets(
+      'H-49/M-08 RingtoneRetryController retries on app resume after sheet unmount and non-Android localizes fallback',
+      (tester) async {
+    var canWrite = false;
+    String? retriedMethod;
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+      if (call.method == 'openWriteSettings') openSettingsCalls++;
+      if (call.method == 'checkWriteSettingsPermission') return canWrite;
+      if (call.method == 'setRingtone') {
+        retriedMethod = call.method;
+        return true;
+      }
+      return null;
+    });
+
+    final l10n = lookupAppLocalizations(const Locale('en'));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: Center(
+              child: ElevatedButton(
+                onPressed: () =>
+                    RingtoneRetryController.openSettingsAndListenForRetry(
+                  songPath: testSong.path,
+                  channel: channel,
+                  type: 'ringtone',
+                  l10n: l10n,
+                  messenger: ScaffoldMessenger.of(context),
+                ),
+                child: const Text('trigger-retry'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('trigger-retry'));
+    await tester.pump();
+    expect(openSettingsCalls, 1);
+
+    // Simulate OS permission grant and app resume (inactive -> resumed triggers AppLifecycleListener.onResume).
+    canWrite = true;
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(retriedMethod, 'setRingtone');
+
+    // Non-Android localizes fallback toast.
+    debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+    await pumpSheet(tester, cubit: baseCubit());
+    await tester.ensureVisible(find.text('Ringtone'));
+    await tester.tap(find.text('Ringtone'));
+    await tester.pumpAndSettle();
+    expect(find.text(l10n.ringtoneAndroidOnly), findsOneWidget);
+    await tester.pump(const Duration(seconds: 5));
     debugDefaultTargetPlatformOverride = null;
   });
 }

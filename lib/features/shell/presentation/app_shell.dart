@@ -30,6 +30,7 @@ import '../../player/cubit/player_state.dart';
 import '../../player/presentation/widgets/tablet_player_bar.dart';
 import '../../settings/presentation/widgets/settings_picker_sheets.dart';
 import '../../ytm_search/cubit/ytm_download_cubit.dart';
+import 'widgets/branch_scroll_bus.dart';
 import 'widgets/dock_style_controller.dart';
 import 'widgets/landscape_sidebar.dart';
 import 'widgets/player_shortcut_scope.dart';
@@ -55,6 +56,8 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
   final ListQueue<int> _tabHistory = ListQueue<int>()..add(0);
   int _lastNavMs = 0;
   int _lastPopMs = 0;
+  final GlobalKey _branchShellKey =
+      GlobalKey(debugLabel: 'app_shell_active_branch');
   final Stopwatch _backPressStopwatch = Stopwatch();
   StreamSubscription<UiEffect>? _downloadEffectsSub;
 
@@ -171,15 +174,15 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
         widget.navigationShell.goBranch(0);
       } catch (_) {}
     }
-    if (isSameTab) {
-      final primary = PrimaryScrollController.maybeOf(context);
-      if (primary != null && primary.hasClients) {
-        primary.animateTo(
-          0.0,
-          duration: context.motionMs(260),
-          curve: context.motionCurve(Curves.easeOutCubic),
-        );
-      }
+    if (isSameTab && mounted) {
+      BranchScrollBus.instance.scrollActiveBranchToTop(
+        branchIndex: index,
+        branchContext: _branchShellKey.currentContext,
+        primaryFallback: PrimaryScrollController.maybeOf(context),
+        reduceMotion: !context.motionEnabled,
+        duration: context.motionMs(260),
+        curve: context.motionCurve(Curves.easeOutCubic),
+      );
     }
   }
 
@@ -319,22 +322,7 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
           didPop: didPop,
           isInspectorOpenOverride: inspectorOpen,
         ),
-        child: PlayerShortcutScope(
-          onTogglePlayPause: () =>
-              context.read<PlayerCubit>().togglePlayPause(),
-          onSeekForward: () => context
-              .read<PlayerCubit>()
-              .fastForward(const Duration(seconds: 10)),
-          onSeekBackward: () =>
-              context.read<PlayerCubit>().rewind(const Duration(seconds: 10)),
-          onVolumeUp: () => context.read<PlayerCubit>().adjustVolume(0.05),
-          onVolumeDown: () => context.read<PlayerCubit>().adjustVolume(-0.05),
-          onNext: () => context.read<PlayerCubit>().next(),
-          onPrevious: () => context.read<PlayerCubit>().previous(),
-          onToggleFavorite: () => context.read<PlayerCubit>().toggleFavorite(),
-          onToggleMute: () => context.read<PlayerCubit>().toggleMute(),
-          onToggleLyrics: () => context.read<PlayerCubit>().toggleLyrics(),
-          onToggleQueue: () => context.read<PlayerCubit>().toggleQueue(),
+        child: PlayerShortcutScope.wrapPlayer(
           child: A11yLiveAnnouncer(
             child: _buildShellContent(
               context,
@@ -373,7 +361,10 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
                 // alive and offers a retry for the failed subtree.
                 child: PulsrErrorBoundary(
                   category: 'Shell.branch',
-                  child: widget.navigationShell,
+                  child: KeyedSubtree(
+                    key: _branchShellKey,
+                    child: widget.navigationShell,
+                  ),
                 ),
               ),
             ),
@@ -469,8 +460,8 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
               child: SafeArea(
                 top: false,
                 bottom: false,
-                left: false,
-                right: true,
+                left: Directionality.of(context) == TextDirection.rtl,
+                right: Directionality.of(context) != TextDirection.rtl,
                 child: Stack(
                   children: [
                     // Upper Screen Row: Active Screen + Optional Side Inspector

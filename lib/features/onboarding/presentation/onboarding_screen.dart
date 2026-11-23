@@ -110,7 +110,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     try {
       final granted = await widget.scannerService.requestPermission();
       if (!granted) {
-        if (mounted) await _handleDeniedStorageAccess();
+        if (mounted) {
+          await _handleDeniedStorageAccess(
+            completeOnSuccess: completeOnSuccess,
+          );
+        }
         return;
       }
 
@@ -138,7 +142,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               behavior: SnackBarBehavior.floating,
               action: SnackBarAction(
                 label: context.l10n.skipAction,
-                onPressed: _completeOnboarding,
+                onPressed:
+                    completeOnSuccess ? _completeOnboarding : _nextPage,
               ),
             ),
           );
@@ -230,8 +235,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             );
         }
       }
-    } else {
-      await _setNotificationDeniedPref(false);
     }
   }
 
@@ -295,7 +298,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     }
   }
 
-  Future<void> _handleDeniedStorageAccess() async {
+  Future<void> _handleDeniedStorageAccess({
+    bool completeOnSuccess = true,
+  }) async {
     final action = await PulsrDialogHelper.showCustomDialog<String>(
       context,
       builder: (ctx) => PulsrDialog(
@@ -316,7 +321,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
 
     if (action == 'limited') {
-      await _completeOnboarding();
+      if (completeOnSuccess) {
+        await _completeOnboarding();
+      } else {
+        _nextPage();
+      }
     } else if (action == 'settings') {
       await openAppSettings();
     }

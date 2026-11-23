@@ -359,7 +359,10 @@ class _UsbDacSectionState extends State<UsbDacSection> {
           // A refused claim is recoverable: keep the retry affordance the
           // exclusive-mode failure needs, routed through the same owner.
           actionLabel: context.l10n.retry,
-          onActionPressed: () => _toggleStreaming(true),
+          onActionPressed: () {
+            if (!mounted || _streamingBusy) return;
+            _toggleStreaming(true);
+          },
         );
       }
       await _refresh();
@@ -381,7 +384,7 @@ class _UsbDacSectionState extends State<UsbDacSection> {
       base,
       rateText,
       if (_status.streamingBitDepth > 0) '${_status.streamingBitDepth}-bit',
-      if (_status.rateVerified) 'Clock verified',
+      if (_status.rateVerified) context.l10n.usbClockVerified,
     ];
     return parts.join(' · ');
   }
@@ -605,7 +608,9 @@ class _UsbDacSectionState extends State<UsbDacSection> {
                           ? Theme.of(context).colorScheme.error
                           : null,
                     ),
-                    tooltip: _uac2Muted == true ? 'Unmute DAC' : 'Mute DAC',
+                    tooltip: _uac2Muted == true
+                        ? context.l10n.usbUnmuteDac
+                        : context.l10n.usbMuteDac,
                     onPressed: () =>
                         unawaited(_toggleUac2Mute(!(_uac2Muted == true))),
                     padding: EdgeInsets.zero,

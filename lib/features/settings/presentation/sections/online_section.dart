@@ -176,13 +176,15 @@ mixin SettingsOnlineSection
         _navTile(
           context,
           Icons.discord_rounded,
-          'Discord Rich Presence',
+          context.l10n.discordRichPresenceTitle,
           DiscordRpcService.instance.isEnabled
-              ? 'Active • Showing currently playing track'
+              ? context.l10n.discordStatusActiveTrack
               : (DiscordRpcService.instance.token.isNotEmpty
-                  ? 'Configured • Tap to enable'
-                  : 'Display listening status on your Discord profile'),
-          trailingBadge: DiscordRpcService.instance.isEnabled ? 'ACTIVE' : null,
+                  ? context.l10n.discordStatusConfiguredTap
+                  : context.l10n.discordRichPresenceSubtitle),
+          trailingBadge: DiscordRpcService.instance.isEnabled
+              ? context.l10n.discordActiveBadge
+              : null,
           onTap: () => DiscordRpcSheet.show(context),
         ),
       ],

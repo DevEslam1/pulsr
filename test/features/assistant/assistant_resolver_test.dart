@@ -283,5 +283,23 @@ void main() {
       );
       expect(() => plan.songIds.add(2), throwsUnsupportedError);
     });
+
+    test('M-08 preserves wantsShuffle for play favorites vs shuffle favorites',
+        () async {
+      final resolver = buildResolver(favorites: const [21, 22, 23]);
+
+      final ordered = await resolver.resolveText(
+        parseAssistantText('play favorites'),
+      ) as AssistantPlayPlan;
+      expect(ordered.source, AssistantPlanSource.favorites);
+      expect(ordered.shuffle, isFalse);
+      expect(ordered.songIds, [21, 22, 23]);
+
+      final shuffled = await resolver.resolveText(
+        parseAssistantText('shuffle favorites'),
+      ) as AssistantPlayPlan;
+      expect(shuffled.source, AssistantPlanSource.favorites);
+      expect(shuffled.shuffle, isTrue);
+    });
   });
 }

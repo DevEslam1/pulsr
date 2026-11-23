@@ -309,6 +309,19 @@ mixin PhoneLayoutSection
           );
           break;
 
+        case 'tools':
+          statusLine = Text(
+            context.l10n.extrasSettingsCategorySubtitle,
+            style: TextStyle(
+              color: p.textSecondary,
+              fontSize: AppFontSize.caption,
+              fontWeight: FontWeight.w500,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          );
+          break;
+
         case 'about':
         default:
           statusLine = Text(

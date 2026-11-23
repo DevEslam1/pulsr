@@ -8,6 +8,7 @@ import '../../core/constants/app_spacing.dart';
 import '../../core/constants/app_typography.dart';
 import '../../core/theme/aura_theme.dart';
 import '../../core/utils/error_logger.dart';
+import '../../core/utils/l10n_extensions.dart';
 import '../settings/presentation/widgets/settings_section.dart';
 import '../settings/presentation/widgets/settings_slider_row.dart';
 import '../settings/presentation/widgets/settings_tiles.dart';
@@ -111,7 +112,9 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
         elevation: 0,
         title: Text(
           AnnouncementStrings.screenTitle,
-          style: TextStyle(fontWeight: FontWeight.w800),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontWeight: FontWeight.w800),
         ),
       ),
       body: ListenableBuilder(
@@ -413,10 +416,13 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
           title: AnnouncementStrings.previewTrackTitle,
           artist: AnnouncementStrings.previewTrackArtist,
         );
+    final l10n = context.l10n;
     final text = composeAnnouncement(
       settings.elements,
       track,
       maxLength: settings.maxLength,
+      formatYear: (y) => AnnouncementStrings.yearLabel(y, l10n),
+      formatTrackNumber: (n) => AnnouncementStrings.trackNumberLabel(n, l10n),
     );
     if (text.isEmpty) {
       messenger?.showSnackBar(SnackBar(

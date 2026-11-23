@@ -75,22 +75,55 @@ class _QuranModePanelState extends State<QuranModePanel> {
   String? _bookmarkError;
   String? _lastLoadedTrackUri;
   bool _alwaysOnRadio = false;
+  bool _alwaysOnRadioUpdating = false;
+  int _alwaysOnRadioRequestId = 0;
+  AppLifecycleListener? _lifecycleListener;
 
   @override
   void initState() {
     super.initState();
     _capsFuture = context.read<PlayerCubit>().detectEarbudCapabilities();
+    _lifecycleListener = AppLifecycleListener(onResume: _refreshAlwaysOnRadio);
+    _refreshAlwaysOnRadio();
+  }
+
+  Future<void> _refreshAlwaysOnRadio() async {
+    final reqId = ++_alwaysOnRadioRequestId;
     try {
-      final future = context.read<PlayerCubit>().isQuranAlwaysOnRadio();
-      unawaited(future.then((v) {
-        if (mounted) setState(() => _alwaysOnRadio = v);
-      }).catchError((Object e, StackTrace st) {
-        ErrorLogger.log('Quran always-on radio read failed',
-            error: e, stackTrace: st, category: 'QuranMode');
-      }));
+      final v = await context.read<PlayerCubit>().isQuranAlwaysOnRadio();
+      if (mounted && reqId == _alwaysOnRadioRequestId && _alwaysOnRadio != v) {
+        setState(() => _alwaysOnRadio = v);
+      }
     } catch (e, st) {
-      ErrorLogger.log('Quran panel init failed',
+      ErrorLogger.log('Quran always-on radio read failed',
           error: e, stackTrace: st, category: 'QuranMode');
+    }
+  }
+
+  Future<void> _toggleAlwaysOnRadio(PlayerCubit cubit, bool value) async {
+    if (_alwaysOnRadioUpdating) return;
+    final previous = _alwaysOnRadio;
+    _alwaysOnRadioRequestId++;
+    setState(() {
+      _alwaysOnRadioUpdating = true;
+      _alwaysOnRadio = value;
+    });
+    try {
+      await cubit.setQuranAlwaysOnRadio(value);
+      final actual = await cubit.isQuranAlwaysOnRadio();
+      if (mounted) {
+        setState(() => _alwaysOnRadio = actual);
+      }
+    } catch (e, st) {
+      ErrorLogger.log('Quran always-on radio write failed',
+          error: e, stackTrace: st, category: 'QuranMode');
+      if (mounted) {
+        setState(() => _alwaysOnRadio = previous);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _alwaysOnRadioUpdating = false);
+      }
     }
   }
 
@@ -176,6 +209,8 @@ class _QuranModePanelState extends State<QuranModePanel> {
 
   @override
   void dispose() {
+    _lifecycleListener?.dispose();
+    _lifecycleListener = null;
     _capsFuture = null;
     super.dispose();
   }
@@ -203,7 +238,12 @@ class _QuranModePanelState extends State<QuranModePanel> {
   Widget build(BuildContext context) {
     final p = context.palette;
 
-    return BlocBuilder<PlayerCubit, PlayerState>(
+    return BlocListener<PlayerCubit, PlayerState>(
+      listenWhen: (a, b) =>
+          a.isQuranModeEnabled != b.isQuranModeEnabled ||
+          a.currentSong?.uri != b.currentSong?.uri,
+      listener: (_, __) => unawaited(_refreshAlwaysOnRadio()),
+      child: BlocBuilder<PlayerCubit, PlayerState>(
       // AUDIT-FIX (P3-23): Omit `position` from outer `buildWhen` so 4Hz+
       // playback ticks do not rebuild the entire sheet; only `QuranMushafView`
       // needs live position via its own `BlocSelector`.
@@ -346,11 +386,12 @@ class _QuranModePanelState extends State<QuranModePanel> {
                   ),
                   PulsrSwitch(
                     value: _alwaysOnRadio,
-                    onChanged: (v) {
-                      PulsrHaptics.selectionClick();
-                      setState(() => _alwaysOnRadio = v);
-                      unawaited(cubit.setQuranAlwaysOnRadio(v));
-                    },
+                    onChanged: _alwaysOnRadioUpdating
+                        ? null
+                        : (v) {
+                            PulsrHaptics.selectionClick();
+                            unawaited(_toggleAlwaysOnRadio(cubit, v));
+                          },
                   ),
                 ],
               ),
@@ -743,6 +784,7 @@ class _QuranModePanelState extends State<QuranModePanel> {
           ],
         );
       },
+      ),
     );
   }
 
@@ -853,7 +895,7 @@ class _QuranModePanelState extends State<QuranModePanel> {
                       ),
                     ),
                     Text(
-                      '${meta.reciter} • Ayah ${meta.ayahStart}-${meta.ayahEnd}',
+                      '${meta.reciter} • ${context.l10n.quranAyahRange(meta.ayahStart, meta.ayahEnd)}',
                       style: TextStyle(
                         fontSize: AppFontSize.caption,
                         color: p.textSecondary,

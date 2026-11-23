@@ -118,4 +118,37 @@ void main() {
 
     expect(find.text('HOME_SCREEN'), findsOneWidget);
   });
+
+  testWidgets('M-08/L-02: Retry invokes DI reconfiguration when needed and respects Reduce Motion',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({'onboarding_completed': true});
+    var reconfigureAttempts = 0;
+    final staleGate = Completer<String>();
+    getIt.registerSingletonAsync<String>(() => staleGate.future);
+    debugConfigureDependenciesOverride = (bool warmUpAsync) async {
+      reconfigureAttempts++;
+      await getIt.reset();
+      getIt.registerSingleton<String>('reconfigured');
+    };
+    addTearDown(() {
+      debugConfigureDependenciesOverride = null;
+    });
+
+    await tester.pumpWidget(
+      MediaQuery(
+        data: const MediaQueryData(disableAnimations: true),
+        child: buildApp(),
+      ),
+    );
+    await tester.pump(const Duration(seconds: 8));
+    await tester.pump();
+
+    expect(find.text(l10n.retry), findsOneWidget);
+    await tester.tap(find.text(l10n.retry));
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(reconfigureAttempts, greaterThanOrEqualTo(1));
+    expect(find.text('HOME_SCREEN'), findsOneWidget);
+  });
 }

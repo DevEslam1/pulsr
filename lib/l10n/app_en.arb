@@ -10949,5 +10949,120 @@
   "lyricsSourceExternalLrc": "LRC File",
   "@lyricsSourceExternalLrc": {
     "description": "Badge label for external LRC lyrics file source"
+  },
+  "annFromYear": "from {year}",
+  "@annFromYear": {
+    "description": "Spoken track release year phrase in track announcements",
+    "placeholders": {
+      "year": {
+        "type": "int"
+      }
+    }
+  },
+  "annTrackNumber": "track {number}",
+  "@annTrackNumber": {
+    "description": "Spoken track number phrase in track announcements",
+    "placeholders": {
+      "number": {
+        "type": "int"
+      }
+    }
+  },
+  "quranAyahRange": "Ayah {start}-{end}",
+  "@quranAyahRange": {
+    "description": "Ayah range displayed for a Quran surah segment",
+    "placeholders": {
+      "start": {
+        "type": "int"
+      },
+      "end": {
+        "type": "int"
+      }
+    }
+  },
+  "ringtoneAndroidOnly": "Ringtone setting is only supported on Android",
+  "@ringtoneAndroidOnly": {
+    "description": "Snackbar warning shown when attempting to set a ringtone on non-Android platforms"
+  },
+  "onboardingHiResSampleSpec": "24-bit / 192kHz • FLAC",
+  "@onboardingHiResSampleSpec": {
+    "description": "Sample Hi-Res format spec badge shown on the onboarding audio engine preview card"
+  },
+  "rcStartMultiPoint": "Start 3-Point Calibration",
+  "@rcStartMultiPoint": {
+    "description": "Primary button label when 3-point room averaging calibration is enabled"
+  },
+  "discordStatusActiveTrack": "Active • Showing currently playing track",
+  "@discordStatusActiveTrack": {
+    "description": "Settings tile subtitle when Discord Rich Presence is actively sharing the playing track"
+  },
+  "discordStatusConfiguredTap": "Configured • Tap to enable",
+  "@discordStatusConfiguredTap": {
+    "description": "Settings tile subtitle when Discord Rich Presence token is saved but disabled"
+  },
+  "discordActiveBadge": "ACTIVE",
+  "@discordActiveBadge": {
+    "description": "Short trailing badge shown when Discord Rich Presence is active"
+  },
+  "settingsCanvasTitle": "Spotify Canvas / Motion Artwork",
+  "@settingsCanvasTitle": {
+    "description": "Settings switch title for animated Canvas motion artwork"
+  },
+  "settingsCanvasSubtitle": "Play looping video backdrops for supported tracks (Spotify, Apple Music, Tidal)",
+  "@settingsCanvasSubtitle": {
+    "description": "Settings switch subtitle for animated Canvas motion artwork"
+  },
+  "settingsCanvasBackdropTitle": "Full-Screen Ambient Backdrop",
+  "@settingsCanvasBackdropTitle": {
+    "description": "Settings switch title for blurring Canvas video behind Now Playing controls"
+  },
+  "settingsCanvasBackdropSubtitle": "Display looping video blurred behind Now Playing controls instead of inside artwork card",
+  "@settingsCanvasBackdropSubtitle": {
+    "description": "Settings switch subtitle for Full-Screen Ambient Backdrop"
+  },
+  "crossfadeBlendDesc": "Songs will blend over {seconds} seconds",
+  "@crossfadeBlendDesc": {
+    "description": "Description below crossfade slider when crossfade is enabled",
+    "placeholders": {
+      "seconds": {
+        "type": "String"
+      }
+    }
+  },
+  "crossfadeDisabledDesc": "Crossfade disabled (songs end naturally)",
+  "@crossfadeDisabledDesc": {
+    "description": "Description below crossfade slider when crossfade is 0 seconds"
+  },
+  "automixDetailedSubtitle": "Confidence-aware DJ beatmatching, tempo stretching, and beat alignment",
+  "@automixDetailedSubtitle": {
+    "description": "Settings switch subtitle for Automix smart DJ transitions"
+  },
+  "usbClockVerified": "Clock verified",
+  "@usbClockVerified": {
+    "description": "Status tag shown when USB DAC sample clock verification succeeded"
+  },
+  "usbMuteDac": "Mute DAC",
+  "@usbMuteDac": {
+    "description": "Tooltip for muting USB DAC hardware volume"
+  },
+  "usbUnmuteDac": "Unmute DAC",
+  "@usbUnmuteDac": {
+    "description": "Tooltip for unmuting USB DAC hardware volume"
+  },
+  "checkForUpdatesTitle": "Check for Updates",
+  "@checkForUpdatesTitle": {
+    "description": "About settings row title to check for newer releases"
+  },
+  "checkForUpdatesSubtitle": "Check GitHub releases for new version",
+  "@checkForUpdatesSubtitle": {
+    "description": "About settings row subtitle explaining GitHub release update checks"
+  },
+  "badgeHiRes": "Hi-Res",
+  "@badgeHiRes": {
+    "description": "Badge shown on the Hi-Res fidelity option in audio setup wizard"
+  },
+  "settingsQuickControls": "Quick Controls",
+  "@settingsQuickControls": {
+    "description": "Heading above the Settings Quick Controls strip"
   }
 }

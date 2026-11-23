@@ -176,8 +176,9 @@ class LandscapeSidebarState extends State<LandscapeSidebar> {
     final primaryItems = destinations.where((d) => d.index <= 2);
     final secondaryItems = destinations.where((d) => d.index >= 3);
     final safePadding = MediaQuery.paddingOf(context);
-    final leftInset = safePadding.left;
-    final totalWidth = width > 0 ? (width + leftInset) : 0.0;
+    final isRtl = Directionality.of(context) == TextDirection.rtl;
+    final startInset = isRtl ? safePadding.right : safePadding.left;
+    final totalWidth = width > 0 ? (width + startInset) : 0.0;
 
     return RepaintBoundary(
       child: MouseRegion(
@@ -216,7 +217,7 @@ class LandscapeSidebarState extends State<LandscapeSidebar> {
             ),
             child: ClipRect(
               child: Padding(
-                padding: EdgeInsetsDirectional.only(start: leftInset),
+                padding: EdgeInsetsDirectional.only(start: startInset),
                 child: SafeArea(
                   top: true,
                   bottom: true,

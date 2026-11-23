@@ -197,4 +197,31 @@ void main() {
     expect(cubit.state.bitPerfectOutput, isTrue);
     expect(prefs.getBool(PrefsKeys.bitPerfectOutput), isTrue);
   });
+
+  test('H-48 startup does not flicker bitPerfectOutput true when no USB DAC is attached',
+      () async {
+    SharedPreferences.setMockInitialValues({
+      PrefsKeys.bitPerfectOutput: true,
+    });
+    final audio = _FakeRouteAudio(_speaker);
+    addTearDown(audio.dispose);
+
+    final cubit = SettingsCubit(
+      scannerService: MockMediaScannerService(),
+      hiResAudioService: audio,
+    );
+    final observedBitPerfect = <bool>[cubit.state.bitPerfectOutput];
+    final sub =
+        cubit.stream.listen((s) => observedBitPerfect.add(s.bitPerfectOutput));
+    addTearDown(() async {
+      await sub.cancel();
+      await cubit.close();
+    });
+
+    await cubit.preferencesReady;
+    await pumpEventQueue(times: 40);
+
+    expect(observedBitPerfect, everyElement(isFalse));
+    expect(cubit.bitPerfectPreferred, isTrue);
+  });
 }

@@ -298,8 +298,8 @@ mixin SettingsCategoryWidgetsSection
                 _navTile(
                   context,
                   Icons.system_update_alt_rounded,
-                  'Check for Updates',
-                  'Check GitHub releases for new version',
+                  context.l10n.checkForUpdatesTitle,
+                  context.l10n.checkForUpdatesSubtitle,
                   onTap: () => AppUpdateService.instance
                       .checkForUpdates(context, userInitiated: true),
                 ),

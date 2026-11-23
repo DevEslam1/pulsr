@@ -358,6 +358,8 @@ class HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                                   isWavy: false,
                                   semanticLabel: context.l10n.shortAudioFilter,
                                   onChanged: (val) =>
+                                      cubit.previewMinDuration(val.toInt()),
+                                  onChangeEnd: (val) =>
                                       cubit.setMinDuration(val.toInt()),
                                 ),
                               ],

@@ -84,7 +84,20 @@ abstract final class AssistantIntentBootstrap {
             if (recent.isEmpty) return const <int>[];
             final albumId = recent.first.albumId;
             if (albumId == null) {
-              return recent.map((song) => song.id).toList();
+              final albumTitle = recent.first.album.trim();
+              if (albumTitle.isEmpty ||
+                  albumTitle.toLowerCase() == 'unknown album') {
+                return <int>[recent.first.id];
+              }
+              final matchingAlbum = recent
+                  .where((song) =>
+                      song.album.trim().toLowerCase() ==
+                      albumTitle.toLowerCase())
+                  .map((song) => song.id)
+                  .toList();
+              return matchingAlbum.isNotEmpty
+                  ? matchingAlbum
+                  : <int>[recent.first.id];
             }
             return _songIdsOf(await repository.getAlbumSongs(albumId));
           },
