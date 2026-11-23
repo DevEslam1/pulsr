@@ -1,6 +1,9 @@
 package config
 
-import "testing"
+import (
+	"net/netip"
+	"testing"
+)
 
 func TestGetOrigin(t *testing.T) {
 	t.Setenv("JAM_PUBLIC_ORIGIN", " https://party.example.com/ ")
@@ -104,5 +107,36 @@ func TestIsAllowedOrigin(t *testing.T) {
 	}
 	if IsAllowedOrigin("") {
 		t.Errorf("empty origin allowed")
+	}
+}
+
+func TestParseTrustedProxiesAndIsTrustedProxy(t *testing.T) {
+	old := TrustedProxies
+	defer func() { TrustedProxies = old }()
+
+	TrustedProxies = ParseTrustedProxies([]string{
+		"127.0.0.1/8",
+		"::1",
+		"10.20.30.40",
+		"not-a-cidr",
+	})
+	if len(TrustedProxies) != 3 {
+		t.Fatalf("expected 3 valid prefixes, got %d", len(TrustedProxies))
+	}
+
+	if !IsTrustedProxy(netip.MustParseAddr("127.0.0.5")) {
+		t.Errorf("expected 127.0.0.5 to match 127.0.0.1/8")
+	}
+	if !IsTrustedProxy(netip.MustParseAddr("::ffff:10.20.30.40")) {
+		t.Errorf("expected mapped IPv4 to match 10.20.30.40")
+	}
+	if !IsTrustedProxy(netip.MustParseAddr("::1")) {
+		t.Errorf("expected ::1 to match")
+	}
+	if IsTrustedProxy(netip.MustParseAddr("203.0.113.5")) {
+		t.Errorf("expected public IP not to match trusted proxies")
+	}
+	if IsTrustedProxy(netip.Addr{}) {
+		t.Errorf("expected invalid addr not to match")
 	}
 }

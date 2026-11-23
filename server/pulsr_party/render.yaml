@@ -1,8 +1,8 @@
-# Render blueprint for BitChord Listen Together (Go backend)
+# Render blueprint for Pulsr Listen Together (Go backend)
 #
 # Deploy this service manually on Render Dashboard (Recommended):
 # - New -> Web Service, connect repo
-# - Root Directory: backend
+# - Root Directory: server/pulsr_party
 # - Runtime: Go
 # - Build Command: go build -o server .
 # - Start Command: ./server
@@ -13,11 +13,11 @@
 
 services:
   - type: web
-    name: bitchord-listen-together
+    name: pulsr-listen-together
     runtime: go
     plan: free
     region: singapore
-    rootDir: backend
+    rootDir: server/pulsr_party
     buildCommand: go build -o server .
     startCommand: ./server
     healthCheckPath: /healthz
@@ -35,9 +35,14 @@ services:
         value: "2"
       - key: JAM_CONNECTION_IDLE_MS
         value: "900000"
-      # Render terminates TLS and supplies the real client IP in X-Forwarded-For.
+      # Render terminates TLS behind Cloudflare and supplies the real client IP
+      # via True-Client-IP (with right-to-left X-Forwarded-For fallback).
       - key: JAM_TRUST_PROXY
         value: "true"
+      - key: JAM_CLIENT_IP_HEADER
+        value: "True-Client-IP"
+      - key: JAM_TRUST_PROXY_HOPS
+        value: "2"
       # Set to the public https origin (e.g. https://party.example.com) when a
       # proxy in front of Render may not carry X-Forwarded-Proto through;
       # invite deep links then use it verbatim.

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"container/list"
 	"context"
 	"encoding/json"
 	"errors"
@@ -8,8 +9,10 @@ import (
 	"html/template"
 	"io"
 	"log"
+	"math"
 	"net"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"os"
 	"os/signal"
@@ -31,15 +34,17 @@ import (
 )
 
 var (
-	store    = party.NewPartyStore()
-	hubInst  = hub.NewHub()
-	createLimiter = newIPRateLimiter(time.Minute, config.CreateRatePerMinute, config.RateLimitMaxEntries)
+	store           = party.NewPartyStore()
+	hubInst         = hub.NewHub()
+	createLimiter   = newIPRateLimiter(time.Minute, config.CreateRatePerMinute, config.RateLimitMaxEntries)
+	joinLimiter     = newIPRateLimiter(time.Minute, config.JoinRatePerMinute, config.RateLimitMaxEntries)
+	readLimiter     = newIPRateLimiter(time.Minute, config.ReadRatePerMinute, config.RateLimitMaxEntries)
 	presenceTracker = presence.NewTracker(
 		time.Duration(config.PresenceIntervalSec+config.PresenceGraceSec)*time.Second,
 		config.PresenceMaxEntries,
 	)
 	presenceLimiter = newIPRateLimiter(time.Minute, config.PresencePingsPerMinute, config.PresenceRateLimitMaxIPs)
-	upgrader = websocket.Upgrader{
+	upgrader        = websocket.Upgrader{
 		CheckOrigin: func(r *http.Request) bool {
 			origin := r.Header.Get("Origin")
 			return origin == "" || config.IsAllowedOrigin(origin)
@@ -47,10 +52,7 @@ var (
 	}
 )
 
-func main() {
-	go startHeartbeatTicker()
-	go startPresenceSweeper()
-
+func buildMux() *http.ServeMux {
 	mux := http.NewServeMux()
 
 	// REST endpoints
@@ -74,7 +76,14 @@ func main() {
 	// WebSocket endpoint
 	mux.HandleFunc("GET /ws/parties/{code}", handleWebSocket)
 
-	handler := corsMiddleware(mux)
+	return mux
+}
+
+func main() {
+	go startHeartbeatTicker()
+	go startPresenceSweeper()
+
+	handler := corsMiddleware(buildMux())
 
 	addr := fmt.Sprintf("0.0.0.0:%d", config.Port)
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -132,63 +141,186 @@ type ipRateLimiter struct {
 	window  time.Duration
 	limit   int
 	maxKeys int
-	entries map[string]ipRateEntry
+	entries map[string]*ipRateEntry
+	lru     *list.List
 	swept   time.Time
+	nowFn   func() time.Time
 }
 
 type ipRateEntry struct {
+	ip      string
 	started time.Time
 	count   int
+	elem    *list.Element
 }
 
 func newIPRateLimiter(window time.Duration, limit, maxKeys int) *ipRateLimiter {
-	return &ipRateLimiter{window: window, limit: limit, maxKeys: maxKeys, entries: make(map[string]ipRateEntry)}
+	return &ipRateLimiter{
+		window:  window,
+		limit:   limit,
+		maxKeys: maxKeys,
+		entries: make(map[string]*ipRateEntry),
+		lru:     list.New(),
+		nowFn:   time.Now,
+	}
+}
+
+func (l *ipRateLimiter) now() time.Time {
+	if l.nowFn != nil {
+		return l.nowFn()
+	}
+	return time.Now()
 }
 
 func (l *ipRateLimiter) Allow(ip string) bool {
 	if l.limit <= 0 {
 		return true
 	}
-	now := time.Now()
+	now := l.now()
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	// Expired entries are also reset on lookup below, so a full sweep only needs
-	// to run about once a second, or when the table is full and needs the room.
+	// Sweep expired entries once per second or when full before evicting LRU keys.
 	if now.Sub(l.swept) >= time.Second || (l.maxKeys > 0 && len(l.entries) >= l.maxKeys) {
 		for key, entry := range l.entries {
 			if now.Sub(entry.started) >= l.window {
+				l.lru.Remove(entry.elem)
 				delete(l.entries, key)
 			}
 		}
 		l.swept = now
 	}
-	entry := l.entries[ip]
-	if entry.started.IsZero() || now.Sub(entry.started) >= l.window {
-		if entry.started.IsZero() && l.maxKeys > 0 && len(l.entries) >= l.maxKeys {
+
+	if entry, ok := l.entries[ip]; ok {
+		l.lru.MoveToFront(entry.elem)
+		if now.Sub(entry.started) >= l.window {
+			entry.started = now
+			entry.count = 1
+			return true
+		}
+		if entry.count >= l.limit {
 			return false
 		}
-		l.entries[ip] = ipRateEntry{started: now, count: 1}
+		entry.count++
 		return true
 	}
-	if entry.count >= l.limit {
-		return false
+
+	if l.maxKeys > 0 {
+		for len(l.entries) >= l.maxKeys && l.lru.Len() > 0 {
+			back := l.lru.Back()
+			evicted := l.lru.Remove(back).(*ipRateEntry)
+			delete(l.entries, evicted.ip)
+		}
 	}
-	entry.count++
+
+	entry := &ipRateEntry{ip: ip, started: now, count: 1}
+	entry.elem = l.lru.PushFront(entry)
 	l.entries[ip] = entry
 	return true
 }
 
-func clientIP(r *http.Request) string {
-	if config.TrustProxy {
-		if forwarded := strings.TrimSpace(strings.Split(r.Header.Get("X-Forwarded-For"), ",")[0]); forwarded != "" {
-			return forwarded
+func parseIPString(raw string) (netip.Addr, bool) {
+	s := strings.TrimSpace(raw)
+	if s == "" {
+		return netip.Addr{}, false
+	}
+	if addr, err := netip.ParseAddr(s); err == nil {
+		return addr.Unmap(), true
+	}
+	if host, _, err := net.SplitHostPort(s); err == nil {
+		if addr, err := netip.ParseAddr(strings.TrimSpace(host)); err == nil {
+			return addr.Unmap(), true
 		}
+	}
+	return netip.Addr{}, false
+}
+
+func remoteAddrIP(r *http.Request) (netip.Addr, string) {
+	if addr, ok := parseIPString(r.RemoteAddr); ok {
+		return addr, addr.String()
 	}
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err == nil {
-		return host
+		return netip.Addr{}, host
 	}
-	return r.RemoteAddr
+	return netip.Addr{}, r.RemoteAddr
+}
+
+func isTrustedProxyPeer(addr netip.Addr) bool {
+	if !config.TrustProxy {
+		return false
+	}
+	if len(config.TrustedProxies) == 0 {
+		return true
+	}
+	return config.IsTrustedProxy(addr)
+}
+
+func clientIP(r *http.Request) string {
+	remoteAddr, remoteStr := remoteAddrIP(r)
+	if !isTrustedProxyPeer(remoteAddr) {
+		return remoteStr
+	}
+
+	if config.ClientIPHeader != "" {
+		if edgeAddr, ok := parseIPString(r.Header.Get(config.ClientIPHeader)); ok {
+			return edgeAddr.String()
+		}
+	}
+
+	var forwarded []string
+	for _, hdr := range r.Header.Values("X-Forwarded-For") {
+		for _, part := range strings.Split(hdr, ",") {
+			if trimmed := strings.TrimSpace(part); trimmed != "" {
+				forwarded = append(forwarded, trimmed)
+			}
+		}
+	}
+	if len(forwarded) == 0 {
+		return remoteStr
+	}
+
+	// Parse X-Forwarded-For right-to-left so spoofed leftmost entries cannot
+	// bypass IP rate limits or pollute limiter keys.
+	if len(config.TrustedProxies) > 0 {
+		var lastValid netip.Addr
+		for i := len(forwarded) - 1; i >= 0; i-- {
+			addr, ok := parseIPString(forwarded[i])
+			if !ok {
+				if lastValid.IsValid() {
+					return lastValid.String()
+				}
+				return remoteStr
+			}
+			lastValid = addr
+			if !config.IsTrustedProxy(addr) {
+				return addr.String()
+			}
+		}
+		if lastValid.IsValid() {
+			return lastValid.String()
+		}
+		return remoteStr
+	}
+
+	hops := config.TrustedProxyHops
+	if hops <= 0 {
+		return remoteStr
+	}
+	// RemoteAddr is hop #1 (the immediate trusted proxy), so skip (hops - 1)
+	// proxy entries from the right of X-Forwarded-For.
+	skipped := 0
+	for i := len(forwarded) - 1; i >= 0; i-- {
+		addr, ok := parseIPString(forwarded[i])
+		if !ok {
+			return remoteStr
+		}
+		if skipped < hops-1 && i > 0 {
+			skipped++
+			continue
+		}
+		return addr.String()
+	}
+	return remoteStr
 }
 
 func decodeJSONBody(w http.ResponseWriter, r *http.Request, dst interface{}) bool {
@@ -390,6 +522,10 @@ func handleCreateParty(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleJoinParty(w http.ResponseWriter, r *http.Request) {
+	if !joinLimiter.Allow(clientIP(r)) {
+		jsonError(w, http.StatusTooManyRequests, "join_rate_limited", "Too many join attempts. Please try again shortly.")
+		return
+	}
 	code := r.PathValue("code")
 	var req protocol.JoinRequest
 	if !decodeJSONBody(w, r, &req) {
@@ -416,7 +552,7 @@ func handleJoinParty(w http.ResponseWriter, r *http.Request) {
 	}
 
 	p.Lock()
-	m, err := p.Join(req.UserId, req.DeviceId, req.DisplayName, req.AvatarUrl, existingToken)
+	m, rejoined, err := p.JoinWithStatus(req.UserId, req.DeviceId, req.DisplayName, req.AvatarUrl, existingToken)
 	if err != nil {
 		p.Unlock()
 		if pe, ok := err.(*party.PartyError); ok {
@@ -429,8 +565,15 @@ func handleJoinParty(w http.ResponseWriter, r *http.Request) {
 	partyWire := p.ToWire()
 	youWire := m.ToWire()
 	token := m.Token
+	memberId := m.MemberId
 	pCode := p.Code
 	p.Unlock()
+
+	if rejoined {
+		// Close any superseded WebSocket connection for this member slot so
+		// stale sockets cannot linger after token rotation.
+		hubInst.CloseMember(pCode, memberId)
+	}
 
 	jsonResponse(w, http.StatusOK, map[string]interface{}{
 		"code":  pCode,
@@ -449,10 +592,11 @@ func handleJoinParty(w http.ResponseWriter, r *http.Request) {
 // exactly what joining would disclose a second later, and anyone holding a code
 // can join. What it does not disclose is what the party is playing, its queue,
 // member or user ids, or anything that would let a caller act on the party.
-//
-// Not rate-limited beyond the service-wide limits: it takes no locks it does
-// not release, allocates a short slice, and creates nothing.
 func handlePreviewParty(w http.ResponseWriter, r *http.Request) {
+	if !readLimiter.Allow(clientIP(r)) {
+		jsonError(w, http.StatusTooManyRequests, "rate_limited", "Too many requests. Please try again shortly.")
+		return
+	}
 	code := r.PathValue("code")
 	p, err := store.Get(code)
 	if err != nil {
@@ -501,6 +645,10 @@ func handlePreviewParty(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleGetParty(w http.ResponseWriter, r *http.Request) {
+	if !readLimiter.Allow(clientIP(r)) {
+		jsonError(w, http.StatusTooManyRequests, "rate_limited", "Too many requests. Please try again shortly.")
+		return
+	}
 	code := r.PathValue("code")
 	token := parseBearerToken(r)
 	if token == "" {
@@ -786,9 +934,13 @@ func requestOrigin(r *http.Request) string {
 	if r.TLS != nil {
 		proto = "https"
 	}
-	if config.TrustProxy {
+	remoteAddr, _ := remoteAddrIP(r)
+	if isTrustedProxyPeer(remoteAddr) {
 		if forwardedProto := r.Header.Get("X-Forwarded-Proto"); forwardedProto != "" {
-			proto = strings.TrimSpace(strings.Split(forwardedProto, ",")[0])
+			cand := strings.ToLower(strings.TrimSpace(strings.Split(forwardedProto, ",")[0]))
+			if cand == "http" || cand == "https" {
+				proto = cand
+			}
 		}
 	}
 	host := r.Host
@@ -799,6 +951,10 @@ func requestOrigin(r *http.Request) string {
 }
 
 func handleInviteLanding(w http.ResponseWriter, r *http.Request) {
+	if !readLimiter.Allow(clientIP(r)) {
+		http.Error(w, "Too many requests. Please try again shortly.", http.StatusTooManyRequests)
+		return
+	}
 	code := codes.Normalise(r.PathValue("code"))
 	origin := requestOrigin(r)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -1129,13 +1285,20 @@ func applyControl(p *party.Party, member *party.Member, action string, frame map
 
 	case protocol.ActionQueueRemove:
 		vid, _ := frame["videoId"].(string)
-		if vid == "" {
-			if idxNum, ok := frame["index"].(float64); ok {
-				idx := int(idxNum)
-				if idx >= 0 && idx < len(p.Playback.Queue) {
-					vid = p.Playback.Queue[idx].VideoId
+		if idxNum, hasIdx := frame["index"].(float64); hasIdx {
+			if math.IsNaN(idxNum) || math.IsInf(idxNum, 0) || idxNum != float64(int(idxNum)) {
+				return false, "not_found", "Track is not in the upcoming queue"
+			}
+			idx := int(idxNum)
+			if vid != "" {
+				if idx <= p.Playback.QueueIndex || idx < 0 || idx >= len(p.Playback.Queue) || p.Playback.Queue[idx].VideoId != vid {
+					return false, "not_found", "Track is not in the upcoming queue"
 				}
 			}
+			if !p.Playback.RemoveUpcomingAt(&member.MemberId, idx) {
+				return false, "not_found", "Track is not in the upcoming queue"
+			}
+			return true, "", ""
 		}
 		if vid == "" {
 			return false, "missing_track", "queueRemove requires videoId or index"
@@ -1232,32 +1395,72 @@ func activityFrame(member *party.Member, action string, frame map[string]interfa
 	detail := action
 	trackTitle := func(raw interface{}) string {
 		track, _ := raw.(map[string]interface{})
+		if track == nil {
+			return ""
+		}
 		title, _ := track["title"].(string)
 		return title
 	}
 	switch action {
 	case protocol.ActionSetTrack:
-		if title := trackTitle(frame["track"]); title != "" { detail = "Changed the song to \"" + title + "\"" }
+		if title := trackTitle(frame["track"]); title != "" {
+			detail = "Changed the song to \"" + title + "\""
+		}
 	case protocol.ActionQueueAdd:
-		if tracks, ok := frame["tracks"].([]interface{}); ok && len(tracks) > 0 {
+		if title := trackTitle(frame["track"]); title != "" {
+			detail = "Added \"" + title + "\" to the queue"
+		} else if _, ok := frame["track"].(map[string]interface{}); ok {
+			detail = "Added a track to the queue"
+		} else if tracks, ok := frame["tracks"].([]interface{}); ok && len(tracks) > 0 {
 			title := trackTitle(tracks[0])
 			if title != "" {
-				if len(tracks) == 1 { detail = "Added \"" + title + "\" to the queue" } else { detail = fmt.Sprintf("Added \"%s\" and %d more to the queue", title, len(tracks)-1) }
+				if len(tracks) == 1 {
+					detail = "Added \"" + title + "\" to the queue"
+				} else {
+					detail = fmt.Sprintf("Added \"%s\" and %d more to the queue", title, len(tracks)-1)
+				}
+			} else if len(tracks) == 1 {
+				detail = "Added a track to the queue"
+			} else {
+				detail = fmt.Sprintf("Added %d tracks to the queue", len(tracks))
 			}
 		}
 	case protocol.ActionSetQueue:
-		if tracks, ok := frame["queue"].([]interface{}); ok { detail = fmt.Sprintf("Replaced the queue with %d tracks", len(tracks)) }
-	case protocol.ActionQueueRemove: detail = "Removed a track from the queue"
-	case protocol.ActionQueueClear: detail = "Cleared upcoming tracks"
-	case protocol.ActionQueueMove: detail = "Reordered the upcoming queue"
-	case protocol.ActionNext: detail = "Skipped to the next song"
-	case protocol.ActionPrevious: detail = "Went back to the previous song"
-	case protocol.ActionPlay: detail = "Started playback"
-	case protocol.ActionPause: detail = "Paused playback"
-	case protocol.ActionSeek: detail = "Changed the playback position"
-	case protocol.ActionKick: detail = "Removed a listener from the party"
-	case protocol.ActionSetMaxMembers: detail = "Changed the party size"
-	case protocol.ActionSetAutoplay: detail = "Changed AutoPlay"
+		if tracks, ok := frame["queue"].([]interface{}); ok {
+			detail = fmt.Sprintf("Replaced the queue with %d tracks", len(tracks))
+		}
+	case protocol.ActionQueueRemove:
+		detail = "Removed a track from the queue"
+	case protocol.ActionQueueClear:
+		detail = "Cleared upcoming tracks"
+	case protocol.ActionQueueMove:
+		detail = "Reordered the upcoming queue"
+	case protocol.ActionNext:
+		detail = "Skipped to the next song"
+	case protocol.ActionPrevious:
+		detail = "Went back to the previous song"
+	case protocol.ActionPlay:
+		detail = "Started playback"
+	case protocol.ActionPause:
+		detail = "Paused playback"
+	case protocol.ActionSeek:
+		detail = "Changed the playback position"
+	case protocol.ActionKick:
+		detail = "Removed a listener from the party"
+	case protocol.ActionSetMaxMembers:
+		detail = "Changed the party size"
+	case protocol.ActionSetAutoplay:
+		detail = "Changed AutoPlay"
+	case protocol.ActionSetHostOnlyControl:
+		if enabled, ok := frame["enabled"].(bool); ok {
+			if enabled {
+				detail = "Restricted playback controls to the host"
+			} else {
+				detail = "Allowed everyone to control playback"
+			}
+		} else {
+			detail = "Changed host-only control"
+		}
 	}
 	return map[string]interface{}{"type": protocol.FrameActivity, "action": action, "by": member.DisplayName, "detail": detail, "atMs": clock.NowMs()}
 }
@@ -1296,6 +1499,37 @@ func startPresenceSweeper() {
 	}
 }
 
+func sweepOnce(now int64) {
+	changed, expired := store.SweepDetailed(now)
+	for _, p := range changed {
+		p.Lock()
+		mf := membersFrame(p)
+		p.Unlock()
+		hubInst.Broadcast(p.Code, mf, "")
+	}
+
+	expiredBye := map[string]interface{}{
+		"type":    protocol.FrameBye,
+		"reason":  "expired",
+		"message": "This party has expired.",
+	}
+	for _, p := range expired {
+		hubInst.DropPartyWithBye(p.Code, expiredBye)
+	}
+
+	activeCodes := hubInst.ActiveCodes()
+	liveParties := store.All()
+	liveMap := make(map[string]bool, len(liveParties))
+	for _, lp := range liveParties {
+		liveMap[lp.Code] = true
+	}
+	for _, code := range activeCodes {
+		if !liveMap[code] {
+			hubInst.DropPartyWithBye(code, expiredBye)
+		}
+	}
+}
+
 func startHeartbeatTicker() {
 	interval := time.Duration(config.StateHeartbeatMs) * time.Millisecond
 	if interval < 1*time.Second {
@@ -1315,24 +1549,6 @@ func startHeartbeatTicker() {
 			}
 		}
 
-		changed := store.Sweep(now)
-		for _, p := range changed {
-			p.Lock()
-			mf := membersFrame(p)
-			p.Unlock()
-			hubInst.Broadcast(p.Code, mf, "")
-		}
-
-		activeCodes := hubInst.ActiveCodes()
-		liveParties := store.All()
-		liveMap := make(map[string]bool)
-		for _, lp := range liveParties {
-			liveMap[lp.Code] = true
-		}
-		for _, code := range activeCodes {
-			if !liveMap[code] {
-				hubInst.DropParty(code)
-			}
-		}
+		sweepOnce(now)
 	}
 }

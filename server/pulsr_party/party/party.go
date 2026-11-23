@@ -210,8 +210,12 @@ func (p *PlaybackState) SetTrack(
 		track != nil && p.Queue[*queueIndex].VideoId == track.VideoId {
 		p.QueueIndex = *queueIndex
 	} else if track != nil {
-		p.QueueIndex = nearestIndexOf(p.Queue, track.VideoId, p.QueueIndex)
-	} else if queueIndex != nil {
+		// Out-of-queue / external tracks must not reset QueueIndex to -1, which
+		// would cause AddUpcoming/ClearUpcoming to treat played history as upcoming.
+		if idx := nearestIndexOf(p.Queue, track.VideoId, p.QueueIndex); idx >= 0 {
+			p.QueueIndex = idx
+		}
+	} else if queueIndex != nil && *queueIndex >= -1 && *queueIndex < len(p.Queue) {
 		p.QueueIndex = *queueIndex
 	}
 
@@ -227,7 +231,9 @@ func (p *PlaybackState) SetQueue(memberId *string, queue []*Track, queueIndex in
 	// after that old copy as still to come.
 	if p.Track != nil {
 		if queueIndex < 0 || queueIndex >= len(queue) || queue[queueIndex].VideoId != p.Track.VideoId {
-			queueIndex = nearestIndexOf(queue, p.Track.VideoId, queueIndex)
+			if idx := nearestIndexOf(queue, p.Track.VideoId, queueIndex); idx >= 0 {
+				queueIndex = idx
+			}
 		}
 	}
 
@@ -384,6 +390,18 @@ func (p *PlaybackState) RemoveUpcoming(memberId *string, videoId string) bool {
 	return true
 }
 
+// RemoveUpcomingAt removes the track at idx only when idx strictly follows
+// QueueIndex and falls within queue bounds, protecting played history and the
+// currently playing slot.
+func (p *PlaybackState) RemoveUpcomingAt(memberId *string, idx int) bool {
+	if idx <= p.QueueIndex || idx < 0 || idx >= len(p.Queue) {
+		return false
+	}
+	p.Queue = append(p.Queue[:idx], p.Queue[idx+1:]...)
+	p.touchQueue(memberId)
+	return true
+}
+
 func (p *PlaybackState) ClearUpcoming(memberId *string) bool {
 	if p.QueueIndex >= 0 {
 		if len(p.Queue) <= p.QueueIndex+1 {
@@ -482,8 +500,7 @@ func (p *PlaybackState) SetAutoplay(memberId *string, enabled bool) {
 		return
 	}
 	p.AutoplayEnabled = enabled
-	p.UpdatedBy = memberId
-	p.UpdatedAtMs = clock.NowMs()
+	p.touch(memberId)
 }
 
 func (p *PlaybackState) QueueToWire() map[string]interface{} {
@@ -502,6 +519,8 @@ type Member struct {
 	DisplayName        string  `json:"displayName"`
 	AvatarUrl          *string `json:"avatarUrl,omitempty"`
 	Token              string  `json:"-"`
+	PrevToken          string  `json:"-"`
+	PrevTokenExpiresMs int64   `json:"-"`
 	IsHost             bool    `json:"isHost"`
 	Connected          bool    `json:"connected"`
 	JoinedAtMs         int64   `json:"joinedAtMs"`
@@ -581,32 +600,54 @@ func (p *Party) Host() *Member {
 	return nil
 }
 
+func memberTokenMatches(m *Member, supplied string, now int64) bool {
+	if supplied == "" {
+		return false
+	}
+	currentMatch := subtle.ConstantTimeCompare([]byte(m.Token), []byte(supplied)) == 1
+	graceActive := m.PrevToken != "" && now <= m.PrevTokenExpiresMs
+	prevMatch := graceActive && subtle.ConstantTimeCompare([]byte(m.PrevToken), []byte(supplied)) == 1
+	return currentMatch || prevMatch
+}
+
 func (p *Party) Join(userId, deviceId, displayName string, avatarUrl *string, existingToken ...string) (*Member, error) {
+	m, _, err := p.JoinWithStatus(userId, deviceId, displayName, avatarUrl, existingToken...)
+	return m, err
+}
+
+// JoinWithStatus joins or rejoins a device slot and reports whether an existing
+// member slot was rejoined (so the caller can close any superseded WebSocket).
+func (p *Party) JoinWithStatus(userId, deviceId, displayName string, avatarUrl *string, existingToken ...string) (*Member, bool, error) {
 	now := clock.NowMs()
 	var suppliedToken string
 	if len(existingToken) > 0 {
 		suppliedToken = strings.TrimSpace(existingToken[0])
 	}
-	// Rejoining device check: require the existing member's token so an
-	// unauthenticated caller cannot hijack an existing member/host slot solely by
-	// knowing or guessing its deviceId.
+	// Rejoining device check: require the existing member's token (or its
+	// short-lived grace predecessor from a retried join) so an unauthenticated
+	// caller cannot hijack an existing member/host slot solely by knowing or
+	// guessing its deviceId.
 	for _, m := range p.Members {
 		if m.DeviceId == deviceId {
-			if suppliedToken == "" || subtle.ConstantTimeCompare([]byte(m.Token), []byte(suppliedToken)) != 1 {
-				return nil, NewPartyError(401, "bad_token", "Valid member token is required to rejoin an existing device slot.")
+			if !memberTokenMatches(m, suppliedToken, now) {
+				return nil, false, NewPartyError(401, "bad_token", "Valid member token is required to rejoin an existing device slot.")
 			}
 			m.DisplayName = displayName
 			m.AvatarUrl = avatarUrl
 			m.UserId = userId
 			m.LastSeenMs = now
+			if subtle.ConstantTimeCompare([]byte(m.Token), []byte(suppliedToken)) == 1 {
+				m.PrevToken = m.Token
+				m.PrevTokenExpiresMs = now + config.TokenGraceMs
+			}
 			m.Token = randomToken(24)
 			p.Touch()
-			return m, nil
+			return m, true, nil
 		}
 	}
 
 	if len(p.Members) >= p.MaxMembers {
-		return nil, NewPartyError(409, "party_full", fmt.Sprintf("This party is full (%d devices).", p.MaxMembers))
+		return nil, false, NewPartyError(409, "party_full", fmt.Sprintf("This party is full (%d devices).", p.MaxMembers))
 	}
 
 	m := &Member{
@@ -627,7 +668,7 @@ func (p *Party) Join(userId, deviceId, displayName string, avatarUrl *string, ex
 	}
 	p.Members[m.MemberId] = m
 	p.Touch()
-	return m, nil
+	return m, false, nil
 }
 
 func (p *Party) SetMaxMembers(member *Member, maxMembers int) error {
@@ -671,8 +712,9 @@ func (p *Party) MayControl(member *Member) bool {
 }
 
 func (p *Party) Authenticate(token string) (*Member, error) {
+	now := clock.NowMs()
 	for _, m := range p.Members {
-		if subtle.ConstantTimeCompare([]byte(m.Token), []byte(token)) == 1 {
+		if memberTokenMatches(m, token, now) {
 			return m, nil
 		}
 	}
@@ -918,29 +960,54 @@ func (s *PartyStore) All() []*Party {
 	return res
 }
 
+// Sweep drops expired rooms and members without holding PartyStore.mu across
+// individual room locks, returning live rooms whose membership changed.
 func (s *PartyStore) Sweep(now int64) []*Party {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	changed, _ := s.SweepDetailed(now)
+	return changed
+}
 
-	var changed []*Party
-	for code, party := range s.parties {
-		party.Lock()
-		gone := party.ExpiredMembers(now)
+// SweepDetailed snapshots room pointers under RLock, sweeps each room under its
+// own lock, removes expired rooms from the store, and returns both changed live
+// rooms and newly expired rooms so callers can send bye frames before closing.
+func (s *PartyStore) SweepDetailed(now int64) (changed []*Party, expired []*Party) {
+	s.mu.RLock()
+	snapshot := make([]*Party, 0, len(s.parties))
+	for _, p := range s.parties {
+		snapshot = append(snapshot, p)
+	}
+	s.mu.RUnlock()
+
+	var toDrop []*Party
+	for _, p := range snapshot {
+		p.Lock()
+		gone := p.ExpiredMembers(now)
 		for _, m := range gone {
-			party.Remove(m.MemberId)
+			p.Remove(m.MemberId)
 		}
-		expired := party.IsExpired(now)
-		party.Unlock()
+		isExpired := p.IsExpired(now)
+		p.Unlock()
 
-		if expired {
-			delete(s.parties, code)
+		if isExpired {
+			toDrop = append(toDrop, p)
 			continue
 		}
 		if len(gone) > 0 {
-			changed = append(changed, party)
+			changed = append(changed, p)
 		}
 	}
-	return changed
+
+	if len(toDrop) > 0 {
+		s.mu.Lock()
+		for _, p := range toDrop {
+			if cur, ok := s.parties[p.Code]; ok && cur == p {
+				delete(s.parties, p.Code)
+				expired = append(expired, p)
+			}
+		}
+		s.mu.Unlock()
+	}
+	return changed, expired
 }
 
 func randomHex(n int) string {

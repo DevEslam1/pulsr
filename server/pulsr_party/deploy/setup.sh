@@ -7,7 +7,7 @@
 # First run on a fresh VM also takes DEPLOY_PUBKEY (the public half of the
 # GitHub Actions deploy key) to create the restricted `deploy` user.
 #
-# Run it from the backend/ directory of a checkout on the VM. The DNS A record
+# Run it from the server/pulsr_party/ directory of a checkout on the VM. The DNS A record
 # for $DOMAIN must already point at this VM, or Caddy cannot get a certificate.
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive

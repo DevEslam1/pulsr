@@ -3,7 +3,9 @@ package party
 import (
 	"fmt"
 	"testing"
+	"time"
 
+	"github.com/pulsr-audio/pulsr/server/party/clock"
 	"github.com/pulsr-audio/pulsr/server/party/codes"
 	"github.com/pulsr-audio/pulsr/server/party/config"
 )
@@ -380,12 +382,241 @@ func TestQueueOperationsDoNotIncrementPlaybackSeq(t *testing.T) {
 	if ps.QueueSeq != qSeq+1 {
 		t.Fatalf("ClearUpcoming must increment QueueSeq")
 	}
+}
 
-	// 6. SetAutoplay
+func TestSetAutoplayIncrementsPlaybackSeq(t *testing.T) {
+	ps := NewPlaybackState()
+	memberId := "mem-1"
+	startSeq := ps.Seq
+
 	ps.SetAutoplay(&memberId, true)
-	if ps.Seq != playbackSeq {
-		t.Fatalf("SetAutoplay should not increment playback Seq, got %d vs %d", ps.Seq, playbackSeq)
+	if ps.Seq != startSeq+1 {
+		t.Fatalf("SetAutoplay toggle must increment Seq, got %d want %d", ps.Seq, startSeq+1)
 	}
+	if ps.UpdatedBy == nil || *ps.UpdatedBy != memberId {
+		t.Fatalf("expected UpdatedBy=%q, got %v", memberId, ps.UpdatedBy)
+	}
+
+	// Repeating the same value is a no-op and does not bump Seq.
+	ps.SetAutoplay(&memberId, true)
+	if ps.Seq != startSeq+1 {
+		t.Fatalf("redundant SetAutoplay must not bump Seq, got %d want %d", ps.Seq, startSeq+1)
+	}
+
+	ps.SetAutoplay(&memberId, false)
+	if ps.Seq != startSeq+2 {
+		t.Fatalf("SetAutoplay off must increment Seq, got %d want %d", ps.Seq, startSeq+2)
+	}
+}
+
+func TestSetTrackOutOfQueuePreservesQueueCursor(t *testing.T) {
+	ps := NewPlaybackState()
+	h0 := &Track{VideoId: "h0", Title: "History 0"}
+	h1 := &Track{VideoId: "h1", Title: "History 1"}
+	curr := &Track{VideoId: "curr", Title: "Current"}
+	up1 := &Track{VideoId: "up1", Title: "Upcoming 1"}
+	ext := &Track{VideoId: "local_ext", Title: "Local File"}
+
+	ps.SetTrack(nil, curr, 0, true, nil, nil)
+	ps.SetQueue(nil, []*Track{h0, h1, curr, up1}, 2)
+	if ps.QueueIndex != 2 {
+		t.Fatalf("expected initial QueueIndex=2, got %d", ps.QueueIndex)
+	}
+
+	// Switching to an out-of-queue track must NOT reset QueueIndex to -1.
+	memberId := "m1"
+	ps.SetTrack(&memberId, ext, 0, true, nil, nil)
+	if ps.QueueIndex != 2 {
+		t.Fatalf("expected QueueIndex to remain 2 on external SetTrack, got %d", ps.QueueIndex)
+	}
+
+	// AddUpcoming (including playNext) must insert after QueueIndex, never before history.
+	upNext := &Track{VideoId: "up_next", Title: "Up Next"}
+	if ok, reason := ps.AddUpcoming(&memberId, []*Track{upNext}, true); !ok {
+		t.Fatalf("AddUpcoming failed: %s", reason)
+	}
+	wantOrder := []string{"h0", "h1", "curr", "up_next", "up1"}
+	if len(ps.Queue) != len(wantOrder) {
+		t.Fatalf("expected %d queue items, got %d", len(wantOrder), len(ps.Queue))
+	}
+	for i, w := range wantOrder {
+		if ps.Queue[i].VideoId != w {
+			t.Fatalf("index %d = %s, want %s", i, ps.Queue[i].VideoId, w)
+		}
+	}
+
+	// ClearUpcoming must preserve played history [h0, h1, curr].
+	if !ps.ClearUpcoming(&memberId) {
+		t.Fatalf("ClearUpcoming failed")
+	}
+	if len(ps.Queue) != 3 || ps.Queue[0].VideoId != "h0" || ps.Queue[1].VideoId != "h1" || ps.Queue[2].VideoId != "curr" {
+		t.Fatalf("ClearUpcoming corrupted played history: len=%d", len(ps.Queue))
+	}
+
+	// SetQueue while external track is active must preserve sender's queueIndex.
+	ps.SetQueue(&memberId, []*Track{h0, h1, curr, up1}, 2)
+	if ps.QueueIndex != 2 {
+		t.Fatalf("SetQueue with active external track clobbered QueueIndex to %d", ps.QueueIndex)
+	}
+}
+
+func TestRemoveUpcomingAt(t *testing.T) {
+	ps := NewPlaybackState()
+	h0 := &Track{VideoId: "dup", Title: "History Dup"}
+	curr := &Track{VideoId: "curr", Title: "Current"}
+	upDup1 := &Track{VideoId: "dup", Title: "Upcoming Dup 1"}
+	other := &Track{VideoId: "other", Title: "Other"}
+	upDup2 := &Track{VideoId: "dup", Title: "Upcoming Dup 2"}
+
+	ps.SetTrack(nil, curr, 0, true, nil, nil)
+	ps.SetQueue(nil, []*Track{h0, curr, upDup1, other, upDup2}, 1)
+	memberId := "m1"
+
+	// Bounds and history/current checks.
+	for _, badIdx := range []int{-1, 0, 1, 5, 100} {
+		if ps.RemoveUpcomingAt(&memberId, badIdx) {
+			t.Fatalf("RemoveUpcomingAt(%d) should fail when QueueIndex=%d and len=%d", badIdx, ps.QueueIndex, len(ps.Queue))
+		}
+	}
+
+	// Removing index 4 must remove only the second upcoming duplicate, keeping index 0 & 2.
+	qSeq := ps.QueueSeq
+	if !ps.RemoveUpcomingAt(&memberId, 4) {
+		t.Fatalf("expected RemoveUpcomingAt(4) to succeed")
+	}
+	if ps.QueueSeq != qSeq+1 {
+		t.Fatalf("expected QueueSeq to increment")
+	}
+	want := []string{"dup", "curr", "dup", "other"}
+	if len(ps.Queue) != len(want) {
+		t.Fatalf("expected len %d, got %d", len(want), len(ps.Queue))
+	}
+	for i, w := range want {
+		if ps.Queue[i].VideoId != w {
+			t.Fatalf("index %d = %s, want %s", i, ps.Queue[i].VideoId, w)
+		}
+	}
+}
+
+func TestJoinTokenGraceWindowAndExpiry(t *testing.T) {
+	p := NewParty("GRACE1")
+	m, err := p.Join("u1", "d1", "Alice", nil)
+	if err != nil {
+		t.Fatalf("initial join failed: %v", err)
+	}
+	tok1 := m.Token
+
+	// First rejoin rotates token and records PrevToken for short grace.
+	mRejoined, rejoined, err := p.JoinWithStatus("u1", "d1", "Alice2", nil, tok1)
+	if err != nil || !rejoined {
+		t.Fatalf("expected rejoin to succeed (rejoined=%v, err=%v)", rejoined, err)
+	}
+	tok2 := mRejoined.Token
+	if tok2 == tok1 {
+		t.Fatalf("expected token rotation on rejoin")
+	}
+
+	// Retried join with tok1 inside grace window succeeds.
+	mRetry, rejoined2, err := p.JoinWithStatus("u1", "d1", "Alice3", nil, tok1)
+	if err != nil || !rejoined2 {
+		t.Fatalf("expected retried join within grace window to succeed: err=%v", err)
+	}
+	if mRetry.MemberId != m.MemberId {
+		t.Fatalf("expected same MemberId on retried join")
+	}
+	tok3 := mRetry.Token
+
+	// Authenticate also accepts tok1 during grace, and current tok3.
+	if _, err := p.Authenticate(tok1); err != nil {
+		t.Fatalf("expected Authenticate(tok1) to succeed during grace: %v", err)
+	}
+	if _, err := p.Authenticate(tok3); err != nil {
+		t.Fatalf("expected Authenticate(tok3) to succeed: %v", err)
+	}
+
+	// Once grace expires, tok1 must be rejected while current tok3 still works.
+	mRetry.PrevTokenExpiresMs = clock.NowMs() - 1
+	if _, err := p.Authenticate(tok1); err == nil {
+		t.Fatalf("expected expired grace token to fail Authenticate")
+	}
+	if _, _, err := p.JoinWithStatus("u1", "d1", "Alice4", nil, tok1); err == nil {
+		t.Fatalf("expected expired grace token to fail Join")
+	}
+	if _, err := p.Authenticate(tok3); err != nil {
+		t.Fatalf("expected active token to keep working after grace expiry: %v", err)
+	}
+}
+
+func TestPartyStoreSweepDetailedSnapshotAndExpiry(t *testing.T) {
+	s := NewPartyStore()
+	pLive, err := s.Create()
+	if err != nil {
+		t.Fatalf("create live failed: %v", err)
+	}
+	pExp, err := s.Create()
+	if err != nil {
+		t.Fatalf("create exp failed: %v", err)
+	}
+
+	now := clock.NowMs()
+	m1, _ := pLive.Join("u1", "d1", "M1", nil)
+	m2, _ := pLive.Join("u2", "d2", "M2", nil)
+	pLive.MarkConnected(m1, true)
+	m2.Connected = false
+	m2.LastSeenMs = now - config.DisconnectGraceMs - 1000
+
+	mExp, _ := pExp.Join("u3", "d3", "M3", nil)
+	pExp.MarkConnected(mExp, true)
+	pExp.CreatedAtMs = now - config.PartyMaxAgeMs - 1000
+
+	// Hold pLive.Lock() while verifying store.Len() doesn't block against SweepDetailed?
+	// Specifically verify SweepDetailed removes pExp, keeps pLive, drops m2, and returns both slices.
+	changed, expired := s.SweepDetailed(now)
+	if len(changed) != 1 || changed[0].Code != pLive.Code {
+		t.Fatalf("expected changed=[%s], got %+v", pLive.Code, changed)
+	}
+	if len(expired) != 1 || expired[0].Code != pExp.Code {
+		t.Fatalf("expected expired=[%s], got %+v", pExp.Code, expired)
+	}
+	if s.Find(pExp.Code) != nil {
+		t.Fatalf("expected expired party to be removed from store")
+	}
+	if s.Find(pLive.Code) == nil {
+		t.Fatalf("expected live party to stay in store")
+	}
+	pLive.Lock()
+	if len(pLive.Members) != 1 {
+		pLive.Unlock()
+		t.Fatalf("expected expired member m2 to be removed from pLive")
+	}
+	pLive.Unlock()
+
+	// Verify SweepDetailed does NOT hold s.mu while waiting on a room lock:
+	// hold pLive.Lock() in main goroutine, start SweepDetailed in background,
+	// and verify s.Len() completes immediately without waiting for pLive.Unlock().
+	pLive.Lock()
+	sweepDone := make(chan struct{})
+	go func() {
+		s.SweepDetailed(now)
+		close(sweepDone)
+	}()
+	time.Sleep(20 * time.Millisecond)
+	lenDone := make(chan int, 1)
+	go func() {
+		lenDone <- s.Len()
+	}()
+	select {
+	case n := <-lenDone:
+		if n != 1 {
+			pLive.Unlock()
+			t.Fatalf("expected s.Len() == 1, got %d", n)
+		}
+	case <-time.After(300 * time.Millisecond):
+		pLive.Unlock()
+		t.Fatalf("PartyStore.Len() blocked while SweepDetailed waited on a single room lock")
+	}
+	pLive.Unlock()
+	<-sweepDone
 }
 
 func TestHostOnlyControlIsHostOnly(t *testing.T) {

@@ -15,28 +15,20 @@ import (
 
 	"github.com/pulsr-audio/pulsr/server/party/clock"
 	"github.com/pulsr-audio/pulsr/server/party/config"
+	"github.com/pulsr-audio/pulsr/server/party/hub"
 	"github.com/pulsr-audio/pulsr/server/party/party"
 	"github.com/pulsr-audio/pulsr/server/party/presence"
 	"github.com/pulsr-audio/pulsr/server/party/protocol"
 )
 
 func setupTestServer() *httptest.Server {
+	store = party.NewPartyStore()
+	hubInst = hub.NewHub()
 	createLimiter = newIPRateLimiter(time.Minute, 100, 100)
-	mux := http.NewServeMux()
-	mux.HandleFunc("GET /{$}", handleRoot)
-	mux.HandleFunc("GET /healthz", handleHealthz)
-	mux.HandleFunc("GET /api/time", handleTime)
-	mux.HandleFunc("POST /api/parties", handleCreateParty)
-	mux.HandleFunc("POST /api/parties/{code}/join", handleJoinParty)
-	mux.HandleFunc("GET /api/parties/{code}", handleGetParty)
-	mux.HandleFunc("POST /api/parties/{code}/leave", handleLeaveParty)
-	mux.HandleFunc("POST /api/presence", handlePresence)
-	mux.HandleFunc("GET /api/stats/live", handleLiveStats)
-	mux.HandleFunc("GET /api/stats/live/badge.svg", handleLiveBadge)
-	mux.HandleFunc("GET /invite/{code}", handleInviteLanding)
-	mux.HandleFunc("GET /ws/parties/{code}", handleWebSocket)
-
-	return httptest.NewServer(corsMiddleware(mux))
+	joinLimiter = newIPRateLimiter(time.Minute, 100, 100)
+	readLimiter = newIPRateLimiter(time.Minute, 100, 100)
+	presenceLimiter = newIPRateLimiter(time.Minute, 100, 100)
+	return httptest.NewServer(corsMiddleware(buildMux()))
 }
 
 func TestRESTEndpoints(t *testing.T) {
@@ -245,19 +237,179 @@ func TestCreateRateLimiter(t *testing.T) {
 }
 
 func TestRateLimiterFreesExpiredEntriesWhenFull(t *testing.T) {
+	now := time.Unix(1000, 0)
 	limiter := newIPRateLimiter(time.Minute, 5, 1)
+	limiter.nowFn = func() time.Time { return now }
+
 	if !limiter.Allow("203.0.113.20") {
 		t.Fatal("expected the first IP to fit")
 	}
-	if limiter.Allow("203.0.113.21") {
-		t.Fatal("expected a second IP to be refused while the table is full")
-	}
-	// Age the only entry past the window; a full table must sweep it to make room.
-	entry := limiter.entries["203.0.113.20"]
-	entry.started = entry.started.Add(-2 * time.Minute)
-	limiter.entries["203.0.113.20"] = entry
+	// Age past window; sweep removes expired entry cleanly before inserting new IP.
+	now = now.Add(2 * time.Minute)
 	if !limiter.Allow("203.0.113.21") {
 		t.Fatal("expected the expired entry to be swept for the new IP")
+	}
+	if _, exists := limiter.entries["203.0.113.20"]; exists {
+		t.Fatal("expected expired IP to be deleted from table")
+	}
+}
+
+func TestRateLimiterLRUEvictionPreventsGlobalDoS(t *testing.T) {
+	now := time.Unix(2000, 0)
+	limiter := newIPRateLimiter(time.Minute, 2, 2)
+	limiter.nowFn = func() time.Time { return now }
+
+	// Fill table to capacity=2: [203.0.113.2, 203.0.113.1] (most-recent -> least-recent)
+	if !limiter.Allow("203.0.113.1") || !limiter.Allow("203.0.113.2") {
+		t.Fatal("expected initial entries to be allowed")
+	}
+	// Touch .1 again so .2 becomes least recently used and .1 reaches its limit of 2.
+	if !limiter.Allow("203.0.113.1") {
+		t.Fatal("expected second hit from .1 to be allowed")
+	}
+
+	// Attacker floods with new IPs: table must evict LRU (.2) rather than
+	// globally denying all new legitimate IPs.
+	if !limiter.Allow("203.0.113.3") {
+		t.Fatal("expected new legitimate IP to succeed via LRU eviction, not global DoS")
+	}
+	if len(limiter.entries) > 2 {
+		t.Fatalf("expected bounded entries <= 2, got %d", len(limiter.entries))
+	}
+	if _, ok := limiter.entries["203.0.113.2"]; ok {
+		t.Fatal("expected least-recently-used IP 203.0.113.2 to be evicted")
+	}
+	// Recently active IP (.1) was retained and remains rate limited on its 3rd hit.
+	if limiter.Allow("203.0.113.1") {
+		t.Fatal("expected recently active IP 203.0.113.1 to remain tracked and rate limited")
+	}
+}
+
+func TestClientIPRightToLeftAndTrustedProxies(t *testing.T) {
+	oldTrust := config.TrustProxy
+	oldHops := config.TrustedProxyHops
+	oldProxies := config.TrustedProxies
+	oldHeader := config.ClientIPHeader
+	defer func() {
+		config.TrustProxy = oldTrust
+		config.TrustedProxyHops = oldHops
+		config.TrustedProxies = oldProxies
+		config.ClientIPHeader = oldHeader
+	}()
+
+	// 1. TrustProxy=false must ignore X-Forwarded-For and edge headers.
+	config.TrustProxy = false
+	config.TrustedProxyHops = 1
+	config.TrustedProxies = nil
+	config.ClientIPHeader = "True-Client-IP"
+	r := httptest.NewRequest("GET", "/", nil)
+	r.RemoteAddr = "198.51.100.10:54321"
+	r.Header.Set("X-Forwarded-For", "1.2.3.4")
+	r.Header.Set("True-Client-IP", "5.6.7.8")
+	if got := clientIP(r); got != "198.51.100.10" {
+		t.Fatalf("TrustProxy=false returned %q, want 198.51.100.10", got)
+	}
+
+	// 2. TrustProxy=true, 1 proxy hop: rightmost entry wins over spoofed leftmost entries.
+	config.TrustProxy = true
+	config.TrustedProxyHops = 1
+	config.ClientIPHeader = ""
+	r = httptest.NewRequest("GET", "/", nil)
+	r.RemoteAddr = "127.0.0.1:4444"
+	r.Header.Add("X-Forwarded-For", "10.99.99.99, 192.0.2.50")
+	r.Header.Add("X-Forwarded-For", "203.0.113.9")
+	if got := clientIP(r); got != "203.0.113.9" {
+		t.Fatalf("1-hop XFF returned %q, want 203.0.113.9", got)
+	}
+
+	// 3. TrustProxy=true, 2 proxy hops: skip 1 proxy hop inside XFF from the right.
+	config.TrustedProxyHops = 2
+	r = httptest.NewRequest("GET", "/", nil)
+	r.RemoteAddr = "127.0.0.1:4444"
+	r.Header.Set("X-Forwarded-For", "1.2.3.4, 203.0.113.42, 172.64.0.1")
+	if got := clientIP(r); got != "203.0.113.42" {
+		t.Fatalf("2-hop XFF returned %q, want 203.0.113.42", got)
+	}
+
+	// 4. Configured TrustedProxies CIDR check: untrusted peer cannot spoof XFF.
+	config.TrustedProxyHops = 1
+	config.TrustedProxies = config.ParseTrustedProxies([]string{"127.0.0.1/8", "10.0.0.0/8"})
+	rUntrusted := httptest.NewRequest("GET", "/", nil)
+	rUntrusted.RemoteAddr = "198.51.100.88:9000"
+	rUntrusted.Header.Set("X-Forwarded-For", "1.2.3.4")
+	if got := clientIP(rUntrusted); got != "198.51.100.88" {
+		t.Fatalf("untrusted peer returned %q, want 198.51.100.88", got)
+	}
+
+	// Trusted peer skips right-to-left only across trusted proxy hops.
+	rTrusted := httptest.NewRequest("GET", "/", nil)
+	rTrusted.RemoteAddr = "127.0.0.1:9000"
+	rTrusted.Header.Set("X-Forwarded-For", "9.9.9.9, 203.0.113.77, 10.1.2.3")
+	if got := clientIP(rTrusted); got != "203.0.113.77" {
+		t.Fatalf("trusted proxy chain returned %q, want 203.0.113.77", got)
+	}
+
+	// 5. Configured platform edge header wins when peer is trusted and header is valid IP.
+	config.ClientIPHeader = "True-Client-IP"
+	rEdge := httptest.NewRequest("GET", "/", nil)
+	rEdge.RemoteAddr = "127.0.0.1:9000"
+	rEdge.Header.Set("True-Client-IP", "203.0.113.120")
+	rEdge.Header.Set("X-Forwarded-For", "1.2.3.4")
+	if got := clientIP(rEdge); got != "203.0.113.120" {
+		t.Fatalf("edge header returned %q, want 203.0.113.120", got)
+	}
+
+	// 6. Malformed XFF garbage falls back to RemoteAddr rather than poisoning limiter map.
+	config.ClientIPHeader = ""
+	config.TrustedProxies = nil
+	rBad := httptest.NewRequest("GET", "/", nil)
+	rBad.RemoteAddr = "127.0.0.1:9000"
+	rBad.Header.Set("X-Forwarded-For", "not-an-ip-key")
+	if got := clientIP(rBad); got != "127.0.0.1" {
+		t.Fatalf("malformed XFF returned %q, want 127.0.0.1", got)
+	}
+}
+
+func TestSpoofedXFFCannotExhaustRateLimiter(t *testing.T) {
+	oldTrust := config.TrustProxy
+	oldHops := config.TrustedProxyHops
+	oldProxies := config.TrustedProxies
+	oldHeader := config.ClientIPHeader
+	defer func() {
+		config.TrustProxy = oldTrust
+		config.TrustedProxyHops = oldHops
+		config.TrustedProxies = oldProxies
+		config.ClientIPHeader = oldHeader
+	}()
+
+	config.TrustProxy = true
+	config.TrustedProxyHops = 1
+	config.TrustedProxies = nil
+	config.ClientIPHeader = ""
+
+	limiter := newIPRateLimiter(time.Minute, 2, 3)
+
+	// Attacker rotates leftmost X-Forwarded-For values behind proxy, which appends
+	// the attacker's actual IP on the right.
+	for i := 0; i < 20; i++ {
+		req := httptest.NewRequest("POST", "/api/parties", nil)
+		req.RemoteAddr = "127.0.0.1:5000"
+		req.Header.Set("X-Forwarded-For", fmt.Sprintf("10.0.%d.%d, 198.51.100.77", i/250, i%250+1))
+		allowed := limiter.Allow(clientIP(req))
+		if i < 2 && !allowed {
+			t.Fatalf("expected attacker's first 2 requests to pass")
+		}
+		if i >= 2 && allowed {
+			t.Fatalf("expected attacker request %d to be rate limited despite spoofed XFF", i)
+		}
+	}
+
+	// Legitimate user behind proxy must still be allowed.
+	legitReq := httptest.NewRequest("POST", "/api/parties", nil)
+	legitReq.RemoteAddr = "127.0.0.1:5001"
+	legitReq.Header.Set("X-Forwarded-For", "203.0.113.55")
+	if !limiter.Allow(clientIP(legitReq)) {
+		t.Fatal("legitimate user was blocked after spoofed XFF flood")
 	}
 }
 
@@ -349,9 +501,9 @@ func TestPresence(t *testing.T) {
 
 func TestPresenceRateLimit(t *testing.T) {
 	presenceTracker = presence.NewTracker(6*time.Minute, 1000)
-	presenceLimiter = newIPRateLimiter(time.Minute, 2, 100)
 	ts := setupTestServer()
 	defer ts.Close()
+	presenceLimiter = newIPRateLimiter(time.Minute, 2, 100)
 
 	body := `{"id":"3f2b8c1e-9a4d-4e6f-8b7a-1c2d3e4f5a6b","platform":"android","open":true}`
 	postPresence(t, ts, body, "")
@@ -647,5 +799,381 @@ func TestReconnectDoesNotMarkLiveMemberDisconnected(t *testing.T) {
 	p.Unlock()
 	if !connected {
 		t.Fatalf("Expected member to remain Connected=true after ws1 defer ran")
+	}
+}
+
+func TestJoinPreviewGetInviteRateLimited(t *testing.T) {
+	ts := setupTestServer()
+	defer ts.Close()
+
+	// Create a party first
+	createBody, _ := json.Marshal(map[string]string{
+		"userId": "u_rl", "deviceId": "d_rl", "displayName": "Host",
+	})
+	res, err := http.Post(ts.URL+"/api/parties", "application/json", bytes.NewReader(createBody))
+	if err != nil || res.StatusCode != http.StatusCreated {
+		t.Fatalf("create failed: status=%v err=%v", res.StatusCode, err)
+	}
+	var pResp map[string]interface{}
+	_ = json.NewDecoder(res.Body).Decode(&pResp)
+	code := pResp["code"].(string)
+	token := pResp["token"].(string)
+
+	// Tighten joinLimiter to 2/min and verify 3rd /join returns 429.
+	joinLimiter = newIPRateLimiter(time.Minute, 2, 100)
+	for i := 0; i < 3; i++ {
+		jb, _ := json.Marshal(map[string]string{
+			"userId":      fmt.Sprintf("u_j_%d", i),
+			"deviceId":    fmt.Sprintf("d_j_%d", i),
+			"displayName": "Guest",
+		})
+		jr, err := http.Post(fmt.Sprintf("%s/api/parties/%s/join", ts.URL, code), "application/json", bytes.NewReader(jb))
+		if err != nil {
+			t.Fatalf("join %d failed: %v", i, err)
+		}
+		if i < 2 && jr.StatusCode != http.StatusOK {
+			t.Fatalf("join %d status=%d, want 200", i, jr.StatusCode)
+		}
+		if i == 2 && jr.StatusCode != http.StatusTooManyRequests {
+			t.Fatalf("join %d status=%d, want 429", i, jr.StatusCode)
+		}
+	}
+
+	// Tighten readLimiter to 3/min across /preview, /get, /invite: 4th read must return 429.
+	readLimiter = newIPRateLimiter(time.Minute, 3, 100)
+
+	r1, _ := http.Get(fmt.Sprintf("%s/api/parties/%s/preview", ts.URL, code))
+	if r1.StatusCode != http.StatusOK {
+		t.Fatalf("/preview status=%d, want 200", r1.StatusCode)
+	}
+
+	req2, _ := http.NewRequest("GET", fmt.Sprintf("%s/api/parties/%s", ts.URL, code), nil)
+	req2.Header.Set("Authorization", "Bearer "+token)
+	r2, _ := http.DefaultClient.Do(req2)
+	if r2.StatusCode != http.StatusOK {
+		t.Fatalf("/get status=%d, want 200", r2.StatusCode)
+	}
+
+	r3, _ := http.Get(fmt.Sprintf("%s/invite/%s", ts.URL, code))
+	if r3.StatusCode != http.StatusOK {
+		t.Fatalf("/invite status=%d, want 200", r3.StatusCode)
+	}
+
+	// Next calls across /preview, /get, /invite must all be 429.
+	for _, urlPath := range []string{
+		fmt.Sprintf("%s/api/parties/%s/preview", ts.URL, code),
+		fmt.Sprintf("%s/api/parties/%s", ts.URL, code),
+		fmt.Sprintf("%s/invite/%s", ts.URL, code),
+	} {
+		req, _ := http.NewRequest("GET", urlPath, nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		rr, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("request %s failed: %v", urlPath, err)
+		}
+		if rr.StatusCode != http.StatusTooManyRequests {
+			t.Fatalf("%s returned status=%d, want 429", urlPath, rr.StatusCode)
+		}
+	}
+}
+
+func TestRejoinClosesSupersededWebSocketAndPreservesRetryGrace(t *testing.T) {
+	ts := setupTestServer()
+	defer ts.Close()
+
+	// Host creates party, guest joins with tok1.
+	hostBody, _ := json.Marshal(map[string]string{"userId": "uh", "deviceId": "dh", "displayName": "Host"})
+	hRes, _ := http.Post(ts.URL+"/api/parties", "application/json", bytes.NewReader(hostBody))
+	var hResp map[string]interface{}
+	_ = json.NewDecoder(hRes.Body).Decode(&hResp)
+	code := hResp["code"].(string)
+
+	guestPayload := map[string]string{"userId": "ug", "deviceId": "dg", "displayName": "Guest"}
+	gb, _ := json.Marshal(guestPayload)
+	gRes, err := http.Post(fmt.Sprintf("%s/api/parties/%s/join", ts.URL, code), "application/json", bytes.NewReader(gb))
+	if err != nil || gRes.StatusCode != http.StatusOK {
+		t.Fatalf("initial join failed: status=%v err=%v", gRes.StatusCode, err)
+	}
+	var gResp map[string]interface{}
+	_ = json.NewDecoder(gRes.Body).Decode(&gResp)
+	tok1 := gResp["token"].(string)
+
+	u, _ := url.Parse(ts.URL)
+	u.Scheme = "ws"
+	u.Path = fmt.Sprintf("/ws/parties/%s", code)
+
+	dialWS := func(tok string) *websocket.Conn {
+		h := http.Header{}
+		h.Set("Authorization", "Bearer "+tok)
+		c, _, err := websocket.DefaultDialer.Dial(u.String(), h)
+		if err != nil {
+			t.Fatalf("dial failed: %v", err)
+		}
+		var welcome map[string]interface{}
+		_ = c.SetReadDeadline(time.Now().Add(2 * time.Second))
+		if err := c.ReadJSON(&welcome); err != nil {
+			t.Fatalf("read welcome failed: %v", err)
+		}
+		return c
+	}
+
+	ws1 := dialWS(tok1)
+	defer ws1.Close()
+
+	// Rejoin via POST /join with tok1: must close superseded ws1 and rotate token.
+	rejoinReq, _ := http.NewRequest("POST", fmt.Sprintf("%s/api/parties/%s/join", ts.URL, code), bytes.NewReader(gb))
+	rejoinReq.Header.Set("Content-Type", "application/json")
+	rejoinReq.Header.Set("Authorization", "Bearer "+tok1)
+	rjRes, err := http.DefaultClient.Do(rejoinReq)
+	if err != nil || rjRes.StatusCode != http.StatusOK {
+		t.Fatalf("rejoin failed: status=%v err=%v", rjRes.StatusCode, err)
+	}
+	var rjResp map[string]interface{}
+	_ = json.NewDecoder(rjRes.Body).Decode(&rjResp)
+	tok2 := rjResp["token"].(string)
+	if tok2 == tok1 {
+		t.Fatalf("expected token rotation on rejoin")
+	}
+
+	// Superseded ws1 must close promptly without sending FrameBye (which would make clients leaveParty).
+	_ = ws1.SetReadDeadline(time.Now().Add(2 * time.Second))
+	for {
+		var msg map[string]interface{}
+		err := ws1.ReadJSON(&msg)
+		if err != nil {
+			break
+		}
+		if msg["type"] == protocol.FrameBye {
+			t.Fatalf("superseded rejoin socket should close cleanly without FrameBye, got %+v", msg)
+		}
+	}
+
+	// Retried join still presenting tok1 within grace window must succeed (no 401 bad_token).
+	retryReq, _ := http.NewRequest("POST", fmt.Sprintf("%s/api/parties/%s/join", ts.URL, code), bytes.NewReader(gb))
+	retryReq.Header.Set("Content-Type", "application/json")
+	retryReq.Header.Set("Authorization", "Bearer "+tok1)
+	rtRes, err := http.DefaultClient.Do(retryReq)
+	if err != nil || rtRes.StatusCode != http.StatusOK {
+		t.Fatalf("retried join with grace token failed: status=%v err=%v", rtRes.StatusCode, err)
+	}
+	var rtResp map[string]interface{}
+	_ = json.NewDecoder(rtRes.Body).Decode(&rtResp)
+	tok3 := rtResp["token"].(string)
+
+	ws2 := dialWS(tok3)
+	defer ws2.Close()
+}
+
+func TestWebSocketSetAutoplayAndQueueRemoveIndexAndSweepBye(t *testing.T) {
+	ts := setupTestServer()
+	defer ts.Close()
+
+	// Create Party (Host)
+	hostBody, _ := json.Marshal(map[string]string{
+		"userId": "u_h", "deviceId": "d_h", "displayName": "Host",
+	})
+	res, _ := http.Post(ts.URL+"/api/parties", "application/json", bytes.NewReader(hostBody))
+	var hostResp map[string]interface{}
+	_ = json.NewDecoder(res.Body).Decode(&hostResp)
+	code := hostResp["code"].(string)
+	hostToken := hostResp["token"].(string)
+
+	// Join Party (Guest)
+	guestBody, _ := json.Marshal(map[string]string{
+		"userId": "u_g", "deviceId": "d_g", "displayName": "Guest",
+	})
+	gRes, _ := http.Post(fmt.Sprintf("%s/api/parties/%s/join", ts.URL, code), "application/json", bytes.NewReader(guestBody))
+	var guestResp map[string]interface{}
+	_ = json.NewDecoder(gRes.Body).Decode(&guestResp)
+	guestToken := guestResp["token"].(string)
+
+	u, _ := url.Parse(ts.URL)
+	u.Scheme = "ws"
+	u.Path = fmt.Sprintf("/ws/parties/%s", code)
+	dial := func(tok string) *websocket.Conn {
+		h := http.Header{}
+		h.Set("Authorization", "Bearer "+tok)
+		c, _, err := websocket.DefaultDialer.Dial(u.String(), h)
+		if err != nil {
+			t.Fatalf("dial failed: %v", err)
+		}
+		var w map[string]interface{}
+		_ = c.SetReadDeadline(time.Now().Add(2 * time.Second))
+		_ = c.ReadJSON(&w)
+		return c
+	}
+
+	hostWS := dial(hostToken)
+	defer hostWS.Close()
+	guestWS := dial(guestToken)
+	defer guestWS.Close()
+
+	// 1. SetAutoplay must bump seq in broadcast state frame.
+	if err := hostWS.WriteJSON(map[string]interface{}{
+		"type":    protocol.FrameControl,
+		"action":  protocol.ActionSetAutoplay,
+		"enabled": true,
+	}); err != nil {
+		t.Fatalf("send setAutoplay failed: %v", err)
+	}
+
+	var gotAutoplayState bool
+	for i := 0; i < 6; i++ {
+		_ = guestWS.SetReadDeadline(time.Now().Add(2 * time.Second))
+		var f map[string]interface{}
+		if err := guestWS.ReadJSON(&f); err != nil {
+			break
+		}
+		if f["type"] == protocol.FrameState {
+			pb, _ := f["playback"].(map[string]interface{})
+			if pb["autoplayEnabled"] == true && pb["seq"].(float64) >= 1 {
+				gotAutoplayState = true
+				break
+			}
+		}
+	}
+	if !gotAutoplayState {
+		t.Fatalf("expected guest to receive state frame with autoplayEnabled=true and seq >= 1")
+	}
+
+	// 2. SetQueue [t0, t1, t2] at queueIndex=1, then test queueRemove by index.
+	if err := hostWS.WriteJSON(map[string]interface{}{
+		"type":   protocol.FrameControl,
+		"action": protocol.ActionSetQueue,
+		"queue": []map[string]interface{}{
+			{"videoId": "t0", "title": "T0"},
+			{"videoId": "t1", "title": "T1"},
+			{"videoId": "t2", "title": "T2"},
+		},
+		"queueIndex": 1,
+	}); err != nil {
+		t.Fatalf("send setQueue failed: %v", err)
+	}
+
+	// Wait until host receives queue frame
+	for i := 0; i < 6; i++ {
+		_ = hostWS.SetReadDeadline(time.Now().Add(2 * time.Second))
+		var f map[string]interface{}
+		if err := hostWS.ReadJSON(&f); err != nil {
+			break
+		}
+		if f["type"] == protocol.FrameQueue {
+			break
+		}
+	}
+
+	// Index 0 (history) and Index 1 (playing) must be rejected with FrameError.
+	for _, badIdx := range []int{0, 1} {
+		if err := hostWS.WriteJSON(map[string]interface{}{
+			"type":   protocol.FrameControl,
+			"action": protocol.ActionQueueRemove,
+			"index":  badIdx,
+		}); err != nil {
+			t.Fatalf("send queueRemove badIdx=%d failed: %v", badIdx, err)
+		}
+		var gotErr bool
+		for i := 0; i < 4; i++ {
+			_ = hostWS.SetReadDeadline(time.Now().Add(2 * time.Second))
+			var f map[string]interface{}
+			if err := hostWS.ReadJSON(&f); err != nil {
+				break
+			}
+			if f["type"] == protocol.FrameError && f["error"] == "not_found" {
+				gotErr = true
+				break
+			}
+		}
+		if !gotErr {
+			t.Fatalf("expected not_found error when removing queue index %d", badIdx)
+		}
+	}
+
+	// Index 2 (upcoming) must succeed.
+	if err := hostWS.WriteJSON(map[string]interface{}{
+		"type":   protocol.FrameControl,
+		"action": protocol.ActionQueueRemove,
+		"index":  2,
+	}); err != nil {
+		t.Fatalf("send queueRemove index=2 failed: %v", err)
+	}
+	var removedOK bool
+	for i := 0; i < 6; i++ {
+		_ = hostWS.SetReadDeadline(time.Now().Add(2 * time.Second))
+		var f map[string]interface{}
+		if err := hostWS.ReadJSON(&f); err != nil {
+			break
+		}
+		if f["type"] == protocol.FrameQueue {
+			q, _ := f["queue"].(map[string]interface{})
+			items, _ := q["items"].([]interface{})
+			if len(items) == 2 {
+				removedOK = true
+				break
+			}
+		}
+	}
+	if !removedOK {
+		t.Fatalf("expected queueRemove index=2 to leave 2 tracks in queue")
+	}
+
+	// 3. Expire the party and run sweepOnce: guest must receive bye with reason=expired.
+	p := store.Find(code)
+	p.Lock()
+	p.CreatedAtMs = clock.NowMs() - config.PartyMaxAgeMs - 1000
+	p.Unlock()
+
+	sweepOnce(clock.NowMs())
+
+	if store.Find(code) != nil {
+		t.Fatalf("expected expired party to be removed from store")
+	}
+
+	var gotExpiredBye bool
+	for i := 0; i < 8; i++ {
+		_ = guestWS.SetReadDeadline(time.Now().Add(2 * time.Second))
+		var f map[string]interface{}
+		if err := guestWS.ReadJSON(&f); err != nil {
+			break
+		}
+		if f["type"] == protocol.FrameBye && f["reason"] == "expired" {
+			gotExpiredBye = true
+			break
+		}
+	}
+	if !gotExpiredBye {
+		t.Fatalf("expected connected client to receive bye with reason=expired before close")
+	}
+}
+
+func TestActivityFrameDetails(t *testing.T) {
+	m := &party.Member{DisplayName: "Alice"}
+
+	// Single frame["track"] on ActionQueueAdd
+	afSingle := activityFrame(m, protocol.ActionQueueAdd, map[string]interface{}{
+		"track": map[string]interface{}{"videoId": "v1", "title": "Blue Horizon"},
+	})
+	if afSingle["detail"] != `Added "Blue Horizon" to the queue` {
+		t.Fatalf("unexpected single queueAdd detail: %v", afSingle["detail"])
+	}
+
+	// Array frame["tracks"] on ActionQueueAdd
+	afMulti := activityFrame(m, protocol.ActionQueueAdd, map[string]interface{}{
+		"tracks": []interface{}{
+			map[string]interface{}{"videoId": "v1", "title": "Song One"},
+			map[string]interface{}{"videoId": "v2", "title": "Song Two"},
+		},
+	})
+	if afMulti["detail"] != `Added "Song One" and 1 more to the queue` {
+		t.Fatalf("unexpected multi queueAdd detail: %v", afMulti["detail"])
+	}
+
+	// ActionSetHostOnlyControl true & false
+	afHostOn := activityFrame(m, protocol.ActionSetHostOnlyControl, map[string]interface{}{"enabled": true})
+	if afHostOn["detail"] != "Restricted playback controls to the host" {
+		t.Fatalf("unexpected hostOnly true detail: %v", afHostOn["detail"])
+	}
+	afHostOff := activityFrame(m, protocol.ActionSetHostOnlyControl, map[string]interface{}{"enabled": false})
+	if afHostOff["detail"] != "Allowed everyone to control playback" {
+		t.Fatalf("unexpected hostOnly false detail: %v", afHostOff["detail"])
 	}
 }
