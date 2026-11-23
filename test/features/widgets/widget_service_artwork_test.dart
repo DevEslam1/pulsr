@@ -3,6 +3,7 @@
 // `artworkFailed`, the widget-click host/path parsing, and the queue drain that
 // skips a re-save of the same song. The prune and basic content paths are
 // covered by widget_service_test.dart.
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/services.dart';
@@ -183,5 +184,61 @@ void main() {
       received.map((u) => u.toString()).toList(),
       ['pulsrwidget:/play_pause', 'pulsrwidget:/main'],
     );
+  });
+
+  test(
+      'H-51: clears stale artwork & artworkFailed synchronously on cache miss and ignores stale catch',
+      () async {
+    final coverA = File('${tempDir.path}${Platform.pathSeparator}cover_a.png')
+      ..writeAsBytesSync([1, 2, 3]);
+    await service.updateNowPlaying(
+      song: _song(id: 31, artworkUri: coverA.uri.toString()),
+      isPlaying: true,
+    );
+    await _settle();
+    await _settle();
+    expect(_lastSaved(calls, 'artwork') as String, isNotEmpty);
+
+    // Switching to an uncached track must clear stale artwork synchronously
+    // before reload triggers.
+    calls.clear();
+    final slowTempDir = Completer<String?>();
+    var tempCallCount = 0;
+    _messenger.setMockMethodCallHandler(_pathProviderChannel, (call) async {
+      if (call.method == 'getTemporaryDirectory') {
+        tempCallCount++;
+        if (tempCallCount == 1) return slowTempDir.future;
+        return tempDir.path;
+      }
+      return null;
+    });
+
+    await service.updateNowPlaying(
+      song: _song(id: 32, artworkUri: '/missing/artwork_32.png'),
+      isPlaying: true,
+    );
+    expect(_allSaved(calls, 'artwork'), contains(''));
+    expect(_allSaved(calls, 'artworkFailed'), contains(false));
+
+    // Switch quickly to song 33 with valid local artwork while song 32's
+    // background resolution is still suspended in _drainPendingArtwork.
+    final coverC = File('${tempDir.path}${Platform.pathSeparator}cover_c.png')
+      ..writeAsBytesSync([4, 5, 6]);
+    await service.updateNowPlaying(
+      song: _song(id: 33, artworkUri: coverC.uri.toString()),
+      isPlaying: true,
+    );
+
+    // Fail song 32's in-flight resolution: generation guard in catch must
+    // ignore song 32's failure and let song 33 resolve cleanly.
+    calls.clear();
+    slowTempDir.completeError(PlatformException(code: 'IO', message: 'fail'));
+    await _settle();
+    await _settle();
+
+    final resolvedC = _lastSaved(calls, 'artwork');
+    expect(resolvedC, isA<String>());
+    expect(resolvedC as String, isNotEmpty);
+    expect(_allSaved(calls, 'artworkFailed'), isNot(contains(true)));
   });
 }

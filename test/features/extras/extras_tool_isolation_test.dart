@@ -1,9 +1,13 @@
 // Regression test for P1-2.4: one tool that fails to initialize must disable
 // only its own row (with an inline error) and leave every other row usable.
+import 'dart:async';
+
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:pulsr/core/di/injection.dart';
 import 'package:pulsr/core/theme/aura_theme.dart';
+import 'package:pulsr/features/announcements/tts_engine.dart';
 import 'package:pulsr/features/extras/presentation/extras_screen.dart';
 import 'package:pulsr/features/settings/presentation/widgets/settings_tiles.dart';
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
@@ -115,5 +119,65 @@ void main() {
     expect(diagnostics.subtitle, l10n.extrasDiagnosticsSubtitle);
     expect(diagnostics.onTap, isNotNull,
         reason: 'one failed tool must not blank the hub');
+  });
+
+  testWidgets('M-08 awaits MethodChannelTtsEngine.init before registering in getIt',
+      (tester) async {
+    await getIt.reset();
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+    final initGate = Completer<bool>();
+    var registeredBeforeInitFinished = false;
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+            const MethodChannel('com.pulsr.music/usb_exclusive'),
+            (call) async => null);
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+            const MethodChannel('com.pulsr.music/usb_exclusive_events'),
+            (call) async => null);
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+      const MethodChannel(MethodChannelTtsEngine.channelName),
+      (call) async {
+        if (call.method == 'init') {
+          registeredBeforeInitFinished =
+              getIt.isRegistered<MethodChannelTtsEngine>();
+          return initGate.future;
+        }
+        return null;
+      },
+    );
+    addTearDown(() async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+              const MethodChannel(MethodChannelTtsEngine.channelName), null);
+      await getIt.reset();
+    });
+
+    await tester.pumpWidget(MaterialApp(
+      theme: AuraTheme.darkTheme,
+      localizationsDelegates: appLocalizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      home: const ExtrasScreen(),
+    ));
+
+    await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 20)));
+    await tester.pump();
+    expect(registeredBeforeInitFinished, isFalse);
+    expect(getIt.isRegistered<MethodChannelTtsEngine>(), isFalse);
+
+    initGate.complete(true);
+    for (var i = 0;
+        i < 200 &&
+            (!getIt.isRegistered<MethodChannelTtsEngine>() ||
+                find.byType(ListView).evaluate().isEmpty);
+        i++) {
+      await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 10)));
+      await tester.pump();
+    }
+    await tester.pumpAndSettle();
+    expect(getIt.isRegistered<MethodChannelTtsEngine>(), isTrue);
   });
 }

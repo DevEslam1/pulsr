@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:pulsr/core/di/injection.dart';
 import 'package:pulsr/core/utils/error_logger.dart';
 import 'package:pulsr/domain/repositories/music_repository_interface.dart';
 import 'package:pulsr/features/assistant/assistant_search_channel.dart';
@@ -135,5 +136,32 @@ void main() {
 
     expect(settings.suggestionsEnabled, isTrue);
     expect(sync.pushed, isTrue);
+  });
+
+  testWidgets('H-45/L-02 resolves suggestionSync fallback from getIt and ellipsizes AppBar',
+      (tester) async {
+    final settings = await enabledSettings();
+    final sync = _RecordingSync();
+    await getIt.reset();
+    getIt.registerSingleton<AssistantSuggestionSync>(sync);
+    addTearDown(() async => getIt.reset());
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AssistantSettingsScreen(settings: settings),
+      ),
+    );
+    await tester.tap(find.text(AssistantStrings.suggestionsTitle));
+    await tester.pumpAndSettle();
+
+    expect(sync.cleared, isTrue);
+
+    final titleFinder = find.descendant(
+      of: find.byType(AppBar),
+      matching: find.byType(Text),
+    );
+    final titleText = tester.widget<Text>(titleFinder.first);
+    expect(titleText.maxLines, 1);
+    expect(titleText.overflow, TextOverflow.ellipsis);
   });
 }

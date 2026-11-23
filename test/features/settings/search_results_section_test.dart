@@ -5,6 +5,7 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/services/sound_feedback_service.dart';
+import 'package:pulsr/features/settings/cubit/settings_accessibility_ext.dart';
 import 'package:pulsr/features/settings/cubit/settings_state.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
@@ -201,5 +202,58 @@ void main() {
           .any((c) => find.textContaining(c).evaluate().isNotEmpty),
       isTrue,
     );
+  });
+
+  testWidgets(
+      'H-48 invalidates memoized search results when dimWhitePoint, visualDensityMode, playerSliderStyle, or appButtonStyle change',
+      (tester) async {
+    final h = await pumpSettingsCategory(
+      tester,
+      category: 'sound',
+      seedState:
+          const SettingsState(experienceMode: ExperienceMode.professional),
+    );
+    addTearDown(h.cubit.close);
+
+    // 1. playerSliderStyle invalidation
+    await type(tester, l10n.seekBarSliderStyleTitle);
+    expect(find.text(l10n.sliderStyleCapsuleTitle), findsOneWidget);
+    await h.cubit.setPlayerSliderStyle(PlayerSliderStyle.wavy);
+    await tester.pump();
+    expect(find.text(l10n.sliderStyleWavyTitle), findsOneWidget);
+
+    // 2. appButtonStyle invalidation
+    await type(tester, l10n.buttonStyleTitle);
+    await h.cubit.setAppButtonStyle(AppButtonStyle.capsule);
+    await tester.pump();
+    expect(find.text(l10n.buttonStyleCapsule), findsOneWidget);
+
+    // 3. dimWhitePoint invalidation
+    await type(tester, l10n.settingsDimWhitePointTitle);
+    Switch dimSwitch() => tester.widget<Switch>(
+          find.descendant(
+            of: find.widgetWithText(ListTile, l10n.settingsDimWhitePointTitle),
+            matching: find.byType(Switch),
+          ),
+        );
+    expect(dimSwitch().value, isFalse);
+    await h.cubit.setDimWhitePoint(true);
+    await tester.pump();
+    expect(dimSwitch().value, isTrue);
+
+    // 4. visualDensityMode invalidation
+    await type(tester, 'density');
+    final calmFinder = find.byWidgetPredicate(
+      (w) =>
+          w is Switch &&
+          find
+              .ancestor(of: find.byWidget(w), matching: find.byType(ListTile))
+              .evaluate()
+              .isNotEmpty,
+    );
+    expect(tester.widget<Switch>(calmFinder.first).value, isFalse);
+    await h.cubit.setVisualDensityMode(VisualDensityMode.calm);
+    await tester.pump();
+    expect(tester.widget<Switch>(calmFinder.first).value, isTrue);
   });
 }

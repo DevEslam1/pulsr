@@ -186,7 +186,7 @@ class AssistantResolver {
       case AssistantIntentKind.resumeLastAlbum:
         return _lastAlbum();
       case AssistantIntentKind.shuffleFavorites:
-        return _favorites(shuffle: true);
+        return _favorites(shuffle: intent.wantsShuffle);
       case AssistantIntentKind.playArtistRadio:
         return _search(
           term: intent.term,

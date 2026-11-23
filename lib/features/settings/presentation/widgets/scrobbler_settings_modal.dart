@@ -31,11 +31,15 @@ class ScrobblerConfigSheet extends StatefulWidget {
 class _ScrobblerConfigSheetState extends State<ScrobblerConfigSheet> {
   bool _listenBrainzEnabled = false;
   final _listenBrainzTokenController = TextEditingController();
+  bool _obscureListenBrainzToken = true;
 
   bool _lastFmEnabled = false;
   final _lastFmApiKeyController = TextEditingController();
   final _lastFmSecretController = TextEditingController();
   final _lastFmSessionKeyController = TextEditingController();
+  bool _obscureLastFmApiKey = true;
+  bool _obscureLastFmSecret = true;
+  bool _obscureLastFmSessionKey = true;
 
   bool _isLoading = true;
 
@@ -224,6 +228,9 @@ class _ScrobblerConfigSheetState extends State<ScrobblerConfigSheet> {
             if (_listenBrainzEnabled) ...[
               TextField(
                 controller: _listenBrainzTokenController,
+                obscureText: _obscureListenBrainzToken,
+                enableSuggestions: false,
+                autocorrect: false,
                 style: TextStyle(
                     color: p.textPrimary, fontSize: AppFontSize.bodySmall),
                 decoration: InputDecoration(
@@ -232,6 +239,20 @@ class _ScrobblerConfigSheetState extends State<ScrobblerConfigSheet> {
                   labelStyle: TextStyle(color: p.textSecondary),
                   border: OutlineInputBorder(borderRadius: AppRadii.r12All),
                   isDense: true,
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscureListenBrainzToken
+                          ? Icons.visibility_rounded
+                          : Icons.visibility_off_rounded,
+                      color: p.textSecondary,
+                      size: 20,
+                    ),
+                    tooltip: _obscureListenBrainzToken
+                        ? context.l10n.showPassword
+                        : context.l10n.hidePassword,
+                    onPressed: () => setState(() =>
+                        _obscureListenBrainzToken = !_obscureListenBrainzToken),
+                  ),
                 ),
               ),
             ],
@@ -256,6 +277,9 @@ class _ScrobblerConfigSheetState extends State<ScrobblerConfigSheet> {
             if (_lastFmEnabled) ...[
               TextField(
                 controller: _lastFmApiKeyController,
+                obscureText: _obscureLastFmApiKey,
+                enableSuggestions: false,
+                autocorrect: false,
                 style: TextStyle(
                     color: p.textPrimary, fontSize: AppFontSize.bodySmall),
                 decoration: InputDecoration(
@@ -263,11 +287,28 @@ class _ScrobblerConfigSheetState extends State<ScrobblerConfigSheet> {
                   labelStyle: TextStyle(color: p.textSecondary),
                   border: OutlineInputBorder(borderRadius: AppRadii.r12All),
                   isDense: true,
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscureLastFmApiKey
+                          ? Icons.visibility_rounded
+                          : Icons.visibility_off_rounded,
+                      color: p.textSecondary,
+                      size: 20,
+                    ),
+                    tooltip: _obscureLastFmApiKey
+                        ? context.l10n.showPassword
+                        : context.l10n.hidePassword,
+                    onPressed: () => setState(
+                        () => _obscureLastFmApiKey = !_obscureLastFmApiKey),
+                  ),
                 ),
               ),
               const SizedBox(height: AppSpacing.s10),
               TextField(
                 controller: _lastFmSecretController,
+                obscureText: _obscureLastFmSecret,
+                enableSuggestions: false,
+                autocorrect: false,
                 style: TextStyle(
                     color: p.textPrimary, fontSize: AppFontSize.bodySmall),
                 decoration: InputDecoration(
@@ -275,11 +316,28 @@ class _ScrobblerConfigSheetState extends State<ScrobblerConfigSheet> {
                   labelStyle: TextStyle(color: p.textSecondary),
                   border: OutlineInputBorder(borderRadius: AppRadii.r12All),
                   isDense: true,
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscureLastFmSecret
+                          ? Icons.visibility_rounded
+                          : Icons.visibility_off_rounded,
+                      color: p.textSecondary,
+                      size: 20,
+                    ),
+                    tooltip: _obscureLastFmSecret
+                        ? context.l10n.showPassword
+                        : context.l10n.hidePassword,
+                    onPressed: () => setState(
+                        () => _obscureLastFmSecret = !_obscureLastFmSecret),
+                  ),
                 ),
               ),
               const SizedBox(height: AppSpacing.s10),
               TextField(
                 controller: _lastFmSessionKeyController,
+                obscureText: _obscureLastFmSessionKey,
+                enableSuggestions: false,
+                autocorrect: false,
                 style: TextStyle(
                     color: p.textPrimary, fontSize: AppFontSize.bodySmall),
                 decoration: InputDecoration(
@@ -287,6 +345,20 @@ class _ScrobblerConfigSheetState extends State<ScrobblerConfigSheet> {
                   labelStyle: TextStyle(color: p.textSecondary),
                   border: OutlineInputBorder(borderRadius: AppRadii.r12All),
                   isDense: true,
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscureLastFmSessionKey
+                          ? Icons.visibility_rounded
+                          : Icons.visibility_off_rounded,
+                      color: p.textSecondary,
+                      size: 20,
+                    ),
+                    tooltip: _obscureLastFmSessionKey
+                        ? context.l10n.showPassword
+                        : context.l10n.hidePassword,
+                    onPressed: () => setState(() =>
+                        _obscureLastFmSessionKey = !_obscureLastFmSessionKey),
+                  ),
                 ),
               ),
             ],

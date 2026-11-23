@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui' show Tristate;
 
 import 'package:flutter/services.dart';
@@ -259,5 +260,79 @@ void main() {
     expect(emptySemantics.flagsCollection.isLiveRegion, isTrue);
 
     semantics.dispose();
+  });
+
+  testWidgets('H-46 prevents stacked palettes and navigates via TextField FocusNode',
+      (tester) async {
+    CommandPaletteSheet.debugResetPaletteOpen();
+    addTearDown(CommandPaletteSheet.debugResetPaletteOpen);
+
+    late BuildContext launchCtx;
+    final router = GoRouter(
+      initialLocation: '/',
+      routes: [
+        GoRoute(
+          path: '/',
+          builder: (context, state) {
+            launchCtx = context;
+            return const Scaffold(body: SizedBox.expand());
+          },
+        ),
+        GoRoute(
+          path: '/library',
+          builder: (context, state) =>
+              const Scaffold(body: Text('library-destination')),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+
+    await tester.pumpWidget(buildSheetHarness(router: router));
+    await tester.pumpAndSettle();
+
+    // Calling show twice concurrently opens only a single palette instance.
+    CommandPaletteSheet.show(launchCtx);
+    CommandPaletteSheet.show(launchCtx);
+    await tester.pumpAndSettle();
+    expect(find.byType(CommandPaletteSheet), findsOneWidget);
+
+    // Search field owns focus; ArrowDown moves from Home (0) -> Library (1) and Enter navigates.
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pumpAndSettle();
+
+    expect(find.text('library-destination'), findsOneWidget);
+    expect(find.byType(CommandPaletteSheet), findsNothing);
+  });
+
+  testWidgets('M-08 deduplicates empty-query Recent actions and updates live player icons',
+      (tester) async {
+    final playerStream = StreamController<PlayerState>.broadcast();
+    addTearDown(playerStream.close);
+    when(() => playerCubit.stream).thenAnswer((_) => playerStream.stream);
+
+    CommandPaletteSheet.recordRecentAction('action_lyrics');
+
+    await tester.pumpWidget(buildSheetHarness(disableAnimations: true));
+    await tester.pumpAndSettle();
+
+    // 'Toggle Lyrics' appears once (in Recent) instead of twice across sections.
+    expect(find.text(l10n.shortcutLyrics), findsOneWidget);
+
+    // Filter to play/pause command so its row is visible in the viewport, then emit live state.
+    await tester.enterText(find.byType(PulsrSearchField), 'play / pause');
+    await tester.pumpAndSettle();
+    expect(find.byIcon(Icons.play_arrow_rounded), findsOneWidget);
+
+    playerStream.add(
+      const PlayerState(
+        playback: PlaybackSlice(isPlaying: true, isMuted: true),
+      ),
+    );
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(find.byIcon(Icons.pause_rounded), findsOneWidget);
   });
 }

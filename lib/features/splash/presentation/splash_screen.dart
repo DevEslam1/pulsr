@@ -32,7 +32,7 @@ class _SplashScreenState extends State<SplashScreen> {
     _checkNextScreen();
   }
 
-  Future<void> _checkNextScreen() async {
+  Future<void> _checkNextScreen({bool isRetry = false}) async {
     if (_isChecking) return;
     _isChecking = true;
     try {
@@ -40,6 +40,15 @@ class _SplashScreenState extends State<SplashScreen> {
       // initializer recoverable without imposing a delay on every launch.
       bool timedOut = false;
       try {
+        if (isRetry) {
+          final depsReady = await ensureAppDependenciesReady(
+            timeout: const Duration(seconds: 8),
+            reconfigureIfNeeded: true,
+          );
+          if (!depsReady) {
+            timedOut = true;
+          }
+        }
         await initializationReady.timeout(
           const Duration(seconds: 8),
           onTimeout: () {
@@ -131,7 +140,7 @@ class _SplashScreenState extends State<SplashScreen> {
                 .fadeIn(
                     delay: context.motionMs(260),
                     duration: context.motionMs(400))
-                .slideY(begin: 0.2, end: 0),
+                .slideY(begin: 0.2, end: 0, duration: context.motionMs(400)),
             const SizedBox(height: AppSpacing.xs),
             Text(
               context.l10n.appTagline,
@@ -153,7 +162,7 @@ class _SplashScreenState extends State<SplashScreen> {
                 ),
                 onPressed: () {
                   setState(() => _timedOut = false);
-                  _checkNextScreen();
+                  _checkNextScreen(isRetry: true);
                 },
                 icon: const Icon(Icons.refresh_rounded, size: 18),
                 label: Text(context.l10n.retry),

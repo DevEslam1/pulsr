@@ -84,11 +84,19 @@ String composeAnnouncement(
   List<AnnouncementElement> elements,
   AnnouncementTrack track, {
   int maxLength = kDefaultAnnouncementMaxLength,
+  String Function(int year)? formatYear,
+  String Function(int trackNumber)? formatTrackNumber,
 }) {
   final title = track.title.trim();
   final parts = <String>[];
   for (final element in elements) {
-    final part = _partFor(element, track, title);
+    final part = _partFor(
+      element,
+      track,
+      title,
+      formatYear: formatYear,
+      formatTrackNumber: formatTrackNumber,
+    );
     if (part != null) parts.add(part);
   }
   return truncateOnWordBoundary(parts.join(', '), maxLength);
@@ -119,8 +127,10 @@ String truncateOnWordBoundary(String text, int maxLength) {
 String? _partFor(
   AnnouncementElement element,
   AnnouncementTrack track,
-  String title,
-) {
+  String title, {
+  String Function(int year)? formatYear,
+  String Function(int trackNumber)? formatTrackNumber,
+}) {
   switch (element) {
     case AnnouncementElement.title:
       return title.isEmpty ? null : title;
@@ -137,10 +147,12 @@ String? _partFor(
       return album;
     case AnnouncementElement.year:
       final year = track.year;
-      return year == null ? null : 'from $year';
+      if (year == null) return null;
+      return formatYear?.call(year) ?? 'from $year';
     case AnnouncementElement.trackNumber:
       final trackNumber = track.trackNumber;
-      return trackNumber == null ? null : 'track $trackNumber';
+      if (trackNumber == null) return null;
+      return formatTrackNumber?.call(trackNumber) ?? 'track $trackNumber';
   }
 }
 

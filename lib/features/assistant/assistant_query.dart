@@ -202,7 +202,8 @@ AssistantTextIntent parseAssistantText(String query) {
     );
   }
 
-  if (lower.startsWith(_shuffleWord)) {
+  final shuffleMatch = _shufflePrefix.firstMatch(lower);
+  if (shuffleMatch != null) {
     if (_favoritesWord.hasMatch(lower)) {
       return AssistantTextIntent(
         kind: AssistantIntentKind.shuffleFavorites,
@@ -212,7 +213,7 @@ AssistantTextIntent parseAssistantText(String query) {
         wantsShuffle: true,
       );
     }
-    final rest = commandless.substring(_shuffleWord.length).trim();
+    final rest = commandless.substring(shuffleMatch.end).trim();
     if (rest.isEmpty) {
       return AssistantTextIntent(
         kind: AssistantIntentKind.shuffleFavorites,
@@ -235,6 +236,16 @@ AssistantTextIntent parseAssistantText(String query) {
       display: segment.display,
       rawText: flat,
       wantsShuffle: true,
+    );
+  }
+
+  if (_favoritesCommandPattern.hasMatch(lower)) {
+    return AssistantTextIntent(
+      kind: AssistantIntentKind.shuffleFavorites,
+      term: '',
+      display: '',
+      rawText: flat,
+      wantsShuffle: false,
     );
   }
 
@@ -372,23 +383,38 @@ String _keyFor(AssistantExtraField field) => switch (field) {
     };
 
 final RegExp _whitespace = RegExp(r'\s+');
-final RegExp _articlePrefix = RegExp(r'^(?:the|a|an)\s+');
+final RegExp _articlePrefix = RegExp(r'^(?:the|a|an|el|la|los|las|un|una)\s+');
 final RegExp _commandPrefix = RegExp(
-  r'^(?:play|listen to|put on|start playing)\s+',
+  r'^(?:play|listen to|put on|start playing|reproduce|reproducir|pon|poner|escucha|escuchar|toca|tocar|شغل|شغّل|تشغيل|اسمع|استمع|استماع)\s+',
   caseSensitive: false,
 );
 final RegExp _commandOnlyPattern = RegExp(
-  r'^(?:play|play music|listen to|put on|start playing)$',
+  r'^(?:play|play music|listen to|put on|start playing|reproduce|reproducir|pon|pon m[uú]sica|poner m[uú]sica|escuchar m[uú]sica|toca|شغل|شغّل|شغل موسيقى|شغّل موسيقى|تشغيل|تشغيل موسيقى|اسمع|استمع)$',
   caseSensitive: false,
 );
-const String _shuffleWord = 'shuffle';
-final RegExp _favoritesWord =
-    RegExp(r'\b(?:favourites?|favorites?|liked|loved|heart)\b');
-final RegExp _resumePattern = RegExp(
-  r'^(?:resume|continue)(?:\s+(?:the|my))?(?:\s+(?:last|previous))?'
-  r'(?:\s+(?:played|listened))?(?:\s+(?:album|record))?$',
+final RegExp _shufflePrefix = RegExp(
+  r'^(?:shuffle|mezclar?|modo aleatorio|aleatorio|خلط|اخلط|تشغيل عشوائي|عشوائي)(?=\s|$)',
+  caseSensitive: false,
 );
-final RegExp _lastAlbumPattern =
-    RegExp(r'^(?:the\s+)?(?:last|previous)\s+(?:played\s+)?(?:album|record)$');
-final RegExp _radioSuffix = RegExp(r'\s+radio$');
-final RegExp _radioPrefix = RegExp(r'^radio\s+');
+final RegExp _favoritesWord = RegExp(
+  r'(?:^|\s)(?:my\s+|mis\s+)?(?:favourites?|favorites?|liked(?:\s+songs)?|loved(?:\s+songs)?|heart|favoritos|favoritas|canciones favoritas|me gusta|preferidas?|المفضلة|المفضله|مفضلتي|أغاني المفضلة|أغانيي المفضلة|الإعجابات|المحبوبة)(?=\s|$)',
+  caseSensitive: false,
+);
+final RegExp _favoritesCommandPattern = RegExp(
+  r'^(?:(?:the|my|mis)\s+)?(?:favourites?|favorites?|liked(?:\s+songs)?|loved(?:\s+songs)?|favoritos|favoritas|canciones favoritas|المفضلة|المفضله|مفضلتي|أغاني المفضلة|أغانيي المفضلة)$',
+  caseSensitive: false,
+);
+final RegExp _resumePattern = RegExp(
+  r'^(?:(?:resume|continue)(?:\s+(?:the|my))?(?:\s+(?:last|previous))?(?:\s+(?:played|listened))?(?:\s+(?:album|record))?'
+  r'|(?:reanuda|reanudar|contin[uú]a|continuar)(?:\s+(?:el|mi))?(?:\s+(?:[uú]ltimo|anterior))?(?:\s+(?:[aá]lbum|disco))?'
+  r'|(?:استأنف|استئناف|أكمل|اكمل|واصل|مواصلة)(?:\s+(?:آخر|اخر))?(?:\s*(?:ألبوم|البوم|الألبوم|الالبوم))?)$',
+  caseSensitive: false,
+);
+final RegExp _lastAlbumPattern = RegExp(
+  r'^(?:(?:the\s+)?(?:last|previous)\s+(?:played\s+)?(?:album|record)'
+  r'|(?:el\s+)?(?:[uú]ltimo|anterior)\s+(?:[aá]lbum|disco)'
+  r'|(?:آخر|اخر)\s+(?:ألبوم|البوم)|(?:الألبوم|الالبوم)\s+(?:الأخير|الاخير))$',
+  caseSensitive: false,
+);
+final RegExp _radioSuffix = RegExp(r'\s+(?:radio|راديو|إذاعة)$', caseSensitive: false);
+final RegExp _radioPrefix = RegExp(r'^(?:radio(?:\s+de)?|راديو|إذاعة)\s+', caseSensitive: false);

@@ -1396,10 +1396,11 @@ void showVisualizerStylePickerSheet(
                     onTap: () async {
                       final preset =
                           await MilkdropPresetStore().importFromFile();
-                      if (!context.mounted) return;
-                      Navigator.pop(ctx);
+                      if (ctx.mounted) {
+                        Navigator.pop(ctx);
+                      }
                       cubit.setVisualizerStyle(VisualizerStyle.milkdrop);
-                      if (preset != null) {
+                      if (preset != null && context.mounted) {
                         ScaffoldMessenger.maybeOf(context)?.showSnackBar(
                           SnackBar(
                             content: Text(context.l10n
@@ -1435,10 +1436,11 @@ void showVisualizerStylePickerSheet(
                     onTap: () async {
                       final preset =
                           await VisualizerPresetStore().importFromFile();
-                      if (!context.mounted) return;
-                      Navigator.pop(ctx);
+                      if (ctx.mounted) {
+                        Navigator.pop(ctx);
+                      }
                       cubit.setVisualizerStyle(VisualizerStyle.custom);
-                      if (preset != null) {
+                      if (preset != null && context.mounted) {
                         ScaffoldMessenger.maybeOf(context)?.showSnackBar(
                           SnackBar(
                             content: Text(context.l10n

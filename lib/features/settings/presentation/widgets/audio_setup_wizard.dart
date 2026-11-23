@@ -517,7 +517,7 @@ class _AudioSetupWizardSheetState extends State<AudioSetupWizardSheet> {
                           )
                         : Text(
                             _currentStep < 2
-                                ? 'Next'
+                                ? l10n.next
                                 : l10n.settingsWizardApply,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -634,7 +634,7 @@ class _AudioSetupWizardSheetState extends State<AudioSetupWizardSheet> {
               : _selectedOutput == AudioWizardOutputType.bluetooth
                   ? l10n.settingsBluetoothHiResDesc
                   : l10n.settingsFloatDspDesc,
-          badge: 'Hi-Res',
+          badge: l10n.badgeHiRes,
           isSelected: _selectedPriority == AudioWizardPriority.fidelity,
           onTap: () =>
               setState(() => _selectedPriority = AudioWizardPriority.fidelity),
@@ -645,7 +645,7 @@ class _AudioSetupWizardSheetState extends State<AudioSetupWizardSheet> {
           icon: Icons.auto_awesome_rounded,
           title: l10n.settingsWizardBalanced,
           subtitle: l10n.settingsWizardBalancedDesc,
-          badge: 'Recommended',
+          badge: l10n.badgeRecommended,
           isSelected: _selectedPriority == AudioWizardPriority.balanced,
           onTap: () =>
               setState(() => _selectedPriority = AudioWizardPriority.balanced),

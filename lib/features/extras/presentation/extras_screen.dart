@@ -28,6 +28,7 @@ import '../../announcements/announcement_settings.dart';
 import '../../announcements/tts_engine.dart';
 import '../../assistant/assistant_settings.dart';
 import '../../assistant/assistant_settings_screen.dart';
+import '../../assistant/assistant_suggestion_sync.dart';
 import '../../audio_profiles/audio_profile_service.dart';
 import '../../audio_profiles/audio_profiles_screen.dart';
 import '../../diagnostics/diagnostics_bundle_service.dart';
@@ -38,6 +39,7 @@ import '../../dlna/dlna_screen.dart';
 import '../../remote_sources/remote_sources_screen.dart';
 import '../../../data/db/app_database.dart' show SongSource, SongsTableData;
 import '../../../domain/models/remote_source.dart';
+import '../../../domain/repositories/music_repository_interface.dart';
 import '../../player/cubit/player_cubit.dart';
 import '../../settings/cubit/settings_cubit.dart';
 import '../../settings/presentation/widgets/settings_section.dart';
@@ -76,9 +78,19 @@ class _ExtrasScreenState extends State<ExtrasScreen> {
   AnnouncementSettings? _announcements;
   MethodChannelTtsEngine? _ttsEngine;
   AssistantSettings? _assistantSettings;
+  AssistantSuggestionSync? _assistantSuggestionSync;
   SystemBehaviorSettings? _systemBehavior;
   UsbErgonomicsService? _usbErgonomics;
   RemotePlaybackRuntime? _remoteRuntime;
+  static int _nextRemoteSongId = -1;
+
+  static int _allocateRemoteSongId() {
+    final id = _nextRemoteSongId--;
+    if (_nextRemoteSongId < -0x3FFFFFFF) {
+      _nextRemoteSongId = -1;
+    }
+    return id;
+  }
   bool _ownsSystemBehavior = false;
   bool _ownsUsbErgonomics = false;
   bool _ownsSafeMode = false;
@@ -400,10 +412,21 @@ class _ExtrasScreenState extends State<ExtrasScreen> {
       final announcements = getIt.isRegistered<AnnouncementSettings>()
           ? getIt<AnnouncementSettings>()
           : await AnnouncementSettings.load();
-      final engine = getIt.isRegistered<MethodChannelTtsEngine>()
+      final engineWasRegistered = getIt.isRegistered<MethodChannelTtsEngine>();
+      final engine = engineWasRegistered
           ? getIt<MethodChannelTtsEngine>()
           : MethodChannelTtsEngine();
-      if (!mounted) return;
+      engine.voiceId = announcements.voiceId;
+      engine.localeId = announcements.localeId;
+      if (!engineWasRegistered) {
+        await engine.init();
+      }
+      if (!mounted) {
+        if (!engineWasRegistered) {
+          engine.dispose();
+        }
+        return;
+      }
       if (!getIt.isRegistered<AnnouncementSettings>()) {
         try {
           getIt.registerSingleton<AnnouncementSettings>(announcements);
@@ -413,10 +436,7 @@ class _ExtrasScreenState extends State<ExtrasScreen> {
         try {
           getIt.registerSingleton<MethodChannelTtsEngine>(engine);
         } catch (_) {}
-        await engine.init();
       }
-      engine.voiceId = announcements.voiceId;
-      engine.localeId = announcements.localeId;
       if (!mounted) return;
       setState(() {
         _announcements = announcements;
@@ -440,8 +460,17 @@ class _ExtrasScreenState extends State<ExtrasScreen> {
           getIt.registerSingleton<AssistantSettings>(assistant);
         } catch (_) {}
       }
+      final suggestionSync = getIt.isRegistered<AssistantSuggestionSync>()
+          ? getIt<AssistantSuggestionSync>()
+          : (getIt.isRegistered<IMusicRepository>()
+              ? AssistantSuggestionSync(
+                  repository: getIt<IMusicRepository>(),
+                  settings: assistant,
+                )
+              : null);
       setState(() {
         _assistantSettings = assistant;
+        _assistantSuggestionSync = suggestionSync;
         _toolErrors.remove(ExtrasTool.assistant);
       });
     } catch (e, st) {
@@ -543,7 +572,7 @@ class _ExtrasScreenState extends State<ExtrasScreen> {
       final uri = await runtime.prepareUri(source, entry.path);
       final name = entry.name;
       final song = SongsTableData(
-        id: -DateTime.now().millisecondsSinceEpoch,
+        id: _allocateRemoteSongId(),
         title: name.isEmpty ? source.displayName : name,
         artist: source.displayName,
         album: albumLabel,
@@ -704,6 +733,7 @@ class _ExtrasScreenState extends State<ExtrasScreen> {
                               : () => _push(
                                     AssistantSettingsScreen(
                                       settings: _assistantSettings!,
+                                      suggestionSync: _assistantSuggestionSync,
                                     ),
                                   ),
                         ),

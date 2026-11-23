@@ -12,6 +12,7 @@ import 'package:pulsr/core/constants/prefs_keys.dart';
 import 'package:pulsr/core/network/proxy_config.dart';
 import 'package:pulsr/data/scanner/media_scanner_service.dart';
 import 'package:pulsr/features/settings/cubit/settings_cubit.dart';
+import 'package:pulsr/features/settings/cubit/settings_state.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class MockMediaScannerService extends Mock implements MediaScannerService {}
@@ -120,6 +121,92 @@ void main() {
       expect(cubit.state.hasProxyPassword, isFalse,
           reason: 'state must not claim a password was stored');
       expect(cubit.state.errorMessage, isNotNull);
+    });
+  });
+
+  group('H-48 & L-02 Settings dirty flags & slider preview methods', () {
+    test(
+        'reconciles proxyList, canvasEnabled, canvasAsBackdrop, playerSliderStyle, and appButtonStyle across in-flight load',
+        () async {
+      SharedPreferences.setMockInitialValues({});
+      final storage = MockSecureStorage();
+      final gate = Completer<String?>();
+      var gateServed = false;
+      when(() => storage.read(key: any(named: 'key'))).thenAnswer((_) {
+        if (!gateServed) {
+          gateServed = true;
+          return gate.future;
+        }
+        return Future<String?>.value(null);
+      });
+      when(() => storage.delete(key: any(named: 'key')))
+          .thenAnswer((_) async {});
+      when(() => storage.write(
+            key: any(named: 'key'),
+            value: any(named: 'value'),
+          )).thenAnswer((_) async {});
+
+      final cubit = SettingsCubit(
+        scannerService: MockMediaScannerService(),
+        secureStorage: storage,
+      );
+      addTearDown(cubit.close);
+
+      await cubit.toggleCanvasEnabled(true);
+      await cubit.setCanvasAsBackdrop(true);
+      await cubit.setPlayerSliderStyle(PlayerSliderStyle.wavy);
+      await cubit.setAppButtonStyle(AppButtonStyle.capsule);
+      await cubit.addProxyEntry(
+        const ProxyEntry(id: 'p1', host: '10.0.0.2', port: 1080),
+      );
+
+      // Write conflicting stale disk values before the initial load completes.
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('setting_canvas_enabled', false);
+      await prefs.setBool('setting_canvas_as_backdrop', false);
+      await prefs.setString(PrefsKeys.playerSliderStyle, 'capsule');
+      await prefs.setString(PrefsKeys.appButtonStyle, 'rectangular');
+
+      gate.complete(null);
+      await cubit.preferencesReady;
+
+      expect(cubit.state.canvasEnabled, isTrue);
+      expect(cubit.state.canvasAsBackdrop, isTrue);
+      expect(cubit.state.playerSliderStyle, PlayerSliderStyle.wavy);
+      expect(cubit.state.appButtonStyle, AppButtonStyle.capsule);
+      expect(cubit.state.proxyList.map((e) => e.id), ['p1']);
+    });
+
+    test('previewCrossfade, previewMinDuration, and previewLiquidGlassTint update state without persisting until committed',
+        () async {
+      SharedPreferences.setMockInitialValues({
+        'setting_crossfade': 2.0,
+        'setting_min_duration': 30,
+        PrefsKeys.liquidGlassTint: 0.4,
+      });
+      final storage = MockSecureStorage();
+      when(() => storage.read(key: any(named: 'key')))
+          .thenAnswer((_) async => null);
+
+      final cubit = SettingsCubit(
+        scannerService: MockMediaScannerService(),
+        secureStorage: storage,
+      );
+      await cubit.preferencesReady;
+      addTearDown(cubit.close);
+
+      cubit.previewCrossfade(6.0);
+      cubit.previewMinDuration(45);
+      cubit.previewLiquidGlassTint(0.85);
+
+      expect(cubit.state.crossfadeSeconds, 6.0);
+      expect(cubit.state.minDurationSec, 45);
+      expect(cubit.state.liquidGlassTint, 0.85);
+
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getDouble('setting_crossfade'), 2.0);
+      expect(prefs.getInt('setting_min_duration'), 30);
+      expect(prefs.getDouble(PrefsKeys.liquidGlassTint), 0.4);
     });
   });
 }

@@ -277,4 +277,72 @@ void main() {
     expect(navBar.embedded, isTrue);
     expect(navBar.iconOnly, isFalse);
   });
+
+  testWidgets('M-08 resyncs layout when layoutMode changes in didUpdateWidget',
+      (tester) async {
+    when(() => playerCubit.state).thenReturn(
+      PlayerState(
+        playback: PlaybackSlice(
+          currentSong: testSong,
+          isPlaying: true,
+          duration: const Duration(minutes: 3),
+        ),
+      ),
+    );
+    when(() => playerCubit.stream)
+        .thenAnswer((_) => const Stream<PlayerState>.empty());
+
+    var layoutMode = ShellLayoutMode.bottomNav;
+    late void Function(VoidCallback) outerSetState;
+
+    await tester.pumpWidget(
+      MultiBlocProvider(
+        providers: [
+          BlocProvider<PlayerCubit>.value(value: playerCubit),
+          BlocProvider<SettingsCubit>.value(value: settingsCubit),
+        ],
+        child: MaterialApp(
+          theme: AuraTheme.darkTheme,
+          home: Scaffold(
+            body: StatefulBuilder(
+              builder: (context, setState) {
+                outerSetState = setState;
+                return Stack(
+                  children: [
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      child: StackedBottomDock(
+                        currentIndex: 0,
+                        onTapNav: (_) {},
+                        onOpenNowPlaying: () {},
+                        mode: DockStackMode.defaultLayout,
+                        layoutMode: layoutMode,
+                        onModeChanged: (_) {},
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      tester.widget<PulsrBottomNavBar>(find.byType(PulsrBottomNavBar)).embedded,
+      isFalse,
+    );
+
+    outerSetState(() => layoutMode = ShellLayoutMode.bottomNavWide);
+    await tester.pumpAndSettle();
+
+    expect(
+      tester.widget<PulsrBottomNavBar>(find.byType(PulsrBottomNavBar)).embedded,
+      isTrue,
+    );
+  });
 }

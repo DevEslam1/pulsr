@@ -126,7 +126,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get twoPaneSelectItem => 'اختر عنصرًا لعرض التفاصيل';
 
   @override
-  String get leAudioRequiresBle => 'تتطلب برامج ترميز LE Audio (LC3 / Opus) اتصال Bluetooth LE Audio.';
+  String get leAudioRequiresBle =>
+      'تتطلب برامج ترميز LE Audio (LC3 / Opus) اتصال Bluetooth LE Audio.';
 
   @override
   String get castEntireQueue => 'بث قائمة الانتظار بأكملها';
@@ -135,7 +136,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get roomAveragingTitle => 'متوسط الغرفة بثلاث نقاط';
 
   @override
-  String get roomAveragingSubtitle => 'يقيس الوسط و1 م يسارًا و1 م يمينًا لتصحيح دقيق';
+  String get roomAveragingSubtitle =>
+      'يقيس الوسط و1 م يسارًا و1 م يمينًا لتصحيح دقيق';
 
   @override
   String get roomPositionCenter => 'الوسط';
@@ -187,7 +189,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get voiceSearchUnavailable => 'البحث الصوتي غير متاح';
 
   @override
-  String get searchLocalOnlineHint => 'ابحث في الموسيقى المحلية وعبر الإنترنت...';
+  String get searchLocalOnlineHint =>
+      'ابحث في الموسيقى المحلية وعبر الإنترنت...';
 
   @override
   String noLocalSongsMatch(String query) {
@@ -203,7 +206,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get professionalMode => 'الوضع الاحترافي';
 
   @override
-  String get professionalModeUnlocked => 'تم فتح DSP المتقدم والبث بت مثالي وعناصر التحكم الصوتية الاحترافية.';
+  String get professionalModeUnlocked =>
+      'تم فتح DSP المتقدم والبث بت مثالي وعناصر التحكم الصوتية الاحترافية.';
 
   @override
   String get quickDspControls => 'عناصر تحكم DSP السريعة';
@@ -303,7 +307,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get somethingWentWrong => 'حدث خطأ ما';
 
   @override
-  String get errorBoundarySubtitle => 'حدث خطأ غير متوقع أثناء عرض هذا المحتوى.';
+  String get errorBoundarySubtitle =>
+      'حدث خطأ غير متوقع أثناء عرض هذا المحتوى.';
 
   @override
   String get saveSearch => 'حفظ البحث';
@@ -450,7 +455,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get equalizer => 'معادل الصوت';
 
   @override
-  String get equalizerSubtitle => 'معادل ١٠ نطاقات، تعزيز الجهير، إعدادات مسبقة';
+  String get equalizerSubtitle =>
+      'معادل ١٠ نطاقات، تعزيز الجهير، إعدادات مسبقة';
 
   @override
   String get sleepTimer => 'مؤقت النوم';
@@ -546,10 +552,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get quranReadingOnly => 'قراءة فقط';
 
   @override
-  String get quranBookmarkFailed => 'تعذّر تحديث العلامة المرجعية للقرآن. حاول مرة أخرى.';
+  String get quranBookmarkFailed =>
+      'تعذّر تحديث العلامة المرجعية للقرآن. حاول مرة أخرى.';
 
   @override
-  String get quranTextUnavailable => 'نص هذه السورة غير مضمّن بعد. يظل تشغيل الصوت متاحًا.';
+  String get quranTextUnavailable =>
+      'نص هذه السورة غير مضمّن بعد. يظل تشغيل الصوت متاحًا.';
 
   @override
   String get quranShowText => 'إظهار النص';
@@ -605,7 +613,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get settingsUiSoundEffects => 'مؤثرات صوتية للواجهة';
 
   @override
-  String get settingsUiSoundEffectsSubtitle => 'تشغيل ردود صوتية خفيفة عند التفاعل';
+  String get settingsUiSoundEffectsSubtitle =>
+      'تشغيل ردود صوتية خفيفة عند التفاعل';
 
   @override
   String get lyricsTranslate => 'ترجمة الكلمات';
@@ -623,7 +632,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get noSongsFound => 'لم يتم العثور على أغانٍ';
 
   @override
-  String get noSongsSubtitle => 'افحص وحدة التخزين للعثور على الملفات الصوتية دون اتصال.';
+  String get noSongsSubtitle =>
+      'افحص وحدة التخزين للعثور على الملفات الصوتية دون اتصال.';
 
   @override
   String get rescanLibrary => 'إعادة فحص مكتبة الوسائط';
@@ -641,7 +651,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get permissionRequired => 'الإذن مطلوب';
 
   @override
-  String get audioAccessRequired => 'يتطلب الوصول إلى الملفات الصوتية لعرض مكتبة الموسيقى الخاصة بك.';
+  String get audioAccessRequired =>
+      'يتطلب الوصول إلى الملفات الصوتية لعرض مكتبة الموسيقى الخاصة بك.';
 
   @override
   String get grantAccess => 'منح الإذن';
@@ -656,7 +667,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get onboardingTitle => 'خصوصية وبدون اتصال';
 
   @override
-  String get onboardingSubtitle => 'موسيقاك لا تغادر جهازك أبدًا. بدون إعلانات، بدون تتبع، وبدون حسابات.';
+  String get onboardingSubtitle =>
+      'موسيقاك لا تغادر جهازك أبدًا. بدون إعلانات، بدون تتبع، وبدون حسابات.';
 
   @override
   String get createPlaylist => 'قائمة تشغيل جديدة';
@@ -674,13 +686,15 @@ class AppLocalizationsAr extends AppLocalizations {
   String get deletePlaylist => 'حذف قائمة التشغيل';
 
   @override
-  String get deletePlaylistPrompt => 'هل أنت متأكد من رغبتك في حذف قائمة التشغيل هذه؟';
+  String get deletePlaylistPrompt =>
+      'هل أنت متأكد من رغبتك في حذف قائمة التشغيل هذه؟';
 
   @override
   String get emptyPlaylists => 'لم يتم إنشاء قوائم تشغيل بعد';
 
   @override
-  String get emptyPlaylistsSubtitle => 'أنشئ قوائم تشغيل مخصصة أو ذكية لتنظيم مساراتك';
+  String get emptyPlaylistsSubtitle =>
+      'أنشئ قوائم تشغيل مخصصة أو ذكية لتنظيم مساراتك';
 
   @override
   String get playlistName => 'اسم قائمة التشغيل';
@@ -866,7 +880,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get resumeAfterInterruption => 'استئناف بعد الانقطاع';
 
   @override
-  String get resumeAfterInterruptionSubtitle => 'الاستئناف بعد المكالمات والإشعارات';
+  String get resumeAfterInterruptionSubtitle =>
+      'الاستئناف بعد المكالمات والإشعارات';
 
   @override
   String get waveformSeekBar => 'شريط الموجة الصوتية';
@@ -905,13 +920,15 @@ class AppLocalizationsAr extends AppLocalizations {
   String get autoHideSystemMedia => 'إخفاء نغمات وإشعارات النظام تلقائيًا';
 
   @override
-  String get autoHideSystemMediaSubtitle => 'تصفية الملفات الصوتية غير الموسيقية';
+  String get autoHideSystemMediaSubtitle =>
+      'تصفية الملفات الصوتية غير الموسيقية';
 
   @override
   String get hiddenFolders => 'المجلدات المستبعدة';
 
   @override
-  String get hiddenFoldersSubtitle => 'إدارة المجلدات الموسيقية المستبعدة والمخفية';
+  String get hiddenFoldersSubtitle =>
+      'إدارة المجلدات الموسيقية المستبعدة والمخفية';
 
   @override
   String get networkAndProxy => 'الشبكة والبروكسي';
@@ -980,7 +997,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get cloudSync => 'المزامنة السحابية والنسخ الاحتياطي';
 
   @override
-  String get cloudSyncSubtitle => 'مزامنة المفضلة وقوائم التشغيل والإعدادات بين أجهزتك';
+  String get cloudSyncSubtitle =>
+      'مزامنة المفضلة وقوائم التشغيل والإعدادات بين أجهزتك';
 
   @override
   String get signInWithGoogle => 'تسجيل الدخول عبر Google';
@@ -1022,10 +1040,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get batteryOptimization => 'تحسين استخدام البطارية';
 
   @override
-  String get batteryOptimizationSubtitle => 'السماح بالتشغيل في الخلفية دون قيود النظام';
+  String get batteryOptimizationSubtitle =>
+      'السماح بالتشغيل في الخلفية دون قيود النظام';
 
   @override
-  String get batteryOptimizationPrompt => 'عطّل قيود البطارية للتشغيل بدون انقطاع';
+  String get batteryOptimizationPrompt =>
+      'عطّل قيود البطارية للتشغيل بدون انقطاع';
 
   @override
   String get requestWhitelist => 'إلغاء القيود';
@@ -1119,7 +1139,8 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get deleteSongConfirmation => 'هل أنت متأكد من رغبتك في حذف هذه الأغنية نهائيًا من جهازك؟';
+  String get deleteSongConfirmation =>
+      'هل أنت متأكد من رغبتك في حذف هذه الأغنية نهائيًا من جهازك؟';
 
   @override
   String deleteMultipleConfirmation(int count) {
@@ -1184,25 +1205,29 @@ class AppLocalizationsAr extends AppLocalizations {
   String get buttonStyleTitle => 'نمط الأزرار والشرائح';
 
   @override
-  String get buttonStyleSubtitle => 'اختر النمط البصري للأزرار وشرائح التصفية في التطبيق';
+  String get buttonStyleSubtitle =>
+      'اختر النمط البصري للأزرار وشرائح التصفية في التطبيق';
 
   @override
   String get buttonStyleRectangular => 'مستطيل زجاجي (Apple Music)';
 
   @override
-  String get buttonStyleRectangularSubtitle => 'زجاج مصنفر أنيق بحواف مستطيلة ناعمة مطابقة للشارة تحت شريط التقدم';
+  String get buttonStyleRectangularSubtitle =>
+      'زجاج مصنفر أنيق بحواف مستطيلة ناعمة مطابقة للشارة تحت شريط التقدم';
 
   @override
   String get buttonStyleCapsule => 'كبسولة زجاجية';
 
   @override
-  String get buttonStyleCapsuleSubtitle => 'كبسولات زجاجية شفافة مستوحاة من نمط الشارة تحت شريط التقدم';
+  String get buttonStyleCapsuleSubtitle =>
+      'كبسولات زجاجية شفافة مستوحاة من نمط الشارة تحت شريط التقدم';
 
   @override
   String get buttonStyleClassic => 'تقليدي';
 
   @override
-  String get buttonStyleClassicSubtitle => 'تصميم Pulsr التقليدي بألوان التمييز والحدود';
+  String get buttonStyleClassicSubtitle =>
+      'تصميم Pulsr التقليدي بألوان التمييز والحدود';
 
   @override
   String get colorSource => 'مصدر الألوان';
@@ -1220,13 +1245,15 @@ class AppLocalizationsAr extends AppLocalizations {
   String get seekLabel => 'بحث';
 
   @override
-  String get homeOfflineNotice => 'وضع عدم الاتصال — البث عبر الإنترنت معطّل في الإعدادات.';
+  String get homeOfflineNotice =>
+      'وضع عدم الاتصال — البث عبر الإنترنت معطّل في الإعدادات.';
 
   @override
   String get homePermissionNeeded => 'الإذن مطلوب';
 
   @override
-  String get homePermissionSubtitle => 'امنح إذن الصوت أو التخزين حتى يتمكن Pulsr من فهرسة مجموعتك الموسيقية المحلية وتشغيلها بجودة مثالية.';
+  String get homePermissionSubtitle =>
+      'امنح إذن الصوت أو التخزين حتى يتمكن Pulsr من فهرسة مجموعتك الموسيقية المحلية وتشغيلها بجودة مثالية.';
 
   @override
   String get homeGrantPermission => 'منح الإذن';
@@ -1240,7 +1267,8 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get homeScanningStorageSubtitle => 'جارٍ البحث عن ملفات الصوت في مجلدات الجهاز...';
+  String get homeScanningStorageSubtitle =>
+      'جارٍ البحث عن ملفات الصوت في مجلدات الجهاز...';
 
   @override
   String get jumpToCategory => 'الانتقال إلى الفئة';
@@ -1300,16 +1328,19 @@ class AppLocalizationsAr extends AppLocalizations {
   String get authUseCodeSignIn => 'هل تواجه مشكلة؟ استخدم تسجيل الدخول بالرمز';
 
   @override
-  String get castAndroidOnly => 'البث (Cast) متاح على Android فقط في هذا الإصدار.';
+  String get castAndroidOnly =>
+      'البث (Cast) متاح على Android فقط في هذا الإصدار.';
 
   @override
-  String get castDirectDeviceMode => 'وضع الجهاز المباشر: يبث المقطع الحالي. تتطلب القائمة ومستوى الصوت عن بُعد Cast SDK.';
+  String get castDirectDeviceMode =>
+      'وضع الجهاز المباشر: يبث المقطع الحالي. تتطلب القائمة ومستوى الصوت عن بُعد Cast SDK.';
 
   @override
   String get playbackPresetsTitle => 'إعدادات التشغيل';
 
   @override
-  String get playbackPresetsSubtitle => 'ضبط بلمسة واحدة للجودة أو التوازن أو توفير البيانات';
+  String get playbackPresetsSubtitle =>
+      'ضبط بلمسة واحدة للجودة أو التوازن أو توفير البيانات';
 
   @override
   String get playbackPresetMaxQuality => 'أعلى جودة';
@@ -1355,7 +1386,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get connectYtmAccount => 'ربط حساب يوتيوب ميوزك';
 
   @override
-  String get connectYtmSubtitle => 'سجّل الدخول للمزامنة التلقائية لمكتبة أغانيك المفضلة';
+  String get connectYtmSubtitle =>
+      'سجّل الدخول للمزامنة التلقائية لمكتبة أغانيك المفضلة';
 
   @override
   String get ytmConnected => 'تم ربط يوتيوب ميوزك';
@@ -1403,7 +1435,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get privacyAndData => 'الخصوصية والبيانات';
 
   @override
-  String get privacyGuaranteeSubtitle => '١٠٠٪ بدون اتصال. بدون تتبع، وبدون تليميتري.';
+  String get privacyGuaranteeSubtitle =>
+      '١٠٠٪ بدون اتصال. بدون تتبع، وبدون تليميتري.';
 
   @override
   String get aboutAppSubtitle => 'الإصدار 1.0.0 • صوت نقي بدون اتصال';
@@ -1437,7 +1470,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get noDownloadsYet => 'لا توجد تنزيلات بعد';
 
   @override
-  String get noDownloadsYetSubtitle => 'قم بتنزيل أغانيك المفضلة من يوتيوب ميوزك للاستماع دون اتصال في أي مكان.';
+  String get noDownloadsYetSubtitle =>
+      'قم بتنزيل أغانيك المفضلة من يوتيوب ميوزك للاستماع دون اتصال في أي مكان.';
 
   @override
   String get offlineDownloads => 'التنزيلات دون اتصال';
@@ -1458,7 +1492,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get noLocalFavorites => 'لا توجد مفضلات محلية';
 
   @override
-  String get noLocalFavoritesSubtitle => 'اضغط على أيقونة القلب على أي مقطع محلي لإضافته هنا.';
+  String get noLocalFavoritesSubtitle =>
+      'اضغط على أيقونة القلب على أي مقطع محلي لإضافته هنا.';
 
   @override
   String get noOnlineFavorites => 'لا توجد مفضلات عبر الإنترنت';
@@ -1470,7 +1505,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get noFoldersFound => 'لم يتم العثور على مجلدات';
 
   @override
-  String get noFoldersSubtitle => 'افحص وحدة التخزين لاكتشاف مجلدات الموسيقى وتنظيمها حسب المسار.';
+  String get noFoldersSubtitle =>
+      'افحص وحدة التخزين لاكتشاف مجلدات الموسيقى وتنظيمها حسب المسار.';
 
   @override
   String get playNext => 'تشغيل التالي';
@@ -1614,7 +1650,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get hideCustomFolder => 'إخفاء مجلد مخصص';
 
   @override
-  String get hideFolderDesc => 'أدخل المسار الكامل للدليل الذي تريد إخفاءه من مكتبة الموسيقى الخاصة بك:';
+  String get hideFolderDesc =>
+      'أدخل المسار الكامل للدليل الذي تريد إخفاءه من مكتبة الموسيقى الخاصة بك:';
 
   @override
   String get hideFolder => 'إخفاء المجلد';
@@ -1623,22 +1660,26 @@ class AppLocalizationsAr extends AppLocalizations {
   String get confirmRestore => 'تأكيد الاستعادة';
 
   @override
-  String get confirmRestoreDesc => 'هل أنت متأكد من رغبتك في استعادة بيانات النسخة الاحتياطية من هذا الملف؟';
+  String get confirmRestoreDesc =>
+      'هل أنت متأكد من رغبتك في استعادة بيانات النسخة الاحتياطية من هذا الملف؟';
 
   @override
-  String get existingLibraryUpdateNotice => 'سيتم تحديث المسارات المطابقة في المكتبة الحالية.';
+  String get existingLibraryUpdateNotice =>
+      'سيتم تحديث المسارات المطابقة في المكتبة الحالية.';
 
   @override
   String get audioVisualizerPermission => 'إذن المؤثرات البصرية للصوت';
 
   @override
-  String get audioVisualizerPermissionDesc => 'يقرأ المؤثر البصري إخراج الصوت وليس الميكروفون. يتطلب نظام أندرويد إذن تسجيل الصوت لمعالجة بيانات التردد.';
+  String get audioVisualizerPermissionDesc =>
+      'يقرأ المؤثر البصري إخراج الصوت وليس الميكروفون. يتطلب نظام أندرويد إذن تسجيل الصوت لمعالجة بيانات التردد.';
 
   @override
   String get useSimulation => 'استخدام المحاكاة';
 
   @override
-  String get visualizerSimulationNotice => 'تم رفض إذن المؤثر البصري — يتم عرض رسم متحرك محاكى بدلاً من ذلك.';
+  String get visualizerSimulationNotice =>
+      'تم رفض إذن المؤثر البصري — يتم عرض رسم متحرك محاكى بدلاً من ذلك.';
 
   @override
   String get visualizerCpuFallbackBadge => 'وضع المعالج: مؤثر GPU غير متاح';
@@ -1656,7 +1697,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get ytdlpServerConfig => 'إعدادات خادم yt-dlp';
 
   @override
-  String get ytdlpServerDesc => 'يربط التطبيق بخادم yt-dlp خارجي بوكلاء متناوبين لتجاوز حظر يوتيوب.';
+  String get ytdlpServerDesc =>
+      'يربط التطبيق بخادم yt-dlp خارجي بوكلاء متناوبين لتجاوز حظر يوتيوب.';
 
   @override
   String get downloadsTitle => 'التنزيلات';
@@ -1665,7 +1707,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get noDownloadsTitle => 'لا توجد تنزيلات بعد';
 
   @override
-  String get noDownloadsSubtitle => 'ستظهر هنا الأغاني التي تم تنزيلها للتشغيل بلا إنترنت.';
+  String get noDownloadsSubtitle =>
+      'ستظهر هنا الأغاني التي تم تنزيلها للتشغيل بلا إنترنت.';
 
   @override
   String get statusQueued => 'في قائمة الانتظار';
@@ -1698,13 +1741,15 @@ class AppLocalizationsAr extends AppLocalizations {
   String get downloadErrorStorage => 'التخزين ممتلئ — حرّر مساحة وأعد المحاولة';
 
   @override
-  String get downloadErrorPermission => 'تم رفض إذن التخزين. يرجى منح الإذن من الإعدادات.';
+  String get downloadErrorPermission =>
+      'تم رفض إذن التخزين. يرجى منح الإذن من الإعدادات.';
 
   @override
   String get downloadErrorInterrupted => 'انقطع التنزيل. انقر للاستئناف.';
 
   @override
-  String get downloadErrorDisabled => 'التنزيلات غير متوفرة أو معطلة في هذا الإصدار.';
+  String get downloadErrorDisabled =>
+      'التنزيلات غير متوفرة أو معطلة في هذا الإصدار.';
 
   @override
   String get downloadErrorTransition => 'انتقال حالة عملية تنزيل غير صالح.';
@@ -1716,7 +1761,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get downloadErrorNetwork => 'لا يوجد اتصال. تحقق من الشبكة.';
 
   @override
-  String get downloadErrorBotChallenge => 'تم تشغيل التحقق من يوتيوب. جارٍ إعادة المحاولة…';
+  String get downloadErrorBotChallenge =>
+      'تم تشغيل التحقق من يوتيوب. جارٍ إعادة المحاولة…';
 
   @override
   String get downloadErrorUnavailable => 'هذا المسار غير متوفر.';
@@ -1725,28 +1771,34 @@ class AppLocalizationsAr extends AppLocalizations {
   String get downloadWifiOnly => 'وضع Wi-Fi فقط نشط. اتصل بالشبكة للتنزيل.';
 
   @override
-  String get downloadOfflineOnly => 'وضع عدم الاتصال فقط نشط. أوقفه من الإعدادات للتنزيل.';
+  String get downloadOfflineOnly =>
+      'وضع عدم الاتصال فقط نشط. أوقفه من الإعدادات للتنزيل.';
 
   @override
   String get settingsDownloadConcurrent => 'التنزيلات المتزامنة';
 
   @override
-  String get settingsDownloadConcurrentSubtitle => 'الحد الأقصى للمقاطع التي يتم تنزيلها في وقت واحد (1-5).';
+  String get settingsDownloadConcurrentSubtitle =>
+      'الحد الأقصى للمقاطع التي يتم تنزيلها في وقت واحد (1-5).';
 
   @override
   String get settingsDownloadLocation => 'موقع التنزيل';
 
   @override
-  String get settingsDownloadLocationUnsupported => 'مواقع التنزيل المخصصة غير مدعومة بعد. يتم حفظ الملفات في مجلد الموسيقى.';
+  String get settingsDownloadLocationUnsupported =>
+      'مواقع التنزيل المخصصة غير مدعومة بعد. يتم حفظ الملفات في مجلد الموسيقى.';
 
   @override
-  String get downloadErrorAlreadyQueued => 'هذه الأغنية موجودة بالفعل في قائمة التنزيل.';
+  String get downloadErrorAlreadyQueued =>
+      'هذه الأغنية موجودة بالفعل في قائمة التنزيل.';
 
   @override
-  String get downloadErrorCorrupt => 'الملف الذي تم تنزيله تالف أو غير مكتمل. يرجى إعادة المحاولة.';
+  String get downloadErrorCorrupt =>
+      'الملف الذي تم تنزيله تالف أو غير مكتمل. يرجى إعادة المحاولة.';
 
   @override
-  String get downloadErrorInvalidTransition => 'انتقال حالة عملية تنزيل غير صالح.';
+  String get downloadErrorInvalidTransition =>
+      'انتقال حالة عملية تنزيل غير صالح.';
 
   @override
   String get downloadErrorTimeout => 'انتهت مهلة التنزيل. يرجى إعادة المحاولة.';
@@ -1755,7 +1807,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get dspEnginePreference => 'تفضيل محرك معالجة الصوت (DSP)';
 
   @override
-  String get dspEnginePreferenceSubtitle => 'اختر محرك الاستوديو المدمج أو مؤثرات النظام الأصلية';
+  String get dspEnginePreferenceSubtitle =>
+      'اختر محرك الاستوديو المدمج أو مؤثرات النظام الأصلية';
 
   @override
   String get dspEngineNative => 'محرك DSP استوديو مدمج (بدون تأخير)';
@@ -1817,19 +1870,22 @@ class AppLocalizationsAr extends AppLocalizations {
   String get dspLoudnessTitle => 'منحنى الجهارة';
 
   @override
-  String get dspLoudnessSubtitle => 'تعويض نبرة مرتبط بمستوى الصوت (فليتشر-مونسون)';
+  String get dspLoudnessSubtitle =>
+      'تعويض نبرة مرتبط بمستوى الصوت (فليتشر-مونسون)';
 
   @override
   String get dspLoudnessIntensity => 'الشدة';
 
   @override
-  String get dspLoudnessReplayGainNote => 'مكمّل لـ ReplayGain: يعاير ReplayGain الجهارة بين المقاطع، وهذا المنحنى يكيّف النبرة مع مستوى استماعك.';
+  String get dspLoudnessReplayGainNote =>
+      'مكمّل لـ ReplayGain: يعاير ReplayGain الجهارة بين المقاطع، وهذا المنحنى يكيّف النبرة مع مستوى استماعك.';
 
   @override
   String get dspSubCrossoverTitle => 'كروس أوفر السابووفر';
 
   @override
-  String get dspSubCrossoverSubtitle => 'إعادة توجيه الباس إلى نقطة ساب أحادية مجمّعة';
+  String get dspSubCrossoverSubtitle =>
+      'إعادة توجيه الباس إلى نقطة ساب أحادية مجمّعة';
 
   @override
   String get dspSubCrossoverCorner => 'تردد التقاطع';
@@ -1838,13 +1894,15 @@ class AppLocalizationsAr extends AppLocalizations {
   String get dspSubCrossoverSubLevel => 'مستوى الساب';
 
   @override
-  String get dspSubCrossoverNote => 'إعادة توجيه باس: يُضاف مجموع أحادي مُرشَّح تمرير منخفض إلى القناتين؛ وليس توجيهاً حقيقياً متعدد القنوات (LFE).';
+  String get dspSubCrossoverNote =>
+      'إعادة توجيه باس: يُضاف مجموع أحادي مُرشَّح تمرير منخفض إلى القناتين؛ وليس توجيهاً حقيقياً متعدد القنوات (LFE).';
 
   @override
   String get dspDynamicEqTitle => 'المعادل الديناميكي';
 
   @override
-  String get dspDynamicEqSubtitle => 'يخفض الرنينات فقط عند تجاوز طاقة النطاق للعتبة';
+  String get dspDynamicEqSubtitle =>
+      'يخفض الرنينات فقط عند تجاوز طاقة النطاق للعتبة';
 
   @override
   String get dspDynamicEqFrequency => 'تردد النطاق';
@@ -1871,7 +1929,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get rcTitle => 'تصحيح الغرفة';
 
   @override
-  String get rcSubtitle => 'قِس استجابة غرفتك بنغمة قصيرة وطبّق معادِلاً يخفّض الانحرافات';
+  String get rcSubtitle =>
+      'قِس استجابة غرفتك بنغمة قصيرة وطبّق معادِلاً يخفّض الانحرافات';
 
   @override
   String get rcStart => 'ابدأ القياس';
@@ -1892,10 +1951,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get rcMicNeeded => 'إذن الميكروفون مطلوب للقياس';
 
   @override
-  String get rcQuietHint => 'أبقِ الغرفة هادئة ودع النغمة تعمل بمستوى الاستماع المعتاد عبر مكبرات الصوت';
+  String get rcQuietHint =>
+      'أبقِ الغرفة هادئة ودع النغمة تعمل بمستوى الاستماع المعتاد عبر مكبرات الصوت';
 
   @override
-  String get rcKeepPlayerPaused => 'يبقى تشغيل الموسيقى متوقفاً أثناء تصحيح الغرفة';
+  String get rcKeepPlayerPaused =>
+      'يبقى تشغيل الموسيقى متوقفاً أثناء تصحيح الغرفة';
 
   @override
   String get rcApplied => 'تم تطبيق إعداد تصحيح الغرفة';
@@ -1976,10 +2037,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get smartAudioManual => 'يدوي';
 
   @override
-  String get smartAudioAutoDesc => 'يكتشف السماعات المتصلة، ويطبّق تصحيح AutoEQ المطابق، ويستخدم أعلى جودة يدعمها الجهاز';
+  String get smartAudioAutoDesc =>
+      'يكتشف السماعات المتصلة، ويطبّق تصحيح AutoEQ المطابق، ويستخدم أعلى جودة يدعمها الجهاز';
 
   @override
-  String get smartAudioManualDesc => 'يحافظ على إعدادات المعادل والتأثيرات وجودة الإخراج كما ضبطتها';
+  String get smartAudioManualDesc =>
+      'يحافظ على إعدادات المعادل والتأثيرات وجودة الإخراج كما ضبطتها';
 
   @override
   String smartAudioDetectedDevice(String device) {
@@ -1995,13 +2058,15 @@ class AppLocalizationsAr extends AppLocalizations {
   String get smartAudioNoMatch => 'لا يوجد تصحيح سماعات مطابق لهذا الجهاز';
 
   @override
-  String get smartAudioAutoCatchAllHint => 'لا يعدّل الوضع التلقائي الصوت إلا عند التعرّف على سماعاتك أو على ملف جهاز محفوظ؛ ولا يتم استبدال اختياراتك في الوضع اليدوي';
+  String get smartAudioAutoCatchAllHint =>
+      'لا يعدّل الوضع التلقائي الصوت إلا عند التعرّف على سماعاتك أو على ملف جهاز محفوظ؛ ولا يتم استبدال اختياراتك في الوضع اليدوي';
 
   @override
   String get smartAudioAutoDacTitle => 'اختيار USB DAC تلقائيًا مع Bit-Perfect';
 
   @override
-  String get smartAudioAutoDacSubtitle => 'يوجّه الصوت تلقائيًا إلى أجهزة USB DAC المتصلة ويُفعّل وضع Bit-Perfect للحصول على أقصى جودة مطابقة للبت.';
+  String get smartAudioAutoDacSubtitle =>
+      'يوجّه الصوت تلقائيًا إلى أجهزة USB DAC المتصلة ويُفعّل وضع Bit-Perfect للحصول على أقصى جودة مطابقة للبت.';
 
   @override
   String get experienceModeTitle => 'وضع الاستخدام';
@@ -2016,10 +2081,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get experienceModeProfessional => 'احترافي';
 
   @override
-  String get experienceModeNormalDesc => 'ذكي وبسيط — يضبط Pulsr الصوت لسماعاتك ويختار أفضل جودة تلقائيًا';
+  String get experienceModeNormalDesc =>
+      'ذكي وبسيط — يضبط Pulsr الصوت لسماعاتك ويختار أفضل جودة تلقائيًا';
 
   @override
-  String get experienceModeProfessionalDesc => 'تحكم كامل في كل مرحلة معالجة وصيغة إخراج وخيار تشخيصي';
+  String get experienceModeProfessionalDesc =>
+      'تحكم كامل في كل مرحلة معالجة وصيغة إخراج وخيار تشخيصي';
 
   @override
   String get undo => 'تراجع';
@@ -2038,7 +2105,8 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String downloadTileSemantics(String title, String artist, String status, String progress) {
+  String downloadTileSemantics(
+      String title, String artist, String status, String progress) {
     return '$title $artist $status $progress';
   }
 
@@ -2051,13 +2119,16 @@ class AppLocalizationsAr extends AppLocalizations {
   String get systemEffectsTitle => 'مؤثرات الصوت للنظام (Dolby Atmos / DAP)';
 
   @override
-  String get systemEffectsSubtitleBypassed => '✓ تم التجاوز: تم تعطيل مؤثرات النظام';
+  String get systemEffectsSubtitleBypassed =>
+      '✓ تم التجاوز: تم تعطيل مؤثرات النظام';
 
   @override
-  String get systemEffectsSubtitleActive => 'نشط: مؤثرات صوت النظام قيد المعالجة';
+  String get systemEffectsSubtitleActive =>
+      'نشط: مؤثرات صوت النظام قيد المعالجة';
 
   @override
-  String get systemEffectsSubtitleUnsupported => 'لم يتم العثور على مؤثرات Dolby/DAP على هذا الجهاز';
+  String get systemEffectsSubtitleUnsupported =>
+      'لم يتم العثور على مؤثرات Dolby/DAP على هذا الجهاز';
 
   @override
   String get systemEffectsAuto => 'تلقائي';
@@ -2069,7 +2140,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get systemEffectsLeaveOn => 'إبقاء التشغيل';
 
   @override
-  String get bluetoothLatencyTitle => 'مزامنة زمن استجابة البلوتوث (AVRCP / الكلمات)';
+  String get bluetoothLatencyTitle =>
+      'مزامنة زمن استجابة البلوتوث (AVRCP / الكلمات)';
 
   @override
   String bluetoothLatencySubtitle(int offset) {
@@ -2091,7 +2163,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get resetToDefault30s => 'إعادة التعيين إلى الافتراضي (٣٠ ث)';
 
   @override
-  String get autoFilteringVoiceMemos => 'تصفية تلقائية للملاحظات الصوتية • مسارات مخصصة';
+  String get autoFilteringVoiceMemos =>
+      'تصفية تلقائية للملاحظات الصوتية • مسارات مخصصة';
 
   @override
   String get manageExcludedDirectories => 'إدارة الأدلة المستبعدة';
@@ -2105,19 +2178,22 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get scanDeviceStorageForAudio => 'فحص وحدة تخزين الجهاز بحثًا عن الملفات الصوتية';
+  String get scanDeviceStorageForAudio =>
+      'فحص وحدة تخزين الجهاز بحثًا عن الملفات الصوتية';
 
   @override
   String get removeMissingFiles => 'إزالة الملفات المفقودة';
 
   @override
-  String get removeMissingFilesSubtitle => 'حذف المقاطع المفهرسة التي لم تعد ملفاتها موجودة';
+  String get removeMissingFilesSubtitle =>
+      'حذف المقاطع المفهرسة التي لم تعد ملفاتها موجودة';
 
   @override
   String get removeMissingFilesConfirmTitle => 'إزالة الملفات المفقودة؟';
 
   @override
-  String get removeMissingFilesConfirmBody => 'سيؤدي هذا إلى حذف المقاطع المفهرسة نهائيًا التي لم تعد ملفاتها موجودة على القرص.';
+  String get removeMissingFilesConfirmBody =>
+      'سيؤدي هذا إلى حذف المقاطع المفهرسة نهائيًا التي لم تعد ملفاتها موجودة على القرص.';
 
   @override
   String get remove => 'إزالة';
@@ -2200,7 +2276,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get lastFmRestScrobbler => 'سكروبلر Last.fm REST';
 
   @override
-  String get enableLastFmDirectScrobbling => 'تفعيل السكروبلر المباشر لـ Last.fm';
+  String get enableLastFmDirectScrobbling =>
+      'تفعيل السكروبلر المباشر لـ Last.fm';
 
   @override
   String get lastFmApiKey => 'مفتاح API لـ Last.fm';
@@ -2233,37 +2310,43 @@ class AppLocalizationsAr extends AppLocalizations {
   String get youtubeWeb => 'يوتيوب ويب';
 
   @override
-  String get youtubeWebSubtitle => 'تصفح جميع مقاطع الفيديو الموسيقية وقوائم التشغيل (بدون قيود جغرافية)';
+  String get youtubeWebSubtitle =>
+      'تصفح جميع مقاطع الفيديو الموسيقية وقوائم التشغيل (بدون قيود جغرافية)';
 
   @override
   String get exploreAndCharts => 'استكشاف وتريندات';
 
   @override
-  String get exploreAndChartsSubtitle => 'الأغاني الرائجة وأفضل القوائم العالمية ومقاطع الفيديو';
+  String get exploreAndChartsSubtitle =>
+      'الأغاني الرائجة وأفضل القوائم العالمية ومقاطع الفيديو';
 
   @override
   String get yourLibrary => 'مكتبتك';
 
   @override
-  String get yourLibrarySubtitle => 'قوائم التشغيل والألبومات والأغاني والفنانون المشتركون';
+  String get yourLibrarySubtitle =>
+      'قوائم التشغيل والألبومات والأغاني والفنانون المشتركون';
 
   @override
   String get likedMusic => 'الموسيقى التي أعجبتك';
 
   @override
-  String get likedMusicSubtitle => 'الأغاني التي أعجبتك والمتزامنة مع حساب Google';
+  String get likedMusicSubtitle =>
+      'الأغاني التي أعجبتك والمتزامنة مع حساب Google';
 
   @override
   String get newReleases => 'الإصدارات الجديدة';
 
   @override
-  String get newReleasesSubtitle => 'أحدث الألبومات والأسطوانات القصيرة والأغاني الفردية الرائجة';
+  String get newReleasesSubtitle =>
+      'أحدث الألبومات والأسطوانات القصيرة والأغاني الفردية الرائجة';
 
   @override
   String get listeningHistory => 'سجل الاستماع';
 
   @override
-  String get listeningHistorySubtitle => 'المقاطع والمحطات التي تم تشغيلها مؤخرًا في حسابك';
+  String get listeningHistorySubtitle =>
+      'المقاطع والمحطات التي تم تشغيلها مؤخرًا في حسابك';
 
   @override
   String get bySongs => 'حسب عدد الأغاني';
@@ -2307,7 +2390,8 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get musicWillStopEndOfQueue => 'ستتوقف الموسيقى عند نهاية قائمة الانتظار';
+  String get musicWillStopEndOfQueue =>
+      'ستتوقف الموسيقى عند نهاية قائمة الانتظار';
 
   @override
   String musicWillStopIn(int minutes, int seconds) {
@@ -2318,7 +2402,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get rcStackWithHeadphoneEq => 'دمج مع AutoEQ للسماعات';
 
   @override
-  String get rcStackWithHeadphoneEqSubtitle => 'ادمج تصحيح الغرفة هذا مع ملف تعريف السماعات المحدد.';
+  String get rcStackWithHeadphoneEqSubtitle =>
+      'ادمج تصحيح الغرفة هذا مع ملف تعريف السماعات المحدد.';
 
   @override
   String get rcMeasuredResponse => 'الاستجابة المقاسة';
@@ -2330,7 +2415,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get rcVerify => 'التحقق من التصحيح';
 
   @override
-  String get rcVerifyHint => 'أعد القياس مع تفعيل التصحيح للتأكد من تسطيح الغرفة.';
+  String get rcVerifyHint =>
+      'أعد القياس مع تفعيل التصحيح للتأكد من تسطيح الغرفة.';
 
   @override
   String get rcVerifying => 'جارٍ التحقق من التصحيح - ابقَ هادئاً...';
@@ -2363,7 +2449,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get fetchMissingArtworkTitle => 'جلب الأغلفة المفقودة؟';
 
   @override
-  String get fetchMissingArtworkBody => 'سيبحث Pulsr عبر الإنترنت عن الألبومات التي تفتقد الأغلفة ويحفظ النتائج في مكتبتك. يتطلب ذلك اتصالًا بالإنترنت.';
+  String get fetchMissingArtworkBody =>
+      'سيبحث Pulsr عبر الإنترنت عن الألبومات التي تفتقد الأغلفة ويحفظ النتائج في مكتبتك. يتطلب ذلك اتصالًا بالإنترنت.';
 
   @override
   String get fetchArtwork => 'جلب الأغلفة';
@@ -2372,7 +2459,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get artworkServiceUnavailable => 'خدمة الأغلفة غير متوفرة';
 
   @override
-  String get noMissingArtworkFound => 'لم يتم العثور على أغلفة مفقودة عبر الإنترنت';
+  String get noMissingArtworkFound =>
+      'لم يتم العثور على أغلفة مفقودة عبر الإنترنت';
 
   @override
   String updatedArtworkForAlbums(int count) {
@@ -2470,7 +2558,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get radioEmptyTitle => 'لا توجد محطات بعد';
 
   @override
-  String get radioEmptySubtitle => 'أضف رابط بث أو استورد قائمة .m3u لبدء الاستماع.';
+  String get radioEmptySubtitle =>
+      'أضف رابط بث أو استورد قائمة .m3u لبدء الاستماع.';
 
   @override
   String get radioStationName => 'اسم المحطة';
@@ -2537,7 +2626,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get radioDirectoryAdded => 'تمت الإضافة';
 
   @override
-  String get radioDirectoryUnreachable => 'تعذّر الوصول إلى هذا البث. جرّب محطة أخرى.';
+  String get radioDirectoryUnreachable =>
+      'تعذّر الوصول إلى هذا البث. جرّب محطة أخرى.';
 
   @override
   String radioCuratedAdded(int count) {
@@ -2545,7 +2635,8 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get radioCuratedUpToDate => 'جميع المحطات المختارة موجودة بالفعل في قائمتك';
+  String get radioCuratedUpToDate =>
+      'جميع المحطات المختارة موجودة بالفعل في قائمتك';
 
   @override
   String get radioCuratedTitle => 'محطات مختارة';
@@ -2575,7 +2666,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get settingsRebuildSearchIndexTitle => 'إعادة بناء فهرس البحث';
 
   @override
-  String get settingsRebuildSearchIndexSubtitle => 'أصل نتائج البحث المفقودة عبر إعادة بناء فهرس النص الكامل';
+  String get settingsRebuildSearchIndexSubtitle =>
+      'أصل نتائج البحث المفقودة عبر إعادة بناء فهرس النص الكامل';
 
   @override
   String get settingsSearchIndexRebuilt => 'تمت إعادة بناء فهرس البحث';
@@ -2587,34 +2679,42 @@ class AppLocalizationsAr extends AppLocalizations {
   String get followTrackSampleRateTitle => 'متابعة معدل عينات المسار';
 
   @override
-  String get followTrackSampleRateSubtitle => 'إعادة ضبط الإخراج إلى المعدل الأصلي لكل مسار؛ يتم تخطيه في البلوتوث وبدون تكرار';
+  String get followTrackSampleRateSubtitle =>
+      'إعادة ضبط الإخراج إلى المعدل الأصلي لكل مسار؛ يتم تخطيه في البلوتوث وبدون تكرار';
 
   @override
-  String get followTrackSampleRateBluetooth => 'يتم تخطيه في البلوتوث — رابط الترميز/AVRCP يتحكم في معدل العينات';
+  String get followTrackSampleRateBluetooth =>
+      'يتم تخطيه في البلوتوث — رابط الترميز/AVRCP يتحكم في معدل العينات';
 
   @override
-  String get followTrackRequiresBitPerfect => 'يتطلب إخراج Bit-Perfect — لا يُطبَّق معدل المسار إلا على مسار USB الحصري';
+  String get followTrackRequiresBitPerfect =>
+      'يتطلب إخراج Bit-Perfect — لا يُطبَّق معدل المسار إلا على مسار USB الحصري';
 
   @override
   String get strictBitPerfectTitle => 'بت-بيرفكت صارم (بدون إعادة عينات)';
 
   @override
-  String get strictBitPerfectSubtitle => 'يفرض بت-بيرفكت + تجاوز DSP ويتابع معدل كل مسار ليصل إلى DAC العينات الأصلية';
+  String get strictBitPerfectSubtitle =>
+      'يفرض بت-بيرفكت + تجاوز DSP ويتابع معدل كل مسار ليصل إلى DAC العينات الأصلية';
 
   @override
-  String get strictBitPerfectBluetooth => 'غير متاح: البلوتوث يعيد الترميز — يحتاج بت-بيرفكت الصارم إلى DAC USB';
+  String get strictBitPerfectBluetooth =>
+      'غير متاح: البلوتوث يعيد الترميز — يحتاج بت-بيرفكت الصارم إلى DAC USB';
 
   @override
-  String get strictBitPerfectActive => 'بت-بيرفكت الصارم مفعّل: تم كتم EQ و ReplayGain والتأثيرات و crossfade لتصل العينات الأصلية إلى DAC';
+  String get strictBitPerfectActive =>
+      'بت-بيرفكت الصارم مفعّل: تم كتم EQ و ReplayGain والتأثيرات و crossfade لتصل العينات الأصلية إلى DAC';
 
   @override
   String get dsdOutputModeTitle => 'إخراج DSD';
 
   @override
-  String get dsdOutputModeSubtitle => 'كيفية وصول ملفات DSF/DFF إلى DAC: فك ترميز إلى PCM أو بث DSD الأصلي كـ DSD فوق PCM';
+  String get dsdOutputModeSubtitle =>
+      'كيفية وصول ملفات DSF/DFF إلى DAC: فك ترميز إلى PCM أو بث DSD الأصلي كـ DSD فوق PCM';
 
   @override
-  String get dsdDopRequiresUsbDac => 'يتطلب توصيل DAC USB يدعم DSD فوق PCM (DoP)';
+  String get dsdDopRequiresUsbDac =>
+      'يتطلب توصيل DAC USB يدعم DSD فوق PCM (DoP)';
 
   @override
   String get dsdOutputPcm => 'PCM';
@@ -2632,7 +2732,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get conversionQuality => 'جودة التحويل';
 
   @override
-  String get conversionQualityDesc => 'تعمل فقط عند اختلاف معدل الإخراج؛ لا تؤثر على التشغيل بتطابق البتات.';
+  String get conversionQualityDesc =>
+      'تعمل فقط عند اختلاف معدل الإخراج؛ لا تؤثر على التشغيل بتطابق البتات.';
 
   @override
   String get conversionOff => 'إيقاف';
@@ -2641,10 +2742,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get settingsUac2VolumeTitle => 'مستوى UAC2';
 
   @override
-  String get settingsUac2VolumeDesc => 'يحرّك مخفّض صوت DAC نفسه؛ 100% يعني دون تخفيض.';
+  String get settingsUac2VolumeDesc =>
+      'يحرّك مخفّض صوت DAC نفسه؛ 100% يعني دون تخفيض.';
 
   @override
-  String get settingsUac2VolumeUnsupported => 'لا يوفّر هذا الـ DAC تحكّماً في مستوى الصوت.';
+  String get settingsUac2VolumeUnsupported =>
+      'لا يوفّر هذا الـ DAC تحكّماً في مستوى الصوت.';
 
   @override
   String get conversionTaps64 => '64 مرشّحاً (سريع)';
@@ -2662,13 +2765,15 @@ class AppLocalizationsAr extends AppLocalizations {
   String get settingsBatterySaverTitle => 'موفّر الطاقة';
 
   @override
-  String get settingsBatterySaverDesc => 'يعطّل مراحل DSP الثقيلة ويُبقي المعادل.';
+  String get settingsBatterySaverDesc =>
+      'يعطّل مراحل DSP الثقيلة ويُبقي المعادل.';
 
   @override
   String get settingsChannelTrimsTitle => 'ضبط وتأخير القنوات';
 
   @override
-  String get settingsChannelTrimsDesc => 'مستوى ومسافة لكل قناة لإخراج من 2 إلى 8 قنوات.';
+  String get settingsChannelTrimsDesc =>
+      'مستوى ومسافة لكل قناة لإخراج من 2 إلى 8 قنوات.';
 
   @override
   String channelTrim(int channel) {
@@ -2765,7 +2870,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get abxVerdictStrong => 'دليل قوي';
 
   @override
-  String get abxNeedsPlayback => 'ابدأ تشغيل مقطع وفعّل DSP لإجراء هذا الاختبار.';
+  String get abxNeedsPlayback =>
+      'ابدأ تشغيل مقطع وفعّل DSP لإجراء هذا الاختبار.';
 
   @override
   String get remoteKindSubsonic => 'Subsonic / Navidrome';
@@ -2861,7 +2967,8 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get audioDelayHelp => 'القيم الموجبة تؤخر الصوت (مثل البلوتوث أو الفيديو البطيء).';
+  String get audioDelayHelp =>
+      'القيم الموجبة تؤخر الصوت (مثل البلوتوث أو الفيديو البطيء).';
 
   @override
   String get themeExported => 'تم تصدير المظهر إلى ورقة المشاركة';
@@ -2882,7 +2989,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get notificationPermissionTitle => 'إظهار عناصر التحكم بالتشغيل';
 
   @override
-  String get notificationPermissionRationale => 'اسمح بالإشعارات ليتمكن Pulsr من إظهار عناصر التحكم بالتشغيل على شاشة القفل وفي درج الإشعارات.';
+  String get notificationPermissionRationale =>
+      'اسمح بالإشعارات ليتمكن Pulsr من إظهار عناصر التحكم بالتشغيل على شاشة القفل وفي درج الإشعارات.';
 
   @override
   String get notificationPermissionAllow => 'السماح';
@@ -2891,13 +2999,16 @@ class AppLocalizationsAr extends AppLocalizations {
   String get notificationPermissionNotNow => 'ليس الآن';
 
   @override
-  String get onboardingNotificationDenied => 'الإشعارات متوقفة. يمكنك تفعيلها لاحقًا من الإعدادات.';
+  String get onboardingNotificationDenied =>
+      'الإشعارات متوقفة. يمكنك تفعيلها لاحقًا من الإعدادات.';
 
   @override
-  String get onboardingScanFailed => 'تعذّر فحص مكتبتك. يمكنك إعادة المحاولة من الإعدادات.';
+  String get onboardingScanFailed =>
+      'تعذّر فحص مكتبتك. يمكنك إعادة المحاولة من الإعدادات.';
 
   @override
-  String get onboardingPermissionRationale => 'بدون الوصول إلى الصوت ستكون مكتبتك فارغة. يمكنك المتابعة بوصول محدود ومنح الإذن لاحقا من الإعدادات.';
+  String get onboardingPermissionRationale =>
+      'بدون الوصول إلى الصوت ستكون مكتبتك فارغة. يمكنك المتابعة بوصول محدود ومنح الإذن لاحقا من الإعدادات.';
 
   @override
   String get continueLimitedAccess => 'المتابعة بوصول محدود';
@@ -2918,7 +3029,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get yearNotFoundHint => 'تعذر العثور على السنة — افتحها من المكتبة.';
 
   @override
-  String get playlistNotFoundHint => 'تعذر العثور على قائمة التشغيل — افتحها من المكتبة.';
+  String get playlistNotFoundHint =>
+      'تعذر العثور على قائمة التشغيل — افتحها من المكتبة.';
 
   @override
   String get folderNotFound => 'تعذر العثور على المجلد';
@@ -2942,7 +3054,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get folderIncluded => 'المجلد مشمول في الفحص';
 
   @override
-  String get clearQueueConfirm => 'مسح قائمة الانتظار؟ (سيتم الاحتفاظ بالمسار الحالي)';
+  String get clearQueueConfirm =>
+      'مسح قائمة الانتظار؟ (سيتم الاحتفاظ بالمسار الحالي)';
 
   @override
   String get queueCleared => 'تم مسح قائمة الانتظار';
@@ -3236,7 +3349,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get activeLabel => 'نشط';
 
   @override
-  String get allDspBypassed => 'تم تجاوز DSP بسبب Bit-Perfect. عطله من الاعدادات';
+  String get allDspBypassed =>
+      'تم تجاوز DSP بسبب Bit-Perfect. عطله من الاعدادات';
 
   @override
   String get spatialAudio => 'صوت مكاني';
@@ -3332,19 +3446,22 @@ class AppLocalizationsAr extends AppLocalizations {
   String get hwFxDesc => 'مؤثرات الصوت مدعومة على اندرويد';
 
   @override
-  String get systemFxActive => 'تحسين النظام نشط. تشغيل DSP فوقه قد يضاعف المعالجة. عطل Dolby او استخدم Bit-Perfect';
+  String get systemFxActive =>
+      'تحسين النظام نشط. تشغيل DSP فوقه قد يضاعف المعالجة. عطل Dolby او استخدم Bit-Perfect';
 
   @override
   String get pasteJsonPreset => 'الصق اعداد JSON:';
 
   @override
-  String get centerFreqHelp => 'التردد المركزي لكل نطاق تصاعديا بين 10 هرتز و30 كيلوهرتز';
+  String get centerFreqHelp =>
+      'التردد المركزي لكل نطاق تصاعديا بين 10 هرتز و30 كيلوهرتز';
 
   @override
   String get roomMeasureHelp => 'قس غرفتك ثم صدر التصحيح';
 
   @override
-  String get dspDisabledBp => 'تم تجاوز DSP بسبب Bit-Perfect. عطله من الاعدادات';
+  String get dspDisabledBp =>
+      'تم تجاوز DSP بسبب Bit-Perfect. عطله من الاعدادات';
 
   @override
   String get saturationBandDesc => 'يحد التشبع بالنطاق المتوسط';
@@ -3545,7 +3662,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get dspViperDdcDemoTitle => 'ملفات تجريبية / مبدئية';
 
   @override
-  String get dspViperDdcDemoNote => 'الملفات المضمّنة توضيحية فقط. حمّل ملف .vdc حقيقي للحصول على تصحيح مقاس.';
+  String get dspViperDdcDemoNote =>
+      'الملفات المضمّنة توضيحية فقط. حمّل ملف .vdc حقيقي للحصول على تصحيح مقاس.';
 
   @override
   String get bookmarkLabel => 'علامة';
@@ -3959,7 +4077,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get googleBlockTip => 'تلميح: الصق الكوكيز من متصفحك';
 
   @override
-  String get ipOutsideYtm => 'عنوان IP خارج دعم يوتيوب ميوزك ويب. افرض وضع مصر او انتقل الى يوتيوب ويب';
+  String get ipOutsideYtm =>
+      'عنوان IP خارج دعم يوتيوب ميوزك ويب. افرض وضع مصر او انتقل الى يوتيوب ويب';
 
   @override
   String get ytmRestricted => 'يوتيوب ميوزك مقيد في منطقتك';
@@ -4134,7 +4253,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get armedLabel => 'مجهز';
 
   @override
-  String get bpGuardrails => 'الحماية نشطة: تم تجاوز DSP وReplayGain. استخدم مستوى صوت DAC عند تفعيله.';
+  String get bpGuardrails =>
+      'الحماية نشطة: تم تجاوز DSP وReplayGain. استخدم مستوى صوت DAC عند تفعيله.';
 
   @override
   String get bpChainVerified => 'سلسلة بت-بيرفكت مُتحقّقة';
@@ -4176,7 +4296,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get bpReasonSourceDepthUnknown => 'عمق المصدر غير معروف';
 
   @override
-  String get bpReasonSourceLossy => 'مصدر مضغوط بفقدان • لا يمكن الجزم بالبت المثالي';
+  String get bpReasonSourceLossy =>
+      'مصدر مضغوط بفقدان • لا يمكن الجزم بالبت المثالي';
 
   @override
   String get bpReasonPrecisionNotPreserved => 'دقة المصدر غير محفوظة';
@@ -4244,7 +4365,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get leAudio => 'LE AUDIO';
 
   @override
-  String get lc3Negotiation => 'اندرويد يتفاوض على LC3. الكودك والمعدل غير قابلين للضبط';
+  String get lc3Negotiation =>
+      'اندرويد يتفاوض على LC3. الكودك والمعدل غير قابلين للضبط';
 
   @override
   String get connectingBt => 'جار الاتصال...';
@@ -4304,7 +4426,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get autoFilterVoiceNotes => 'تصفية تلقائية للرسائل الصوتية';
 
   @override
-  String get autoFilterVoiceNotesDesc => 'يتجاهل ملفات واتساب وتيليجرام والتسجيلات.';
+  String get autoFilterVoiceNotesDesc =>
+      'يتجاهل ملفات واتساب وتيليجرام والتسجيلات.';
 
   @override
   String get shortAudioFilterDesc => 'تجاهل المقاطع القصيرة والمؤثرات';
@@ -4331,7 +4454,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get universalScrobblingEngine => 'محرك سكرابلنغ شامل';
 
   @override
-  String get scrobblingServicesDesc => 'متصل بـ Last.fm وListenBrainz وLibre.fm وWebhooks.';
+  String get scrobblingServicesDesc =>
+      'متصل بـ Last.fm وListenBrainz وLibre.fm وWebhooks.';
 
   @override
   String get last7DaysActivity => 'نشاط 7 ايام';
@@ -4346,7 +4470,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get amoledLabel => 'AMOLED';
 
   @override
-  String get settingsSearchHint => 'جرب البحث عن equalizer او dark mode او proxy او cache.';
+  String get settingsSearchHint =>
+      'جرب البحث عن equalizer او dark mode او proxy او cache.';
 
   @override
   String get bitPerfectLabel => 'BIT-PERFECT';
@@ -4364,7 +4489,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get playbackStopsScreenOff => 'هل يتوقف التشغيل عند اطفاء الشاشة؟';
 
   @override
-  String get batteryExemptionDesc => 'بعض المصنعين يوقفون التشغيل في الخلفية. امنح استثناء البطارية.';
+  String get batteryExemptionDesc =>
+      'بعض المصنعين يوقفون التشغيل في الخلفية. امنح استثناء البطارية.';
 
   @override
   String get deviceGuide => 'دليل الاجهزة';
@@ -4421,7 +4547,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get mbcPerBandTitle => 'ديناميكية لكل نطاق';
 
   @override
-  String get mbcPerBandSubtitle => 'العتبة والنسبة وكسب التعويض لكل نطاق من نطاقات LR4 الأربعة.';
+  String get mbcPerBandSubtitle =>
+      'العتبة والنسبة وكسب التعويض لكل نطاق من نطاقات LR4 الأربعة.';
 
   @override
   String get mbcBandLow => 'النطاق 1 · منخفض';
@@ -4468,7 +4595,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get noDspStages => 'لا توجد مراحل من المحرك.';
 
   @override
-  String get dolbyHijackDesc => 'Dolby Atmos يسيطر على جلسة HAL. بدل الى OEM او عطل Dolby.';
+  String get dolbyHijackDesc =>
+      'Dolby Atmos يسيطر على جلسة HAL. بدل الى OEM او عطل Dolby.';
 
   @override
   String get switchedToOem => 'تم التبديل الى OEM. اعد تشغيل المسار.';
@@ -4507,7 +4635,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get onboardingPowerful => 'تشغيل قوي';
 
   @override
-  String get onboardingPowerfulDesc => 'معادل 10 نطاقات وتلاشي وتشغيل متصل ومؤقت.';
+  String get onboardingPowerfulDesc =>
+      'معادل 10 نطاقات وتلاشي وتشغيل متصل ومؤقت.';
 
   @override
   String get onboardingThemes => '4 سمات للمشغل';
@@ -4603,7 +4732,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get usbBpFailed => 'تعذر بدء البث USB bit-perfect (DAC غير مدعوم).';
 
   @override
-  String get cloudSyncItemsDesc => 'تتم مزامنة المفضلة والقوائم والسجل في الاتجاهين. تبقى الاعدادات على هذا الجهاز.';
+  String get cloudSyncItemsDesc =>
+      'تتم مزامنة المفضلة والقوائم والسجل في الاتجاهين. تبقى الاعدادات على هذا الجهاز.';
 
   @override
   String get dspCopyJsonReport => 'نسخ تقرير JSON';
@@ -4625,10 +4755,12 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get dspSessionPendingPlayTrack => 'الجلسة معلّقة — شغّل مقطعًا للاتصال';
+  String get dspSessionPendingPlayTrack =>
+      'الجلسة معلّقة — شغّل مقطعًا للاتصال';
 
   @override
-  String get dspHalDetachedDolbyNativeDsp => 'HAL منفصل (Dolby) — DSP المدمج نشط';
+  String get dspHalDetachedDolbyNativeDsp =>
+      'HAL منفصل (Dolby) — DSP المدمج نشط';
 
   @override
   String get dspAudioEffectSessionDetached => 'جلسة AudioEffect منفصلة';
@@ -4780,16 +4912,20 @@ class AppLocalizationsAr extends AppLocalizations {
   String get settingsSearchPlaceholder => 'ابحث في الإعدادات والصوت والمظهر...';
 
   @override
-  String get settingsCategoryAudioSubtitle => 'المُعادل، DSP، الدقة العالية، ReplayGain';
+  String get settingsCategoryAudioSubtitle =>
+      'المُعادل، DSP، الدقة العالية، ReplayGain';
 
   @override
-  String get settingsCategoryPlaybackSubtitle => 'الانتقال، التشغيل المتصل، مؤقت النوم، التخطي';
+  String get settingsCategoryPlaybackSubtitle =>
+      'الانتقال، التشغيل المتصل، مؤقت النوم، التخطي';
 
   @override
-  String get settingsCategoryAppearanceSubtitle => 'وضع السمة، ألوان التمييز، المُصوّر';
+  String get settingsCategoryAppearanceSubtitle =>
+      'وضع السمة، ألوان التمييز، المُصوّر';
 
   @override
-  String get settingsCategoryGesturesSubtitle => 'سحب المشغّل المصغّر، النقر المزدوج على الغلاف';
+  String get settingsCategoryGesturesSubtitle =>
+      'سحب المشغّل المصغّر، النقر المزدوج على الغلاف';
 
   @override
   String get settingsCategoryProfiles => 'الملفات والقواعد';
@@ -4798,22 +4934,26 @@ class AppLocalizationsAr extends AppLocalizations {
   String get settingsCategoryProfilesSubtitle => 'ربط أجهزة DAC وقواعد التشغيل';
 
   @override
-  String get settingsCategoryLibrarySubtitle => 'المجلدات، الوسائط المخفية، مرشّح المدة';
+  String get settingsCategoryLibrarySubtitle =>
+      'المجلدات، الوسائط المخفية، مرشّح المدة';
 
   @override
   String get settingsCategoryOnline => 'الشبكة ويوتيوب';
 
   @override
-  String get settingsCategoryOnlineSubtitle => 'جودة الصوت، ذاكرة البث، البروكسي';
+  String get settingsCategoryOnlineSubtitle =>
+      'جودة الصوت، ذاكرة البث، البروكسي';
 
   @override
-  String get settingsCategoryStorageSubtitle => 'استخدام القرص، الأغلفة المخزّنة، التنظيف';
+  String get settingsCategoryStorageSubtitle =>
+      'استخدام القرص، الأغلفة المخزّنة، التنظيف';
 
   @override
   String get settingsCategoryPrivacy => 'الخصوصية والنسخ الاحتياطي';
 
   @override
-  String get settingsCategoryPrivacySubtitle => 'ضمان العمل دون اتصال، التسجيل، النسخ الاحتياطي';
+  String get settingsCategoryPrivacySubtitle =>
+      'ضمان العمل دون اتصال، التسجيل، النسخ الاحتياطي';
 
   @override
   String get settingsCategoryAbout => 'حول';
@@ -4830,25 +4970,32 @@ class AppLocalizationsAr extends AppLocalizations {
   String get settingsAutomationTitle => 'الأتمتة';
 
   @override
-  String get settingsSmartAudioSectionSubtitle => 'تصحيح تلقائي لسماعات الرأس وأفضل جودة إخراج';
+  String get settingsSmartAudioSectionSubtitle =>
+      'تصحيح تلقائي لسماعات الرأس وأفضل جودة إخراج';
 
   @override
-  String get settingsQuranModeSubtitle => 'معادل صوتي للترتيل، أجواء المسجد، سرعة الحفظ';
+  String get settingsQuranModeSubtitle =>
+      'معادل صوتي للترتيل، أجواء المسجد، سرعة الحفظ';
 
   @override
-  String get settingsDeviceProfilesSectionSubtitle => 'ربط ملفات DAC وبلوتوث لكل مخرج';
+  String get settingsDeviceProfilesSectionSubtitle =>
+      'ربط ملفات DAC وبلوتوث لكل مخرج';
 
   @override
-  String get settingsAutomationSectionSubtitle => 'تفعيل الملفات تلقائياً عند أحداث الأجهزة';
+  String get settingsAutomationSectionSubtitle =>
+      'تفعيل الملفات تلقائياً عند أحداث الأجهزة';
 
   @override
-  String get settingsAutomationTileSubtitle => 'تطبيق الملفات عند توصيل السماعات أو البلوتوث أو الشحن';
+  String get settingsAutomationTileSubtitle =>
+      'تطبيق الملفات عند توصيل السماعات أو البلوتوث أو الشحن';
 
   @override
-  String get settingsStorageSectionSubtitle => 'إدارة استخدام القرص وذاكرة الصوت المؤقتة';
+  String get settingsStorageSectionSubtitle =>
+      'إدارة استخدام القرص وذاكرة الصوت المؤقتة';
 
   @override
-  String get settingsAboutSectionSubtitle => 'معلومات الإصدار والتراخيص والبنية';
+  String get settingsAboutSectionSubtitle =>
+      'معلومات الإصدار والتراخيص والبنية';
 
   @override
   String settingsAboutVersionSubtitle(String version) {
@@ -4856,43 +5003,50 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get settingsAppearanceSectionSubtitle => 'السمة، ألوان التمييز، المُصوّر ومظهر المشغّل';
+  String get settingsAppearanceSectionSubtitle =>
+      'السمة، ألوان التمييز، المُصوّر ومظهر المشغّل';
 
   @override
   String get settingsAutoDarkModeTitle => 'الوضع الداكن التلقائي حسب الوقت';
 
   @override
-  String get settingsAutoDarkModeSubtitle => 'اتّبع جدولاً من 7 مساءً حتى 6 صباحاً';
+  String get settingsAutoDarkModeSubtitle =>
+      'اتّبع جدولاً من 7 مساءً حتى 6 صباحاً';
 
   @override
   String get settingsHighContrastTitle => 'تباين عالٍ';
 
   @override
-  String get settingsHighContrastSubtitle => 'زيد التباين بلوحة ألوان مناسبة لـ AMOLED';
+  String get settingsHighContrastSubtitle =>
+      'زيد التباين بلوحة ألوان مناسبة لـ AMOLED';
 
   @override
   String get settingsDimWhitePointTitle => 'تعتيم النقطة البيضاء';
 
   @override
-  String get settingsDimWhitePointSubtitle => 'تخفيف النص الساطع لتسهيل الاستماع ليلًا';
+  String get settingsDimWhitePointSubtitle =>
+      'تخفيف النص الساطع لتسهيل الاستماع ليلًا';
 
   @override
   String get settingsReduceMotionTitle => 'تقليل الحركة';
 
   @override
-  String get settingsReduceMotionSubtitle => 'تشغيل الحركات فورًا بدلًا من انتقالها التدريجي';
+  String get settingsReduceMotionSubtitle =>
+      'تشغيل الحركات فورًا بدلًا من انتقالها التدريجي';
 
   @override
   String get settingsHapticsTitle => 'الاستجابة اللمسية';
 
   @override
-  String get settingsHapticsSubtitle => 'الاهتزاز عند اللمس والإيماءات في جميع أنحاء التطبيق';
+  String get settingsHapticsSubtitle =>
+      'الاهتزاز عند اللمس والإيماءات في جميع أنحاء التطبيق';
 
   @override
   String get settingsLiquidGlassTitle => 'صبغة الزجاج السائل';
 
   @override
-  String get settingsLiquidGlassSubtitle => 'اضبط الانكسار بين الوضوح الفائق (0٪) والتلوين (100٪)';
+  String get settingsLiquidGlassSubtitle =>
+      'اضبط الانكسار بين الوضوح الفائق (0٪) والتلوين (100٪)';
 
   @override
   String get settingsBadgeStyle => 'النمط';
@@ -4904,13 +5058,16 @@ class AppLocalizationsAr extends AppLocalizations {
   String get settingsBadgePalette => 'اللوحة';
 
   @override
-  String get settingsGesturesSectionSubtitle => 'اضبط إيماءات السحب والنقر المزدوج في المشغّل المصغّر والغلاف';
+  String get settingsGesturesSectionSubtitle =>
+      'اضبط إيماءات السحب والنقر المزدوج في المشغّل المصغّر والغلاف';
 
   @override
-  String get settingsLibrarySectionSubtitle => 'فهرسة الوسائط وقواعد الاستبعاد والتنظيف';
+  String get settingsLibrarySectionSubtitle =>
+      'فهرسة الوسائط وقواعد الاستبعاد والتنظيف';
 
   @override
-  String get settingsOnlineSectionSubtitle => 'البث والتنزيلات وتوجيه البروكسي وإعدادات الجودة';
+  String get settingsOnlineSectionSubtitle =>
+      'البث والتنزيلات وتوجيه البروكسي وإعدادات الجودة';
 
   @override
   String get settingsTapToManage => 'انقر للإدارة';
@@ -4919,7 +5076,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get settingsBadgeConnected => 'متصل';
 
   @override
-  String get settingsDownloadsSubtitle => 'عرض وإدارة المسارات والتنزيلات دون اتصال';
+  String get settingsDownloadsSubtitle =>
+      'عرض وإدارة المسارات والتنزيلات دون اتصال';
 
   @override
   String get settingsProxyEnabled => 'ممكّن';
@@ -4928,25 +5086,29 @@ class AppLocalizationsAr extends AppLocalizations {
   String get settingsProxyDisabledHint => 'معطّل • انقر لإعداد HTTP / SOCKS5';
 
   @override
-  String get settingsPrivacySectionSubtitle => 'سيادة البيانات والنسخ الاحتياطي وتكامل خدمات التسجيل';
+  String get settingsPrivacySectionSubtitle =>
+      'سيادة البيانات والنسخ الاحتياطي وتكامل خدمات التسجيل';
 
   @override
   String get settingsScrobblingTitle => 'التسجيل (Last.fm وListenBrainz)';
 
   @override
-  String get settingsScrobblingSubtitle => 'التسجيل المباشر عبر API وبث بيانات التشغيل';
+  String get settingsScrobblingSubtitle =>
+      'التسجيل المباشر عبر API وبث بيانات التشغيل';
 
   @override
   String get settingsScrobbleStatsTitle => 'إحصاءات التسجيل';
 
   @override
-  String get settingsScrobbleStatsSubtitle => 'سجل الاستماع ونظرة تحليلية على التسجيل';
+  String get settingsScrobbleStatsSubtitle =>
+      'سجل الاستماع ونظرة تحليلية على التسجيل';
 
   @override
   String get settingsCloudBackupDashboard => 'لوحة النسخ الاحتياطي السحابي';
 
   @override
-  String get settingsCloudBackupDashboardSubtitle => 'إدارة الأجهزة المتزامنة ولقطات النسخ الاحتياطي السحابي';
+  String get settingsCloudBackupDashboardSubtitle =>
+      'إدارة الأجهزة المتزامنة ولقطات النسخ الاحتياطي السحابي';
 
   @override
   String settingsNoSettingsFound(String query) {
@@ -4954,10 +5116,12 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get settingsCloudSyncCompleted => 'اكتمل النسخ الاحتياطي والمزامنة السحابية!';
+  String get settingsCloudSyncCompleted =>
+      'اكتمل النسخ الاحتياطي والمزامنة السحابية!';
 
   @override
-  String get settingsCloudSyncFailed => 'فشلت المزامنة. تحقّق من اتصال الإنترنت.';
+  String get settingsCloudSyncFailed =>
+      'فشلت المزامنة. تحقّق من اتصال الإنترنت.';
 
   @override
   String get settingsNeverLabel => 'أبداً';
@@ -4985,7 +5149,8 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get settingsSearchDirectoriesHint => 'ابحث في المجلدات بالاسم أو المسار...';
+  String get settingsSearchDirectoriesHint =>
+      'ابحث في المجلدات بالاسم أو المسار...';
 
   @override
   String settingsNoDirectoriesMatch(String query) {
@@ -4993,7 +5158,8 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get settingsNoAudioFolders => 'لم يتم العثور على مجلدات صوتية بعد. افحص مساحة التخزين.';
+  String get settingsNoAudioFolders =>
+      'لم يتم العثور على مجلدات صوتية بعد. افحص مساحة التخزين.';
 
   @override
   String get settingsUnhide => 'إظهار';
@@ -5028,19 +5194,22 @@ class AppLocalizationsAr extends AppLocalizations {
   String get settingsArtworkSwipeDisabled => 'معطّل';
 
   @override
-  String get settingsArtworkSwipeIgnoreDesc => 'تجاهل السحب الأفقي على غلاف الألبوم';
+  String get settingsArtworkSwipeIgnoreDesc =>
+      'تجاهل السحب الأفقي على غلاف الألبوم';
 
   @override
   String get settingsArtworkSwipeNextPrev => 'المسار التالي / السابق';
 
   @override
-  String get settingsArtworkSwipeNextPrevDesc => 'اسحب لليسار للمسار التالي، ولليمين للسابق';
+  String get settingsArtworkSwipeNextPrevDesc =>
+      'اسحب لليسار للمسار التالي، ولليمين للسابق';
 
   @override
   String get settingsAudioNormalization => 'تطبيع الصوت';
 
   @override
-  String get settingsAudioNormalizationSubtitle => 'وحّد مستوى الصوت للمسارات بدون وسوم ReplayGain';
+  String get settingsAudioNormalizationSubtitle =>
+      'وحّد مستوى الصوت للمسارات بدون وسوم ReplayGain';
 
   @override
   String get settingsAudioOutputDevice => 'جهاز إخراج الصوت';
@@ -5049,13 +5218,15 @@ class AppLocalizationsAr extends AppLocalizations {
   String get settingsAuthenticationOptional => 'المصادقة (اختياري)';
 
   @override
-  String get settingsBitPerfectBtUnavailable => 'غير متاح: البلوتوث يعيد الترميز — استخدم USB / DAC سلكي';
+  String get settingsBitPerfectBtUnavailable =>
+      'غير متاح: البلوتوث يعيد الترميز — استخدم USB / DAC سلكي';
 
   @override
   String get settingsBitPerfectUsb => 'تمرير USB بت مثالي';
 
   @override
-  String get settingsBitPerfectUsbDesc => 'بث مباشر إلى USB / DAC سلكي (يتجاوز مُعيد أخذ العينات في أندرويد)';
+  String get settingsBitPerfectUsbDesc =>
+      'بث مباشر إلى USB / DAC سلكي (يتجاوز مُعيد أخذ العينات في أندرويد)';
 
   @override
   String get settingsBluetoothCodecTitle => 'ترميز البلوتوث';
@@ -5083,19 +5254,22 @@ class AppLocalizationsAr extends AppLocalizations {
   String get settingsBluetoothHiRes => 'بلوتوث عالي الدقة (أفضل جهد)';
 
   @override
-  String get settingsBluetoothHiResDesc => 'يبقي مسار float مُفعّلاً، ويطبّق الـ dither بعمق الترميز، ويطابق معدل الترميز. يحسّن الجودة، لكن البلوتوث ضاغط ولا يمكن أن يكون مطابقًا بتًا ببت';
+  String get settingsBluetoothHiResDesc =>
+      'يبقي مسار float مُفعّلاً، ويطبّق الـ dither بعمق الترميز، ويطابق معدل الترميز. يحسّن الجودة، لكن البلوتوث ضاغط ولا يمكن أن يكون مطابقًا بتًا ببت';
 
   @override
   String get settingsBpmSyncCrossfade => 'انتقال متزامن مع BPM';
 
   @override
-  String get settingsBpmSyncCrossfadeDesc => 'يضبط مدة الانتقال على أقرب 2/4/8/16/32 نبضة من المسار القادم عند معرفة BPM (يُضبط لكل مسار في معلومات الأغنية)؛ وإلا تُستخدم المدة المُعدّة';
+  String get settingsBpmSyncCrossfadeDesc =>
+      'يضبط مدة الانتقال على أقرب 2/4/8/16/32 نبضة من المسار القادم عند معرفة BPM (يُضبط لكل مسار في معلومات الأغنية)؛ وإلا تُستخدم المدة المُعدّة';
 
   @override
   String get settingsBypassDspBitPerfect => 'تجاوز DSP في الوضع بت المثالي';
 
   @override
-  String get settingsBypassDspBitPerfectDesc => 'يتجاوز المعادل والمُجسّم لإرسال تدفّق صوتي نقي دون تلوين إلى DAC';
+  String get settingsBypassDspBitPerfectDesc =>
+      'يتجاوز المعادل والمُجسّم لإرسال تدفّق صوتي نقي دون تلوين إلى DAC';
 
   @override
   String get settingsBypassList => 'قائمة التجاوز (مفصولة بفواصل)';
@@ -5122,25 +5296,30 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get settingsCastNoSdkDesc => 'تتطلب جلسات Cast حزمة SDK الخاصة بـ Play Services (في إصدارات dev/ytm فقط). يظهر هنا اكتشاف الأجهزة.';
+  String get settingsCastNoSdkDesc =>
+      'تتطلب جلسات Cast حزمة SDK الخاصة بـ Play Services (في إصدارات dev/ytm فقط). يظهر هنا اكتشاف الأجهزة.';
 
   @override
-  String get settingsCastSdkDesc => 'يستخدم مستقبل الوسائط الافتراضي من Google. تُقدَّم الملفات المحلية عبر شبكتك المحلية؛ وتُبثّ الأغلفة/الروابط البعيدة مباشرة.';
+  String get settingsCastSdkDesc =>
+      'يستخدم مستقبل الوسائط الافتراضي من Google. تُقدَّم الملفات المحلية عبر شبكتك المحلية؛ وتُبثّ الأغلفة/الروابط البعيدة مباشرة.';
 
   @override
   String get settingsColorSourceArtwork => 'غلاف الألبوم';
 
   @override
-  String get settingsColorSourceArtworkDesc => 'يكيّف الألوان من غلاف المسار الحالي (يتغيّر لكل أغنية)';
+  String get settingsColorSourceArtworkDesc =>
+      'يكيّف الألوان من غلاف المسار الحالي (يتغيّر لكل أغنية)';
 
   @override
   String get settingsColorSourceCustom => 'تمييز مخصّص';
 
   @override
-  String get settingsColorSourceCustomDesc => 'استخدم لون التمييز الثابت الذي تختاره في الإعدادات';
+  String get settingsColorSourceCustomDesc =>
+      'استخدم لون التمييز الثابت الذي تختاره في الإعدادات';
 
   @override
-  String get settingsColorSourceSystemDesc => 'اتّبع لوحة خلفية النظام في Android 12+ • يعود إلى غلاف الألبوم في الأجهزة الأقدم';
+  String get settingsColorSourceSystemDesc =>
+      'اتّبع لوحة خلفية النظام في Android 12+ • يعود إلى غلاف الألبوم في الأجهزة الأقدم';
 
   @override
   String get settingsColorSourceWallpaper => 'Material You (خلفية الشاشة)';
@@ -5163,7 +5342,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get settingsDacVoicing => 'طابع محوّل DAC';
 
   @override
-  String get settingsDacVoicingDesc => 'يحاكي مرشِّح الاسترجاع الاختياري والتوافقيات الزوجية في محوّل DAC الراقي. يضيف تأخيرًا عند التشغيل؛ والإيقاف لا يغيّر الإشارة.';
+  String get settingsDacVoicingDesc =>
+      'يحاكي مرشِّح الاسترجاع الاختياري والتوافقيات الزوجية في محوّل DAC الراقي. يضيف تأخيرًا عند التشغيل؛ والإيقاف لا يغيّر الإشارة.';
 
   @override
   String get settingsDacVoicingSharp => 'حادة';
@@ -5193,13 +5373,15 @@ class AppLocalizationsAr extends AppLocalizations {
   String get settingsDoubleTapDisabled => 'معطّل';
 
   @override
-  String get settingsDoubleTapFavoriteDesc => 'أضف الأغنية النشطة إلى المفضّلة أو أزلها';
+  String get settingsDoubleTapFavoriteDesc =>
+      'أضف الأغنية النشطة إلى المفضّلة أو أزلها';
 
   @override
   String get settingsDoubleTapIgnoreDesc => 'تجاهل إيماءة النقر المزدوج';
 
   @override
-  String get settingsDoubleTapLyricsDesc => 'أظهر أو أخفِ تراكب الكلمات المتزامنة';
+  String get settingsDoubleTapLyricsDesc =>
+      'أظهر أو أخفِ تراكب الكلمات المتزامنة';
 
   @override
   String get settingsDoubleTapToggleFavorite => 'تبديل المفضّلة';
@@ -5208,16 +5390,20 @@ class AppLocalizationsAr extends AppLocalizations {
   String get settingsDoubleTapToggleLyrics => 'تبديل تراكب الكلمات';
 
   @override
-  String get settingsDspAutoDesc => 'تجاوز مؤثرات المصنّع تلقائياً عند تفعيل DSP';
+  String get settingsDspAutoDesc =>
+      'تجاوز مؤثرات المصنّع تلقائياً عند تفعيل DSP';
 
   @override
-  String get settingsDspInspectorDesc => 'افحص مراحل DSP النشطة ومؤثرات HAL وحالة المحرّك';
+  String get settingsDspInspectorDesc =>
+      'افحص مراحل DSP النشطة ومؤثرات HAL وحالة المحرّك';
 
   @override
-  String get settingsDspNativeDesc => 'DSP أصلي آني بدقة 64 بت وبزمن استجابة صفري';
+  String get settingsDspNativeDesc =>
+      'DSP أصلي آني بدقة 64 بت وبزمن استجابة صفري';
 
   @override
-  String get settingsDspOemDesc => 'مؤثرات صوتية على مستوى النظام/المصنّع (Dolby وDirac وغيرها)';
+  String get settingsDspOemDesc =>
+      'مؤثرات صوتية على مستوى النظام/المصنّع (Dolby وDirac وغيرها)';
 
   @override
   String get settingsDuckLevel => 'مستوى الخفض';
@@ -5226,10 +5412,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get settingsDuckOnNavigation => 'خفض الصوت عند التنقّل';
 
   @override
-  String get settingsDuckOnNavigationSubtitle => 'اخفض الموسيقى بدل إيقافها مؤقتاً عند التنبيهات';
+  String get settingsDuckOnNavigationSubtitle =>
+      'اخفض الموسيقى بدل إيقافها مؤقتاً عند التنبيهات';
 
   @override
-  String get settingsDvcDesc => 'يثبّت تدفّق وسائط أندرويد على الحد الأقصى ويطبّق الصوت في مسار DSP العائم، لمدى ديناميكي أعلى وتشويش أقل عند الصوت المنخفض. غير متاح أثناء التشغيل بت المثالي وعلى مسار إخراج AAudio المباشر';
+  String get settingsDvcDesc =>
+      'يثبّت تدفّق وسائط أندرويد على الحد الأقصى ويطبّق الصوت في مسار DSP العائم، لمدى ديناميكي أعلى وتشويش أقل عند الصوت المنخفض. غير متاح أثناء التشغيل بت المثالي وعلى مسار إخراج AAudio المباشر';
 
   @override
   String get settingsDvcTitle => 'تحكّم مباشر بمستوى الصوت (DVC)';
@@ -5247,22 +5435,26 @@ class AppLocalizationsAr extends AppLocalizations {
   String get settingsExclusiveUsb => 'واجهة USB حصرية';
 
   @override
-  String get settingsExclusiveUsbDesc => 'يحجز واجهة AudioStreaming عندما يحرّرها مشغّل النواة. غير قسري: لا يفصل مشغّل صوت أندرويد أبداً';
+  String get settingsExclusiveUsbDesc =>
+      'يحجز واجهة AudioStreaming عندما يحرّرها مشغّل النواة. غير قسري: لا يفصل مشغّل صوت أندرويد أبداً';
 
   @override
   String get settingsExportSessionLogs => 'تصدير سجلات جلسة الصوت';
 
   @override
-  String get settingsExportSessionLogsDesc => 'شارك سجل JSONL على الجهاز لجلسات التشغيل الأخيرة';
+  String get settingsExportSessionLogsDesc =>
+      'شارك سجل JSONL على الجهاز لجلسات التشغيل الأخيرة';
 
   @override
   String get settingsExtendedSpeedRange => 'نطاق سرعة موسّع';
 
   @override
-  String get settingsExtendedSpeedRangeSubtitle => 'اسمح بسرعة تشغيل من 0.1x إلى 8.0x (الافتراضي 0.25x–4.0x)';
+  String get settingsExtendedSpeedRangeSubtitle =>
+      'اسمح بسرعة تشغيل من 0.1x إلى 8.0x (الافتراضي 0.25x–4.0x)';
 
   @override
-  String get settingsFloatDspDesc => 'الدقة العالية أولاً: يغذّي سلسلة DSP الأصلية بعينات float32 للحفاظ على عمق المصادر 24/32 بت (المحتوى 16 بت غير متأثر). الأجهزة غير المدعومة تتراجع بأمان إلى 16 بت. عند الإيقاف: تُخفَّض مصادر 24/32 بت إلى 16 بت على هذا المسار.';
+  String get settingsFloatDspDesc =>
+      'الدقة العالية أولاً: يغذّي سلسلة DSP الأصلية بعينات float32 للحفاظ على عمق المصادر 24/32 بت (المحتوى 16 بت غير متأثر). الأجهزة غير المدعومة تتراجع بأمان إلى 16 بت. عند الإيقاف: تُخفَّض مصادر 24/32 بت إلى 16 بت على هذا المسار.';
 
   @override
   String get settingsFloatDspPath => 'مسار DSP عائم 24/32 بت';
@@ -5277,7 +5469,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get settingsHedgedStreaming => 'بث احتياطي';
 
   @override
-  String get settingsHedgedStreamingSubtitle => 'سابِق بين محلّلين واختر أسرع رابط';
+  String get settingsHedgedStreamingSubtitle =>
+      'سابِق بين محلّلين واختر أسرع رابط';
 
   @override
   String get settingsHttpLabel => 'HTTP';
@@ -5315,7 +5508,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get settingsMasterAudioEngine => 'محرّك الصوت الرئيسي';
 
   @override
-  String get settingsNoneSelectedAutoSkip => 'لم يتم تحديد أي منها — التخطّي التلقائي معطّل';
+  String get settingsNoneSelectedAutoSkip =>
+      'لم يتم تحديد أي منها — التخطّي التلقائي معطّل';
 
   @override
   String get settingsNonMusicLabel => 'مقاطع غير موسيقية';
@@ -5347,13 +5541,16 @@ class AppLocalizationsAr extends AppLocalizations {
   String get settingsPerAlbumEqMemory => 'ذاكرة المعادل لكل ألبوم';
 
   @override
-  String get settingsPerAlbumEqMemorySubtitle => 'استعادة لقطة المعادل لكل ألبوم/فنان';
+  String get settingsPerAlbumEqMemorySubtitle =>
+      'استعادة لقطة المعادل لكل ألبوم/فنان';
 
   @override
-  String get settingsPerTrackFormatDesc => 'الدقة العالية أولاً: يطلب معدّل العينات/عمق البت الأصلي لكل مسار من جهاز الإخراج (محدود بالجهاز). يحتفظ الوضع بت المثالي بصيغته الحصرية. عند اختلاف المعدّل عن معدّل المِزج تُعاد العيّنة داخل التطبيق قبل معالجة DSP وليس بواسطة أندرويد بعدها. أوقفه لاستخدام صيغة يدوية واحدة';
+  String get settingsPerTrackFormatDesc =>
+      'الدقة العالية أولاً: يطلب معدّل العينات/عمق البت الأصلي لكل مسار من جهاز الإخراج (محدود بالجهاز). يحتفظ الوضع بت المثالي بصيغته الحصرية. عند اختلاف المعدّل عن معدّل المِزج تُعاد العيّنة داخل التطبيق قبل معالجة DSP وليس بواسطة أندرويد بعدها. أوقفه لاستخدام صيغة يدوية واحدة';
 
   @override
-  String get settingsPerTrackFormatNegotiation => 'التفاوض على صيغة الإخراج لكل مسار';
+  String get settingsPerTrackFormatNegotiation =>
+      'التفاوض على صيغة الإخراج لكل مسار';
 
   @override
   String get settingsPortHint => 'مثلاً 8080';
@@ -5368,25 +5565,29 @@ class AppLocalizationsAr extends AppLocalizations {
   String get settingsPreampWithRg => 'مضخّم أولي (مع وسم RG)';
 
   @override
-  String get settingsPrivacyControlBody => 'يمكن تعطيل المزامنة السحابية والبيانات الوصفية البعيدة. تُخزَّن قواعد الأتمتة وملفات الأجهزة محلياً.';
+  String get settingsPrivacyControlBody =>
+      'يمكن تعطيل المزامنة السحابية والبيانات الوصفية البعيدة. تُخزَّن قواعد الأتمتة وملفات الأجهزة محلياً.';
 
   @override
   String get settingsPrivacyControlTitle => 'أنت من يتحكّم';
 
   @override
-  String get settingsPrivacyNoTrackersBody => 'إصدارات Pure (متجر Play) تأتي دون صلاحية INTERNET أو حزم تحليلات أو معرّفات إعلانية.';
+  String get settingsPrivacyNoTrackersBody =>
+      'إصدارات Pure (متجر Play) تأتي دون صلاحية INTERNET أو حزم تحليلات أو معرّفات إعلانية.';
 
   @override
   String get settingsPrivacyNoTrackersTitle => 'لا متعقّبات في Pure';
 
   @override
-  String get settingsPrivacyOfflineBody => 'مكتبتك والتشغيل والإعدادات على هذا الجهاز. لا يُرفع شيء إلا إذا سجّلت الدخول للمزامنة السحابية.';
+  String get settingsPrivacyOfflineBody =>
+      'مكتبتك والتشغيل والإعدادات على هذا الجهاز. لا يُرفع شيء إلا إذا سجّلت الدخول للمزامنة السحابية.';
 
   @override
   String get settingsPrivacyOfflineTitle => 'العمل دون اتصال أولاً';
 
   @override
-  String get settingsPrivacyPermissionsBody => 'يُستخدم الوصول إلى التخزين/الوسائط فقط لفحص وتشغيل صوتك المحلي. ويُطلب الوصول إلى البلوتوث والإشعارات فقط لميزات الصوت المتصل وعناصر التحكم بالتشغيل.';
+  String get settingsPrivacyPermissionsBody =>
+      'يُستخدم الوصول إلى التخزين/الوسائط فقط لفحص وتشغيل صوتك المحلي. ويُطلب الوصول إلى البلوتوث والإشعارات فقط لميزات الصوت المتصل وعناصر التحكم بالتشغيل.';
 
   @override
   String get settingsPrivacyPermissionsTitle => 'الأذونات محدّدة الغرض';
@@ -5395,22 +5596,26 @@ class AppLocalizationsAr extends AppLocalizations {
   String get settingsProxyActiveDesc => 'توجَّه الحركة عبر البروكسي المُعدّ';
 
   @override
-  String get settingsProxyHttpDesc => 'يوجّه حركة الويب القياسية HTTP وHTTPS واستخراج البث.';
+  String get settingsProxyHttpDesc =>
+      'يوجّه حركة الويب القياسية HTTP وHTTPS واستخراج البث.';
 
   @override
   String get settingsProxyInactiveDesc => 'اتصال مباشر (البروكسي معطّل)';
 
   @override
-  String get settingsProxySocksDesc => 'يوجّه حزم الشبكة عبر SOCKS5 (موصى به لـ Tor وClash وShadowsocks). ملاحظة: يُطبَّق SOCKS5 على طبقة البث الأصلية؛ وتعود استدعاءات Dart داخل التطبيق (البحث، الأغلفة، الكلمات) إلى DIRECT عند تفعيل SOCKS5.';
+  String get settingsProxySocksDesc =>
+      'يوجّه حزم الشبكة عبر SOCKS5 (موصى به لـ Tor وClash وShadowsocks). ملاحظة: يُطبَّق SOCKS5 على طبقة البث الأصلية؛ وتعود استدعاءات Dart داخل التطبيق (البحث، الأغلفة، الكلمات) إلى DIRECT عند تفعيل SOCKS5.';
 
   @override
   String get settingsQualityHigh => 'عالية (~160+ kbps • الأفضل)';
 
   @override
-  String get settingsQualityHighDownloadDesc => 'ملفات صوتية بأعلى جودة (~160+ kbps M4A)';
+  String get settingsQualityHighDownloadDesc =>
+      'ملفات صوتية بأعلى جودة (~160+ kbps M4A)';
 
   @override
-  String get settingsQualityHighStreamDesc => 'أعلى معدّل بت متاح (~160+ kbps) لصوت نقي';
+  String get settingsQualityHighStreamDesc =>
+      'أعلى معدّل بت متاح (~160+ kbps) لصوت نقي';
 
   @override
   String get settingsQualityLow => 'منخفضة (~64 kbps • موفّر البيانات)';
@@ -5419,16 +5624,19 @@ class AppLocalizationsAr extends AppLocalizations {
   String get settingsQualityLowDownloadDesc => 'أصغر حجم ملف (~64 kbps)';
 
   @override
-  String get settingsQualityLowStreamDesc => 'استهلاك بيانات أقل (~64 kbps) للاتصالات البطيئة';
+  String get settingsQualityLowStreamDesc =>
+      'استهلاك بيانات أقل (~64 kbps) للاتصالات البطيئة';
 
   @override
   String get settingsQualityMedium => 'متوسطة (~128 kbps)';
 
   @override
-  String get settingsQualityMediumDownloadDesc => 'حجم وجودة قياسيان (~128 kbps M4A)';
+  String get settingsQualityMediumDownloadDesc =>
+      'حجم وجودة قياسيان (~128 kbps M4A)';
 
   @override
-  String get settingsQualityMediumStreamDesc => 'معدّل بت قياسي (~128 kbps) مع استهلاك متوازن للبيانات';
+  String get settingsQualityMediumStreamDesc =>
+      'معدّل بت قياسي (~128 kbps) مع استهلاك متوازن للبيانات';
 
   @override
   String get settingsRaiseVolume => 'رفع مستوى صوت التشغيل';
@@ -5437,10 +5645,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get settingsRemoveProxy => 'إزالة البروكسي';
 
   @override
-  String get settingsReplayGainDesc => 'ربح المسار/الألبوم من الوسوم، يُطبَّق أثناء التشغيل';
+  String get settingsReplayGainDesc =>
+      'ربح المسار/الألبوم من الوسوم، يُطبَّق أثناء التشغيل';
 
   @override
-  String get settingsRequiresUacDac => 'يتطلب DAC من نوع UAC مع تحكّم بمستوى الصوت';
+  String get settingsRequiresUacDac =>
+      'يتطلب DAC من نوع UAC مع تحكّم بمستوى الصوت';
 
   @override
   String get settingsResamplerFast => 'سريع (خطي)';
@@ -5452,7 +5662,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get settingsResamplerQuality => 'جودة مُعيد أخذ العينات';
 
   @override
-  String get settingsResamplerQualityDesc => 'يتولى Android تحويل معدل العينات أثناء التشغيل. إعدادات جودة sinc الأصلية غير متاحة لمسار الإخراج هذا.';
+  String get settingsResamplerQualityDesc =>
+      'يتولى Android تحويل معدل العينات أثناء التشغيل. إعدادات جودة sinc الأصلية غير متاحة لمسار الإخراج هذا.';
 
   @override
   String get settingsResamplerStandard => 'قياسي (16 منقّحاً)';
@@ -5479,19 +5690,22 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get settingsSearchAccentColorSubtitle => 'لوحة ألوان تمييز مخصّصة للأزرار والعناصر النشطة';
+  String get settingsSearchAccentColorSubtitle =>
+      'لوحة ألوان تمييز مخصّصة للأزرار والعناصر النشطة';
 
   @override
   String get settingsSearchAccentColorTitle => 'لون التمييز';
 
   @override
-  String get settingsSearchBitPerfectSubtitle => 'مطابقة معدّل العينات مع DAC USB مباشر';
+  String get settingsSearchBitPerfectSubtitle =>
+      'مطابقة معدّل العينات مع DAC USB مباشر';
 
   @override
   String get settingsSearchBitPerfectTitle => 'إخراج بت مثالي وعالي الدقة';
 
   @override
-  String get settingsSearchCacheSubtitle => 'مسح الأغلفة ومقاطع البث المخزّنة مؤقتاً';
+  String get settingsSearchCacheSubtitle =>
+      'مسح الأغلفة ومقاطع البث المخزّنة مؤقتاً';
 
   @override
   String get settingsSearchCacheTitle => 'ذاكرة الأغلفة والصوت المؤقتة';
@@ -5512,16 +5726,19 @@ class AppLocalizationsAr extends AppLocalizations {
   String get settingsSearchCategoryStorage => 'التخزين';
 
   @override
-  String get settingsSearchCrossfadeSubtitle => 'انتقالات سلسة وشريط ثواني الانتقال';
+  String get settingsSearchCrossfadeSubtitle =>
+      'انتقالات سلسة وشريط ثواني الانتقال';
 
   @override
   String get settingsSearchCrossfadeTitle => 'الانتقال والتشغيل المتصل';
 
   @override
-  String get settingsSearchEqualizerSubtitle => 'معادل 10 نطاقات، تعزيز الجهير، مُجسّم، صدى';
+  String get settingsSearchEqualizerSubtitle =>
+      'معادل 10 نطاقات، تعزيز الجهير، مُجسّم، صدى';
 
   @override
-  String get settingsSearchHiddenFoldersSubtitle => 'استثنِ المذكرات الصوتية والنغمات ومجلدات محدّدة';
+  String get settingsSearchHiddenFoldersSubtitle =>
+      'استثنِ المذكرات الصوتية والنغمات ومجلدات محدّدة';
 
   @override
   String get settingsSearchHighContrastTitle => 'وضع التباين العالي';
@@ -5530,40 +5747,48 @@ class AppLocalizationsAr extends AppLocalizations {
   String get settingsSearchNowPlayingThemeTitle => 'نمط شاشة التشغيل';
 
   @override
-  String get settingsSearchPrivacySubtitle => 'مبادئ العمل دون اتصال وتفسير الأذونات';
+  String get settingsSearchPrivacySubtitle =>
+      'مبادئ العمل دون اتصال وتفسير الأذونات';
 
   @override
   String get settingsSearchPrivacyTitle => 'ضمان الخصوصية';
 
   @override
-  String get settingsSearchProxySubtitle => 'توجيه بروكسي HTTP وSOCKS5 مع فحص زمن الاستجابة';
+  String get settingsSearchProxySubtitle =>
+      'توجيه بروكسي HTTP وSOCKS5 مع فحص زمن الاستجابة';
 
   @override
-  String get settingsSearchQualitySubtitle => 'تفضيلات معدّل البت للبث والملفات المحفوظة';
+  String get settingsSearchQualitySubtitle =>
+      'تفضيلات معدّل البت للبث والملفات المحفوظة';
 
   @override
   String get settingsSearchQualityTitle => 'جودة صوت البث والتنزيل';
 
   @override
-  String get settingsSearchRescanSubtitle => 'اكتشاف الأغاني المحمّلة حديثاً وتحديث البيانات الوصفية';
+  String get settingsSearchRescanSubtitle =>
+      'اكتشاف الأغاني المحمّلة حديثاً وتحديث البيانات الوصفية';
 
   @override
   String get settingsSearchRescanTitle => 'إعادة فحص مساحة التخزين';
 
   @override
-  String get settingsSearchScrobblingSubtitle => 'تتبّع سجل الاستماع وبثّ حالة التشغيل';
+  String get settingsSearchScrobblingSubtitle =>
+      'تتبّع سجل الاستماع وبثّ حالة التشغيل';
 
   @override
-  String get settingsSearchSleepTimerSubtitle => 'أوقف التشغيل تلقائياً بعد مدة أو عند انتهاء المسار';
+  String get settingsSearchSleepTimerSubtitle =>
+      'أوقف التشغيل تلقائياً بعد مدة أو عند انتهاء المسار';
 
   @override
-  String get settingsSearchSwipeSubtitle => 'إجراءات السحب يميناً ويساراً (تخطٍّ، سابق، حجم)';
+  String get settingsSearchSwipeSubtitle =>
+      'إجراءات السحب يميناً ويساراً (تخطٍّ، سابق، حجم)';
 
   @override
   String get settingsSearchSwipeTitle => 'إيماءات سحب المشغّل المصغّر';
 
   @override
-  String get settingsSearchThemeModeSubtitle => 'النظام أو الفاتح أو الداكن أو AMOLED عالي التباين';
+  String get settingsSearchThemeModeSubtitle =>
+      'النظام أو الفاتح أو الداكن أو AMOLED عالي التباين';
 
   @override
   String get settingsSearchThemeModeTitle => 'وضع السمة';
@@ -5584,7 +5809,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get settingsSessionDiagnostics => 'تشخيص صوت الجلسة';
 
   @override
-  String get settingsSessionDiagnosticsDesc => 'يسجّل سجلاً واحداً لكل مسار: نوع المسار، ترميز البلوتوث، معدّل العينات/عمق البت المتفاوض عليه، المقاطعات وعدد الانقطاعات';
+  String get settingsSessionDiagnosticsDesc =>
+      'يسجّل سجلاً واحداً لكل مسار: نوع المسار، ترميز البلوتوث، معدّل العينات/عمق البت المتفاوض عليه، المقاطعات وعدد الانقطاعات';
 
   @override
   String get settingsSessionLogsShareText => 'سجلات جلسة صوت Pulsr';
@@ -5602,13 +5828,15 @@ class AppLocalizationsAr extends AppLocalizations {
   String get settingsSpeakerBluetooth => 'مكبّر الصوت + بلوتوث';
 
   @override
-  String get settingsSpeakerBluetoothSubtitle => 'إخراج متزامن بأفضل جهد ممكن (يتراجع بسلاسة)';
+  String get settingsSpeakerBluetoothSubtitle =>
+      'إخراج متزامن بأفضل جهد ممكن (يتراجع بسلاسة)';
 
   @override
   String get settingsSponsorBlock => 'SponsorBlock';
 
   @override
-  String get settingsSponsorBlockSubtitle => 'تخطَّ تلقائياً مقاطع الرعاية وغير الموسيقى في مسارات يوتيوب';
+  String get settingsSponsorBlockSubtitle =>
+      'تخطَّ تلقائياً مقاطع الرعاية وغير الموسيقى في مسارات يوتيوب';
 
   @override
   String get settingsSponsorLabel => 'الرعاة';
@@ -5643,13 +5871,15 @@ class AppLocalizationsAr extends AppLocalizations {
   String get settingsSwipeNextTrack => 'المسار التالي';
 
   @override
-  String get settingsSwipePrevDesc => 'تخطَّ إلى الأغنية السابقة أو أعد تشغيل المسار';
+  String get settingsSwipePrevDesc =>
+      'تخطَّ إلى الأغنية السابقة أو أعد تشغيل المسار';
 
   @override
   String get settingsSwipePreviousTrack => 'المسار السابق';
 
   @override
-  String get settingsSwipeRightAction => 'إجراء السحب لليمين في المشغّل المصغّر';
+  String get settingsSwipeRightAction =>
+      'إجراء السحب لليمين في المشغّل المصغّر';
 
   @override
   String get settingsSyncingLibrary => 'جارٍ مزامنة مكتبتك...';
@@ -5664,7 +5894,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get settingsTestingAll => 'جارٍ اختبار الجميع...';
 
   @override
-  String get settingsTestingProxyConnectivity => 'جارٍ اختبار اتصال البروكسي...';
+  String get settingsTestingProxyConnectivity =>
+      'جارٍ اختبار اتصال البروكسي...';
 
   @override
   String get settingsTestLatency => 'اختبار زمن الاستجابة';
@@ -5673,58 +5904,68 @@ class AppLocalizationsAr extends AppLocalizations {
   String get settingsThemeCardGlass => 'بطاقة زجاجية متراكبة';
 
   @override
-  String get settingsThemeCardGlassDesc => 'غلاف خلفي بكامل الشاشة مع أدوات زجاجية مصنفرة';
+  String get settingsThemeCardGlassDesc =>
+      'غلاف خلفي بكامل الشاشة مع أدوات زجاجية مصنفرة';
 
   @override
   String get settingsThemeFullBleed => 'شكل موجي بكامل الشاشة';
 
   @override
-  String get settingsThemeFullBleedDesc => 'خلفية مُصوّر موجي متوهّج يتفاعل مع الصوت بكامل الشاشة';
+  String get settingsThemeFullBleedDesc =>
+      'خلفية مُصوّر موجي متوهّج يتفاعل مع الصوت بكامل الشاشة';
 
   @override
   String get settingsThemeKaraoke => 'انغماس كلمات الكاريوكي';
 
   @override
-  String get settingsThemeKaraokeDesc => 'واجهة مشغّل كاريوكي بالكلمات المتزامنة المكبّرة';
+  String get settingsThemeKaraokeDesc =>
+      'واجهة مشغّل كاريوكي بالكلمات المتزامنة المكبّرة';
 
   @override
   String get settingsThemeRetroCassette => 'مشغّل كاسيت كلاسيكي';
 
   @override
-  String get settingsThemeRetroCassetteDesc => 'شريط كاسيت قديم ببكرات دوّارة وعدّاد شريط مغناطيسي';
+  String get settingsThemeRetroCassetteDesc =>
+      'شريط كاسيت قديم ببكرات دوّارة وعدّاد شريط مغناطيسي';
 
   @override
   String get settingsThemeCdTurntable => 'مشغل أسطوانات CD';
 
   @override
-  String get settingsThemeCdTurntableDesc => 'قرص CD عاكس يدور مع غلاف الأغنية وإبرة تشغيل متحركة';
+  String get settingsThemeCdTurntableDesc =>
+      'قرص CD عاكس يدور مع غلاف الأغنية وإبرة تشغيل متحركة';
 
   @override
   String get settingsThemeClean => 'التدفق العصري الأنيق';
 
   @override
-  String get settingsThemeCleanDesc => 'واجهة مستوحاة من آبل بغلاف نقي وشريط تمرير كبسولي وخيارات سفلية سريعة';
+  String get settingsThemeCleanDesc =>
+      'واجهة مستوحاة من آبل بغلاف نقي وشريط تمرير كبسولي وخيارات سفلية سريعة';
 
   @override
   String get settingsThemeMilkdrop => 'مُصوّر Milkdrop';
 
   @override
-  String get settingsThemeMilkdropDesc => 'مُصوّر موسيقي أبيض شفاف يمتد عبر الشاشة بأكملها خلف صورة الألبوم';
+  String get settingsThemeMilkdropDesc =>
+      'مُصوّر موسيقي أبيض شفاف يمتد عبر الشاشة بأكملها خلف صورة الألبوم';
 
   @override
   String get settingsThemeVinylTurntable => 'استوديو أسطوانة دوّارة';
 
   @override
-  String get settingsThemeVinylTurntableDesc => 'أسطوانة فينيل حقيقية بأخاديد واقعية وملصق مركزي وذراع';
+  String get settingsThemeVinylTurntableDesc =>
+      'أسطوانة فينيل حقيقية بأخاديد واقعية وملصق مركزي وذراع';
 
   @override
   String get settingsTurnOffGapless => 'إيقاف التشغيل المتصل';
 
   @override
-  String get settingsTurnOffGaplessEnableCrossfade => 'أوقف التشغيل المتصل وفعّل الانتقال';
+  String get settingsTurnOffGaplessEnableCrossfade =>
+      'أوقف التشغيل المتصل وفعّل الانتقال';
 
   @override
-  String get settingsUnavailableAaudio => 'غير متاح أثناء تمكين إخراج AAudio المباشر';
+  String get settingsUnavailableAaudio =>
+      'غير متاح أثناء تمكين إخراج AAudio المباشر';
 
   @override
   String get settingsUnknownConnectionFailure => 'فشل اتصال غير معروف';
@@ -5741,13 +5982,15 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get settingsUsbHwVolumeGrant => 'امنح صلاحية USB للتحكم بمستوى صوت DAC مباشرة';
+  String get settingsUsbHwVolumeGrant =>
+      'امنح صلاحية USB للتحكم بمستوى صوت DAC مباشرة';
 
   @override
   String get settingsUsbStreamingActive => 'البث المتزامن UAC2 الخام نشط';
 
   @override
-  String get settingsUsbStreamingDesc => 'يحجز DAC حصرياً ويبثّ PCM المعالج مباشرة عبر URBs متزامنة USB. غير مُتحقّق منه على العتاد؛ يتراجع بأمان إذا فشل الحجز أو إعداد النقطة الطرفية';
+  String get settingsUsbStreamingDesc =>
+      'يحجز DAC حصرياً ويبثّ PCM المعالج مباشرة عبر URBs متزامنة USB. غير مُتحقّق منه على العتاد؛ يتراجع بأمان إذا فشل الحجز أو إعداد النقطة الطرفية';
 
   @override
   String get settingsUsernameLabel => 'اسم المستخدم';
@@ -5780,13 +6023,16 @@ class AppLocalizationsAr extends AppLocalizations {
   String get settingsVisualizerWaveSmooth => 'موجة (طيف خطي سلس)';
 
   @override
-  String get settingsVizBarDesc => 'أشرطة تردد عمودية كلاسيكية مع حركة ارتفاع سلسة';
+  String get settingsVizBarDesc =>
+      'أشرطة تردد عمودية كلاسيكية مع حركة ارتفاع سلسة';
 
   @override
-  String get settingsVizCircularDesc => 'أشرطة تردد شعاعية مستقبلية حول غلاف الألبوم';
+  String get settingsVizCircularDesc =>
+      'أشرطة تردد شعاعية مستقبلية حول غلاف الألبوم';
 
   @override
-  String get settingsVizCustomDesc => 'إعداد JSON من المستخدم: أشرطة / موجة / شعاعي / جزيئات / ليساجو';
+  String get settingsVizCustomDesc =>
+      'إعداد JSON من المستخدم: أشرطة / موجة / شعاعي / جزيئات / ليساجو';
 
   @override
   String get settingsVizLabelBar => 'أشرطة';
@@ -5816,7 +6062,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get settingsVizLabelTerrain => 'تضاريس ثلاثية الأبعاد';
 
   @override
-  String get settingsVizTerrainDesc => 'تضاريس صوتية ثلاثية الأبعاد ينحتها الطيف';
+  String get settingsVizTerrainDesc =>
+      'تضاريس صوتية ثلاثية الأبعاد ينحتها الطيف';
 
   @override
   String get settingsVizLabelAlbumReactive => 'تفاعلي مع الألبوم';
@@ -5848,25 +6095,29 @@ class AppLocalizationsAr extends AppLocalizations {
   String get settingsAdaptiveQuality => 'جودة تكيفية';
 
   @override
-  String get settingsAdaptiveQualitySubtitle => 'خفّض/ارفع معدّل البت أثناء التوقّف';
+  String get settingsAdaptiveQualitySubtitle =>
+      'خفّض/ارفع معدّل البت أثناء التوقّف';
 
   @override
   String get settingsAaudioBufferSize => 'حجم مخزن AAudio المؤقت';
 
   @override
-  String get settingsAaudioBufferSizeDesc => 'تلميح سعة مخزن البث بالمللي ثانية. أقل = زمن استجابة أقل (سلكي)، أعلى = مقاومة أكبر للتوقّف';
+  String get settingsAaudioBufferSizeDesc =>
+      'تلميح سعة مخزن البث بالمللي ثانية. أقل = زمن استجابة أقل (سلكي)، أعلى = مقاومة أكبر للتوقّف';
 
   @override
   String get settingsAaudioDirect => 'إخراج AAudio مباشر (زمن وصول منخفض)';
 
   @override
-  String get settingsAaudioDirectDesc => 'يتجاوز مازج النظام بتدفّق AAudio أصلي يُفتح عند معدّل كل مسار (محاولة EXCLUSIVE، وتراجع SHARED). تتعطّل سلسلة DSP وأدوات السرعة/النغمة في هذا الوضع؛ يُطبَّق على المشغّلات المُنشأة حديثاً. لا يُبلَّغ عن هذا المسار كـ Bit-Perfect مُتحقَّق منه، لأنه لا يستطيع إثبات وصول بايتات المصدر إلى DAC دون تغيير';
+  String get settingsAaudioDirectDesc =>
+      'يتجاوز مازج النظام بتدفّق AAudio أصلي يُفتح عند معدّل كل مسار (محاولة EXCLUSIVE، وتراجع SHARED). تتعطّل سلسلة DSP وأدوات السرعة/النغمة في هذا الوضع؛ يُطبَّق على المشغّلات المُنشأة حديثاً. لا يُبلَّغ عن هذا المسار كـ Bit-Perfect مُتحقَّق منه، لأنه لا يستطيع إثبات وصول بايتات المصدر إلى DAC دون تغيير';
 
   @override
   String get dspAboutBassBoost => 'حول تعزيز الجهير';
 
   @override
-  String get dspMasterNoSnapshotNotice => 'المؤثرات متوقفة الآن. شغّل المراحل التي تريدها بشكل فردي؛ لا شيء يُستعاد تلقائيًا.';
+  String get dspMasterNoSnapshotNotice =>
+      'المؤثرات متوقفة الآن. شغّل المراحل التي تريدها بشكل فردي؛ لا شيء يُستعاد تلقائيًا.';
 
   @override
   String get dspAboutBitPerfect => 'حول Bit-Perfect';
@@ -5935,7 +6186,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get dspBlockedBitPerfect => 'محظور: تجاوز Bit-Perfect نشط';
 
   @override
-  String get dspBluetoothCompensationDesc => 'يحصل البلوتوث منخفض الجودة على تعويض طفيف للحضور وذيل صدى أقصر.';
+  String get dspBluetoothCompensationDesc =>
+      'يحصل البلوتوث منخفض الجودة على تعويض طفيف للحضور وذيل صدى أقصر.';
 
   @override
   String get dspCodec => 'برنامج الترميز';
@@ -6022,7 +6274,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get dspFreqRange20To20k => 'يجب أن تبقى الترددات ضمن 20-20000 هرتز.';
 
   @override
-  String get dspFreqStrictlyAscending => 'يجب أن تكون الترددات تصاعدية بشكل صارم.';
+  String get dspFreqStrictlyAscending =>
+      'يجب أن تكون الترددات تصاعدية بشكل صارم.';
 
   @override
   String get dspHardwareEndpoint => 'نقطة نهاية العتاد';
@@ -6085,7 +6338,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get dspOutputDriver => 'برنامج تشغيل الإخراج';
 
   @override
-  String get dspPresetImportInvalid => 'فشل استيراد الإعداد المسبق: تنسيق JSON غير صالح';
+  String get dspPresetImportInvalid =>
+      'فشل استيراد الإعداد المسبق: تنسيق JSON غير صالح';
 
   @override
   String get dspPresetImported => 'تم استيراد الإعداد المسبق للمُعادل بنجاح!';
@@ -6121,7 +6375,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get dspResamplingEngine => 'محرك إعادة أخذ العينات';
 
   @override
-  String get dspResetAllEqTooltip => 'إعادة ضبط كل إعدادات DSP وEQ إلى الافتراضي';
+  String get dspResetAllEqTooltip =>
+      'إعادة ضبط كل إعدادات DSP وEQ إلى الافتراضي';
 
   @override
   String get dspResetBalanceCenter => 'إعادة التوازن إلى الوسط';
@@ -6145,10 +6400,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get dspResetToDefault20wet => 'إعادة الضبط إلى الافتراضي (20% رطب)';
 
   @override
-  String get dspResetToDefault350us => 'إعادة الضبط إلى الافتراضي (350 ميكروثانية)';
+  String get dspResetToDefault350us =>
+      'إعادة الضبط إلى الافتراضي (350 ميكروثانية)';
 
   @override
-  String get dspResetToDefault50ms => 'إعادة الضبط إلى الافتراضي (50 مللي ثانية)';
+  String get dspResetToDefault50ms =>
+      'إعادة الضبط إلى الافتراضي (50 مللي ثانية)';
 
   @override
   String get dspResetToDefault9db => 'إعادة الضبط إلى الافتراضي (-9.0 dB)';
@@ -6157,10 +6414,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get dspResetVolumeBoost => 'إعادة تعزيز مستوى الصوت (إيقاف)';
 
   @override
-  String get dspSearchHeadphones => 'ابحث عن سماعات (Sony، Sennheiser، Apple...)';
+  String get dspSearchHeadphones =>
+      'ابحث عن سماعات (Sony، Sennheiser، Apple...)';
 
   @override
-  String get dspSearchHeadphonesHint => 'ابحث عن سماعات (مثل AirPods وSony وMoondrop)...';
+  String get dspSearchHeadphonesHint =>
+      'ابحث عن سماعات (مثل AirPods وSony وMoondrop)...';
 
   @override
   String get dspSlider1Label => 'slider1 (المعدل / الدفع)';
@@ -6226,10 +6485,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get dspVocalWarmthDesc => 'ثراء توافقي في صوت القارئ';
 
   @override
-  String get dspWiredCompensationDesc => 'يُترك إخراج السلك / USB دون تعويض من العتاد.';
+  String get dspWiredCompensationDesc =>
+      'يُترك إخراج السلك / USB دون تعويض من العتاد.';
 
   @override
-  String get browseAccountConnectedDone => 'تم ربط الحساب! اضغط \"تم\" للإنهاء.';
+  String get browseAccountConnectedDone =>
+      'تم ربط الحساب! اضغط \"تم\" للإنهاء.';
 
   @override
   String get browseAcoustic => 'أكوستيك';
@@ -6247,25 +6508,31 @@ class AppLocalizationsAr extends AppLocalizations {
   String get browseAlarmSound => 'صوت المنبّه';
 
   @override
-  String get browseAllLikedSongsDownloadedOffline => 'كل الأغاني المفضلة تم تنزيلها بالفعل دون اتصال.';
+  String get browseAllLikedSongsDownloadedOffline =>
+      'كل الأغاني المفضلة تم تنزيلها بالفعل دون اتصال.';
 
   @override
-  String get browseAllOnlineLikedDownloaded => 'كل الأغاني المفضلة عبر الإنترنت تم تنزيلها بالفعل أو قيد التنزيل.';
+  String get browseAllOnlineLikedDownloaded =>
+      'كل الأغاني المفضلة عبر الإنترنت تم تنزيلها بالفعل أو قيد التنزيل.';
 
   @override
-  String get browseAllOnlineTracksDownloaded => 'كل المقاطع عبر الإنترنت تم تنزيلها بالفعل أو قيد التنزيل.';
+  String get browseAllOnlineTracksDownloaded =>
+      'كل المقاطع عبر الإنترنت تم تنزيلها بالفعل أو قيد التنزيل.';
 
   @override
-  String get browseAllSongsOffline => 'كل الأغاني في هذه القائمة هي مقاطع محلية دون اتصال بالفعل.';
+  String get browseAllSongsOffline =>
+      'كل الأغاني في هذه القائمة هي مقاطع محلية دون اتصال بالفعل.';
 
   @override
-  String get browseAllTracksAlreadyDownloaded => 'كل المقاطع تم تنزيلها بالفعل أو محلية';
+  String get browseAllTracksAlreadyDownloaded =>
+      'كل المقاطع تم تنزيلها بالفعل أو محلية';
 
   @override
   String get browseAllTracksFrom => 'كل المقاطع من';
 
   @override
-  String get browseAllTracksOfflineLocal => 'كل المقاطع في قائمة التشغيل هذه هي ملفات محلية دون اتصال بالفعل.';
+  String get browseAllTracksOfflineLocal =>
+      'كل المقاطع في قائمة التشغيل هذه هي ملفات محلية دون اتصال بالفعل.';
 
   @override
   String get browseAlreadyDownloadedOffline => 'تم تنزيلها بالفعل دون اتصال.';
@@ -6327,7 +6594,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get browseClearHistoryFailed => 'فشل مسح السجل';
 
   @override
-  String get browseClearListeningHistoryMessage => 'سيؤدي هذا إلى إزالة كل المقاطع من سجل الاستماع الأخير. لن تتأثر ملفات الصوت وقوائم التشغيل.';
+  String get browseClearListeningHistoryMessage =>
+      'سيؤدي هذا إلى إزالة كل المقاطع من سجل الاستماع الأخير. لن تتأثر ملفات الصوت وقوائم التشغيل.';
 
   @override
   String get browseClearListeningHistoryTitle => 'مسح سجل الاستماع؟';
@@ -6336,7 +6604,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get browseClearPlayHistory => 'مسح سجل التشغيل';
 
   @override
-  String get browseClearPlayHistoryMessage => 'سيؤدي هذا إلى إعادة تعيين قائمة التشغيل الأخيرة وسجل الاستماع. لن تتأثر ملفات الأغاني وقوائم التشغيل.';
+  String get browseClearPlayHistoryMessage =>
+      'سيؤدي هذا إلى إعادة تعيين قائمة التشغيل الأخيرة وسجل الاستماع. لن تتأثر ملفات الأغاني وقوائم التشغيل.';
 
   @override
   String get browseClearPlayHistoryTitle => 'مسح سجل التشغيل؟';
@@ -6354,13 +6623,16 @@ class AppLocalizationsAr extends AppLocalizations {
   String get browseConnect => 'ربط';
 
   @override
-  String get browseConnectToSync => 'اربط الحساب لمزامنة الموسيقى المفضلة تلقائيًا';
+  String get browseConnectToSync =>
+      'اربط الحساب لمزامنة الموسيقى المفضلة تلقائيًا';
 
   @override
-  String get browseCookiesRejected => 'رفض YouTube ملفات تعريف الارتباط هذه — انتهت صلاحيتها أو تنتمي إلى جلسة مسجّلة الخروج';
+  String get browseCookiesRejected =>
+      'رفض YouTube ملفات تعريف الارتباط هذه — انتهت صلاحيتها أو تنتمي إلى جلسة مسجّلة الخروج';
 
   @override
-  String get browseCookieVerifyOffline => 'تعذّر الوصول إلى YouTube للتحقق — تم حفظ ملفات تعريف الارتباط، حاول مجددًا عند عودة الاتصال';
+  String get browseCookieVerifyOffline =>
+      'تعذّر الوصول إلى YouTube للتحقق — تم حفظ ملفات تعريف الارتباط، حاول مجددًا عند عودة الاتصال';
 
   @override
   String get browseCopied => 'تم النسخ';
@@ -6375,7 +6647,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get browseCouldNotLoadTopTracks => 'تعذّر تحميل المقاطع الأكثر شهرة.';
 
   @override
-  String get browseCouldNotLoadTracks => 'تعذّر تحميل مقاطع قائمة التشغيل هذه. تحقق من اتصالك بالإنترنت أو الرابط.';
+  String get browseCouldNotLoadTracks =>
+      'تعذّر تحميل مقاطع قائمة التشغيل هذه. تحقق من اتصالك بالإنترنت أو الرابط.';
 
   @override
   String get browseCreateCloudAccount => 'إنشاء حساب سحابي';
@@ -6411,10 +6684,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get browseDownloadAllLikedSongs => 'تنزيل كل الأغاني المفضلة';
 
   @override
-  String get browseDownloadAllOfflineActive => 'تنزيل الكل دون اتصال (3 تنزيلات نشطة)';
+  String get browseDownloadAllOfflineActive =>
+      'تنزيل الكل دون اتصال (3 تنزيلات نشطة)';
 
   @override
-  String get browseDownloadAllOnlineFavorites => 'تنزيل كل المفضلة عبر الإنترنت';
+  String get browseDownloadAllOnlineFavorites =>
+      'تنزيل كل المفضلة عبر الإنترنت';
 
   @override
   String get browseDownloadOffline => 'تنزيل دون اتصال';
@@ -6450,13 +6725,15 @@ class AppLocalizationsAr extends AppLocalizations {
   String get browseExplore => 'استكشاف';
 
   @override
-  String get browseFailedLoadFeed => 'فشل تحميل المحتوى. تحقق من الاتصال وأعد المحاولة.';
+  String get browseFailedLoadFeed =>
+      'فشل تحميل المحتوى. تحقق من الاتصال وأعد المحاولة.';
 
   @override
   String get browseFailedToFetch => 'فشل الجلب';
 
   @override
-  String get browseFailedToLoadAccountPlaylists => 'فشل تحميل قوائم تشغيل الحساب';
+  String get browseFailedToLoadAccountPlaylists =>
+      'فشل تحميل قوائم تشغيل الحساب';
 
   @override
   String get browseFetching => 'جارٍ الجلب';
@@ -6504,7 +6781,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get browseGoogleBlocking => 'Google يمنع تسجيل الدخول هذا';
 
   @override
-  String get browseGoogleBlockingBody => 'يحظر Google تسجيل الدخول داخل المتصفحات المدمجة لبعض الحسابات، ولم تتجاوز المحاولات التلقائية (مسح ملفات تعريف الارتباط وتبديل هوية المتصفح) ذلك.\n\nاستخدم الخيار الموثوق بالأسفل لتسجيل الدخول عبر Google TV: وافِق من متصفحك الخاص ولن يرى Google أي WebView مدمج، لذا لا يوجد اختبار كابتشا. سيزامن Pulsr مكتبتك وقوائم التشغيل؛ ويظل التشغيل يعمل كالمعتاد.';
+  String get browseGoogleBlockingBody =>
+      'يحظر Google تسجيل الدخول داخل المتصفحات المدمجة لبعض الحسابات، ولم تتجاوز المحاولات التلقائية (مسح ملفات تعريف الارتباط وتبديل هوية المتصفح) ذلك.\n\nاستخدم الخيار الموثوق بالأسفل لتسجيل الدخول عبر Google TV: وافِق من متصفحك الخاص ولن يرى Google أي WebView مدمج، لذا لا يوجد اختبار كابتشا. سيزامن Pulsr مكتبتك وقوائم التشغيل؛ ويظل التشغيل يعمل كالمعتاد.';
 
   @override
   String get browseHipHop => 'هيب هوب';
@@ -6528,7 +6806,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get browseJazz => 'جاز';
 
   @override
-  String get browseLatestTracksSubtitle => 'أحدث المقاطع المشغّلة على هذا الجهاز';
+  String get browseLatestTracksSubtitle =>
+      'أحدث المقاطع المشغّلة على هذا الجهاز';
 
   @override
   String get browseLibraryStats => 'إحصاءات المكتبة';
@@ -6558,7 +6837,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get browseMahraganat => 'مهرجانات';
 
   @override
-  String get browseMissingSessionCookies => 'ملفات تعريف ارتباط الجلسة مفقودة — يحتاج النص الملصوق إلى SAPISID و__Secure-3PSID (أو 1PSID)';
+  String get browseMissingSessionCookies =>
+      'ملفات تعريف ارتباط الجلسة مفقودة — يحتاج النص الملصوق إلى SAPISID و__Secure-3PSID (أو 1PSID)';
 
   @override
   String get browseMoreOptions => 'خيارات أكثر';
@@ -6606,7 +6886,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get browseNoTracksFound => 'لم يتم العثور على مقاطع';
 
   @override
-  String get browseNoTracksInFolder => 'لم يتم العثور على مقاطع صوتية قابلة للتشغيل في هذا المجلد.';
+  String get browseNoTracksInFolder =>
+      'لم يتم العثور على مقاطع صوتية قابلة للتشغيل في هذا المجلد.';
 
   @override
   String get browseNoTracksInGenre => 'لم يتم العثور على مقاطع في هذا النوع.';
@@ -6615,10 +6896,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get browseNoTracksInYear => 'لم يتم العثور على مقاطع لهذا العام.';
 
   @override
-  String get browseNoTracksMatchSmartRules => 'لا توجد مقاطع تطابق قواعد قائمة التشغيل الذكية هذه.';
+  String get browseNoTracksMatchSmartRules =>
+      'لا توجد مقاطع تطابق قواعد قائمة التشغيل الذكية هذه.';
 
   @override
-  String get browseNoTracksPrivateLiked => 'لم يتم العثور على مقاطع. إذا كانت هذه موسيقاك المفضلة الخاصة، فتأكد من تسجيل الدخول أو اضغط \"مزامنة\".';
+  String get browseNoTracksPrivateLiked =>
+      'لم يتم العثور على مقاطع. إذا كانت هذه موسيقاك المفضلة الخاصة، فتأكد من تسجيل الدخول أو اضغط \"مزامنة\".';
 
   @override
   String get browseNotSet => 'غير محدد';
@@ -6627,19 +6910,22 @@ class AppLocalizationsAr extends AppLocalizations {
   String get browseNoYearsFound => 'لا توجد سنوات';
 
   @override
-  String get browseNoYtmMatchesFor => 'لا توجد نتائج مطابقة في YouTube Music لـ';
+  String get browseNoYtmMatchesFor =>
+      'لا توجد نتائج مطابقة في YouTube Music لـ';
 
   @override
   String get browseOauthAccessDenied => 'تم رفض الوصول في صفحة Google.';
 
   @override
-  String get browseOauthExpired => 'انتهت صلاحية الرمز قبل الموافقة عليه. حاول مجددًا.';
+  String get browseOauthExpired =>
+      'انتهت صلاحية الرمز قبل الموافقة عليه. حاول مجددًا.';
 
   @override
   String get browseOauthGoogleError => 'أعاد Google خطأ';
 
   @override
-  String get browseOauthStartFailed => 'تعذّر بدء تسجيل الدخول عبر Google. تحقق من اتصالك.';
+  String get browseOauthStartFailed =>
+      'تعذّر بدء تسجيل الدخول عبر Google. تحقق من اتصالك.';
 
   @override
   String get browseOfflinePlaylist => 'قائمة تشغيل دون اتصال';
@@ -6654,16 +6940,19 @@ class AppLocalizationsAr extends AppLocalizations {
   String get browsePassword => 'كلمة المرور';
 
   @override
-  String get browsePasswordMinChars => 'يجب أن تتكوّن كلمة المرور من 6 أحرف على الأقل';
+  String get browsePasswordMinChars =>
+      'يجب أن تتكوّن كلمة المرور من 6 أحرف على الأقل';
 
   @override
-  String get browsePasswordResetSent => 'تم إرسال رابط إعادة تعيين كلمة المرور إلى';
+  String get browsePasswordResetSent =>
+      'تم إرسال رابط إعادة تعيين كلمة المرور إلى';
 
   @override
   String get browsePasteFromClipboard => 'لصق من الحافظة';
 
   @override
-  String get browsePastePlaylistLinkHint => 'الصق رابط قائمة تشغيل من YouTube أو YouTube Music.';
+  String get browsePastePlaylistLinkHint =>
+      'الصق رابط قائمة تشغيل من YouTube أو YouTube Music.';
 
   @override
   String get browsePersonalized => 'مخصّص';
@@ -6672,7 +6961,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get browsePlaylistExportedSuccess => 'تم تصدير قائمة التشغيل بنجاح';
 
   @override
-  String get browsePlaylistHasNoSongs => 'لا تحتوي قائمة التشغيل هذه على أغانٍ.';
+  String get browsePlaylistHasNoSongs =>
+      'لا تحتوي قائمة التشغيل هذه على أغانٍ.';
 
   @override
   String get browsePlaylistSharePrefix => 'قائمة التشغيل:';
@@ -6684,7 +6974,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get browsePlays => 'مرات التشغيل';
 
   @override
-  String get browsePleaseEnterCookieText => 'الرجاء إدخال نص ملفات تعريف الارتباط';
+  String get browsePleaseEnterCookieText =>
+      'الرجاء إدخال نص ملفات تعريف الارتباط';
 
   @override
   String get browsePleaseEnterEmail => 'الرجاء إدخال البريد الإلكتروني';
@@ -6732,7 +7023,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get browseRenamePlaylist => 'إعادة تسمية قائمة التشغيل';
 
   @override
-  String get browseRequiresModifySettings => 'مباشرةً، يتطلب Android إذن \"تعديل إعدادات النظام\".';
+  String get browseRequiresModifySettings =>
+      'مباشرةً، يتطلب Android إذن \"تعديل إعدادات النظام\".';
 
   @override
   String get browseRock => 'روك';
@@ -6759,10 +7051,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get browseSearchFailed => 'فشل البحث';
 
   @override
-  String get browseSearchingOnlineMetadata => 'جارٍ البحث عن البيانات الوصفية عبر الإنترنت...';
+  String get browseSearchingOnlineMetadata =>
+      'جارٍ البحث عن البيانات الوصفية عبر الإنترنت...';
 
   @override
-  String get browseSearchSongsHint => 'ابحث عن الأغاني حسب العنوان أو الفنان...';
+  String get browseSearchSongsHint =>
+      'ابحث عن الأغاني حسب العنوان أو الفنان...';
 
   @override
   String get browseSearchWithinPlaylist => 'ابحث داخل قائمة التشغيل…';
@@ -6807,7 +7101,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get browseSyncingLikedSongs => 'جارٍ مزامنة الأغاني المفضلة…';
 
   @override
-  String get browseSyncPullSubtitle => 'اضغط مزامنة بالأسفل لجلب أحدث مكتبة أغانٍ مفضلة من YouTube Music.';
+  String get browseSyncPullSubtitle =>
+      'اضغط مزامنة بالأسفل لجلب أحدث مكتبة أغانٍ مفضلة من YouTube Music.';
 
   @override
   String get browseTapToPlayOrDownload => 'اضغط للتشغيل أو التنزيل';
@@ -6897,7 +7192,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get browseYoutubeWeb => 'ويب YouTube';
 
   @override
-  String get browseYtmSearchScreenDesc => 'شغّل ونزّل الأغاني من YouTube Music دون إعلانات.';
+  String get browseYtmSearchScreenDesc =>
+      'شغّل ونزّل الأغاني من YouTube Music دون إعلانات.';
 
   @override
   String dspPreampClipWarning(String preamp, String boost) {
@@ -6958,7 +7254,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get errIrRejected => 'رفض محرك الصوت استجابة النبضة';
 
   @override
-  String get errLocalMatchStreaming => 'لا توجد نسخة محلية، جارٍ البث عبر الإنترنت';
+  String get errLocalMatchStreaming =>
+      'لا توجد نسخة محلية، جارٍ البث عبر الإنترنت';
 
   @override
   String errPlayFailed(String title) {
@@ -6993,7 +7290,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get errYtmRegionRestricted => 'هذا المسار مقيد في منطقتك.';
 
   @override
-  String get errYtmAgeRestricted => 'هذا المقطع مقيّد بالعمر (+18) على يوتيوب. سجّل الدخول بحساب موثّق العمر أو جرّب نسخة أخرى.';
+  String get errYtmAgeRestricted =>
+      'هذا المقطع مقيّد بالعمر (+18) على يوتيوب. سجّل الدخول بحساب موثّق العمر أو جرّب نسخة أخرى.';
 
   @override
   String get errYtmStreamFailed => 'تعذّر تحميل البث. جارٍ تحديث الرابط…';
@@ -7026,7 +7324,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get errYtmExtractFail => 'فشل استخراج البث. جارٍ تبديل المسار.';
 
   @override
-  String get errYtmSabr => 'لا يوفّر YouTube هذا المقطع إلا بصيغة لا يستطيع Pulsr بثّها حتى الآن.';
+  String get errYtmSabr =>
+      'لا يوفّر YouTube هذا المقطع إلا بصيغة لا يستطيع Pulsr بثّها حتى الآن.';
 
   @override
   String get errYtmVerify => 'يحتاج YouTube إلى التحقق. جارٍ تجربة مسار بديل.';
@@ -7089,7 +7388,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get eqUnlockStudioConsole => 'فتح وحدة تحكم DSP للاستوديو';
 
   @override
-  String get eqUnlockStudioDesc => 'الوصول إلى نطاقات بارامترية 10/32/64 وتصحيح الغرفة والمحدد والموسع الصوتي';
+  String get eqUnlockStudioDesc =>
+      'الوصول إلى نطاقات بارامترية 10/32/64 وتصحيح الغرفة والمحدد والموسع الصوتي';
 
   @override
   String get queueConfirmDelete => 'تأكيد الحذف';
@@ -7138,40 +7438,47 @@ class AppLocalizationsAr extends AppLocalizations {
   String get resetWeeklyDoseTitle => 'إعادة ضبط جرعة الصوت الأسبوعية؟';
 
   @override
-  String get resetWeeklyDoseDesc => 'سيؤدي هذا إلى إعادة ضبط عداد التعرض الصوتي المتراكم إلى 0% وإلغاء تخفيف الأمان. أعد الضبط فقط عند بدء أسبوع مراقبة جديد أو تغيير بيئة الاستماع.';
+  String get resetWeeklyDoseDesc =>
+      'سيؤدي هذا إلى إعادة ضبط عداد التعرض الصوتي المتراكم إلى 0% وإلغاء تخفيف الأمان. أعد الضبط فقط عند بدء أسبوع مراقبة جديد أو تغيير بيئة الاستماع.';
 
   @override
   String get resetDoseAction => 'إعادة ضبط الجرعة';
 
   @override
-  String get weeklyDoseResetSnackbar => 'تمت إعادة ضبط جرعة الصوت الأسبوعية إلى 0.0%';
+  String get weeklyDoseResetSnackbar =>
+      'تمت إعادة ضبط جرعة الصوت الأسبوعية إلى 0.0%';
 
   @override
   String get headphoneSafetyTitle => 'أمان وجرعة سماعات الرأس';
 
   @override
-  String get headphoneSafetyStandard => 'المعيار الصوتي WHO-ITU H.870 / EN 62368-1';
+  String get headphoneSafetyStandard =>
+      'المعيار الصوتي WHO-ITU H.870 / EN 62368-1';
 
   @override
   String get headphoneSafetyToggleTitle => 'تخفيف الأمان التلقائي';
 
   @override
-  String get headphoneSafetyToggleDesc => 'عند وصول الجرعة الأسبوعية إلى 100%، يتم تفعيل محدد أمان استباقي بسلاسة لتقييد ذروة الإخراج عند -6 dBFS.';
+  String get headphoneSafetyToggleDesc =>
+      'عند وصول الجرعة الأسبوعية إلى 100%، يتم تفعيل محدد أمان استباقي بسلاسة لتقييد ذروة الإخراج عند -6 dBFS.';
 
   @override
   String get weeklySoundAllowance => 'الحصة الصوتية الأسبوعية';
 
   @override
-  String get safetyLimiterActiveDesc => 'محدد الأمان نشط (سقف -6 dBFS مفعل لمنع تلف السمع)';
+  String get safetyLimiterActiveDesc =>
+      'محدد الأمان نشط (سقف -6 dBFS مفعل لمنع تلف السمع)';
 
   @override
-  String get highSoundDoseWarning => 'جرعة صوتية عالية: يُرجى تقليل مستوى الصوت لحماية السمع';
+  String get highSoundDoseWarning =>
+      'جرعة صوتية عالية: يُرجى تقليل مستوى الصوت لحماية السمع';
 
   @override
   String get doseBudgetLabel => 'ميزانية الجرعة الأسبوعية';
 
   @override
-  String get doseBudgetDesc => 'يتم تحديد الصوت بعد استهلاك هذه النسبة من جرعة المرجع 40 ساعة عند 80 dBA.';
+  String get doseBudgetDesc =>
+      'يتم تحديد الصوت بعد استهلاك هذه النسبة من جرعة المرجع 40 ساعة عند 80 dBA.';
 
   @override
   String doseQuietUntilClear(String time) {
@@ -7179,19 +7486,22 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get optimalExposureDesc => 'تعرض مثالي: مستويات استماع آمنة ضمن بدل الـ 40 ساعة';
+  String get optimalExposureDesc =>
+      'تعرض مثالي: مستويات استماع آمنة ضمن بدل الـ 40 ساعة';
 
   @override
   String get latencySyncDiagnostics => 'تشخيصات التأخير والمزامنة';
 
   @override
-  String get latencySyncDiagnosticsDesc => 'مقاييس تأخير المعالجة والإخراج المباشرة من أجهزة الصوت الأصلية.';
+  String get latencySyncDiagnosticsDesc =>
+      'مقاييس تأخير المعالجة والإخراج المباشرة من أجهزة الصوت الأصلية.';
 
   @override
   String get dspPipelineDelay => 'تأخير معالجة مسار DSP';
 
   @override
-  String get dspPipelineDelayDesc => 'محدد الاستباق + تأخير مجموعة إعادة التشكيل + تأخير الصدى المقسم';
+  String get dspPipelineDelayDesc =>
+      'محدد الاستباق + تأخير مجموعة إعادة التشكيل + تأخير الصدى المقسم';
 
   @override
   String get usbBufferedDelay => 'تأخير التخزين المؤقت لجهاز USB';
@@ -7203,7 +7513,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get totalMonitoredLatency => 'إجمالي التأخير المراقب';
 
   @override
-  String get totalMonitoredLatencyDesc => 'مجموع المعالجة الرقمية النشطة والتخزين المؤقت للأجهزة';
+  String get totalMonitoredLatencyDesc =>
+      'مجموع المعالجة الرقمية النشطة والتخزين المؤقت للأجهزة';
 
   @override
   String get directUsbExclusivePath => 'مسار USB حصري مباشر';
@@ -7260,16 +7571,19 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get bpDirectActiveUsb => 'التمرير المباشر للأجهزة نشط على محول USB DAC';
+  String get bpDirectActiveUsb =>
+      'التمرير المباشر للأجهزة نشط على محول USB DAC';
 
   @override
   String get bpDirectActiveWired => 'التمرير المباشر للأجهزة نشط (سلكي مباشر)';
 
   @override
-  String get bpPassThroughArmed => 'التمرير جاهز • يعمل تلقائياً عند توصيل محول DAC متوافق';
+  String get bpPassThroughArmed =>
+      'التمرير جاهز • يعمل تلقائياً عند توصيل محول DAC متوافق';
 
   @override
-  String get bpBypassesAndroidMixer => 'يتجاوز مازج أندرويد ومعالجة DSP لإخراج صوتي مطابق (يتطلب USB أندرويد 14+، والسلكي يتطلب مساراً مباشراً)';
+  String get bpBypassesAndroidMixer =>
+      'يتجاوز مازج أندرويد ومعالجة DSP لإخراج صوتي مطابق (يتطلب USB أندرويد 14+، والسلكي يتطلب مساراً مباشراً)';
 
   @override
   String settingsResultsCount(int count) {
@@ -7295,10 +7609,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get dspPitchDownSemitone => 'حِدّة -1 نصف نغمة';
 
   @override
-  String get dspPitchMeterUnavailable => 'كشف حِدّة الصوت غير متاح في هذا الإصدار.';
+  String get dspPitchMeterUnavailable =>
+      'كشف حِدّة الصوت غير متاح في هذا الإصدار.';
 
   @override
-  String get castNoLocalItems => 'لا يوجد ما يمكن بثّه — الملفات المحلية فقط قابلة للبث.';
+  String get castNoLocalItems =>
+      'لا يوجد ما يمكن بثّه — الملفات المحلية فقط قابلة للبث.';
 
   @override
   String settingsCastingQueueTo(String device) {
@@ -7352,7 +7668,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get dockStyleTitle => 'نمط الإرساء';
 
   @override
-  String get dockStyleSubtitle => 'اختر طريقة تراص المشغّل المصغّر وشريط التنقّل';
+  String get dockStyleSubtitle =>
+      'اختر طريقة تراص المشغّل المصغّر وشريط التنقّل';
 
   @override
   String get dockStyleDefault => 'جنبًا إلى جنب';
@@ -7379,7 +7696,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get dockStyleNavTopDesc => 'يظهر المشغّل المصغّر خلف شريط التنقّل';
 
   @override
-  String get dockStyleHint => 'اضغط مطوّلًا على المشغّل المصغّر لتغيير نمط الإرساء';
+  String get dockStyleHint =>
+      'اضغط مطوّلًا على المشغّل المصغّر لتغيير نمط الإرساء';
 
   @override
   String whatsNewSubtitle(String version) {
@@ -7401,7 +7719,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get studioExplainerTitle => 'ما الذي يضيفه وضع الاستوديو';
 
   @override
-  String get studioExplainerBody => 'إخراج مثالي للبت، وحزمة DSP الكاملة، وملفات الأجهزة، والأتمتة، وخادم الوسيط. يمكنك الرجوع في أي وقت.';
+  String get studioExplainerBody =>
+      'إخراج مثالي للبت، وحزمة DSP الكاملة، وملفات الأجهزة، والأتمتة، وخادم الوسيط. يمكنك الرجوع في أي وقت.';
 
   @override
   String get alphabetIndexLabel => 'فهرس الحروف الأبجدي';
@@ -7427,13 +7746,15 @@ class AppLocalizationsAr extends AppLocalizations {
   String get webSessionInterruptedTitle => 'انقطعت جلسة الويب';
 
   @override
-  String get webSessionInterruptedDesc => 'تم فصل مقبض عرض الويب أو استعادته بواسطة النظام. اضغط أدناه لإعادة تحميل الجلسة.';
+  String get webSessionInterruptedDesc =>
+      'تم فصل مقبض عرض الويب أو استعادته بواسطة النظام. اضغط أدناه لإعادة تحميل الجلسة.';
 
   @override
   String get onboardingGesturesTitle => 'الإيماءات والاختصارات';
 
   @override
-  String get onboardingGesturesDesc => 'بعض السحب واللمسات تجعل Pulsr سهل الاستخدام.';
+  String get onboardingGesturesDesc =>
+      'بعض السحب واللمسات تجعل Pulsr سهل الاستخدام.';
 
   @override
   String get onboardingGestureSwipeUpTitle => 'اسحب لأعلى';
@@ -7445,7 +7766,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get onboardingGestureSwipeDownTitle => 'اسحب لأسفل';
 
   @override
-  String get onboardingGestureSwipeDownDesc => 'يعيد ترتيب المشغّل المصغّر وشريط التنقّل';
+  String get onboardingGestureSwipeDownDesc =>
+      'يعيد ترتيب المشغّل المصغّر وشريط التنقّل';
 
   @override
   String get onboardingGestureDoubleTapTitle => 'انقر مرتين على الغلاف';
@@ -7454,7 +7776,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get onboardingGestureDoubleTapDesc => 'يبدّل المفضّلة';
 
   @override
-  String get onboardingGestureLongPressTitle => 'اضغط مطوّلًا على المشغّل المصغّر';
+  String get onboardingGestureLongPressTitle =>
+      'اضغط مطوّلًا على المشغّل المصغّر';
 
   @override
   String get onboardingGestureLongPressDesc => 'يفتح خيارات نمط الإرساء';
@@ -7477,13 +7800,16 @@ class AppLocalizationsAr extends AppLocalizations {
   String get headsetResumeWindow => 'نافذة الاستئناف';
 
   @override
-  String get headsetKeepNotification => 'الإبقاء على الإشعار عند الإيقاف المؤقت';
+  String get headsetKeepNotification =>
+      'الإبقاء على الإشعار عند الإيقاف المؤقت';
 
   @override
-  String get headsetKeepNotificationOnDesc => 'تبقى عناصر التحكم في لوحة الإشعارات بعد الإيقاف (يتطلب إعادة التشغيل).';
+  String get headsetKeepNotificationOnDesc =>
+      'تبقى عناصر التحكم في لوحة الإشعارات بعد الإيقاف (يتطلب إعادة التشغيل).';
 
   @override
-  String get headsetKeepNotificationOffDesc => 'يُزال الإشعار عند الإيقاف المؤقت لتوفير البطارية.';
+  String get headsetKeepNotificationOffDesc =>
+      'يُزال الإشعار عند الإيقاف المؤقت لتوفير البطارية.';
 
   @override
   String get headsetSinglePress => 'ضغطة واحدة';
@@ -7498,13 +7824,15 @@ class AppLocalizationsAr extends AppLocalizations {
   String get headsetMultiPressWindow => 'نافذة الضغط المتعدد';
 
   @override
-  String get headsetMultiPressWindowDesc => 'مدة تجميع الضغطات في ضغطة مزدوجة أو ثلاثية.';
+  String get headsetMultiPressWindowDesc =>
+      'مدة تجميع الضغطات في ضغطة مزدوجة أو ثلاثية.';
 
   @override
   String get headsetSeekStep => 'خطوة التنقل';
 
   @override
-  String get headsetSeekStepDesc => 'يُستخدم عند تعيين ضغطة للتقديم أو الإرجاع.';
+  String get headsetSeekStepDesc =>
+      'يُستخدم عند تعيين ضغطة للتقديم أو الإرجاع.';
 
   @override
   String get headsetActionPlayPause => 'تشغيل / إيقاف مؤقت';
@@ -7602,25 +7930,29 @@ class AppLocalizationsAr extends AppLocalizations {
   String get whatsNewBitPerfectTitle => 'إخراج بت مثالي وعالي الدقة';
 
   @override
-  String get whatsNewBitPerfectDesc => 'بث مباشر عبر منفذ USB DAC، وتحكم في مستوى الصوت بالعتاد، وتشغيل DSD/DoP أصلي.';
+  String get whatsNewBitPerfectDesc =>
+      'بث مباشر عبر منفذ USB DAC، وتحكم في مستوى الصوت بالعتاد، وتشغيل DSD/DoP أصلي.';
 
   @override
   String get whatsNewProDspTitle => 'مجموعة معالجة DSP الاستوديو الاحترافية';
 
   @override
-  String get whatsNewProDspDesc => 'معادل بارامتري باستجابة حرة، وضاغط متعدد النطاقات، ومحدّد مسبق، وتغذية بسماعية.';
+  String get whatsNewProDspDesc =>
+      'معادل بارامتري باستجابة حرة، وضاغط متعدد النطاقات، ومحدّد مسبق، وتغذية بسماعية.';
 
   @override
   String get whatsNewThemesTitle => 'سمات مشغّل تكيفية';
 
   @override
-  String get whatsNewThemesDesc => 'ثماني سمات مشغّل مصممة يدويًا مع الوضع الأفقي للهاتف ولوحة مزدوجة للأجهزة اللوحية وتحسين AMOLED.';
+  String get whatsNewThemesDesc =>
+      'ثماني سمات مشغّل مصممة يدويًا مع الوضع الأفقي للهاتف ولوحة مزدوجة للأجهزة اللوحية وتحسين AMOLED.';
 
   @override
   String get whatsNewAccessibilityTitle => 'إمكانية الوصول والإيماءات السلسة';
 
   @override
-  String get whatsNewAccessibilityDesc => 'التوافق مع تباين WCAG 2.1 AA، ودعم نوع الخط الديناميكي 2.0x، ودلالات كاملة لقارئ الشاشة.';
+  String get whatsNewAccessibilityDesc =>
+      'التوافق مع تباين WCAG 2.1 AA، ودعم نوع الخط الديناميكي 2.0x، ودلالات كاملة لقارئ الشاشة.';
 
   @override
   String get proxyInvalidHostFormat => 'تنسيق مضيف الوكيل غير صالح';
@@ -7635,13 +7967,15 @@ class AppLocalizationsAr extends AppLocalizations {
   String get eqMacroMidTitle => 'الغناء والحضور';
 
   @override
-  String get eqMacroMidDesc => 'الغناء الرئيسي والحضور الصوتي (500 هرتز – 2 كيلوهرتز)';
+  String get eqMacroMidDesc =>
+      'الغناء الرئيسي والحضور الصوتي (500 هرتز – 2 كيلوهرتز)';
 
   @override
   String get eqMacroTrebleTitle => 'الوضوح والنقاء';
 
   @override
-  String get eqMacroTrebleDesc => 'لمعان الأصوات العالية والتفاصيل المكانية (4 كيلوهرتز – 16 كيلوهرتز)';
+  String get eqMacroTrebleDesc =>
+      'لمعان الأصوات العالية والتفاصيل المكانية (4 كيلوهرتز – 16 كيلوهرتز)';
 
   @override
   String get eqIrCustomLoaded => 'مخصص (محمّل)';
@@ -7653,22 +7987,26 @@ class AppLocalizationsAr extends AppLocalizations {
   String get eqAuditionFiveSeconds => 'تجربة (5 ثوانٍ)';
 
   @override
-  String get eqAuditioningCrossfeed => 'جارٍ تجربة إعداد التغذية البسماعية (5 ثوانٍ)...';
+  String get eqAuditioningCrossfeed =>
+      'جارٍ تجربة إعداد التغذية البسماعية (5 ثوانٍ)...';
 
   @override
   String get onboardingPersonalizeTitle => 'اجعله يناسبك';
 
   @override
-  String get onboardingPersonalizeDesc => 'اختر لونًا الآن — يمكنك تغييره في أي وقت من الإعدادات.';
+  String get onboardingPersonalizeDesc =>
+      'اختر لونًا الآن — يمكنك تغييره في أي وقت من الإعدادات.';
 
   @override
   String get featureInfoBitPerfectTitle => 'تمرير USB بتقنية Bit-Perfect';
 
   @override
-  String get featureInfoBitPerfectSubtitle => 'بث مباشر عبر العتاد إلى DAC USB / سلكي';
+  String get featureInfoBitPerfectSubtitle =>
+      'بث مباشر عبر العتاد إلى DAC USB / سلكي';
 
   @override
-  String get featureInfoBitPerfectDescription => 'يتجاوز AudioFlinger في أندرويد ويرسل عينات الملف الدقيقة (مثل 96 kHz / 24 بت) مباشرة إلى DAC USB عبر AudioMixerAttributes (API 34)، أو عبر مستقبل UAC2 المتزامن الخاص بـ Pulsr عندما لا توفر المنصة مازجًا حصريًا. لا يُبلَّغ عن Bit-Perfect كمُتحقَّق منه إلا حين لا يوجد في المسار أي مستوى صوت برمجي أو مرحلة DSP أو مؤثر HAL؛ وأي تخفيت برمجي يهبط بالخرج إلى حصري غير مُتحقَّق منه. لا يوفر أندرويد إخراج Bit-Perfect حصريًا لمقبس 3.5 مم / وحدة الترميز الداخلية — إذ يستخدم هذا المسار AAudio Direct ومسار DSP العائم 24/32 بت بدلًا من ذلك، ولا يُعدّ مُتحقَّقًا منه. البلوتوث ليس Bit-Perfect أبدًا (تحويل SBC/AAC/LDAC).';
+  String get featureInfoBitPerfectDescription =>
+      'يتجاوز AudioFlinger في أندرويد ويرسل عينات الملف الدقيقة (مثل 96 kHz / 24 بت) مباشرة إلى DAC USB عبر AudioMixerAttributes (API 34)، أو عبر مستقبل UAC2 المتزامن الخاص بـ Pulsr عندما لا توفر المنصة مازجًا حصريًا. لا يُبلَّغ عن Bit-Perfect كمُتحقَّق منه إلا حين لا يوجد في المسار أي مستوى صوت برمجي أو مرحلة DSP أو مؤثر HAL؛ وأي تخفيت برمجي يهبط بالخرج إلى حصري غير مُتحقَّق منه. لا يوفر أندرويد إخراج Bit-Perfect حصريًا لمقبس 3.5 مم / وحدة الترميز الداخلية — إذ يستخدم هذا المسار AAudio Direct ومسار DSP العائم 24/32 بت بدلًا من ذلك، ولا يُعدّ مُتحقَّقًا منه. البلوتوث ليس Bit-Perfect أبدًا (تحويل SBC/AAC/LDAC).';
 
   @override
   String get featureInfoBypassDspTitle => 'تجاوز DSP في وضع Bit-Perfect';
@@ -7677,52 +8015,65 @@ class AppLocalizationsAr extends AppLocalizations {
   String get featureInfoBypassDspSubtitle => 'تيار بتات نقي بلا تلوين إلى DAC';
 
   @override
-  String get featureInfoBypassDspDescription => 'عند التفعيل، يؤدي الدخول إلى Bit-Perfect إلى تعطيل EQ وVirtualizer وDynamics وCrossfeed وLimiter وReverb وموازن الستيريو ومُعيد أخذ العينات Sinc فورًا (القناع الأصلي = 0). يبقى التحكم بالصوت البرمجي في المشغّل ما لم يملك التحكم الصوتي العتادي في DAC مسؤولية التوهين؛ وأي توهين رقمي يجعل الخرج حصريًا لكن غير مُتحقَّق منه. أوقفه إذا أردت EQ + Bit-Perfect (ليس Bit-Perfect حقيقيًا، لكن بعض أجهزة DAC تتحمله).';
+  String get featureInfoBypassDspDescription =>
+      'عند التفعيل، يؤدي الدخول إلى Bit-Perfect إلى تعطيل EQ وVirtualizer وDynamics وCrossfeed وLimiter وReverb وموازن الستيريو ومُعيد أخذ العينات Sinc فورًا (القناع الأصلي = 0). يبقى التحكم بالصوت البرمجي في المشغّل ما لم يملك التحكم الصوتي العتادي في DAC مسؤولية التوهين؛ وأي توهين رقمي يجعل الخرج حصريًا لكن غير مُتحقَّق منه. أوقفه إذا أردت EQ + Bit-Perfect (ليس Bit-Perfect حقيقيًا، لكن بعض أجهزة DAC تتحمله).';
 
   @override
-  String get featureInfoFollowTrackSampleRateTitle => 'متابعة معدل عينات المقطع';
+  String get featureInfoFollowTrackSampleRateTitle =>
+      'متابعة معدل عينات المقطع';
 
   @override
-  String get featureInfoFollowTrackSampleRateSubtitle => 'إعادة تهيئة الإخراج إلى المعدل الأصلي لكل مقطع';
+  String get featureInfoFollowTrackSampleRateSubtitle =>
+      'إعادة تهيئة الإخراج إلى المعدل الأصلي لكل مقطع';
 
   @override
-  String get featureInfoFollowTrackSampleRateDescription => 'عند كل تغيير للمقطع، يطلب معدل العينات الخاص بالمقطع من جهاز الإخراج فلا حاجة إلى إعادة أخذ عينات برمجية. تتم إزالة التكرار حتى لا تؤدي المقاطع ذات المعدل المشترك إلى إعادة تهيئة أصلية متكررة. يُتخطى في البلوتوث، حيث يملك رابط AVRCP/الترميز المعدل. قد يظل الجهاز يحد من المعدل؛ ويُعرض التنسيق المتفاوض عليه في تشخيص مسار الإخراج.';
+  String get featureInfoFollowTrackSampleRateDescription =>
+      'عند كل تغيير للمقطع، يطلب معدل العينات الخاص بالمقطع من جهاز الإخراج فلا حاجة إلى إعادة أخذ عينات برمجية. تتم إزالة التكرار حتى لا تؤدي المقاطع ذات المعدل المشترك إلى إعادة تهيئة أصلية متكررة. يُتخطى في البلوتوث، حيث يملك رابط AVRCP/الترميز المعدل. قد يظل الجهاز يحد من المعدل؛ ويُعرض التنسيق المتفاوض عليه في تشخيص مسار الإخراج.';
 
   @override
-  String get featureInfoStrictBitPerfectTitle => 'Bit-Perfect صارم (بلا إعادة أخذ عينات)';
+  String get featureInfoStrictBitPerfectTitle =>
+      'Bit-Perfect صارم (بلا إعادة أخذ عينات)';
 
   @override
-  String get featureInfoStrictBitPerfectSubtitle => 'بتات المصدر الدقيقة، بلا مُعيد أخذ عينات — مراحل DSP متوقفة';
+  String get featureInfoStrictBitPerfectSubtitle =>
+      'بتات المصدر الدقيقة، بلا مُعيد أخذ عينات — مراحل DSP متوقفة';
 
   @override
-  String get featureInfoStrictBitPerfectDescription => 'يفرض إخراج Bit-Perfect وتجاوز DSP، ثم يتابع معدل العينات الأصلي لكل مقطع كي يتلقى DAC عينات المصدر الدقيقة دون إعادة أخذ عينات. ولأنه صارم، لا يمكن تشغيل EQ وReplayGain وVirtualizer/Dynamics وCrossfade: إذ ستُغيّر تيار البتات. يتطلب مسارًا يعلن دعم Bit-Perfect الحصري (DAC USB على أندرويد 14+)؛ وإلا يُعطَّل المفتاح مع سبب النظام الأساسي.';
+  String get featureInfoStrictBitPerfectDescription =>
+      'يفرض إخراج Bit-Perfect وتجاوز DSP، ثم يتابع معدل العينات الأصلي لكل مقطع كي يتلقى DAC عينات المصدر الدقيقة دون إعادة أخذ عينات. ولأنه صارم، لا يمكن تشغيل EQ وReplayGain وVirtualizer/Dynamics وCrossfade: إذ ستُغيّر تيار البتات. يتطلب مسارًا يعلن دعم Bit-Perfect الحصري (DAC USB على أندرويد 14+)؛ وإلا يُعطَّل المفتاح مع سبب النظام الأساسي.';
 
   @override
   String get featureInfoEqualizerTitle => 'موازن بارامتري 10 / 32 نطاقًا';
 
   @override
-  String get featureInfoEqualizerSubtitle => '±15 dB لكل نطاق، Q=1.414، مسطح افتراضيًا';
+  String get featureInfoEqualizerSubtitle =>
+      '±15 dB لكل نطاق، Q=1.414، مسطح افتراضيًا';
 
   @override
-  String get featureInfoEqualizerDescription => 'سلسلة biquad أصلية بلغة C++ (بحد أقصى 32 نطاقًا، 8 قنوات). تستخدم قفزة JNI دفعية واحدة (≈1 ms) مع تجاوز بلا تكلفة عند التعطيل. تدمج ملفات AutoEQ على ترددات لوغاريتمية. لا يمكن أن تكون نشطة مع تجاوز Bit-Perfect (ستعيد أخذ العينات وتغيّر البتات).';
+  String get featureInfoEqualizerDescription =>
+      'سلسلة biquad أصلية بلغة C++ (بحد أقصى 32 نطاقًا، 8 قنوات). تستخدم قفزة JNI دفعية واحدة (≈1 ms) مع تجاوز بلا تكلفة عند التعطيل. تدمج ملفات AutoEQ على ترددات لوغاريتمية. لا يمكن أن تكون نشطة مع تجاوز Bit-Perfect (ستعيد أخذ العينات وتغيّر البتات).';
 
   @override
   String get featureInfoBassBoostTitle => 'مُعزِّز الجهير';
 
   @override
-  String get featureInfoBassBoostSubtitle => 'كسب منخفض الترددات بنمط shelf (جزء من محرك EQ)';
+  String get featureInfoBassBoostSubtitle =>
+      'كسب منخفض الترددات بنمط shelf (جزء من محرك EQ)';
 
   @override
-  String get featureInfoBassBoostDescription => 'يضيف رفعًا منخفضًا low-shelf دون ~150 Hz عبر سلسلة biquad الأصلية للـ EQ. يتشارك نفس مرحلة المعالجة مع الموازن الرسومي، لذا يُعطَّل أثناء تفعيل تجاوز Bit-Perfect. أبقِه معتدلًا لتجنب حجب التفاصيل.';
+  String get featureInfoBassBoostDescription =>
+      'يضيف رفعًا منخفضًا low-shelf دون ~150 Hz عبر سلسلة biquad الأصلية للـ EQ. يتشارك نفس مرحلة المعالجة مع الموازن الرسومي، لذا يُعطَّل أثناء تفعيل تجاوز Bit-Perfect. أبقِه معتدلًا لتجنب حجب التفاصيل.';
 
   @override
   String get featureInfoCrossfeedTitle => 'Crossfeed للسماعات';
 
   @override
-  String get featureInfoCrossfeedSubtitle => 'تأخير 200–700 µs، تسرب من –15 إلى –6 dB';
+  String get featureInfoCrossfeedSubtitle =>
+      'تأخير 200–700 µs، تسرب من –15 إلى –6 dB';
 
   @override
-  String get featureInfoCrossfeedDescription => 'مزيج Chu Moy / Linkwitz يجعل السماعات تبدو كمكبرات صوت (يقلل الفصل الحاد بين اليسار/اليمين). يضيف ~0.05 ms زمن استجابة. معطَّل أثناء Bit-Perfect.';
+  String get featureInfoCrossfeedDescription =>
+      'مزيج Chu Moy / Linkwitz يجعل السماعات تبدو كمكبرات صوت (يقلل الفصل الحاد بين اليسار/اليمين). يضيف ~0.05 ms زمن استجابة. معطَّل أثناء Bit-Perfect.';
 
   @override
   String get featureInfoLimiterTitle => 'محدد Brickwall بنظرة مسبقة';
@@ -7731,88 +8082,107 @@ class AppLocalizationsAr extends AppLocalizations {
   String get featureInfoLimiterSubtitle => 'True-peak، نظرة مسبقة 0.5–20 ms';
 
   @override
-  String get featureInfoLimiterDescription => 'محدد true-peak تكيفي بفرط أخذ عينات 4×. يحمي من القص عند تعزيز EQ. يضيف ~5 ms زمن استجابة. المرحلة الأخيرة قبل DAC. معطَّل أثناء Bit-Perfect.';
+  String get featureInfoLimiterDescription =>
+      'محدد true-peak تكيفي بفرط أخذ عينات 4×. يحمي من القص عند تعزيز EQ. يضيف ~5 ms زمن استجابة. المرحلة الأخيرة قبل DAC. معطَّل أثناء Bit-Perfect.';
 
   @override
   String get featureInfoReverbTitle => 'ريفرب بالالتفاف';
 
   @override
-  String get featureInfoReverbSubtitle => '8 غرف (RT60 0.35–5 s)، تداخل بين القنوات، أو IR مخصص';
+  String get featureInfoReverbSubtitle =>
+      '8 غرف (RT60 0.35–5 s)، تداخل بين القنوات، أو IR مخصص';
 
   @override
-  String get featureInfoReverbDescription => 'الالتفاف المُقسَّم (كتل من 512 إطارًا) مقابل استجابة نبضية لغرفة مُصنَّعة أو استجابة نبضية مخصصة تحمّلها. يتميز بتداخل قابل للضبط بين القنوات لتوطين ستيريو binaural IRS أصيل. صفر تخصيصات في كومة الذاكرة داخل حلقة الصوت. يحتاج مسار DSP الأصلي؛ معطَّل أثناء Bit-Perfect.';
+  String get featureInfoReverbDescription =>
+      'الالتفاف المُقسَّم (كتل من 512 إطارًا) مقابل استجابة نبضية لغرفة مُصنَّعة أو استجابة نبضية مخصصة تحمّلها. يتميز بتداخل قابل للضبط بين القنوات لتوطين ستيريو binaural IRS أصيل. صفر تخصيصات في كومة الذاكرة داخل حلقة الصوت. يحتاج مسار DSP الأصلي؛ معطَّل أثناء Bit-Perfect.';
 
   @override
   String get featureInfoPannerTitle => 'موازنة ستيريو ومزج أحادي';
 
   @override
-  String get featureInfoPannerSubtitle => '–1.0 يسار … +1.0 يمين، دمج إلى أحادي';
+  String get featureInfoPannerSubtitle =>
+      '–1.0 يسار … +1.0 يمين، دمج إلى أحادي';
 
   @override
-  String get featureInfoPannerDescription => 'مُوزِّع ثابت القدرة + خلط أحادي (L+R / 2). مفيد لسماع عدم التماثل. يطوي مسرح الصوت عند تفعيل الأحادي. معطَّل أثناء Bit-Perfect.';
+  String get featureInfoPannerDescription =>
+      'مُوزِّع ثابت القدرة + خلط أحادي (L+R / 2). مفيد لسماع عدم التماثل. يطوي مسرح الصوت عند تفعيل الأحادي. معطَّل أثناء Bit-Perfect.';
 
   @override
   String get featureInfoResamplerTitle => 'مُعيد أخذ عينات Sinc متعدد الأطوار';
 
   @override
-  String get featureInfoResamplerSubtitle => '32 طورًا × 32 صنبورًا (محرك متعدد الأطوار)';
+  String get featureInfoResamplerSubtitle =>
+      '32 طورًا × 32 صنبورًا (محرك متعدد الأطوار)';
 
   @override
-  String get featureInfoResamplerDescription => 'محرك استيفاء Sinc متعدد الأطوار. يُبقي مسار التشغيل المتدفق عدد إطارات المصدر، لذا يقوم الإخراج الأساسي (AudioTrack) بتحويل معدل المقطع→الجهاز؛ ويُطبَّق المحرك متعدد الأطوار داخليًا في المسار الرطب لريفرب الالتفاف فوق 48 kHz. معطَّل أثناء Bit-Perfect (تدفق مباشر 1:1).';
+  String get featureInfoResamplerDescription =>
+      'محرك استيفاء Sinc متعدد الأطوار. يُبقي مسار التشغيل المتدفق عدد إطارات المصدر، لذا يقوم الإخراج الأساسي (AudioTrack) بتحويل معدل المقطع→الجهاز؛ ويُطبَّق المحرك متعدد الأطوار داخليًا في المسار الرطب لريفرب الالتفاف فوق 48 kHz. معطَّل أثناء Bit-Perfect (تدفق مباشر 1:1).';
 
   @override
   String get featureInfoVirtualizerTitle => 'توسيع مسرح الصوت (Virtualizer)';
 
   @override
-  String get featureInfoVirtualizerSubtitle => 'توسعة ستيريو عبر Virtualizer في أندرويد';
+  String get featureInfoVirtualizerSubtitle =>
+      'توسعة ستيريو عبر Virtualizer في أندرويد';
 
   @override
-  String get featureInfoVirtualizerDescription => 'يوسّع الحقل الستيريو عبر AudioEffect Virtualizer (0–1000 mB). في الأجهزة المزودة بـ Spatializer عتادي، تكون الأولوية لـ Spatializer ويُتجاوَز Virtualizer. معطَّل أثناء Bit-Perfect.';
+  String get featureInfoVirtualizerDescription =>
+      'يوسّع الحقل الستيريو عبر AudioEffect Virtualizer (0–1000 mB). في الأجهزة المزودة بـ Spatializer عتادي، تكون الأولوية لـ Spatializer ويُتجاوَز Virtualizer. معطَّل أثناء Bit-Perfect.';
 
   @override
   String get featureInfoSpatializerTitle => 'Spatializer عتادي';
 
   @override
-  String get featureInfoSpatializerSubtitle => 'واجهة Spatializer في أندرويد + تتبع الرأس';
+  String get featureInfoSpatializerSubtitle =>
+      'واجهة Spatializer في أندرويد + تتبع الرأس';
 
   @override
-  String get featureInfoSpatializerDescription => 'يستخدم AudioManager.spatializer عند توفره (أندرويد 12L+). يوفّر صوتًا مكانيًا حقيقيًا إذا دعمه الجهاز؛ وإلا يحاكي عبر Virtualizer. يُدار بالتبادل مع Virtualizer.';
+  String get featureInfoSpatializerDescription =>
+      'يستخدم AudioManager.spatializer عند توفره (أندرويد 12L+). يوفّر صوتًا مكانيًا حقيقيًا إذا دعمه الجهاز؛ وإلا يحاكي عبر Virtualizer. يُدار بالتبادل مع Virtualizer.';
 
   @override
   String get featureInfoDynamicsTitle => 'ديناميكيات الاستوديو وMBC';
 
   @override
-  String get featureInfoDynamicsSubtitle => 'MBC ثلاثي النطاقات + إعدادات المحدد';
+  String get featureInfoDynamicsSubtitle =>
+      'MBC ثلاثي النطاقات + إعدادات المحدد';
 
   @override
-  String get featureInfoDynamicsDescription => 'ضاغط متعدد النطاقات DynamicsProcessing (Studio Punch / Warm Analog / Vocal Focus / Night Leveller / Bass Tightener). يتحكم في العابر والجهارة. معطَّل أثناء Bit-Perfect.';
+  String get featureInfoDynamicsDescription =>
+      'ضاغط متعدد النطاقات DynamicsProcessing (Studio Punch / Warm Analog / Vocal Focus / Night Leveller / Bass Tightener). يتحكم في العابر والجهارة. معطَّل أثناء Bit-Perfect.';
 
   @override
   String get featureInfoRoomCorrectionTitle => 'معالج تصحيح الغرفة';
 
   @override
-  String get featureInfoRoomCorrectionSubtitle => 'قياس بمسح نغمي متدرج + مواءمة EQ';
+  String get featureInfoRoomCorrectionSubtitle =>
+      'قياس بمسح نغمي متدرج + مواءمة EQ';
 
   @override
-  String get featureInfoRoomCorrectionDescription => 'يشغّل مسحًا نغميًا قصيرًا عبر مكبرات الصوت، ويسجله بالميكروفون، ويوفّق إعداد EQ لتصحيح الغرفة يسطّح الاستجابة المقيسة (مقيّد بنطاق EQ من +/-15 dB مع تنعيم النطاقات المتجاورة). يُطبَّق عبر مسار EQ العادي، لذا يشارك في تجاوز Bit-Perfect كأي إعداد EQ. ليس بديلًا عن المعالجة الصوتية.';
+  String get featureInfoRoomCorrectionDescription =>
+      'يشغّل مسحًا نغميًا قصيرًا عبر مكبرات الصوت، ويسجله بالميكروفون، ويوفّق إعداد EQ لتصحيح الغرفة يسطّح الاستجابة المقيسة (مقيّد بنطاق EQ من +/-15 dB مع تنعيم النطاقات المتجاورة). يُطبَّق عبر مسار EQ العادي، لذا يشارك في تجاوز Bit-Perfect كأي إعداد EQ. ليس بديلًا عن المعالجة الصوتية.';
 
   @override
   String get featureInfoDsdNativeTitle => 'DSD (فك ترميز PCM / إخراج DoP)';
 
   @override
-  String get featureInfoDsdNativeSubtitle => 'PCM افتراضيًا — DoP فقط مع DAC USB متوافق';
+  String get featureInfoDsdNativeSubtitle =>
+      'PCM افتراضيًا — DoP فقط مع DAC USB متوافق';
 
   @override
-  String get featureInfoDsdNativeDescription => 'تُفكَّك ملفات DSD (DSF/DFF) إلى PCM عبر مفكك ترميز DSD الأصلي افتراضيًا وتتبع مسار DSP العادي. عندما يختار المستخدم إخراج DoP ويكون DAC USB قادر على حمله متصلًا، يُطوَّق تيار بتات DSD الخام كـ DSD over PCM (علامات متبادلة 0x05/0xFA) بمعدل DSD / 16 (DSD64 → 176.4 kHz، DSD128 → 352.8 kHz، DSD256 → 705.6 kHz) كي يبثّ DAC DSD أصليًا، في حاويات 24 بت أو 32 بت معبأة بالأصفار (قابلة للاختيار لأجهزة DAC التي تتطلب إطارات USB بسعة 32 بت). لا يُفعَّل DoP تلقائيًا أبدًا ويظل غير متاح عند عدم اكتشاف DAC USB متوافق. البث المباشر لـ DSD الأصلي الذي يتجاوز DoP غير مُنفَّذ في هذا الإصدار، لذا لا تُدَّعى قدرة DSD الأصلية بأكثر من DAC USB المكتشف.';
+  String get featureInfoDsdNativeDescription =>
+      'تُفكَّك ملفات DSD (DSF/DFF) إلى PCM عبر مفكك ترميز DSD الأصلي افتراضيًا وتتبع مسار DSP العادي. عندما يختار المستخدم إخراج DoP ويكون DAC USB قادر على حمله متصلًا، يُطوَّق تيار بتات DSD الخام كـ DSD over PCM (علامات متبادلة 0x05/0xFA) بمعدل DSD / 16 (DSD64 → 176.4 kHz، DSD128 → 352.8 kHz، DSD256 → 705.6 kHz) كي يبثّ DAC DSD أصليًا، في حاويات 24 بت أو 32 بت معبأة بالأصفار (قابلة للاختيار لأجهزة DAC التي تتطلب إطارات USB بسعة 32 بت). لا يُفعَّل DoP تلقائيًا أبدًا ويظل غير متاح عند عدم اكتشاف DAC USB متوافق. البث المباشر لـ DSD الأصلي الذي يتجاوز DoP غير مُنفَّذ في هذا الإصدار، لذا لا تُدَّعى قدرة DSD الأصلية بأكثر من DAC USB المكتشف.';
 
   @override
   String get featureInfoMqaTitle => 'MQA (Master Quality Authenticated)';
 
   @override
-  String get featureInfoMqaSubtitle => 'مكتشف — فتح أساسي فقط، بلا عرض مصادق عليه';
+  String get featureInfoMqaSubtitle =>
+      'مكتشف — فتح أساسي فقط، بلا عرض مصادق عليه';
 
   @override
-  String get featureInfoMqaDescription => 'تُكتشف الملفات المشفرة بـ MQA من توقيعها وتُوسَم باسم \"MQA\" في ورقة الجودة. يتولى مفكك الترميز داخل التطبيق الفتح الأساسي؛ وعرض MQA الكامل المصادق عليه/الأصلي غير متاح في هذا الإصدار، لذا لا يُبلَّغ عن حالة MQA بصمت كـ lossless عادي ولا يُدَّعى إخراج MQA مصادق عليه أبدًا.';
+  String get featureInfoMqaDescription =>
+      'تُكتشف الملفات المشفرة بـ MQA من توقيعها وتُوسَم باسم \"MQA\" في ورقة الجودة. يتولى مفكك الترميز داخل التطبيق الفتح الأساسي؛ وعرض MQA الكامل المصادق عليه/الأصلي غير متاح في هذا الإصدار، لذا لا يُبلَّغ عن حالة MQA بصمت كـ lossless عادي ولا يُدَّعى إخراج MQA مصادق عليه أبدًا.';
 
   @override
   String get featureInfoGaplessTitle => 'تشغيل دون فواصل';
@@ -7821,7 +8191,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get featureInfoGaplessSubtitle => 'ConcatenatingAudioSource، بلا فجوة';
 
   @override
-  String get featureInfoGaplessDescription => 'يربط المقاطع المتتالية بدقة العينة دون صمت. مثالي للألبومات الحية. متبادل الاستبعاد مع Crossfade — تفعيل أحدهما يفرض إيقاف الآخر.';
+  String get featureInfoGaplessDescription =>
+      'يربط المقاطع المتتالية بدقة العينة دون صمت. مثالي للألبومات الحية. متبادل الاستبعاد مع Crossfade — تفعيل أحدهما يفرض إيقاف الآخر.';
 
   @override
   String get featureInfoCrossfadeTitle => 'Crossfade';
@@ -7830,25 +8201,30 @@ class AppLocalizationsAr extends AppLocalizations {
   String get featureInfoCrossfadeSubtitle => 'تلاشٍ متداخل بمشغلين من 0–12 s';
 
   @override
-  String get featureInfoCrossfadeDescription => 'يخفت المقطع الحالي بينما يظهر التالي عبر ExoPlayer مزدوج. يتطلب تعطيل Gapless (لا يمكن أن يكون دون فواصل ومتخافتًا في آن واحد).';
+  String get featureInfoCrossfadeDescription =>
+      'يخفت المقطع الحالي بينما يظهر التالي عبر ExoPlayer مزدوج. يتطلب تعطيل Gapless (لا يمكن أن يكون دون فواصل ومتخافتًا في آن واحد).';
 
   @override
   String get featureInfoReplayGainTitle => 'تطبيع ReplayGain';
 
   @override
-  String get featureInfoReplayGainSubtitle => 'وسوم كسب المقطع / الألبوم في كسب مسبق أصلي';
+  String get featureInfoReplayGainSubtitle =>
+      'وسوم كسب المقطع / الألبوم في كسب مسبق أصلي';
 
   @override
-  String get featureInfoReplayGainDescription => 'كسب مسبق أصلي شفاف بتاتيًا مدفوع بوسوم Track/Album Gain (تنعيم 20 ms، هامش 0.5 dB بين العينات، آمن من القص). ثم يحمل خلاط Dart مستوى صوت المستخدم فقط فلا يُطبَّق الكسب مرتين؛ ويلجأ DoP وأنظمة غير أندرويد إلى حسابات Dart. يتعارض مع تجاوز Bit-Perfect (أي كسب سيغيّر البتات). اضبطه على Off للحصول على حصري حقيقي.';
+  String get featureInfoReplayGainDescription =>
+      'كسب مسبق أصلي شفاف بتاتيًا مدفوع بوسوم Track/Album Gain (تنعيم 20 ms، هامش 0.5 dB بين العينات، آمن من القص). ثم يحمل خلاط Dart مستوى صوت المستخدم فقط فلا يُطبَّق الكسب مرتين؛ ويلجأ DoP وأنظمة غير أندرويد إلى حسابات Dart. يتعارض مع تجاوز Bit-Perfect (أي كسب سيغيّر البتات). اضبطه على Off للحصول على حصري حقيقي.';
 
   @override
   String get featureInfoOemTitle => 'تحذير صوت OEM';
 
   @override
-  String get featureInfoOemSubtitle => 'معالجة مزدوجة من Dolby / Dirac / SoundAlive';
+  String get featureInfoOemSubtitle =>
+      'معالجة مزدوجة من Dolby / Dirac / SoundAlive';
 
   @override
-  String get featureInfoOemDescription => 'تعمل التأثيرات على مستوى النظام (Dolby Atmos وXiaomi Sound وDirac) خارج التطبيق. وتشغيل DSP الخاص بـ Pulsr فوقها يسبب EQ مزدوجًا وقصًا. استخدم تفضيل DSP = أصلي أو عطّل تأثيرات النظام لأصفى صوت.';
+  String get featureInfoOemDescription =>
+      'تعمل التأثيرات على مستوى النظام (Dolby Atmos وXiaomi Sound وDirac) خارج التطبيق. وتشغيل DSP الخاص بـ Pulsr فوقها يسبب EQ مزدوجًا وقصًا. استخدم تفضيل DSP = أصلي أو عطّل تأثيرات النظام لأصفى صوت.';
 
   @override
   String get featureInfoVolumeBoostTitle => 'تعزيز مستوى الصوت';
@@ -7857,97 +8233,123 @@ class AppLocalizationsAr extends AppLocalizations {
   String get featureInfoVolumeBoostSubtitle => 'LoudnessEnhancer +10 dB';
 
   @override
-  String get featureInfoVolumeBoostDescription => 'كسب LoudnessEnhancer العتادي (0–1000 mB). محدود بـ +6 dB مع مضخم السماعات لتجنب القص. معطَّل أثناء تجاوز Bit-Perfect (مستوى DAC العتادي فقط).';
+  String get featureInfoVolumeBoostDescription =>
+      'كسب LoudnessEnhancer العتادي (0–1000 mB). محدود بـ +6 dB مع مضخم السماعات لتجنب القص. معطَّل أثناء تجاوز Bit-Perfect (مستوى DAC العتادي فقط).';
 
   @override
   String get featureInfoSaturationTitle => 'تشبع توافقي / مُنشِّط';
 
   @override
-  String get featureInfoSaturationSubtitle => 'شريط، صمام مفرغ (التوافقي الثاني)، أو Clase A تناظري بفرط أخذ عينات sinc 4×';
+  String get featureInfoSaturationSubtitle =>
+      'شريط، صمام مفرغ (التوافقي الثاني)، أو Clase A تناظري بفرط أخذ عينات sinc 4×';
 
   @override
-  String get featureInfoSaturationDescription => 'يولّد دفئًا تناظريًا غنيًا وكثافة توافقية. يقدّم 3 ملفات لون قابلة للاختيار: شريط (تشبع ناعم فردي الرتبة)، وصمام مفرغ (ثلاثي 6J1 غير متماثل بتوافقيات ثانية دافئة زوجية)، وClase A تناظري (استجابة محول عتيقة كاملة). يتميز بمانع تشويه aliasing متعدد الأطوار 4× وحجب DC. معطَّل أثناء Bit-Perfect.';
+  String get featureInfoSaturationDescription =>
+      'يولّد دفئًا تناظريًا غنيًا وكثافة توافقية. يقدّم 3 ملفات لون قابلة للاختيار: شريط (تشبع ناعم فردي الرتبة)، وصمام مفرغ (ثلاثي 6J1 غير متماثل بتوافقيات ثانية دافئة زوجية)، وClase A تناظري (استجابة محول عتيقة كاملة). يتميز بمانع تشويه aliasing متعدد الأطوار 4× وحجب DC. معطَّل أثناء Bit-Perfect.';
 
   @override
-  String get featureInfoStereoWidthTitle => 'صورة ستيريو ثلاثية النطاقات وجهير أحادي';
+  String get featureInfoStereoWidthTitle =>
+      'صورة ستيريو ثلاثية النطاقات وجهير أحادي';
 
   @override
-  String get featureInfoStereoWidthSubtitle => 'عرض متعدد النطاقات + حماية طورية أحادية للجهير العميق';
+  String get featureInfoStereoWidthSubtitle =>
+      'عرض متعدد النطاقات + حماية طورية أحادية للجهير العميق';
 
   @override
-  String get featureInfoStereoWidthDescription => 'صورة ستيريو متعددة النطاقات Mid/Side تستخدم تقاطعات Linkwitz-Riley خطية الطور. تتضمن عناصر تحكم بعرض مخصصة للمنخفض (<160 Hz) والمتوسط (160 Hz–2.5 kHz) والمرتفع (>2.5 kHz). يلغي عزل الجهير العميق الأحادي إلغاء الطور الستيريو للترددات المنخفضة والترشيح المشطي. معطَّل أثناء Bit-Perfect.';
+  String get featureInfoStereoWidthDescription =>
+      'صورة ستيريو متعددة النطاقات Mid/Side تستخدم تقاطعات Linkwitz-Riley خطية الطور. تتضمن عناصر تحكم بعرض مخصصة للمنخفض (<160 Hz) والمتوسط (160 Hz–2.5 kHz) والمرتفع (>2.5 kHz). يلغي عزل الجهير العميق الأحادي إلغاء الطور الستيريو للترددات المنخفضة والترشيح المشطي. معطَّل أثناء Bit-Perfect.';
 
   @override
-  String get featureInfoLoudnessContourTitle => 'محيط الجهارة (Fletcher–Munson)';
+  String get featureInfoLoudnessContourTitle =>
+      'محيط الجهارة (Fletcher–Munson)';
 
   @override
-  String get featureInfoLoudnessContourSubtitle => 'تعويض الجهير والأجيس المرتبط بمستوى الصوت';
+  String get featureInfoLoudnessContourSubtitle =>
+      'تعويض الجهير والأجيس المرتبط بمستوى الصوت';
 
   @override
-  String get featureInfoLoudnessContourDescription => 'تقريب الجهارة المتساوية: مع انخفاض مستوى التشغيل، يُطبَّق رفع ناعم low-shelf (~100 Hz) ورفع أصغر high-shelf (~8 kHz) يتلاشيان عند المستوى الأقصى. يعمل في نطاق الكسب لكنه مكمّل لـ ReplayGain — فـ ReplayGain يسوّي المقاطع إلى هدف مشترك، بينما يواءم هذا المحيط النغمة مع مستوى الاستماع؛ ويمكن تشغيلهما معًا. معطَّل أثناء Bit-Perfect.';
+  String get featureInfoLoudnessContourDescription =>
+      'تقريب الجهارة المتساوية: مع انخفاض مستوى التشغيل، يُطبَّق رفع ناعم low-shelf (~100 Hz) ورفع أصغر high-shelf (~8 kHz) يتلاشيان عند المستوى الأقصى. يعمل في نطاق الكسب لكنه مكمّل لـ ReplayGain — فـ ReplayGain يسوّي المقاطع إلى هدف مشترك، بينما يواءم هذا المحيط النغمة مع مستوى الاستماع؛ ويمكن تشغيلهما معًا. معطَّل أثناء Bit-Perfect.';
 
   @override
-  String get featureInfoSubCrossoverTitle => 'تقاطع مكبر الصوت الفرعي (إعادة توجيه الجهير)';
+  String get featureInfoSubCrossoverTitle =>
+      'تقاطع مكبر الصوت الفرعي (إعادة توجيه الجهير)';
 
   @override
-  String get featureInfoSubCrossoverSubtitle => 'Linkwitz-Riley من 60–150 Hz، جهير أحادي + تحديد مانع للفرقعات';
+  String get featureInfoSubCrossoverSubtitle =>
+      'Linkwitz-Riley من 60–150 Hz، جهير أحادي + تحديد مانع للفرقعات';
 
   @override
-  String get featureInfoSubCrossoverDescription => 'إعادة توجيه الجهير لأنظمة الستيريو: يُمزج مجموع أحادي تمرير منخفض Linkwitz-Riley من الرتبة الرابعة في كلتا القناتين. يتميز بطرح القناة الجانبية للجهير الأحادي لإبقاء الجهير العميق قويًا ومتمركزًا أحاديًا، مع تحديد ناعم tanh مضاد للفرقعات لإزالة النقرات. معطَّل أثناء Bit-Perfect.';
+  String get featureInfoSubCrossoverDescription =>
+      'إعادة توجيه الجهير لأنظمة الستيريو: يُمزج مجموع أحادي تمرير منخفض Linkwitz-Riley من الرتبة الرابعة في كلتا القناتين. يتميز بطرح القناة الجانبية للجهير الأحادي لإبقاء الجهير العميق قويًا ومتمركزًا أحاديًا، مع تحديد ناعم tanh مضاد للفرقعات لإزالة النقرات. معطَّل أثناء Bit-Perfect.';
 
   @override
   String get featureInfoDynamicEqTitle => 'EQ ديناميكي (خفض ورفع)';
 
   @override
-  String get featureInfoDynamicEqSubtitle => 'مرشحات ديناميكية متعددة الأوضاع (Peaking، Low-Shelf، High-Shelf)';
+  String get featureInfoDynamicEqSubtitle =>
+      'مرشحات ديناميكية متعددة الأوضاع (Peaking، Low-Shelf، High-Shelf)';
 
   @override
-  String get featureInfoDynamicEqDescription => 'معادلة ديناميكية لكل نطاق تدعم وضعي الخفض (ترويض الرنين) والرفع (توسيع العابر). قابلة للاختيار بين استجابات ديناميكية Peaking biquad وLow-Shelf وHigh-Shelf مع كشف ناعم للركبة. معطَّل أثناء Bit-Perfect.';
+  String get featureInfoDynamicEqDescription =>
+      'معادلة ديناميكية لكل نطاق تدعم وضعي الخفض (ترويض الرنين) والرفع (توسيع العابر). قابلة للاختيار بين استجابات ديناميكية Peaking biquad وLow-Shelf وHigh-Shelf مع كشف ناعم للركبة. معطَّل أثناء Bit-Perfect.';
 
   @override
-  String get featureInfoMultibandCompressorTitle => 'ضاغط متعدد النطاقات أصلي رباعي النطاقات';
+  String get featureInfoMultibandCompressorTitle =>
+      'ضاغط متعدد النطاقات أصلي رباعي النطاقات';
 
   @override
-  String get featureInfoMultibandCompressorSubtitle => 'تقاطعات Linkwitz-Riley من الرتبة الرابعة متوافقة الطور، C++ بلا زمن استجابة';
+  String get featureInfoMultibandCompressorSubtitle =>
+      'تقاطعات Linkwitz-Riley من الرتبة الرابعة متوافقة الطور، C++ بلا زمن استجابة';
 
   @override
-  String get featureInfoMultibandCompressorDescription => 'ضاغط ماسترينج استوديو احترافي رباعي النطاقات مدمج مباشرة في محرك DSP الأصلي بلغة C++. يستخدم تقاطعات Linkwitz-Riley من الرتبة الرابعة (LR4) لجمع مقدار مسطح بدقة مع صفر تشويه طور. يتميز بعتبة ونسبة وهجوم وإطلاق وركبة ناعمة وكسب تعويضي مستقلة لكل نطاق. يستبدل مسارات ضاغط HAL الهشة. معطَّل أثناء Bit-Perfect.';
+  String get featureInfoMultibandCompressorDescription =>
+      'ضاغط ماسترينج استوديو احترافي رباعي النطاقات مدمج مباشرة في محرك DSP الأصلي بلغة C++. يستخدم تقاطعات Linkwitz-Riley من الرتبة الرابعة (LR4) لجمع مقدار مسطح بدقة مع صفر تشويه طور. يتميز بعتبة ونسبة وهجوم وإطلاق وركبة ناعمة وكسب تعويضي مستقلة لكل نطاق. يستبدل مسارات ضاغط HAL الهشة. معطَّل أثناء Bit-Perfect.';
 
   @override
-  String get featureInfoDynamicBassTitle => 'الجهير الديناميكي (Dynamic System)';
+  String get featureInfoDynamicBassTitle =>
+      'الجهير الديناميكي (Dynamic System)';
 
   @override
-  String get featureInfoDynamicBassSubtitle => 'دفعة جهير عميق متكيفة مع الغلاف وتوطين للسماعات';
+  String get featureInfoDynamicBassSubtitle =>
+      'دفعة جهير عميق متكيفة مع الغلاف وتوطين للسماعات';
 
   @override
-  String get featureInfoDynamicBassDescription => 'مستوحى من Dynamic System الشهير في ViPER4Android. يستعيد الثقل المادي والدفعة الملموسة للسماعات عبر توسيع مقاطع الجهير الهادئة ديناميكيًا وتشبع ناعم للقمم العالية. يتميز باستخلاص Mid-Side للجهير العميق، وتركيب توافقي نفسي-صوتي، و9 إعدادات معايرة كلاسيكية لأجهزة السماعات. معطَّل أثناء Bit-Perfect.';
+  String get featureInfoDynamicBassDescription =>
+      'مستوحى من Dynamic System الشهير في ViPER4Android. يستعيد الثقل المادي والدفعة الملموسة للسماعات عبر توسيع مقاطع الجهير الهادئة ديناميكيًا وتشبع ناعم للقمم العالية. يتميز باستخلاص Mid-Side للجهير العميق، وتركيب توافقي نفسي-صوتي، و9 إعدادات معايرة كلاسيكية لأجهزة السماعات. معطَّل أثناء Bit-Perfect.';
 
   @override
-  String get featureInfoViperDdcTitle => 'ViPER-DDC (التصحيح الديناميكي الرقمي)';
+  String get featureInfoViperDdcTitle =>
+      'ViPER-DDC (التصحيح الديناميكي الرقمي)';
 
   @override
   String get featureInfoViperDdcSubtitle => 'طابع سماعة العتاد وخطية التردد';
 
   @override
-  String get featureInfoViperDdcDescription => 'يحمّل ملفات تصحيح ViPER-DDC (.vdc) الأصلية. ينفّذ ترشيح ستيريو Direct Form II لأقسام من الرتبة الثانية (SOS) عالية الرتبة مع تكييف معدل العينات في الوقت الحقيقي (44.1 kHz / 48 kHz). يحيّد بدقة رنين كل سماعة على حدة. معطَّل أثناء Bit-Perfect.';
+  String get featureInfoViperDdcDescription =>
+      'يحمّل ملفات تصحيح ViPER-DDC (.vdc) الأصلية. ينفّذ ترشيح ستيريو Direct Form II لأقسام من الرتبة الثانية (SOS) عالية الرتبة مع تكييف معدل العينات في الوقت الحقيقي (44.1 kHz / 48 kHz). يحيّد بدقة رنين كل سماعة على حدة. معطَّل أثناء Bit-Perfect.';
 
   @override
   String get featureInfoArbitraryEqTitle => 'EQ استجابة تعسفية (GraphicEq)';
 
   @override
-  String get featureInfoArbitraryEqSubtitle => 'محلل منحنى GraphicEq من EqualizerAPO ومرشح FIR بـ512 صنبورًا';
+  String get featureInfoArbitraryEqSubtitle =>
+      'محلل منحنى GraphicEq من EqualizerAPO ومرشح FIR بـ512 صنبورًا';
 
   @override
-  String get featureInfoArbitraryEqDescription => 'يحلل مواصفات المنحنى القياسية من EqualizerAPO \"GraphicEq: <freq> <gain>; ...\". يحسب استجابة التردد المستوفاة لوغاريتميًا ويصنع استجابة نبضية FIR مُنوَّفة بـ512 صنبورًا للمطابقة الصوتية الدقيقة. طور أدنى افتراضيًا (بلا تأخير إضافي)؛ فعّل FIR خطي الطور لتأخير مجموعة ثابت وطور دقيق بتكلفة رنين مسبق. معطَّل أثناء Bit-Perfect.';
+  String get featureInfoArbitraryEqDescription =>
+      'يحلل مواصفات المنحنى القياسية من EqualizerAPO \"GraphicEq: <freq> <gain>; ...\". يحسب استجابة التردد المستوفاة لوغاريتميًا ويصنع استجابة نبضية FIR مُنوَّفة بـ512 صنبورًا للمطابقة الصوتية الدقيقة. طور أدنى افتراضيًا (بلا تأخير إضافي)؛ فعّل FIR خطي الطور لتأخير مجموعة ثابت وطور دقيق بتكلفة رنين مسبق. معطَّل أثناء Bit-Perfect.';
 
   @override
   String get featureInfoLiveProgTitle => 'DSP قابل للبرمجة مباشرة (برمجة EEL)';
 
   @override
-  String get featureInfoLiveProgSubtitle => 'آلة بايت كود DSP صوتية مخصصة في الوقت الحقيقي';
+  String get featureInfoLiveProgSubtitle =>
+      'آلة بايت كود DSP صوتية مخصصة في الوقت الحقيقي';
 
   @override
-  String get featureInfoLiveProgDescription => 'اكتب خوارزميات DSP صوتية مخصصة بصياغة برمجة Jesusonic / EEL مباشرة على هاتفك. يُترجم الكود مباشرة إلى بايت كود آمن بلا زمن استجابة يُنفَّذ لكل عينة داخل خيط الصوت الأصلي عالي الأولوية. يدعم @init و@sample والمنزلقات 1..8 ودوال رياضية متسامية شاملة. معطَّل أثناء Bit-Perfect.';
+  String get featureInfoLiveProgDescription =>
+      'اكتب خوارزميات DSP صوتية مخصصة بصياغة برمجة Jesusonic / EEL مباشرة على هاتفك. يُترجم الكود مباشرة إلى بايت كود آمن بلا زمن استجابة يُنفَّذ لكل عينة داخل خيط الصوت الأصلي عالي الأولوية. يدعم @init و@sample والمنزلقات 1..8 ودوال رياضية متسامية شاملة. معطَّل أثناء Bit-Perfect.';
 
   @override
   String get conflictWithAllDspBypassDsp => 'كل DSP عند تفعيل \"تجاوز DSP\"';
@@ -7956,7 +8358,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get conflictWithBitPerfect => 'تجاوز Bit-Perfect';
 
   @override
-  String get conflictWithEqReplayGainEffectsCrossfade => 'EQ / ReplayGain / التأثيرات / Crossfade';
+  String get conflictWithEqReplayGainEffectsCrossfade =>
+      'EQ / ReplayGain / التأثيرات / Crossfade';
 
   @override
   String get conflictWithCrossfade => 'Crossfade (>0 s)';
@@ -7971,61 +8374,79 @@ class AppLocalizationsAr extends AppLocalizations {
   String get conflictWithVirtualizer => 'تجاوز Bit-Perfect، Spatializer عتادي';
 
   @override
-  String get conflictAaudioDirect => 'معطَّل: AAudio Direct مفعّل — يتجاوز سلسلة DSP في ExoPlayer (EQ، السرعة/النغمة، تخطي الصمت، Crossfade). أوقفه لإعادة تفعيل DSP.';
+  String get conflictAaudioDirect =>
+      'معطَّل: AAudio Direct مفعّل — يتجاوز سلسلة DSP في ExoPlayer (EQ، السرعة/النغمة، تخطي الصمت، Crossfade). أوقفه لإعادة تفعيل DSP.';
 
   @override
-  String get conflictDsdDop => 'معطَّل: يجري تشغيل DSD over PCM (DoP) — أي DSP أو كسب سيفسد حامل DoP. بدّل إخراج DSD إلى PCM لإعادة تفعيل DSP.';
+  String get conflictDsdDop =>
+      'معطَّل: يجري تشغيل DSD over PCM (DoP) — أي DSP أو كسب سيفسد حامل DoP. بدّل إخراج DSD إلى PCM لإعادة تفعيل DSP.';
 
   @override
-  String get conflictDspBitPerfectBypass => 'معطَّل: تجاوز Bit-Perfect مفعّل — سيغيّر هذا DSP التيار البتاتي الحصري. أوقف Bit-Perfect أو \"تجاوز DSP\" لتمكينه.';
+  String get conflictDspBitPerfectBypass =>
+      'معطَّل: تجاوز Bit-Perfect مفعّل — سيغيّر هذا DSP التيار البتاتي الحصري. أوقف Bit-Perfect أو \"تجاوز DSP\" لتمكينه.';
 
   @override
-  String get conflictBtBitPerfectUnsupported => 'لا يمكن التفعيل: البلوتوث يحوّل الترميز (SBC/AAC/LDAC/LC3) — Bit-Perfect فقط على DAC USB.';
+  String get conflictBtBitPerfectUnsupported =>
+      'لا يمكن التفعيل: البلوتوث يحوّل الترميز (SBC/AAC/LDAC/LC3) — Bit-Perfect فقط على DAC USB.';
 
   @override
-  String get conflictRequiresAndroid14 => 'يتطلب أندرويد 14+ لإخراج Bit-Perfect عبر USB.';
+  String get conflictRequiresAndroid14 =>
+      'يتطلب أندرويد 14+ لإخراج Bit-Perfect عبر USB.';
 
   @override
-  String get conflictExclusiveRequiresUsbDac => 'لا يمكن التفعيل: لا يكشف أندرويد الإخراج الحصري إلا لأجهزة DAC USB. تظل الدقة العالية السلكية تُشغَّل مباشرة عندما يدعمها الجهاز.';
+  String get conflictExclusiveRequiresUsbDac =>
+      'لا يمكن التفعيل: لا يكشف أندرويد الإخراج الحصري إلا لأجهزة DAC USB. تظل الدقة العالية السلكية تُشغَّل مباشرة عندما يدعمها الجهاز.';
 
   @override
-  String get conflictNoMixerAttributes => 'لا يعلن DAC USB هذا عن تهيئة خلاط حصرية.';
+  String get conflictNoMixerAttributes =>
+      'لا يعلن DAC USB هذا عن تهيئة خلاط حصرية.';
 
   @override
-  String get conflictUsbNotSupported => 'لا يدعم Android الإخراج الحصري بالبت المثالي لمحول USB DAC هذا.';
+  String get conflictUsbNotSupported =>
+      'لا يدعم Android الإخراج الحصري بالبت المثالي لمحول USB DAC هذا.';
 
   @override
-  String get conflictTargetFormatUnavailable => 'لا يوفر محول USB DAC هذا معدل العينات / عمق البت المحدد في الوضع الحصري.';
+  String get conflictTargetFormatUnavailable =>
+      'لا يوفر محول USB DAC هذا معدل العينات / عمق البت المحدد في الوضع الحصري.';
 
   @override
-  String get conflictSetMixerAttributesFailed => 'رفض Android الوضع الحصري لمحول USB DAC هذا (قد يستخدمه تطبيق آخر).';
+  String get conflictSetMixerAttributesFailed =>
+      'رفض Android الوضع الحصري لمحول USB DAC هذا (قد يستخدمه تطبيق آخر).';
 
   @override
-  String get conflictExclusiveApiUnavailable => 'واجهة برمجة تطبيقات الإخراج الحصري غير متوفرة على هذا الجهاز.';
+  String get conflictExclusiveApiUnavailable =>
+      'واجهة برمجة تطبيقات الإخراج الحصري غير متوفرة على هذا الجهاز.';
 
   @override
-  String get strictBitPerfectUnsupportedDevice => 'البت المثالي الصارم غير مدعوم من جهاز الإخراج الحالي.';
+  String get strictBitPerfectUnsupportedDevice =>
+      'البت المثالي الصارم غير مدعوم من جهاز الإخراج الحالي.';
 
   @override
   String get directUsbStreamStopFailed => 'تعذر إيقاف تدفق USB السابق.';
 
   @override
-  String get directUsbStreamStopFailedRetry => 'تعذر إيقاف تدفق USB السابق. أعد محاولة تعطيل البت المثالي.';
+  String get directUsbStreamStopFailedRetry =>
+      'تعذر إيقاف تدفق USB السابق. أعد محاولة تعطيل البت المثالي.';
 
   @override
-  String get dspBypassUpdateFailed => 'فشل تحديث تجاوز معالجة الإشارة الرقمية الأصلية.';
+  String get dspBypassUpdateFailed =>
+      'فشل تحديث تجاوز معالجة الإشارة الرقمية الأصلية.';
 
   @override
-  String get directUsbSinkSwitchOwnershipFailed => 'تعذر إيقاف تدفق USB المباشر؛ لم يتم تبديل الإخراج ولا يزال البت المثالي يمتلك إخراج DAC السابق.';
+  String get directUsbSinkSwitchOwnershipFailed =>
+      'تعذر إيقاف تدفق USB المباشر؛ لم يتم تبديل الإخراج ولا يزال البت المثالي يمتلك إخراج DAC السابق.';
 
   @override
-  String get outputCannotApplySampleRate => 'لا يمكن لهذا الإخراج تطبيق معدل العينات المطلوب.';
+  String get outputCannotApplySampleRate =>
+      'لا يمكن لهذا الإخراج تطبيق معدل العينات المطلوب.';
 
   @override
-  String get outputCannotApplyBitDepth => 'لا يمكن لهذا الإخراج تطبيق عمق البت المطلوب.';
+  String get outputCannotApplyBitDepth =>
+      'لا يمكن لهذا الإخراج تطبيق عمق البت المطلوب.';
 
   @override
-  String get cannotOpenBluetoothCodecSettings => 'تعذر فتح إعدادات برنامج ترميز البلوتوث.';
+  String get cannotOpenBluetoothCodecSettings =>
+      'تعذر فتح إعدادات برنامج ترميز البلوتوث.';
 
   @override
   String directUsbSuspendedArmed(String message) {
@@ -8038,7 +8459,8 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get dspBypassOrCrossfadeDisableFailed => 'فشل تفعيل تجاوز معالجة الإشارة الرقمية أو تعطيل Crossfade.';
+  String get dspBypassOrCrossfadeDisableFailed =>
+      'فشل تفعيل تجاوز معالجة الإشارة الرقمية أو تعطيل Crossfade.';
 
   @override
   String conflictGaplessNeedsZeroCrossfade(String crossfadeSeconds) {
@@ -8046,42 +8468,54 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get conflictCrossfadeNeedsGaplessOff => 'معطَّل: التشغيل دون فواصل مفعّل — يحتاج Crossfade إلى إيقافه. عطّل التشغيل دون فواصل لتمكين Crossfade.';
+  String get conflictCrossfadeNeedsGaplessOff =>
+      'معطَّل: التشغيل دون فواصل مفعّل — يحتاج Crossfade إلى إيقافه. عطّل التشغيل دون فواصل لتمكين Crossfade.';
 
   @override
-  String get conflictStrictBitPerfectActive => 'Bit-Perfect الصارم مفعّل: EQ وReplayGain وVirtualizer/Dynamics وCrossfade مكتومة كي تصل عينات المصدر الدقيقة إلى DAC. أوقف Bit-Perfect الصارم لإعادة تفعيلها.';
+  String get conflictStrictBitPerfectActive =>
+      'Bit-Perfect الصارم مفعّل: EQ وReplayGain وVirtualizer/Dynamics وCrossfade مكتومة كي تصل عينات المصدر الدقيقة إلى DAC. أوقف Bit-Perfect الصارم لإعادة تفعيلها.';
 
   @override
-  String get conflictCrossfadeBitPerfectBypass => 'معطَّل: تجاوز Bit-Perfect مفعّل — يتداخل Crossfade بين مقطعين وسيغيّر تيار البتات. أوقف Bit-Perfect (أو تجاوز DSP الخاص به) لاستخدام Crossfade.';
+  String get conflictCrossfadeBitPerfectBypass =>
+      'معطَّل: تجاوز Bit-Perfect مفعّل — يتداخل Crossfade بين مقطعين وسيغيّر تيار البتات. أوقف Bit-Perfect (أو تجاوز DSP الخاص به) لاستخدام Crossfade.';
 
   @override
-  String get conflictSpeedBitPerfectBypass => 'معطَّل: تجاوز Bit-Perfect مفعّل — تغيير السرعة أو النغمة يعيد أخذ العينات ويُغيّر تدفق البتات الحصري. أعد السرعة إلى 1.0× أو أوقف Bit-Perfect.';
+  String get conflictSpeedBitPerfectBypass =>
+      'معطَّل: تجاوز Bit-Perfect مفعّل — تغيير السرعة أو النغمة يعيد أخذ العينات ويُغيّر تدفق البتات الحصري. أعد السرعة إلى 1.0× أو أوقف Bit-Perfect.';
 
   @override
-  String get conflictSilenceSkipBitPerfectBypass => 'معطَّل: تجاوز Bit-Perfect مفعّل — تخطي الصمت يعدّل تدفق العينات. أوقف Bit-Perfect (أو تجاوز DSP) لاستخدامه.';
+  String get conflictSilenceSkipBitPerfectBypass =>
+      'معطَّل: تجاوز Bit-Perfect مفعّل — تخطي الصمت يعدّل تدفق العينات. أوقف Bit-Perfect (أو تجاوز DSP) لاستخدامه.';
 
   @override
-  String get conflictNoDeviceDetected => 'لا يمكن التفعيل: لم يُكتشف أي جهاز إخراج بعد. وصّل DAC USB وأعد المحاولة.';
+  String get conflictNoDeviceDetected =>
+      'لا يمكن التفعيل: لم يُكتشف أي جهاز إخراج بعد. وصّل DAC USB وأعد المحاولة.';
 
   @override
-  String get conflictNoExclusiveMixer => 'لا يمكن التفعيل: مسار الإخراج هذا لا يكشف سمات خلاط Bit-Perfect حصرية.';
+  String get conflictNoExclusiveMixer =>
+      'لا يمكن التفعيل: مسار الإخراج هذا لا يكشف سمات خلاط Bit-Perfect حصرية.';
 
   @override
-  String get conflictAaudioDirectCrossfade => 'معطَّل: AAudio Direct مفعّل — يُطبَّق Crossfade في سلسلة DSP في ExoPlayer التي يتجاوزها. أوقف AAudio Direct لاستخدام Crossfade.';
+  String get conflictAaudioDirectCrossfade =>
+      'معطَّل: AAudio Direct مفعّل — يُطبَّق Crossfade في سلسلة DSP في ExoPlayer التي يتجاوزها. أوقف AAudio Direct لاستخدام Crossfade.';
 
   @override
-  String get conflictOemDoubleProcessing => 'تحذير: Dolby/Dirac في النظام نشط — تشغيل DSP الخاص بـ Pulsr فوقه يسبب معالجة مزدوجة. يُفضَّل تفضيل DSP = أصلي وتعطيل تأثيرات النظام.';
+  String get conflictOemDoubleProcessing =>
+      'تحذير: Dolby/Dirac في النظام نشط — تشغيل DSP الخاص بـ Pulsr فوقه يسبب معالجة مزدوجة. يُفضَّل تفضيل DSP = أصلي وتعطيل تأثيرات النظام.';
 
   @override
-  String conflictVolumeBoostClipping(String preampDb, String boostDb, String totalDb) {
+  String conflictVolumeBoostClipping(
+      String preampDb, String boostDb, String totalDb) {
     return 'خطر القص: مضخم EQ المسبق ($preampDb dB) + التعزيز (+$boostDb dB) = +$totalDb dB، فوق مقياس 0 dBFS الكامل.';
   }
 
   @override
-  String get conflictHighBoostDistortion => 'قد يسبب التعزيز العالي تشوهًا أو إجهادًا سمعيًا.';
+  String get conflictHighBoostDistortion =>
+      'قد يسبب التعزيز العالي تشوهًا أو إجهادًا سمعيًا.';
 
   @override
-  String get swipeToPlayNextFavoriteHint => 'اسحب للتشغيل التالي أو الإضافة إلى المفضلة';
+  String get swipeToPlayNextFavoriteHint =>
+      'اسحب للتشغيل التالي أو الإضافة إلى المفضلة';
 
   @override
   String removeSelectedDownloadsConfirm(int count) {
@@ -8112,10 +8546,12 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get bitPerfectConflictTitle => 'تعطيل هذه الميزات لاستخدام Bit-Perfect؟';
+  String get bitPerfectConflictTitle =>
+      'تعطيل هذه الميزات لاستخدام Bit-Perfect؟';
 
   @override
-  String get bitPerfectConflictBody => 'يرسل Bit-Perfect الصوت الأصلي دون تعديل إلى DAC عبر USB. هذه الميزات تغيّر الصوت وهي غير متوافقة:';
+  String get bitPerfectConflictBody =>
+      'يرسل Bit-Perfect الصوت الأصلي دون تعديل إلى DAC عبر USB. هذه الميزات تغيّر الصوت وهي غير متوافقة:';
 
   @override
   String get bitPerfectDisableAndEnable => 'تعطيل وتفعيل';
@@ -8136,13 +8572,15 @@ class AppLocalizationsAr extends AppLocalizations {
   String get settingsAdvancedAudioTitle => 'متقدم';
 
   @override
-  String get settingsAdvancedAudioDesc => 'حجم الذاكرة الوسيطة ومسار التعويم والتفاوض';
+  String get settingsAdvancedAudioDesc =>
+      'حجم الذاكرة الوسيطة ومسار التعويم والتفاوض';
 
   @override
   String get settingsAccessibilityAndComfort => 'إمكانية الوصول والراحة';
 
   @override
-  String get settingsAccessibilityAndComfortSubtitle => 'التباين، الحركة، الراحة البصرية وتأثيرات الصوت';
+  String get settingsAccessibilityAndComfortSubtitle =>
+      'التباين، الحركة، الراحة البصرية وتأثيرات الصوت';
 
   @override
   String get settingsWizardTitle => 'معالج إعداد الصوت';
@@ -8169,13 +8607,15 @@ class AppLocalizationsAr extends AppLocalizations {
   String get settingsWizardFidelity => 'أقصى دقة';
 
   @override
-  String get settingsWizardFidelityDesc => 'بث مباشر Bit-Perfect مع تجاوز كافة معالجات DSP';
+  String get settingsWizardFidelityDesc =>
+      'بث مباشر Bit-Perfect مع تجاوز كافة معالجات DSP';
 
   @override
   String get settingsWizardBalanced => 'متوازن';
 
   @override
-  String get settingsWizardBalancedDesc => 'تشغيل سلس وتسوية مستوى الصوت ومُعادل غني';
+  String get settingsWizardBalancedDesc =>
+      'تشغيل سلس وتسوية مستوى الصوت ومُعادل غني';
 
   @override
   String get settingsWizardDataSaver => 'توفير البيانات';
@@ -8187,16 +8627,20 @@ class AppLocalizationsAr extends AppLocalizations {
   String get settingsWizardApply => 'تطبيق الإعداد';
 
   @override
-  String get dockStyleDefaultBestFor => 'الأفضل للتصفح المتوازن بيد واحدة مع التحكم الكامل';
+  String get dockStyleDefaultBestFor =>
+      'الأفضل للتصفح المتوازن بيد واحدة مع التحكم الكامل';
 
   @override
-  String get dockStyleSystemBestFor => 'الأفضل للشاشات المدمجة وأقصى مساحة للمحتوى';
+  String get dockStyleSystemBestFor =>
+      'الأفضل للشاشات المدمجة وأقصى مساحة للمحتوى';
 
   @override
-  String get dockStyleMiniTopBestFor => 'الأفضل للاستماع النشط والوصول السريع إلى المشغل';
+  String get dockStyleMiniTopBestFor =>
+      'الأفضل للاستماع النشط والوصول السريع إلى المشغل';
 
   @override
-  String get dockStyleNavTopBestFor => 'الأفضل للاستكشاف العميق للمكتبة وقوائم التشغيل';
+  String get dockStyleNavTopBestFor =>
+      'الأفضل للاستكشاف العميق للمكتبة وقوائم التشغيل';
 
   @override
   String get dockStylePreviewBadge => 'معاينة مباشرة';
@@ -8208,7 +8652,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get shortcutHelpTitle => 'اختصارات لوحة المفاتيح';
 
   @override
-  String get shortcutHelpSubtitle => 'مفاتيح التنقل السريع لسطح المكتب والأجهزة اللوحية';
+  String get shortcutHelpSubtitle =>
+      'مفاتيح التنقل السريع لسطح المكتب والأجهزة اللوحية';
 
   @override
   String get shortcutPlayPause => 'تشغيل / إيقاف مؤقت';
@@ -8244,13 +8689,15 @@ class AppLocalizationsAr extends AppLocalizations {
   String get shortcutNext => 'المقطع التالي';
 
   @override
-  String get shortcutNextDesc => 'الانتقال إلى الأغنية التالية في قائمة الانتظار';
+  String get shortcutNextDesc =>
+      'الانتقال إلى الأغنية التالية في قائمة الانتظار';
 
   @override
   String get shortcutPrevious => 'المقطع السابق';
 
   @override
-  String get shortcutPreviousDesc => 'إعادة تشغيل المقطع أو الرجوع للأغنية السابقة';
+  String get shortcutPreviousDesc =>
+      'إعادة تشغيل المقطع أو الرجوع للأغنية السابقة';
 
   @override
   String get shortcutMute => 'كتم الصوت';
@@ -8309,7 +8756,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get unifiedFavoritesHeader => 'مجموعة المفضلة';
 
   @override
-  String get unifiedFavoritesHeaderSubtitle => 'جميع مقاطعك المفضلة والمميزة في مكان واحد';
+  String get unifiedFavoritesHeaderSubtitle =>
+      'جميع مقاطعك المفضلة والمميزة في مكان واحد';
 
   @override
   String get unifiedFavoritesViewAll => 'فتح المفضلة بالكامل';
@@ -8318,13 +8766,16 @@ class AppLocalizationsAr extends AppLocalizations {
   String get folderPersistentExcludedBadge => 'مستبعد من الفحص';
 
   @override
-  String get audioQualityCapabilityProbe => 'فحص القدرات فقط؛ لا يُقاس تنسيق مخرج العتاد.';
+  String get audioQualityCapabilityProbe =>
+      'فحص القدرات فقط؛ لا يُقاس تنسيق مخرج العتاد.';
 
   @override
-  String get audioQualityOutputSwitchUnavailable => 'تبديل المخرج غير متاح لمحرك التشغيل هذا.';
+  String get audioQualityOutputSwitchUnavailable =>
+      'تبديل المخرج غير متاح لمحرك التشغيل هذا.';
 
   @override
-  String get audioQualityFormatFollowsEngine => 'يتبع التنسيق محرك التشغيل. التحويل اليدوي غير متاح.';
+  String get audioQualityFormatFollowsEngine =>
+      'يتبع التنسيق محرك التشغيل. التحويل اليدوي غير متاح.';
 
   @override
   String get upNext => 'التالي';
@@ -8345,7 +8796,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get bootStartupFailed => 'تعذّر إكمال تشغيل Pulsr';
 
   @override
-  String get bootStartupFailedMessage => 'لم تصبح مكوّنات التشغيل جاهزة في الوقت المحدد. إعادة المحاولة تحلّ عادةً مشكلة بدء التشغيل البطيء.';
+  String get bootStartupFailedMessage =>
+      'لم تصبح مكوّنات التشغيل جاهزة في الوقت المحدد. إعادة المحاولة تحلّ عادةً مشكلة بدء التشغيل البطيء.';
 
   @override
   String get dspResyncAction => 'إعادة مزامنة DSP';
@@ -8389,7 +8841,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get quranNoMetadataTitle => 'لا تتوفر بيانات وصفية للقرآن';
 
   @override
-  String get quranNoMetadataDesc => 'هذا المسار لا يحتوي على بيانات قرآنية معتمدة (سورة/آية). تتبع الآيات والعلامات معزول تماماً عن الموسيقى العادية.';
+  String get quranNoMetadataDesc =>
+      'هذا المسار لا يحتوي على بيانات قرآنية معتمدة (سورة/آية). تتبع الآيات والعلامات معزول تماماً عن الموسيقى العادية.';
 
   @override
   String quranBookmarkSaved(String surah, int ayah) {
@@ -8487,7 +8940,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get queueReordered => 'تمت إعادة ترتيب قائمة الانتظار';
 
   @override
-  String downloadsProgressSummary(Object active, Object completed, Object total) {
+  String downloadsProgressSummary(
+      Object active, Object completed, Object total) {
     return 'جارٍ التنزيل $active • اكتمل $completed/$total';
   }
 
@@ -8512,7 +8966,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get partyResetDefault => 'استعادة الافتراضي';
 
   @override
-  String get partySyncDescription => 'زامن الموسيقى عبر عدة أجهزة في الوقت الفعلي.';
+  String get partySyncDescription =>
+      'زامن الموسيقى عبر عدة أجهزة في الوقت الفعلي.';
 
   @override
   String get partyDisplayNameHint => 'اسم العرض (اختياري)';
@@ -8558,7 +9013,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get partyLeave => 'مغادرة الجلسة';
 
   @override
-  String get partyUnableReconnect => 'تعذر إعادة الاتصال بالجلسة. تحقق من اتصالك.';
+  String get partyUnableReconnect =>
+      'تعذر إعادة الاتصال بالجلسة. تحقق من اتصالك.';
 
   @override
   String partyShareText(Object link) {
@@ -8574,7 +9030,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get radioDuplicateUrl => 'يوجد بالفعل محطة بهذا الرابط.';
 
   @override
-  String get lyricsTrackChanged => 'تغيّر المقطع المشغّل. أعد فتح محرر الكلمات لهذا المقطع.';
+  String get lyricsTrackChanged =>
+      'تغيّر المقطع المشغّل. أعد فتح محرر الكلمات لهذا المقطع.';
 
   @override
   String get lyricsTranslationUnavailable => 'الترجمة غير متاحة الآن.';
@@ -8613,7 +9070,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get abLoopSetB => 'تعيين نقطة التكرار B';
 
   @override
-  String get playerNoPlayableTracks => 'لا توجد مقاطع قابلة للتشغيل في قائمة الانتظار';
+  String get playerNoPlayableTracks =>
+      'لا توجد مقاطع قابلة للتشغيل في قائمة الانتظار';
 
   @override
   String get discard => 'تجاهل';
@@ -8625,7 +9083,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get reorderFailed => 'تعذر حفظ الترتيب الجديد';
 
   @override
-  String get reorderInstructions => 'اسحب لإعادة الترتيب. حدد المقاطع لنقلها دفعة واحدة.';
+  String get reorderInstructions =>
+      'اسحب لإعادة الترتيب. حدد المقاطع لنقلها دفعة واحدة.';
 
   @override
   String get moveToTop => 'نقل إلى الأعلى';
@@ -8674,7 +9133,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get lyricsShareTitle => 'مشاركة بطاقة الكلمات';
 
   @override
-  String get lyricsShareLimitHint => 'يمكنك اختيار ما يصل إلى 6 أسطر لبطاقة القصة.';
+  String get lyricsShareLimitHint =>
+      'يمكنك اختيار ما يصل إلى 6 أسطر لبطاقة القصة.';
 
   @override
   String lyricsShareSelectionCount(Object count) {
@@ -8765,7 +9225,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get discordRichPresenceTitle => 'الحضور الغني على Discord';
 
   @override
-  String get discordRichPresenceSubtitle => 'اعرض الأغنية قيد التشغيل حاليًا على ملفك الشخصي';
+  String get discordRichPresenceSubtitle =>
+      'اعرض الأغنية قيد التشغيل حاليًا على ملفك الشخصي';
 
   @override
   String get discordRichPresenceStatus => 'حالة الحضور الغني';
@@ -8786,7 +9247,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get discordEnterTokenLabel => 'أدخل رمز Discord';
 
   @override
-  String get discordTokenHelp => 'رمز مستخدم حساب Discord الخاص بك (ترويسة Authorization). يُحفظ محليًا في إعدادات التطبيق.';
+  String get discordTokenHelp =>
+      'رمز مستخدم حساب Discord الخاص بك (ترويسة Authorization). يُحفظ محليًا في إعدادات التطبيق.';
 
   @override
   String get discordTokenHint => 'الصق الرمز هنا...';
@@ -8803,7 +9265,8 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get discordTokenVerifyFailed => 'تعذّر التحقق من الرمز. يرجى مراجعته والمحاولة مرة أخرى.';
+  String get discordTokenVerifyFailed =>
+      'تعذّر التحقق من الرمز. يرجى مراجعته والمحاولة مرة أخرى.';
 
   @override
   String get updateAvailableTitle => 'يتوفر تحديث';
@@ -8834,10 +9297,12 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get pureIntegrityCheckFailed => 'فشل فحص سلامة إصدار Pulsr Pure: هذا البناء يستطيع الوصول إلى الشبكة.';
+  String get pureIntegrityCheckFailed =>
+      'فشل فحص سلامة إصدار Pulsr Pure: هذا البناء يستطيع الوصول إلى الشبكة.';
 
   @override
-  String get backgroundMediaControlsUnavailable => 'أدوات التحكم في الوسائط في الخلفية غير متاحة في هذا التشغيل. تعمل الوسائط، لكن تعذّر بدء أزرار شاشة القفل.';
+  String get backgroundMediaControlsUnavailable =>
+      'أدوات التحكم في الوسائط في الخلفية غير متاحة في هذا التشغيل. تعمل الوسائط، لكن تعذّر بدء أزرار شاشة القفل.';
 
   @override
   String get discordTokenEmpty => 'لا يمكن أن يكون الرمز فارغًا';
@@ -8846,16 +9311,19 @@ class AppLocalizationsAr extends AppLocalizations {
   String get radioCardsTitle => 'بطاقات الراديو';
 
   @override
-  String get radioCardsRestoreHint => 'يمكنك إظهارها مجددًا في أي وقت من صفحة الراديو';
+  String get radioCardsRestoreHint =>
+      'يمكنك إظهارها مجددًا في أي وقت من صفحة الراديو';
 
   @override
   String get hideRadioCardsFromHome => 'إخفاء بطاقات الراديو من الرئيسية';
 
   @override
-  String get hideRadioCardsSubtitle => 'إخفاء شريط راديو القرآن من الصفحة الرئيسية';
+  String get hideRadioCardsSubtitle =>
+      'إخفاء شريط راديو القرآن من الصفحة الرئيسية';
 
   @override
-  String get radioCardsHiddenToast => 'تم إخفاء بطاقات الراديو. يمكنك إظهارها من صفحة الراديو.';
+  String get radioCardsHiddenToast =>
+      'تم إخفاء بطاقات الراديو. يمكنك إظهارها من صفحة الراديو.';
 
   @override
   String get radioCardsVisibleOnHome => 'بطاقات الراديو ظاهرة في الرئيسية';
@@ -8885,10 +9353,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get radioCardsHiddenFromHome => 'بطاقات الراديو مخفية من الرئيسية';
 
   @override
-  String get tapToRestoreRadioCards => 'انقر هنا لإعادة إظهارها في الشاشة الرئيسية';
+  String get tapToRestoreRadioCards =>
+      'انقر هنا لإعادة إظهارها في الشاشة الرئيسية';
 
   @override
-  String get radioCardsRestoredToast => 'تمت استعادة بطاقات الراديو في الشاشة الرئيسية';
+  String get radioCardsRestoredToast =>
+      'تمت استعادة بطاقات الراديو في الشاشة الرئيسية';
 
   @override
   String get pinRadioCardToFirst => 'تثبيت في المقدمة';
@@ -8983,7 +9453,8 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get dupReasonChecksum => 'محتوى صوتي متطابق (تم التحقق بالبصمة الرقمية)';
+  String get dupReasonChecksum =>
+      'محتوى صوتي متطابق (تم التحقق بالبصمة الرقمية)';
 
   @override
   String get ytmBrowseChartsTitle => 'الأفضل ورائجًا';
@@ -9001,7 +9472,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get ytmBrowseMoodsTitle => 'الحالات والأنواع';
 
   @override
-  String get ytmBrowseMoodsSubtitle => 'أغانٍ رائجة من حالات وأنواع YouTube Music';
+  String get ytmBrowseMoodsSubtitle =>
+      'أغانٍ رائجة من حالات وأنواع YouTube Music';
 
   @override
   String get ytmUnknownTitle => 'عنوان غير معروف';
@@ -9022,7 +9494,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get suggestionForgottenFavoritesTitle => 'المفضلة المنسية';
 
   @override
-  String get suggestionForgottenFavoritesDesc => 'أغانٍ مميزة لم تسمعها منذ فترة';
+  String get suggestionForgottenFavoritesDesc =>
+      'أغانٍ مميزة لم تسمعها منذ فترة';
 
   @override
   String get suggestionHiResTitle => 'عرض عالي الدقة لعشاق الصوت';
@@ -9067,13 +9540,15 @@ class AppLocalizationsAr extends AppLocalizations {
   String get wizardBluetoothTitle => 'صوت Bluetooth';
 
   @override
-  String get wizardBluetoothSubtitle => 'سماعات لاسلكية أو سماعات أذن أو صوت السيارة';
+  String get wizardBluetoothSubtitle =>
+      'سماعات لاسلكية أو سماعات أذن أو صوت السيارة';
 
   @override
   String get wizardSpeakerTitle => 'مكبر الصوت / المدمج';
 
   @override
-  String get wizardSpeakerSubtitle => 'مكبرات الهاتف مع تعديل الصوت والعلو من النظام';
+  String get wizardSpeakerSubtitle =>
+      'مكبرات الهاتف مع تعديل الصوت والعلو من النظام';
 
   @override
   String get wizardWiredTitle => 'سماعات سلكية';
@@ -9146,13 +9621,16 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get dspPrefNativeSubtitle => 'معالجة صوتية مخصّصة لحظية بدقة 64-bit مع EQ بارامتري وواحد ومحاكاة صدى تلافيفية وصوت Bit-Perfect.';
+  String get dspPrefNativeSubtitle =>
+      'معالجة صوتية مخصّصة لحظية بدقة 64-bit مع EQ بارامتري وواحد ومحاكاة صدى تلافيفية وصوت Bit-Perfect.';
 
   @override
-  String get dspPrefSystemSubtitle => 'مؤثرات صوتية من الشركة المصنّعة (Dolby Atmos وDirac وXiaomi Sound وغيرها) عبر مؤثرات نظام Android.';
+  String get dspPrefSystemSubtitle =>
+      'مؤثرات صوتية من الشركة المصنّعة (Dolby Atmos وDirac وXiaomi Sound وغيرها) عبر مؤثرات نظام Android.';
 
   @override
-  String get dspPrefAutoSubtitle => 'يستخدم معالجة Native Studio افتراضيًا ويعود إلى AudioFX من النظام عند عدم توفّر المحرك الأصلي.';
+  String get dspPrefAutoSubtitle =>
+      'يستخدم معالجة Native Studio افتراضيًا ويعود إلى AudioFX من النظام عند عدم توفّر المحرك الأصلي.';
 
   @override
   String get badgeRecommended => 'موصى به';
@@ -9188,10 +9666,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get quranAutoDetectRecitations => 'كشف التلاوات تلقائيًا';
 
   @override
-  String get autoPreampActiveClipping => 'المقدمة التلقائية: نشطة (محمي من القطع)';
+  String get autoPreampActiveClipping =>
+      'المقدمة التلقائية: نشطة (محمي من القطع)';
 
   @override
-  String get spotifyImportHelp => 'الصق رابط قائمة تشغيل Spotify العامة أو المعرّف URI لمطابقة أغانٍ منها واستيرادها إلى مكتبة Pulsr.';
+  String get spotifyImportHelp =>
+      'الصق رابط قائمة تشغيل Spotify العامة أو المعرّف URI لمطابقة أغانٍ منها واستيرادها إلى مكتبة Pulsr.';
 
   @override
   String get spotifyImporting => 'جارٍ استيراد قائمة التشغيل...';
@@ -9214,7 +9694,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get speedPickerAutomixTitle => 'المزج التلقائي / انتقالات ذكية';
 
   @override
-  String get speedPickerAutomixDesc => 'موازنة الإيقاع ومحاذاة شبكة النقاط وتبديل الجهير';
+  String get speedPickerAutomixDesc =>
+      'موازنة الإيقاع ومحاذاة شبكة النقاط وتبديل الجهير';
 
   @override
   String get listenTogetherPartyMode => 'الاستماع معًا (وضع الحفلة)';
@@ -9236,7 +9717,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get smartPlaylistValueLabel => 'القيمة';
 
   @override
-  String get smartPlaylistNameHint => 'مثال: روك الثمانينيات، الأكثر تشغيلًا...';
+  String get smartPlaylistNameHint =>
+      'مثال: روك الثمانينيات، الأكثر تشغيلًا...';
 
   @override
   String get smartPlaylistTitleHint => 'مثال: بوهيميان، حب...';
@@ -9251,7 +9733,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get containerAverageEstimated => 'متوسط الحاوية (تقديري)';
 
   @override
-  String get losslessOutputFidelityNote => 'مصدر بلا فقد (جودة الإخراج أمر منفصل)';
+  String get losslessOutputFidelityNote =>
+      'مصدر بلا فقد (جودة الإخراج أمر منفصل)';
 
   @override
   String get ytmQualityHighBitrate => 'مرتفع • 160k';
@@ -9338,13 +9821,15 @@ class AppLocalizationsAr extends AppLocalizations {
   String get errQuranApplyAudioProfile => 'تعذّر تطبيق الملف الصوتي للقرآن';
 
   @override
-  String get errQuranRestoreSettings => 'تعذّر استعادة إعدادات الصوت من وضع القرآن';
+  String get errQuranRestoreSettings =>
+      'تعذّر استعادة إعدادات الصوت من وضع القرآن';
 
   @override
   String get errQuranSaveReciterStyle => 'تعذّر حفظ أسلوب القارئ';
 
   @override
-  String get errQuranResetStyleAdjustments => 'تعذّر إعادة تعيين تعديلات أسلوب التلاوة';
+  String get errQuranResetStyleAdjustments =>
+      'تعذّر إعادة تعيين تعديلات أسلوب التلاوة';
 
   @override
   String get errQuranSetLearningSpeed => 'تعذّر ضبط سرعة التعلم';
@@ -9384,22 +9869,28 @@ class AppLocalizationsAr extends AppLocalizations {
   String get widgetNothingPlaying => 'لا يوجد ما يُشغَّل الآن';
 
   @override
-  String get conflictLiveOrLossyNotBitPerfect => 'لا يمكن تشغيل بث الراديو المباشر والمسارات المضغوطة بدقة Bit-Perfect.';
+  String get conflictLiveOrLossyNotBitPerfect =>
+      'لا يمكن تشغيل بث الراديو المباشر والمسارات المضغوطة بدقة Bit-Perfect.';
 
   @override
-  String get uac1RateReadbackUnsupported => 'قراءة معدل العينات UAC1 غير مدعومة بواسطة هذا الـ DAC؛ يتطلب وضع Strict Bit-Perfect معدلات مؤكدة.';
+  String get uac1RateReadbackUnsupported =>
+      'قراءة معدل العينات UAC1 غير مدعومة بواسطة هذا الـ DAC؛ يتطلب وضع Strict Bit-Perfect معدلات مؤكدة.';
 
   @override
-  String get uac3Unsupported => 'فئة صوت USB 3 (UAC3) غير مدعومة للتشغيل بدقة Bit-Perfect.';
+  String get uac3Unsupported =>
+      'فئة صوت USB 3 (UAC3) غير مدعومة للتشغيل بدقة Bit-Perfect.';
 
   @override
-  String get conflictSource32BitIntegerNotBitPerfect => 'يحتاج الصوت الصحيح 32 بت إلى مرحلة float32 قبل DAC ولا يمكن تشغيله بدقة بتية كاملة.';
+  String get conflictSource32BitIntegerNotBitPerfect =>
+      'يحتاج الصوت الصحيح 32 بت إلى مرحلة float32 قبل DAC ولا يمكن تشغيله بدقة بتية كاملة.';
 
   @override
-  String get conflictSource32BitFloatNotBitPerfect => 'يتطلب الصوت ذو الفاصلة العائمة 32 بت تحويلاً غير متطابق ولا يمكن تشغيله بدقة Bit-Perfect.';
+  String get conflictSource32BitFloatNotBitPerfect =>
+      'يتطلب الصوت ذو الفاصلة العائمة 32 بت تحويلاً غير متطابق ولا يمكن تشغيله بدقة Bit-Perfect.';
 
   @override
-  String get bpDigitalVolumeAttenuation => 'مستوى الصوت الرقمي أقل من 100% — تتطلب الدقة البتية الكاملة وحدة الكسب';
+  String get bpDigitalVolumeAttenuation =>
+      'مستوى الصوت الرقمي أقل من 100% — تتطلب الدقة البتية الكاملة وحدة الكسب';
 
   @override
   String get bpSourceCodecUnconfirmed => 'ترميز المصدر غير مؤكد';
@@ -9413,7 +9904,8 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get directUsbFollowFormatSuspendedNotice => 'تم تعليق USB المباشر: صيغة المسار تتطلب تتبع معدل العينات.';
+  String get directUsbFollowFormatSuspendedNotice =>
+      'تم تعليق USB المباشر: صيغة المسار تتطلب تتبع معدل العينات.';
 
   @override
   String directUsbUnsupportedRateNotice(int sampleRate) {
@@ -9465,7 +9957,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get badgeLossless => 'بدون فقدان';
 
   @override
-  String get badgeHiRes => 'Hi-Res';
+  String get badgeHiRes => 'عالي الدقة';
 
   @override
   String get badgeHiResLossless => 'Hi-Res بدون فقدان';
@@ -9519,7 +10011,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get dspEffectsPausedSuffix => '(متوقف مؤقتًا)';
 
   @override
-  String get autoPreampOffHint => 'المضخم التلقائي: متوقف (انقر للحماية من التشويه)';
+  String get autoPreampOffHint =>
+      'المضخم التلقائي: متوقف (انقر للحماية من التشويه)';
 
   @override
   String autoPreampManualOverride(String gainDb) {
@@ -9530,7 +10023,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get preampOutputGainHint => 'كسب الخرج المطبق قبل المعادل';
 
   @override
-  String get tabletSplitViewHint => 'انقر على زر الفاحص في شريط المشغل لفتح العرض المقسم لقائمة الانتظار والكلمات';
+  String get tabletSplitViewHint =>
+      'انقر على زر الفاحص في شريط المشغل لفتح العرض المقسم لقائمة الانتظار والكلمات';
 
   @override
   String get setLoopPointAHint => 'تعيين نقطة التكرار A';
@@ -9560,7 +10054,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get audioQualityShowDiagnostics => 'إظهار التشخيص';
 
   @override
-  String get audioQualityDiagnosticsProHint => 'مسار الإشارة وشهادة الحفظ وفحص USB';
+  String get audioQualityDiagnosticsProHint =>
+      'مسار الإشارة وشهادة الحفظ وفحص USB';
 
   @override
   String queueSlotTooltip(int slot) {
@@ -9571,7 +10066,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get gesturesGuideTitle => 'دليل الإيماءات';
 
   @override
-  String get gesturesGuideSubtitle => 'كل سحبة ونقرة وتقريب واختصار تناظري في Pulsr';
+  String get gesturesGuideSubtitle =>
+      'كل سحبة ونقرة وتقريب واختصار تناظري في Pulsr';
 
   @override
   String get gestureSurfaceMiniPlayer => 'المشغل المصغر';
@@ -9592,10 +10088,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get gestureSurfaceLyrics => 'كلمات الأغاني';
 
   @override
-  String get gestureMiniSwipeHorizTitle => 'اسحب المشغل المصغر يسارًا أو يمينًا';
+  String get gestureMiniSwipeHorizTitle =>
+      'اسحب المشغل المصغر يسارًا أو يمينًا';
 
   @override
-  String get gestureMiniSwipeHorizDesc => 'تخطَّ المسارات في قائمة الانتظار أو فعّل إجراءات السحب المخصصة';
+  String get gestureMiniSwipeHorizDesc =>
+      'تخطَّ المسارات في قائمة الانتظار أو فعّل إجراءات السحب المخصصة';
 
   @override
   String get gestureMiniSwipeUpTitle => 'اسحب لأعلى على المشغل المصغر';
@@ -9604,64 +10102,78 @@ class AppLocalizationsAr extends AppLocalizations {
   String get gestureMiniSwipeUpDesc => 'توسيع شاشة التشغيل الكاملة';
 
   @override
-  String get gestureDockSwipeDownTitle => 'اسحب لأسفل أو اضغط مطولًا على الشريط السفلي';
+  String get gestureDockSwipeDownTitle =>
+      'اسحب لأسفل أو اضغط مطولًا على الشريط السفلي';
 
   @override
-  String get gestureDockSwipeDownDesc => 'اختر نمط تكديس الشريط السفلي بين المشغل المصغر والتنقل';
+  String get gestureDockSwipeDownDesc =>
+      'اختر نمط تكديس الشريط السفلي بين المشغل المصغر والتنقل';
 
   @override
   String get gestureArtworkTapTitle => 'انقر على الغلاف';
 
   @override
-  String get gestureArtworkTapDesc => 'إظهار أو إخفاء الكلمات المتزامنة (أو تشغيل/إيقاف مؤقت على قرص الفينيل)';
+  String get gestureArtworkTapDesc =>
+      'إظهار أو إخفاء الكلمات المتزامنة (أو تشغيل/إيقاف مؤقت على قرص الفينيل)';
 
   @override
   String get gestureArtworkDoubleTapTitle => 'انقر مرتين على الغلاف';
 
   @override
-  String get gestureArtworkDoubleTapDesc => 'تبديل المفضلة للمسار الحالي (قابل للتخصيص من الإعدادات)';
+  String get gestureArtworkDoubleTapDesc =>
+      'تبديل المفضلة للمسار الحالي (قابل للتخصيص من الإعدادات)';
 
   @override
   String get gestureArtworkSwipeTitle => 'اسحب الغلاف يسارًا أو يمينًا';
 
   @override
-  String get gestureArtworkSwipeDesc => 'الانتقال إلى المسار التالي أو السابق في القائمة';
+  String get gestureArtworkSwipeDesc =>
+      'الانتقال إلى المسار التالي أو السابق في القائمة';
 
   @override
   String get gestureNowPlayingDismissTitle => 'اسحب لأسفل في شاشة التشغيل';
 
   @override
-  String get gestureNowPlayingDismissDesc => 'إغلاق شاشة التشغيل والعودة إلى مكتبتك';
+  String get gestureNowPlayingDismissDesc =>
+      'إغلاق شاشة التشغيل والعودة إلى مكتبتك';
 
   @override
-  String get gesturePlatterScrubTitle => 'اسحب قرص الفينيل أو الـ CD بشكل دائري';
+  String get gesturePlatterScrubTitle =>
+      'اسحب قرص الفينيل أو الـ CD بشكل دائري';
 
   @override
-  String get gesturePlatterScrubDesc => 'تحريك تناظري للأمام أو للخلف مع اهتزازات استجابة لمسية';
+  String get gesturePlatterScrubDesc =>
+      'تحريك تناظري للأمام أو للخلف مع اهتزازات استجابة لمسية';
 
   @override
   String get gestureRpmBadgeTitle => 'انقر على شارة 33⅓ RPM / الاستعداد';
 
   @override
-  String get gestureRpmBadgeDesc => 'فتح منتقي سرعة التشغيل مباشرة من قاعدة القرص';
+  String get gestureRpmBadgeDesc =>
+      'فتح منتقي سرعة التشغيل مباشرة من قاعدة القرص';
 
   @override
-  String get gestureWaveformPinchTitle => 'قرّب/باعد بإصبعين على شريط الموجة (أو انقر مرتين)';
+  String get gestureWaveformPinchTitle =>
+      'قرّب/باعد بإصبعين على شريط الموجة (أو انقر مرتين)';
 
   @override
-  String get gestureWaveformPinchDesc => 'تكبير الموجة للتنقل الدقيق؛ انقر مرتين لإعادة الضبط';
+  String get gestureWaveformPinchDesc =>
+      'تكبير الموجة للتنقل الدقيق؛ انقر مرتين لإعادة الضبط';
 
   @override
-  String get gestureLyricsOffsetTitle => 'أزرار − / + لمزامنة الكلمات وشريحة الإزاحة';
+  String get gestureLyricsOffsetTitle =>
+      'أزرار − / + لمزامنة الكلمات وشريحة الإزاحة';
 
   @override
-  String get gestureLyricsOffsetDesc => 'تقديم الكلمات (−100 مللي ثانية) أو تأخيرها (+100 مللي ثانية) مع التراجع أو فتح لوحة المزامنة';
+  String get gestureLyricsOffsetDesc =>
+      'تقديم الكلمات (−100 مللي ثانية) أو تأخيرها (+100 مللي ثانية) مع التراجع أو فتح لوحة المزامنة';
 
   @override
   String get viewAllGestures => 'عرض كل الإيماءات';
 
   @override
-  String get gesturesGuideSubtitleShort => 'السحب، الفينيل، السرعة ومزامنة الكلمات';
+  String get gesturesGuideSubtitleShort =>
+      'السحب، الفينيل، السرعة ومزامنة الكلمات';
 
   @override
   String get lyricsOffsetEarlier => 'تقديم الكلمات (-100 مللي ثانية)';
@@ -9681,7 +10193,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get visualDensityTitle => 'الكثافة البصرية';
 
   @override
-  String get visualDensitySubtitle => 'تقليل التوهج وطبقات التدرج والخطوط اللامعة في الواجهة';
+  String get visualDensitySubtitle =>
+      'تقليل التوهج وطبقات التدرج والخطوط اللامعة في الواجهة';
 
   @override
   String get visualDensityComfortable => 'مريح';
@@ -9717,7 +10230,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get seekBarSliderStyleTitle => 'نمط شريط التمرير';
 
   @override
-  String get audioRouteRequestedWaiting => 'المسار المطلوب • في انتظار تأكيد التشغيل';
+  String get audioRouteRequestedWaiting =>
+      'المسار المطلوب • في انتظار تأكيد التشغيل';
 
   @override
   String audioRouteActive(String spec) {
@@ -9743,16 +10257,19 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get bitPerfectSourcePreservedUnmeasured => 'تم الحفاظ على تنسيق المصدر؛ هوية عينة DAC غير مقاسة';
+  String get bitPerfectSourcePreservedUnmeasured =>
+      'تم الحفاظ على تنسيق المصدر؛ هوية عينة DAC غير مقاسة';
 
   @override
   String get bitPerfectRequestsExclusiveUsb => 'يطلب مزج USB حصري عند الدعم';
 
   @override
-  String get bitPerfectUnsupportedDevice => 'إخراج Bit-Perfect غير مدعوم من قبل جهاز الإخراج الحالي.';
+  String get bitPerfectUnsupportedDevice =>
+      'إخراج Bit-Perfect غير مدعوم من قبل جهاز الإخراج الحالي.';
 
   @override
-  String hardwareFormatReportedByPlatform(String dacLabel, String rate, int bitDepth) {
+  String hardwareFormatReportedByPlatform(
+      String dacLabel, String rate, int bitDepth) {
     return '$dacLabel • $rate / $bitDepth-بت تم الإبلاغ عنه بواسطة النظام';
   }
 
@@ -9781,7 +10298,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get spatialEmulated => 'محاكى';
 
   @override
-  String get spatialVirtualizerDesc => 'توسيع مجال الاستيريو عبر المحاكي الصوتي للعتاد';
+  String get spatialVirtualizerDesc =>
+      'توسيع مجال الاستيريو عبر المحاكي الصوتي للعتاد';
 
   @override
   String get spatialHardwareDetected => 'تم اكتشاف معالج مكاني في العتاد';
@@ -9790,10 +10308,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get spatialEmulatedMode => 'وضع التوسيع ثلاثي الأبعاد المحاكى';
 
   @override
-  String get spatialMultiChannelDesc => 'واجهة Android Spatializer مع مسرح صوتي متعدد القنوات';
+  String get spatialMultiChannelDesc =>
+      'واجهة Android Spatializer مع مسرح صوتي متعدد القنوات';
 
   @override
-  String get spatialVirtualizerActiveDesc => 'توسيع مجال الاستيريو نشط عبر المحاكي الصوتي';
+  String get spatialVirtualizerActiveDesc =>
+      'توسيع مجال الاستيريو نشط عبر المحاكي الصوتي';
 
   @override
   String get dspBlockedBadge => 'محجوب';
@@ -9939,7 +10459,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get smartCriteriaOpBetween => 'بين';
 
   @override
-  String get smartPlaylistDescRecentlyAdded => 'المقاطع المضافة إلى مكتبتك خلال آخر 30 يوماً';
+  String get smartPlaylistDescRecentlyAdded =>
+      'المقاطع المضافة إلى مكتبتك خلال آخر 30 يوماً';
 
   @override
   String get smartPlaylistDescMostPlayed => 'أكثر مقاطعك تشغيلاً وتكراراً';
@@ -9948,10 +10469,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get smartPlaylistDescRecentlyPlayed => 'سجل الاستماع والتشغيل الأخير';
 
   @override
-  String get smartPlaylistDescLongTracks => 'المقاطع الطويلة والمزج الممتد لأكثر من 5 دقائق';
+  String get smartPlaylistDescLongTracks =>
+      'المقاطع الطويلة والمزج الممتد لأكثر من 5 دقائق';
 
   @override
-  String get smartPlaylistDescForgotten => 'مقاطع أحببتها ولم تستمع إليها مؤخراً';
+  String get smartPlaylistDescForgotten =>
+      'مقاطع أحببتها ولم تستمع إليها مؤخراً';
 
   @override
   String get smartPlaylistDescTopRated => 'أعلى مقاطعك تقييماً وتمييزاً بنجمة';
@@ -9963,13 +10486,15 @@ class AppLocalizationsAr extends AppLocalizations {
   String get smartPlaylistDescWorkout => 'مقاطع عالية الطاقة لمواصلة التمرين';
 
   @override
-  String get smartPlaylistDescLossless => 'مقاطع عالية الدقة بدون فقدان في مكتبتك';
+  String get smartPlaylistDescLossless =>
+      'مقاطع عالية الدقة بدون فقدان في مكتبتك';
 
   @override
   String get smartPlaylistDesc90s => 'مقاطع كلاسيكية وحنين من حقبة التسعينيات';
 
   @override
-  String get smartPlaylistDescDefault => 'قائمة ذكية متجددة تلقائياً وفق قواعد مخصصة';
+  String get smartPlaylistDescDefault =>
+      'قائمة ذكية متجددة تلقائياً وفق قواعد مخصصة';
 
   @override
   String durationHoursMinutes(int hours, int minutes) {
@@ -10024,7 +10549,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get sliderStyleCapsuleTitle => 'كبسولة (Apple Music)';
 
   @override
-  String get sliderStyleCapsuleDesc => 'شريط تقدم كبسولي أنيق ومتصل بدون مقبض بارز';
+  String get sliderStyleCapsuleDesc =>
+      'شريط تقدم كبسولي أنيق ومتصل بدون مقبض بارز';
 
   @override
   String get sliderStyleNormalShort => 'كلاسيكي (مقبض)';
@@ -10045,7 +10571,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get sliderStyleMinimalTitle => 'بسيط (خط رفيع)';
 
   @override
-  String get sliderStyleMinimalDesc => 'خط تقدم عصري فائق النحافة مع مؤشر سحب لطيف';
+  String get sliderStyleMinimalDesc =>
+      'خط تقدم عصري فائق النحافة مع مؤشر سحب لطيف';
 
   @override
   String get custodyCertificateHeader => 'شهادة سلسلة حفظ الصوت في Pulsr';
@@ -10110,43 +10637,50 @@ class AppLocalizationsAr extends AppLocalizations {
   String get commandPaletteNavDiagnostics => 'التشخيصات';
 
   @override
-  String get commandPaletteNavDiagnosticsSubtitle => 'سجلات النظام وفحوصات صوت USB والوضع الآمن';
+  String get commandPaletteNavDiagnosticsSubtitle =>
+      'سجلات النظام وفحوصات صوت USB والوضع الآمن';
 
   @override
   String get commandPaletteNavAudioProfiles => 'ملفات تعريف الصوت';
 
   @override
-  String get commandPaletteNavAudioProfilesSubtitle => 'إعدادات الصوت المسبقة ومعالجة الإشارات المحفوظة';
+  String get commandPaletteNavAudioProfilesSubtitle =>
+      'إعدادات الصوت المسبقة ومعالجة الإشارات المحفوظة';
 
   @override
   String get commandPaletteNavDlna => 'بث DLNA / UPnP';
 
   @override
-  String get commandPaletteNavDlnaSubtitle => 'بث الصوت إلى أجهزة ومكبرات صوت الشبكة';
+  String get commandPaletteNavDlnaSubtitle =>
+      'بث الصوت إلى أجهزة ومكبرات صوت الشبكة';
 
   @override
   String get commandPaletteNavPodcasts => 'البودكاست والكتب الصوتية';
 
   @override
-  String get commandPaletteNavPodcastsSubtitle => 'المحتوى الصوتي الطويل مع إشارات مرجعية للموضع';
+  String get commandPaletteNavPodcastsSubtitle =>
+      'المحتوى الصوتي الطويل مع إشارات مرجعية للموضع';
 
   @override
   String get coachMarkDspTitle => 'معالجة الصوت الأساسية والاستوديو';
 
   @override
-  String get coachMarkDspBody => 'بدّل بين عناصر التحكم البسيطة وأدوات الماسترينغ الاحترافية.';
+  String get coachMarkDspBody =>
+      'بدّل بين عناصر التحكم البسيطة وأدوات الماسترينغ الاحترافية.';
 
   @override
   String get coachMarkUsbDacTitle => 'إخراج صوتي فائق الدقة Bit-Perfect';
 
   @override
-  String get coachMarkUsbDacBody => 'البث المباشر للعتاد نشط. تم تجاوز معالج النظام لتشغيل صوتي مطابق للأصل تماماً.';
+  String get coachMarkUsbDacBody =>
+      'البث المباشر للعتاد نشط. تم تجاوز معالج النظام لتشغيل صوتي مطابق للأصل تماماً.';
 
   @override
   String get coachMarkDockSwipeTitle => 'أنماط شريط التشغيل المخصصة';
 
   @override
-  String get coachMarkDockSwipeBody => 'اسحب لأعلى على المشغل المصغر أو اضغط مطولاً لتخصيص أوضاع التثبيت.';
+  String get coachMarkDockSwipeBody =>
+      'اسحب لأعلى على المشغل المصغر أو اضغط مطولاً لتخصيص أوضاع التثبيت.';
 
   @override
   String get databaseHealth => 'صحة قاعدة البيانات';
@@ -10193,7 +10727,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get alwaysOnRadio => 'تشغيل دائم مع الراديو';
 
   @override
-  String get alwaysOnRadioDesc => 'تشغيل تلقائي مع الراديو؛ وإيقاف عند تشغيل المقاطع المحلية أو عبر الإنترنت';
+  String get alwaysOnRadioDesc =>
+      'تشغيل تلقائي مع الراديو؛ وإيقاف عند تشغيل المقاطع المحلية أو عبر الإنترنت';
 
   @override
   String get styleDefaultNotice => 'الافتراضي: تجويد • حفظ اختيارك كافتراضي';
@@ -10210,16 +10745,19 @@ class AppLocalizationsAr extends AppLocalizations {
   String get multichannelSpeakerAlignment => 'محاذاة السماعات متعددة القنوات';
 
   @override
-  String get multichannelSubtitle => 'ضبط كسب كل قناة وتأخير المحاذاة وتقسيم ترددات LFE';
+  String get multichannelSubtitle =>
+      'ضبط كسب كل قناة وتأخير المحاذاة وتقسيم ترددات LFE';
 
   @override
   String get multichannelInfoTooltip => 'معلومات الصوت متعدد القنوات';
 
   @override
-  String get multichannelBypassedByBitPerfect => 'تم التجاوز بواسطة وضع Bit-Perfect';
+  String get multichannelBypassedByBitPerfect =>
+      'تم التجاوز بواسطة وضع Bit-Perfect';
 
   @override
-  String get multichannelAaudioNote => 'يقتصر AAudio على قناتين في أندرويد؛ لذا تُوجَّه التدفقات متعددة القنوات (أكثر من قناتين) عبر مسار AudioTrack العائم 32-بت في Pulsr للحصول على صوت محيطي حقيقي.';
+  String get multichannelAaudioNote =>
+      'يقتصر AAudio على قناتين في أندرويد؛ لذا تُوجَّه التدفقات متعددة القنوات (أكثر من قناتين) عبر مسار AudioTrack العائم 32-بت في Pulsr للحصول على صوت محيطي حقيقي.';
 
   @override
   String get multichannelSpeakerLayout => 'تخطيط السماعات';
@@ -10262,19 +10800,22 @@ class AppLocalizationsAr extends AppLocalizations {
   String get multichannelLfeTitle => 'تقسيم ترددات LFE وإدارة الجهير';
 
   @override
-  String get multichannelLfeSubtitle => 'مرشح تمرير عالٍ للسماعات وتقسيم مضخم الصوت المخصص';
+  String get multichannelLfeSubtitle =>
+      'مرشح تمرير عالٍ للسماعات وتقسيم مضخم الصوت المخصص';
 
   @override
   String get multichannelLfeInfoTooltip => 'معلومات تقسيم ترددات LFE';
 
   @override
-  String get multichannelLfeDescription => 'يطبّق مرشح Linkwitz-Riley تمريرًا عاليًا على القنوات الفرعية ويوجه الترددات المنخفضة المعاد توجيهها إلى قناة LFE المخصصة.';
+  String get multichannelLfeDescription =>
+      'يطبّق مرشح Linkwitz-Riley تمريرًا عاليًا على القنوات الفرعية ويوجه الترددات المنخفضة المعاد توجيهها إلى قناة LFE المخصصة.';
 
   @override
   String get multichannelSatelliteCrossover => 'تردد تقسيم السماعات (HPF)';
 
   @override
-  String get multichannelSubwooferLowPass => 'مرشح التمرير المنخفض لمضخم الصوت (LPF)';
+  String get multichannelSubwooferLowPass =>
+      'مرشح التمرير المنخفض لمضخم الصوت (LPF)';
 
   @override
   String get multichannelFilterSlope => 'ميل مرشح التقسيم';
@@ -10292,7 +10833,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get multichannelRedirectSatelliteBass => 'إعادة توجيه جهير السماعات';
 
   @override
-  String get multichannelRedirectSatelliteBassDesc => 'يجمع ترددات السماعات دون تردد التقسيم في قناة LFE مع تطبيع القدرة 1/√(N-1).';
+  String get multichannelRedirectSatelliteBassDesc =>
+      'يجمع ترددات السماعات دون تردد التقسيم في قناة LFE مع تطبيع القدرة 1/√(N-1).';
 
   @override
   String get hrtfTitle => 'مكاني الصوت ثنائي الأذن ثلاثي الأبعاد HRTF';
@@ -10306,7 +10848,8 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get hrtfCrossfeedConflict => 'متعارضان: تفعيل HRTF يعطّل Crossfeed للسماعات.';
+  String get hrtfCrossfeedConflict =>
+      'متعارضان: تفعيل HRTF يعطّل Crossfeed للسماعات.';
 
   @override
   String get hrtfVirtualSpeakerAzimuth => 'سمت السماعة الافتراضية';
@@ -10346,7 +10889,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get hrtfLoadCustomSofa => 'تحميل ملف SOFA / WAV مخصص...';
 
   @override
-  String get hrtfResetTooltip => 'إعادة تعيين السمت / الارتفاع / مجموعة البيانات';
+  String get hrtfResetTooltip =>
+      'إعادة تعيين السمت / الارتفاع / مجموعة البيانات';
 
   @override
   String hrtfDatasetLoadedToast(String name) {
@@ -10360,7 +10904,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get remasterSuiteTitle => 'حزمة إعادة الماستر';
 
   @override
-  String get remasterSuiteSubtitle => 'مضاعفة عينات الإخراج ومرشحات إعادة البناء وPCM→DSD';
+  String get remasterSuiteSubtitle =>
+      'مضاعفة عينات الإخراج ومرشحات إعادة البناء وPCM→DSD';
 
   @override
   String get remasterPcmOversampling => 'مضاعفة عينات إخراج PCM';
@@ -10392,7 +10937,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get remasterPcmToDsdModulator => 'معدّل PCM → DSD';
 
   @override
-  String get remasterOfflineSdmNote => 'محرك SDM غير متصل (لا يوجد مسار تشغيل بعد)';
+  String get remasterOfflineSdmNote =>
+      'محرك SDM غير متصل (لا يوجد مسار تشغيل بعد)';
 
   @override
   String get remasterDsdRate => 'معدل DSD';
@@ -10414,7 +10960,8 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get remasterStatusPcmToDsd => 'تم طلب PCM → DSD · محرك غير متصل فقط، ليس على مسار التشغيل';
+  String get remasterStatusPcmToDsd =>
+      'تم طلب PCM → DSD · محرك غير متصل فقط، ليس على مسار التشغيل';
 
   @override
   String remasterStatusOversampling(int multiplier) {
@@ -10428,7 +10975,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get telemetryDspPowerConsumption => 'استهلاك طاقة DSP';
 
   @override
-  String get telemetryLowPowerBypassBadge => '⚡ 0.0 مللي أمبير/ساعة (طاقة منخفضة صحيحة)';
+  String get telemetryLowPowerBypassBadge =>
+      '⚡ 0.0 مللي أمبير/ساعة (طاقة منخفضة صحيحة)';
 
   @override
   String telemetryPowerDrainEstimate(String mah) {
@@ -10436,7 +10984,8 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get telemetryLowPowerBypassDesc => 'مسار الأعداد الصحيحة منخفض الطاقة نشط: تم تجاوز معالج DSP العائم بالكامل لصوت PCM صحيح مطابق للأصل.';
+  String get telemetryLowPowerBypassDesc =>
+      'مسار الأعداد الصحيحة منخفض الطاقة نشط: تم تجاوز معالج DSP العائم بالكامل لصوت PCM صحيح مطابق للأصل.';
 
   @override
   String get telemetryStageDrainBreakdown => 'تفصيل استهلاك مراحل DSP النشطة:';
@@ -10447,7 +10996,8 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get telemetryAllStagesIdle => 'جميع مراحل DSP خاملة (~0.0 مللي أمبير/ساعة).';
+  String get telemetryAllStagesIdle =>
+      'جميع مراحل DSP خاملة (~0.0 مللي أمبير/ساعة).';
 
   @override
   String get telemetryBandLow => 'منخفض';
@@ -10478,7 +11028,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get extrasLoading => 'جارٍ تحميل الأدوات…';
 
   @override
-  String get extrasLoadFailed => 'تعذر بدء بعض الأدوات. اسحب للتحديث أو أعد المحاولة أدناه.';
+  String get extrasLoadFailed =>
+      'تعذر بدء بعض الأدوات. اسحب للتحديث أو أعد المحاولة أدناه.';
 
   @override
   String get extrasUnknownDevice => 'جهاز إخراج غير معروف';
@@ -10490,82 +11041,96 @@ class AppLocalizationsAr extends AppLocalizations {
   String get extrasSettingsCategoryTitle => 'الأدوات والإضافات';
 
   @override
-  String get extrasSettingsCategorySubtitle => 'الإعلانات، سلوك النظام، راحة استخدام USB DAC، إخراج الشبكة، الملفات الصوتية والتشخيصات.';
+  String get extrasSettingsCategorySubtitle =>
+      'الإعلانات، سلوك النظام، راحة استخدام USB DAC، إخراج الشبكة، الملفات الصوتية والتشخيصات.';
 
   @override
   String get extrasPlaybackTitle => 'إضافات التشغيل';
 
   @override
-  String get extrasPlaybackSubtitle => 'الإعلانات، سلوك النظام وراحة استخدام USB DAC.';
+  String get extrasPlaybackSubtitle =>
+      'الإعلانات، سلوك النظام وراحة استخدام USB DAC.';
 
   @override
   String get extrasAnnouncementsTitle => 'إعلانات المقاطع';
 
   @override
-  String get extrasAnnouncementsSubtitle => 'نطق العنوان والفنان والألبوم عند بدء تشغيل المقطع.';
+  String get extrasAnnouncementsSubtitle =>
+      'نطق العنوان والفنان والألبوم عند بدء تشغيل المقطع.';
 
   @override
   String get extrasSystemBehaviorTitle => 'سلوك النظام';
 
   @override
-  String get extrasSystemBehaviorSubtitle => 'تحرير تركيز الصوت، الإيقاف المؤقت للإشعارات، التلاشي التدريجي وخطوات مستوى الصوت.';
+  String get extrasSystemBehaviorSubtitle =>
+      'تحرير تركيز الصوت، الإيقاف المؤقت للإشعارات، التلاشي التدريجي وخطوات مستوى الصوت.';
 
   @override
   String get extrasUsbTitle => 'راحة استخدام USB DAC';
 
   @override
-  String get extrasUsbSubtitle => 'صمت بداية المقطع، إعادة ضبط الإعداد البديل، فرض 16 بت، مفاتيح HID وفحص سرعة الناقل لكل جهاز.';
+  String get extrasUsbSubtitle =>
+      'صمت بداية المقطع، إعادة ضبط الإعداد البديل، فرض 16 بت، مفاتيح HID وفحص سرعة الناقل لكل جهاز.';
 
   @override
   String get extrasOutputTitle => 'الشبكة والإخراج';
 
   @override
-  String get extrasOutputSubtitle => 'التشغيل على وحدات DLNA/UPnP أو تصفح مكتبات SMB/WebDAV/FTP.';
+  String get extrasOutputSubtitle =>
+      'التشغيل على وحدات DLNA/UPnP أو تصفح مكتبات SMB/WebDAV/FTP.';
 
   @override
   String get extrasDlnaTitle => 'إخراج DLNA / UPnP';
 
   @override
-  String get extrasDlnaSubtitle => 'اكتشاف أجهزة استقبال AVR وSonos وKodi والتلفزيونات على الشبكة المحلية.';
+  String get extrasDlnaSubtitle =>
+      'اكتشاف أجهزة استقبال AVR وSonos وKodi والتلفزيونات على الشبكة المحلية.';
 
   @override
   String get extrasRemoteTitle => 'مكتبات الشبكة';
 
   @override
-  String get extrasRemoteSubtitle => 'مشاركات SMB2/3 وWebDAV وFTP كمصادر قابلة للتشغيل، مع ذاكرة تخزين مؤقت محلية.';
+  String get extrasRemoteSubtitle =>
+      'مشاركات SMB2/3 وWebDAV وFTP كمصادر قابلة للتشغيل، مع ذاكرة تخزين مؤقت محلية.';
 
   @override
   String get extrasSupportTitle => 'الإعدادات والدعم';
 
   @override
-  String get extrasSupportSubtitle => 'نقل الإعداد المضبوط بين الأجهزة، أو تصدير حزمة التشخيص.';
+  String get extrasSupportSubtitle =>
+      'نقل الإعداد المضبوط بين الأجهزة، أو تصدير حزمة التشخيص.';
 
   @override
   String get extrasAssistantTitle => 'المساعد والبحث';
 
   @override
-  String get extrasAssistantSubtitle => 'الاشتراك في اقتراحات التشغيل المحلي في بحث النظام؛ لا شيء يغادر الجهاز.';
+  String get extrasAssistantSubtitle =>
+      'الاشتراك في اقتراحات التشغيل المحلي في بحث النظام؛ لا شيء يغادر الجهاز.';
 
   @override
   String get extrasProfilesTitle => 'الملفات الصوتية';
 
   @override
-  String get extrasProfilesSubtitle => 'حفظ سلسلة DSP والمعادل وتغذية التداخل ووضع الإخراج في ملف واحد.';
+  String get extrasProfilesSubtitle =>
+      'حفظ سلسلة DSP والمعادل وتغذية التداخل ووضع الإخراج في ملف واحد.';
 
   @override
   String get extrasDiagnosticsTitle => 'التشخيصات والوضع الآمن';
 
   @override
-  String get extrasDiagnosticsSubtitle => 'عدادات مسار الإخراج، السجلات الأخيرة، والرجوع التلقائي بعد فشل متكرر.';
+  String get extrasDiagnosticsSubtitle =>
+      'عدادات مسار الإخراج، السجلات الأخيرة، والرجوع التلقائي بعد فشل متكرر.';
 
   @override
   String get extrasRemoteUnavailableTitle => 'مكتبات الشبكة غير متوفرة';
 
   @override
-  String get extrasRemoteUnavailableBody => 'تعذر على Pulsr فتح منفذ البث المحلي. أغلق تطبيقات VPN أو البروكسي الأخرى وحاول ثانية.';
+  String get extrasRemoteUnavailableBody =>
+      'تعذر على Pulsr فتح منفذ البث المحلي. أغلق تطبيقات VPN أو البروكسي الأخرى وحاول ثانية.';
 
   @override
-  String get extrasRemotePlaybackFailed => 'تعذر تشغيل هذا الملف من المشاركة. تحقق من الاتصال وحاول ثانية.';
+  String get extrasRemotePlaybackFailed =>
+      'تعذر تشغيل هذا الملف من المشاركة. تحقق من الاتصال وحاول ثانية.';
 
   @override
   String get extrasRemoteAlbumLabel => 'مكتبة الشبكة';
@@ -10603,7 +11168,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get partyServerUrlEmpty => 'لا يمكن أن يكون عنوان URL للخادم فارغاً';
 
   @override
-  String get partyServerUrlInvalid => 'أدخل عنوان URL صالحاً (http أو https أو ws أو wss)';
+  String get partyServerUrlInvalid =>
+      'أدخل عنوان URL صالحاً (http أو https أو ws أو wss)';
 
   @override
   String get castDefaultDevice => 'الجهاز';
@@ -10612,10 +11178,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get paste => 'لصق';
 
   @override
-  String get spotifyInvalidUrl => 'رابط قائمة تشغيل سبوتيفاي غير صالح. يرجى التحقق من الرابط والمحاولة مجدداً.';
+  String get spotifyInvalidUrl =>
+      'رابط قائمة تشغيل سبوتيفاي غير صالح. يرجى التحقق من الرابط والمحاولة مجدداً.';
 
   @override
-  String get spotifyFetchingMetadata => 'جارٍ جلب البيانات الوصفية لقائمة تشغيل سبوتيفاي...';
+  String get spotifyFetchingMetadata =>
+      'جارٍ جلب البيانات الوصفية لقائمة تشغيل سبوتيفاي...';
 
   @override
   String spotifyMatchingTracks(int completed, int total) {
@@ -10640,7 +11208,8 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get assistantNothingMatchedGeneric => 'لا يوجد شيء في مكتبتك يطابق هذا الطلب.';
+  String get assistantNothingMatchedGeneric =>
+      'لا يوجد شيء في مكتبتك يطابق هذا الطلب.';
 
   @override
   String assistantNothingMatchedTerm(String term) {
@@ -10663,13 +11232,15 @@ class AppLocalizationsAr extends AppLocalizations {
   String get assistantSuggestionsTitle => 'اقتراحات البحث';
 
   @override
-  String get assistantSuggestionsSubtitle => 'عرض مقاطع المكتبة الأخيرة في مربع بحث النظام. معطّل افتراضياً: الذاكرة المؤقتة قابلة للقراءة من واجهة البحث ذات الصلاحيات.';
+  String get assistantSuggestionsSubtitle =>
+      'عرض مقاطع المكتبة الأخيرة في مربع بحث النظام. معطّل افتراضياً: الذاكرة المؤقتة قابلة للقراءة من واجهة البحث ذات الصلاحيات.';
 
   @override
   String get assistantSuggestionsSection => 'بحث النظام';
 
   @override
-  String get assistantSuggestionsOffNotice => 'تم إيقاف الاقتراحات. تم مسح جميع الصفوف المخزنة مؤقتاً.';
+  String get assistantSuggestionsOffNotice =>
+      'تم إيقاف الاقتراحات. تم مسح جميع الصفوف المخزنة مؤقتاً.';
 
   @override
   String get annScreenTitle => 'الإعلانات الصوتية';
@@ -10681,7 +11252,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get annMasterTitle => 'نطق تفاصيل المقطع';
 
   @override
-  String get annMasterSubtitle => 'قراءة التفاصيل المحددة بصوت عالٍ عند بدء المقطع.';
+  String get annMasterSubtitle =>
+      'قراءة التفاصيل المحددة بصوت عالٍ عند بدء المقطع.';
 
   @override
   String get annSectionElements => 'ما يتم الإعلان عنه';
@@ -10693,13 +11265,15 @@ class AppLocalizationsAr extends AppLocalizations {
   String get annSectionTiming => 'التوقيت ومستوى الصوت';
 
   @override
-  String get annSectionTimingSubtitle => 'يُطبّق على كل إعلان صوتي على هذا الجهاز.';
+  String get annSectionTimingSubtitle =>
+      'يُطبّق على كل إعلان صوتي على هذا الجهاز.';
 
   @override
   String get annDelayLabel => 'التأخير قبل النطق';
 
   @override
-  String get annDelaySubtitle => 'ينتظر قليلاً حتى يبدأ تشغيل المقطع قبل بدء الصوت.';
+  String get annDelaySubtitle =>
+      'ينتظر قليلاً حتى يبدأ تشغيل المقطع قبل بدء الصوت.';
 
   @override
   String get annVolumeLabel => 'مستوى صوت الإعلان';
@@ -10711,37 +11285,44 @@ class AppLocalizationsAr extends AppLocalizations {
   String get annMaxLengthLabel => 'الحد الأقصى للطول';
 
   @override
-  String get annMaxLengthSubtitle => 'يتم اختصار التفاصيل الأطول إلى هذا العدد من الأحرف.';
+  String get annMaxLengthSubtitle =>
+      'يتم اختصار التفاصيل الأطول إلى هذا العدد من الأحرف.';
 
   @override
   String get annDuckAudioTitle => 'خفض الموسيقى أثناء النطق';
 
   @override
-  String get annDuckAudioSubtitle => 'يخفض صوت الموسيقى ليبقى الصوت المسموع واضحاً.';
+  String get annDuckAudioSubtitle =>
+      'يخفض صوت الموسيقى ليبقى الصوت المسموع واضحاً.';
 
   @override
   String get annSectionSkip => 'تخطي الإعلانات الصوتية';
 
   @override
-  String get annSectionSkipSubtitle => 'بعض المخارج لا ينبغي مقاطعتها بصوت أبداً.';
+  String get annSectionSkipSubtitle =>
+      'بعض المخارج لا ينبغي مقاطعتها بصوت أبداً.';
 
   @override
   String get annSkipCastingTitle => 'أثناء البث';
 
   @override
-  String get annSkipCastingSubtitle => 'تعرض أجهزة استقبال البث تفاصيل المقطع على الشاشة بالفعل.';
+  String get annSkipCastingSubtitle =>
+      'تعرض أجهزة استقبال البث تفاصيل المقطع على الشاشة بالفعل.';
 
   @override
-  String get annSkipBitPerfectTitle => 'أثناء التشغيل المثالي للبت (Bit-Perfect)';
+  String get annSkipBitPerfectTitle =>
+      'أثناء التشغيل المثالي للبت (Bit-Perfect)';
 
   @override
-  String get annSkipBitPerfectSubtitle => 'يحافظ على المخرج الحصري خالياً من أصوات النظام.';
+  String get annSkipBitPerfectSubtitle =>
+      'يحافظ على المخرج الحصري خالياً من أصوات النظام.';
 
   @override
   String get annSectionVoice => 'الصوت';
 
   @override
-  String get annSectionVoiceSubtitle => 'تُوفَّر الأصوات من قِبل محرك النطق في النظام.';
+  String get annSectionVoiceSubtitle =>
+      'تُوفَّر الأصوات من قِبل محرك النطق في النظام.';
 
   @override
   String get annVoiceLabel => 'صوت النظام';
@@ -10777,7 +11358,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get annUnavailableTitle => 'غير متاح على هذه المنصة';
 
   @override
-  String get annUnavailableBody => 'تحتاج الإعلانات الصوتية إلى محرك تحويل النص إلى كلام في أندرويد. تظل بقية الإعدادات تعمل بشكل طبيعي.';
+  String get annUnavailableBody =>
+      'تحتاج الإعلانات الصوتية إلى محرك تحويل النص إلى كلام في أندرويد. تظل بقية الإعدادات تعمل بشكل طبيعي.';
 
   @override
   String get annElementTitle => 'العنوان';
@@ -10844,19 +11426,22 @@ class AppLocalizationsAr extends AppLocalizations {
   String get sysBehavPauseOnNotifTitle => 'إيقاف مؤقت عند أصوات الإشعارات';
 
   @override
-  String get sysBehavPauseOnNotifSubtitle => 'يوقف التشغيل مؤقتاً بدلاً من خفض الصوت عند صدور تنبيه نظام أو توجيه ملاحة. أوقف هذا الخيار لإبقاء الموسيقى بمستوى منخفض.';
+  String get sysBehavPauseOnNotifSubtitle =>
+      'يوقف التشغيل مؤقتاً بدلاً من خفض الصوت عند صدور تنبيه نظام أو توجيه ملاحة. أوقف هذا الخيار لإبقاء الموسيقى بمستوى منخفض.';
 
   @override
   String get sysBehavResumeAfterCallTitle => 'استئناف بعد المكالمات';
 
   @override
-  String get sysBehavResumeAfterCallSubtitle => 'يواصل التشغيل عند انتهاء مكالمة هاتفية أو مقاطعة أخرى، طالما لم يستحوذ تطبيق آخر على تركيز الصوت في الأثناء.';
+  String get sysBehavResumeAfterCallSubtitle =>
+      'يواصل التشغيل عند انتهاء مكالمة هاتفية أو مقاطعة أخرى، طالما لم يستحوذ تطبيق آخر على تركيز الصوت في الأثناء.';
 
   @override
   String get sysBehavUsbReleaseTitle => 'تحرير USB عند فقدان التركيز';
 
   @override
-  String get sysBehavUsbReleaseSubtitle => 'يتخلى عن الاستحواذ الحصري على USB عندما يأخذ تطبيق آخر أو مكالمة تركيز الصوت، ليتمكن من استعادة المحول (DAC) لاحقاً.';
+  String get sysBehavUsbReleaseSubtitle =>
+      'يتخلى عن الاستحواذ الحصري على USB عندما يأخذ تطبيق آخر أو مكالمة تركيز الصوت، ليتمكن من استعادة المحول (DAC) لاحقاً.';
 
   @override
   String get sysBehavUsbReleaseNever => 'أبداً';
@@ -10868,31 +11453,37 @@ class AppLocalizationsAr extends AppLocalizations {
   String get sysBehavUsbReleaseTransient => 'مؤقت';
 
   @override
-  String get sysBehavUsbReleaseNeverIconLabel => 'الاحتفاظ بـ USB عند كل فقدان للتركيز';
+  String get sysBehavUsbReleaseNeverIconLabel =>
+      'الاحتفاظ بـ USB عند كل فقدان للتركيز';
 
   @override
-  String get sysBehavUsbReleasePermanentIconLabel => 'تحرير USB عند فقدان التركيز الدائم';
+  String get sysBehavUsbReleasePermanentIconLabel =>
+      'تحرير USB عند فقدان التركيز الدائم';
 
   @override
-  String get sysBehavUsbReleaseTransientIconLabel => 'تحرير USB عند أي فقدان للتركيز';
+  String get sysBehavUsbReleaseTransientIconLabel =>
+      'تحرير USB عند أي فقدان للتركيز';
 
   @override
   String get sysBehavCloseUsbBgTitle => 'إغلاق USB في الخلفية';
 
   @override
-  String get sysBehavCloseUsbBgSubtitle => 'يحرر الاستحواذ الحصري عندما يغادر التطبيق الواجهة، ليتمكن تطبيق آخر على الجهاز من استخدام المحول (DAC).';
+  String get sysBehavCloseUsbBgSubtitle =>
+      'يحرر الاستحواذ الحصري عندما يغادر التطبيق الواجهة، ليتمكن تطبيق آخر على الجهاز من استخدام المحول (DAC).';
 
   @override
   String get sysBehavVolumeRockerTitle => 'الضغط المزدوج على الصوت للتخطي';
 
   @override
-  String get sysBehavVolumeRockerSubtitle => 'الضغط المزدوج على زر الصوت الفعلي يتخطى إلى المقطع التالي بدلاً من تغيير مستوى الصوت مرتين.';
+  String get sysBehavVolumeRockerSubtitle =>
+      'الضغط المزدوج على زر الصوت الفعلي يتخطى إلى المقطع التالي بدلاً من تغيير مستوى الصوت مرتين.';
 
   @override
   String get sysBehavVolumeCurveTitle => 'منحنى مستوى الصوت';
 
   @override
-  String get sysBehavVolumeCurveSubtitle => 'المنحنى الخطي يغير الكسب بنفس المقدار في كل خطوة. اللوغاريتمي يغير الجهارة المحسوسة بنفس المقدار، ما يجعل الخطوات الأولى هادئة والأخيرة عملية.';
+  String get sysBehavVolumeCurveSubtitle =>
+      'المنحنى الخطي يغير الكسب بنفس المقدار في كل خطوة. اللوغاريتمي يغير الجهارة المحسوسة بنفس المقدار، ما يجعل الخطوات الأولى هادئة والأخيرة عملية.';
 
   @override
   String get sysBehavCurveLinear => 'خطي';
@@ -10910,31 +11501,38 @@ class AppLocalizationsAr extends AppLocalizations {
   String get sysBehavVolumeStepTitle => 'خطوة مستوى الصوت';
 
   @override
-  String get sysBehavVolumeStepSubtitle => 'مقدار التغير في خطوة صوت واحدة كنسبة مئوية من المقياس الكامل.';
+  String get sysBehavVolumeStepSubtitle =>
+      'مقدار التغير في خطوة صوت واحدة كنسبة مئوية من المقياس الكامل.';
 
   @override
   String get sysBehavFadeOutPauseTitle => 'تلاشي الصوت قبل الإيقاف المؤقت';
 
   @override
-  String get sysBehavFadeOutPauseSubtitle => 'يخفض الصوت تدريجياً إلى الصفر قبل الإيقاف المؤقت حتى لا تنقطع الموسيقى فجأة. اضبطه على 0 للإيقاف الفوري.';
+  String get sysBehavFadeOutPauseSubtitle =>
+      'يخفض الصوت تدريجياً إلى الصفر قبل الإيقاف المؤقت حتى لا تنقطع الموسيقى فجأة. اضبطه على 0 للإيقاف الفوري.';
 
   @override
   String get sysBehavFadeOffValue => 'إيقاف';
 
   @override
-  String get sysBehavStopTaskRemovedTitle => 'الإيقاف عند إغلاق التطبيق من الخلفية';
+  String get sysBehavStopTaskRemovedTitle =>
+      'الإيقاف عند إغلاق التطبيق من الخلفية';
 
   @override
-  String get sysBehavStopTaskRemovedSubtitle => 'يوقف التشغيل عند إزالة التطبيق من قائمة التطبيقات الأخيرة بدلاً من الإيقاف المؤقت والاحتفاظ بقائمة الانتظار.';
+  String get sysBehavStopTaskRemovedSubtitle =>
+      'يوقف التشغيل عند إزالة التطبيق من قائمة التطبيقات الأخيرة بدلاً من الإيقاف المؤقت والاحتفاظ بقائمة الانتظار.';
 
   @override
-  String get sysBehavAndroidOnlyLimit => 'لأندرويد فقط: هذه المنصة لا توفر إشعاراً عند إزالة التطبيق من القائمة، لذا لا يمكن تطبيق الإعداد هنا.';
+  String get sysBehavAndroidOnlyLimit =>
+      'لأندرويد فقط: هذه المنصة لا توفر إشعاراً عند إزالة التطبيق من القائمة، لذا لا يمكن تطبيق الإعداد هنا.';
 
   @override
-  String get sysBehavUsbOnlyLimit => 'لأندرويد فقط: مخرج USB الحصري غير متوفر على هذه المنصة، لذا لا يمكن تطبيق الإعداد هنا.';
+  String get sysBehavUsbOnlyLimit =>
+      'لأندرويد فقط: مخرج USB الحصري غير متوفر على هذه المنصة، لذا لا يمكن تطبيق الإعداد هنا.';
 
   @override
-  String get sysBehavVolumeRockerLimit => 'لأندرويد فقط: لا تصل أزرار الصوت الفعلية إلى التطبيق على هذه المنصة، لذا لا يمكن تطبيق الإعداد هنا.';
+  String get sysBehavVolumeRockerLimit =>
+      'لأندرويد فقط: لا تصل أزرار الصوت الفعلية إلى التطبيق على هذه المنصة، لذا لا يمكن تطبيق الإعداد هنا.';
 
   @override
   String sysBehavFadeValueMs(int milliseconds) {
@@ -10950,7 +11548,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get dlnaTitle => 'مشغّلات DLNA';
 
   @override
-  String get dlnaSubtitle => 'شغّل الصوت على تلفاز أو مكبر صوت على شبكة Wi-Fi الخاصة بك.';
+  String get dlnaSubtitle =>
+      'شغّل الصوت على تلفاز أو مكبر صوت على شبكة Wi-Fi الخاصة بك.';
 
   @override
   String get dlnaScan => 'البحث عن الأجهزة';
@@ -10962,16 +11561,19 @@ class AppLocalizationsAr extends AppLocalizations {
   String get dlnaCastCurrentTrack => 'بث المقطع الحالي';
 
   @override
-  String get dlnaCastFileSemantics => 'اختر ملفاً صوتياً محلياً لبثه إلى المشغّل';
+  String get dlnaCastFileSemantics =>
+      'اختر ملفاً صوتياً محلياً لبثه إلى المشغّل';
 
   @override
-  String get dlnaCastCurrentSemantics => 'بث المقطع قيد التشغيل حالياً على هذا الجهاز إلى المشغّل';
+  String get dlnaCastCurrentSemantics =>
+      'بث المقطع قيد التشغيل حالياً على هذا الجهاز إلى المشغّل';
 
   @override
   String get dlnaScanning => 'جاري البحث عن المشغّلات';
 
   @override
-  String get dlnaNoDevices => 'لم يتم العثور على مشغّلات DLNA. تأكد من أن التلفاز أو مكبر الصوت على نفس الشبكة وأن مشاركة الوسائط مفعّلة.';
+  String get dlnaNoDevices =>
+      'لم يتم العثور على مشغّلات DLNA. تأكد من أن التلفاز أو مكبر الصوت على نفس الشبكة وأن مشاركة الوسائط مفعّلة.';
 
   @override
   String get dlnaConnect => 'اتصال';
@@ -11010,7 +11612,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get dlnaErrorTitle => 'تعذر الوصول إلى الجهاز';
 
   @override
-  String get dlnaPollLost => 'فُقد الاتصال بالمشغّل. قد تكون الحالة المعروضة قديمة؛ أعد المحاولة لإعادة الاتصال.';
+  String get dlnaPollLost =>
+      'فُقد الاتصال بالمشغّل. قد تكون الحالة المعروضة قديمة؛ أعد المحاولة لإعادة الاتصال.';
 
   @override
   String get dlnaScanSemantics => 'فحص الشبكة بحثاً عن مشغّلات DLNA';
@@ -11048,7 +11651,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get remoteSrcTitle => 'المصادر البعيدة';
 
   @override
-  String get remoteSrcIntro => 'شغّل الموسيقى المخزنة على جهاز NAS أو خادم WebDAV أو مضيف FTP.';
+  String get remoteSrcIntro =>
+      'شغّل الموسيقى المخزنة على جهاز NAS أو خادم WebDAV أو مضيف FTP.';
 
   @override
   String get remoteSrcAddSource => 'إضافة مصدر';
@@ -11060,10 +11664,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get remoteSrcEmptyTitle => 'لا توجد مصادر بعيدة بعد';
 
   @override
-  String get remoteSrcEmptyBody => 'أضف مكتبة WebDAV أو FTP أو SMB لتصفحها من هنا.';
+  String get remoteSrcEmptyBody =>
+      'أضف مكتبة WebDAV أو FTP أو SMB لتصفحها من هنا.';
 
   @override
-  String get remoteSrcLoadFailed => 'تعذر قراءة المصادر المحفوظة. تم الاحتفاظ بها على القرص.';
+  String get remoteSrcLoadFailed =>
+      'تعذر قراءة المصادر المحفوظة. تم الاحتفاظ بها على القرص.';
 
   @override
   String get remoteSrcRetry => 'إعادة المحاولة';
@@ -11120,7 +11726,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get remoteSrcTlsLabel => 'استخدام HTTPS';
 
   @override
-  String get remoteSrcCleartextWarning => 'HTTPS متوقف: ستُرسل كلمة المرور وبيانات المكتبة دون تشفير. فعّله ما لم يكن الخادم لا يدعم TLS.';
+  String get remoteSrcCleartextWarning =>
+      'HTTPS متوقف: ستُرسل كلمة المرور وبيانات المكتبة دون تشفير. فعّله ما لم يكن الخادم لا يدعم TLS.';
 
   @override
   String get remoteSrcRootLabel => 'المجلد الجذري';
@@ -11147,7 +11754,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get remoteSrcSubsonicUrlHint => 'https://music.example.com';
 
   @override
-  String get remoteSrcSubsonicUrlInvalid => 'أدخل عنوان الخادم الكامل، مثلاً https://music.example.com.';
+  String get remoteSrcSubsonicUrlInvalid =>
+      'أدخل عنوان الخادم الكامل، مثلاً https://music.example.com.';
 
   @override
   String get remoteSrcCancel => 'إلغاء';
@@ -11159,7 +11767,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get remoteSrcSaveFailed => 'تعذر حفظ المصدر.';
 
   @override
-  String get remoteSrcCredentialsFailed => 'تم حفظ المصدر، لكن تعذر تخزين كلمة المرور بشكل آمن.';
+  String get remoteSrcCredentialsFailed =>
+      'تم حفظ المصدر، لكن تعذر تخزين كلمة المرور بشكل آمن.';
 
   @override
   String get remoteSrcHostRequired => 'المضيف مطلوب.';
@@ -11174,7 +11783,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get remoteSrcRootRequired => 'حدّد مجلداً جذرياً، مثلاً /Music.';
 
   @override
-  String get remoteSrcShareRequired => 'يحتاج SMB إلى مشاركة في الجذر، مثلاً /Music.';
+  String get remoteSrcShareRequired =>
+      'يحتاج SMB إلى مشاركة في الجذر، مثلاً /Music.';
 
   @override
   String get remoteSrcConnectedIn => 'تم الاتصال خلال';
@@ -11249,7 +11859,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get remoteSrcUpnpTitle => 'خوادم وسائط UPnP';
 
   @override
-  String get remoteSrcUpnpIntro => 'ابحث عن خادم وسائط DLNA على هذه الشبكة وتصفحه هنا.';
+  String get remoteSrcUpnpIntro =>
+      'ابحث عن خادم وسائط DLNA على هذه الشبكة وتصفحه هنا.';
 
   @override
   String get remoteSrcUpnpSearch => 'البحث عن خوادم';
@@ -11264,13 +11875,15 @@ class AppLocalizationsAr extends AppLocalizations {
   String get remoteSrcUpnpUse => 'استخدام هذا الخادم';
 
   @override
-  String get remoteSrcUpnpFailed => 'تعذر اكتشاف خوادم الوسائط. تأكد من أن هذا الجهاز على نفس الشبكة.';
+  String get remoteSrcUpnpFailed =>
+      'تعذر اكتشاف خوادم الوسائط. تأكد من أن هذا الجهاز على نفس الشبكة.';
 
   @override
   String get remoteSrcDeleteTitle => 'حذف هذا المصدر؟';
 
   @override
-  String get remoteSrcDeleteBody => 'ستُحذف كلمة المرور المحفوظة والصوت المخزّن مؤقتاً أيضاً.';
+  String get remoteSrcDeleteBody =>
+      'ستُحذف كلمة المرور المحفوظة والصوت المخزّن مؤقتاً أيضاً.';
 
   @override
   String get remoteSrcKindWebdavDesc => 'Nextcloud و ownCloud و Apache mod_dav';
@@ -11282,7 +11895,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get remoteSrcKindSmbDesc => 'مشاركات ويندوز و Samba (أندرويد فقط)';
 
   @override
-  String get remoteSrcKindSubsonicDesc => 'Navidrome و Airsonic و Gonic وخوادم Subsonic الأخرى';
+  String get remoteSrcKindSubsonicDesc =>
+      'Navidrome و Airsonic و Gonic وخوادم Subsonic الأخرى';
 
   @override
   String get remoteSrcKindUpnpDesc => 'خوادم وسائط DLNA المكتشفة على شبكتك';
@@ -11319,7 +11933,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get audioProfCaptureDialogTitle => 'تسمية هذا الملف';
 
   @override
-  String get audioProfCaptureDialogMessage => 'يحفظ إعدادات المعادل و DSP والمخرج والبت المثالي الحالية في ملف واحد يمكنك مشاركته.';
+  String get audioProfCaptureDialogMessage =>
+      'يحفظ إعدادات المعادل و DSP والمخرج والبت المثالي الحالية في ملف واحد يمكنك مشاركته.';
 
   @override
   String get audioProfCaptureDialogHint => 'مثال: USB DAC - متوازن';
@@ -11370,7 +11985,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get audioProfDefaultDialogTitle => 'الملف الافتراضي';
 
   @override
-  String get audioProfDefaultDialogMessage => 'اختر الملف المحدد كافتراضي لهذا الجهاز. مسحه يُبقي إعداداتك الحالية دون تغيير.';
+  String get audioProfDefaultDialogMessage =>
+      'اختر الملف المحدد كافتراضي لهذا الجهاز. مسحه يُبقي إعداداتك الحالية دون تغيير.';
 
   @override
   String get audioProfDefaultNone => 'بدون افتراضي';
@@ -11382,7 +11998,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get audioProfDefaultCleared => 'تم مسح الملف الافتراضي.';
 
   @override
-  String get audioProfDefaultMissing => 'لم يعد هذا الملف التعريفي متوفراً على هذا الجهاز.';
+  String get audioProfDefaultMissing =>
+      'لم يعد هذا الملف التعريفي متوفراً على هذا الجهاز.';
 
   @override
   String get audioProfDefaultBadge => 'الملف الافتراضي';
@@ -11409,31 +12026,38 @@ class AppLocalizationsAr extends AppLocalizations {
   String get audioProfEmptyTitle => 'لا توجد ملفات صوت تعريفية بعد';
 
   @override
-  String get audioProfEmptySubtitle => 'احفظ إعدادك الحالي لإعادة استخدامه على جهاز آخر أو سماعة أخرى.';
+  String get audioProfEmptySubtitle =>
+      'احفظ إعدادك الحالي لإعادة استخدامه على جهاز آخر أو سماعة أخرى.';
 
   @override
   String get audioProfErrorTitle => 'تعذر تحميل الملفات التعريفية';
 
   @override
-  String get audioProfErrorSubtitle => 'قد يكون تخزين التطبيق غير متاح. حاول مجدداً بعد قليل.';
+  String get audioProfErrorSubtitle =>
+      'قد يكون تخزين التطبيق غير متاح. حاول مجدداً بعد قليل.';
 
   @override
   String get audioProfRetry => 'إعادة المحاولة';
 
   @override
-  String get audioProfFormatCorrupt => 'هذا الملف ليس ملف صوت تعريفي صالحاً لـ Pulsr.';
+  String get audioProfFormatCorrupt =>
+      'هذا الملف ليس ملف صوت تعريفي صالحاً لـ Pulsr.';
 
   @override
-  String get audioProfFormatMissingVersion => 'يفتقد الملف التعريفي إلى إصدار التنسيق.';
+  String get audioProfFormatMissingVersion =>
+      'يفتقد الملف التعريفي إلى إصدار التنسيق.';
 
   @override
-  String get audioProfFormatTooLarge => 'حجم ملف التعريف أكبر من الحد المسموح به وهو 512 كيلوبايت.';
+  String get audioProfFormatTooLarge =>
+      'حجم ملف التعريف أكبر من الحد المسموح به وهو 512 كيلوبايت.';
 
   @override
-  String get audioProfFormatTooManyValues => 'يحتوي الملف التعريفي على أكثر من 200 إعداد.';
+  String get audioProfFormatTooManyValues =>
+      'يحتوي الملف التعريفي على أكثر من 200 إعداد.';
 
   @override
-  String get audioProfFormatEmptyKey => 'يحتوي الملف التعريفي على اسم إعداد فارغ.';
+  String get audioProfFormatEmptyKey =>
+      'يحتوي الملف التعريفي على اسم إعداد فارغ.';
 
   @override
   String get audioProfFormatInvalidId => 'معرّف الملف التعريفي غير صالح.';
@@ -11465,7 +12089,8 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get audioProfApplyFailedRolledBackOne => 'تعذر كتابة إعداد واحد؛ تمت استعادة إعداداتك السابقة.';
+  String get audioProfApplyFailedRolledBackOne =>
+      'تعذر كتابة إعداد واحد؛ تمت استعادة إعداداتك السابقة.';
 
   @override
   String audioProfApplyFailedRolledBackMany(int failed) {
@@ -11473,7 +12098,8 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get audioProfApplyFailedRollbackIncompleteOne => 'تعذر كتابة إعداد واحد ولم تكتمل استعادة الإعدادات السابقة بالكامل.';
+  String get audioProfApplyFailedRollbackIncompleteOne =>
+      'تعذر كتابة إعداد واحد ولم تكتمل استعادة الإعدادات السابقة بالكامل.';
 
   @override
   String audioProfApplyFailedRollbackIncompleteMany(int failed) {
@@ -11481,7 +12107,8 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get audioProfImportSavedSkippedOne => 'تم استيراد الملف التعريفي. تم تخطي إعداد واحد غير مدعوم.';
+  String get audioProfImportSavedSkippedOne =>
+      'تم استيراد الملف التعريفي. تم تخطي إعداد واحد غير مدعوم.';
 
   @override
   String audioProfImportSavedSkippedMany(int skipped) {
@@ -11542,7 +12169,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get usbErgoSectionJson => 'ملف JSON التعريفي';
 
   @override
-  String get usbErgoJsonHint => 'انسخ هذا أو شاركه لإعادة تطبيق الإعداد على جهاز آخر.';
+  String get usbErgoJsonHint =>
+      'انسخ هذا أو شاركه لإعادة تطبيق الإعداد على جهاز آخر.';
 
   @override
   String get usbErgoNoDeviceTitle => 'لا يوجد محول USB DAC متصل';
@@ -11560,43 +12188,50 @@ class AppLocalizationsAr extends AppLocalizations {
   String get usbErgoHidTitle => 'أزرار وسائط HID';
 
   @override
-  String get usbErgoHidHint => 'يقرأ أزرار التشغيل/الإيقاف والتخطي ومستوى الصوت من المحول.';
+  String get usbErgoHidHint =>
+      'يقرأ أزرار التشغيل/الإيقاف والتخطي ومستوى الصوت من المحول.';
 
   @override
   String get usbErgoAudioSectionTitle => 'تخصيصات نقل الصوت';
 
   @override
-  String get usbErgoAudioSectionHint => 'تُطبّق على مسار USB المباشر فقط. القيم التي تغيّر دلالات البت المثالي تُعرض في حالة البث.';
+  String get usbErgoAudioSectionHint =>
+      'تُطبّق على مسار USB المباشر فقط. القيم التي تغيّر دلالات البت المثالي تُعرض في حالة البث.';
 
   @override
   String get usbErgoForce16Title => 'فرض إخراج 16-بت';
 
   @override
-  String get usbErgoForce16Hint => 'يقتطع المصادر الأوسع؛ ولا يمكن للبث حينها ادعاء البت المثالي.';
+  String get usbErgoForce16Hint =>
+      'يقتطع المصادر الأوسع؛ ولا يمكن للبث حينها ادعاء البت المثالي.';
 
   @override
   String get usbErgoAltResetTitle => 'إعادة ضبط الإعداد البديل عند الإيقاف';
 
   @override
-  String get usbErgoAltResetHint => 'يُعيد المحول إلى الإعداد البديل 0 قبل تحرير الواجهة.';
+  String get usbErgoAltResetHint =>
+      'يُعيد المحول إلى الإعداد البديل 0 قبل تحرير الواجهة.';
 
   @override
   String get usbErgoDisableFeedbackTitle => 'تجاهل نقطة نهاية التغذية الراجعة';
 
   @override
-  String get usbErgoDisableFeedbackHint => 'لمحولات DAC التي تعاني من خلل في بث التغذية الراجعة؛ يتم توجيه الانحراف تلقائياً.';
+  String get usbErgoDisableFeedbackHint =>
+      'لمحولات DAC التي تعاني من خلل في بث التغذية الراجعة؛ يتم توجيه الانحراف تلقائياً.';
 
   @override
   String get usbErgoUac1ReassertTitle => 'إعادة تأكيد معدل UAC1';
 
   @override
-  String get usbErgoUac1ReassertHint => 'يعيد كتابة معدل العينة بعد اختيار الإعداد البديل.';
+  String get usbErgoUac1ReassertHint =>
+      'يعيد كتابة معدل العينة بعد اختيار الإعداد البديل.';
 
   @override
   String get usbErgoDisableClockSwitchTitle => 'عدم برمجة ساعة UAC2';
 
   @override
-  String get usbErgoDisableClockSwitchHint => 'يحتفظ المحول بساعته الخاصة؛ لا يمكن التحقق من البت المثالي.';
+  String get usbErgoDisableClockSwitchHint =>
+      'يحتفظ المحول بساعته الخاصة؛ لا يمكن التحقق من البت المثالي.';
 
   @override
   String get usbErgoSilenceLabel => 'الصمت قبل البدء (مللي ثانية)';
@@ -11611,7 +12246,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get usbErgoSelectorPinLabel => 'دبوس محدد الساعة (فارغ = تلقائي)';
 
   @override
-  String get usbErgoVolumeCalibrationLabel => 'معايرة مستوى الصوت (ديسيبل، من -24.0 إلى +24.0)';
+  String get usbErgoVolumeCalibrationLabel =>
+      'معايرة مستوى الصوت (ديسيبل، من -24.0 إلى +24.0)';
 
   @override
   String get usbErgoNumberInvalid => 'أدخل رقماً ضمن النطاق المسموح.';
@@ -11668,7 +12304,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get usbErgoSaved => 'تم حفظ الملف التعريفي وتطبيقه';
 
   @override
-  String get usbErgoDeleted => 'تم حذف الملف التعريفي، جاري استخدام الإعدادات الافتراضية';
+  String get usbErgoDeleted =>
+      'تم حذف الملف التعريفي، جاري استخدام الإعدادات الافتراضية';
 
   @override
   String get usbErgoActiveProfileLabel => 'الملف النشط';
@@ -11683,7 +12320,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get usbErgoDeleteFailed => 'تعذر حذف الملف التعريفي.';
 
   @override
-  String get usbErgoNoDeviceId => 'لا يبلغ المحول عن معرّفات USB، لذا لا يمكن حفظ ملف تعريفي.';
+  String get usbErgoNoDeviceId =>
+      'لا يبلغ المحول عن معرّفات USB، لذا لا يمكن حفظ ملف تعريفي.';
 
   @override
   String get usbErgoApplyFailed => 'فشل استدعاء تحسينات USB الأصلي.';
@@ -11731,7 +12369,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get diagPathsNativeNotReported => 'غير مُبلّغ من المحرك الأصلي';
 
   @override
-  String get diagPathsUnavailable => 'لا يبلغ المحرك الأصلي في هذا الإصدار عن عدادات xrun. الأصفار أدناه تعني «غير مقاس» وليس «بلا تقطّع».';
+  String get diagPathsUnavailable =>
+      'لا يبلغ المحرك الأصلي في هذا الإصدار عن عدادات xrun. الأصفار أدناه تعني «غير مقاس» وليس «بلا تقطّع».';
 
   @override
   String get diagDspTitle => 'مراحل DSP';
@@ -11758,10 +12397,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get diagSafeModeExit => 'الخروج من الوضع الآمن';
 
   @override
-  String get diagSafeModeEntered => 'تم تفعيل الوضع الآمن. تم إيقاف AAudio وصوت USB والبت المثالي الصارم.';
+  String get diagSafeModeEntered =>
+      'تم تفعيل الوضع الآمن. تم إيقاف AAudio وصوت USB والبت المثالي الصارم.';
 
   @override
-  String get diagSafeModeExited => 'تم إيقاف الوضع الآمن. تمت استعادة إعدادات الإخراج السابقة.';
+  String get diagSafeModeExited =>
+      'تم إيقاف الوضع الآمن. تمت استعادة إعدادات الإخراج السابقة.';
 
   @override
   String get diagSafeModeResetDone => 'تمت إعادة ضبط الوضع الآمن.';
@@ -11883,8 +12524,88 @@ class AppLocalizationsAr extends AppLocalizations {
   String get vdcInvalidFile => 'ملف غير صالح أو يتعذر الوصول إليه';
 
   @override
-  String get vdcInvalidFileSize => 'حجم ملف غير صالح (يجب أن يكون أكبر من 0 وأقل من 2 ميجابايت)';
+  String get vdcInvalidFileSize =>
+      'حجم ملف غير صالح (يجب أن يكون أكبر من 0 وأقل من 2 ميجابايت)';
 
   @override
   String get lyricsSourceExternalLrc => 'ملف LRC';
+
+  @override
+  String annFromYear(int year) {
+    return 'من عام $year';
+  }
+
+  @override
+  String annTrackNumber(int number) {
+    return 'المقطع $number';
+  }
+
+  @override
+  String quranAyahRange(int start, int end) {
+    return 'الآية $start-$end';
+  }
+
+  @override
+  String get ringtoneAndroidOnly => 'إعداد النغمة مدعوم على أندرويد فقط';
+
+  @override
+  String get onboardingHiResSampleSpec => '24 بت / 192 كيلوهرتز • FLAC';
+
+  @override
+  String get rcStartMultiPoint => 'بدء المعايرة من 3 نقاط';
+
+  @override
+  String get discordStatusActiveTrack => 'نشط • يعرض المقطع المشغل حالياً';
+
+  @override
+  String get discordStatusConfiguredTap => 'مُعدّ • اضغط للتفعيل';
+
+  @override
+  String get discordActiveBadge => 'نشط';
+
+  @override
+  String get settingsCanvasTitle => 'غلاف سبوتيفاي / الأعمال المتحركة';
+
+  @override
+  String get settingsCanvasSubtitle =>
+      'تشغيل خلفيات فيديو متكررة للمقاطع المدعومة (Spotify وApple Music وTidal)';
+
+  @override
+  String get settingsCanvasBackdropTitle => 'خلفية محيطية بملء الشاشة';
+
+  @override
+  String get settingsCanvasBackdropSubtitle =>
+      'عرض الفيديو المتكرر بتمويه خلف عناصر التحكم بدلاً من داخل بطاقة الغلاف';
+
+  @override
+  String crossfadeBlendDesc(String seconds) {
+    return 'سيتم دمج الأغاني خلال $seconds ثوانٍ';
+  }
+
+  @override
+  String get crossfadeDisabledDesc =>
+      'الانتقال المتداخل معطل (تنتهي الأغاني بشكل طبيعي)';
+
+  @override
+  String get automixDetailedSubtitle =>
+      'مزامنة إيقاع DJ ذكية، وتمديد السرعة، ومحاذاة النبضات';
+
+  @override
+  String get usbClockVerified => 'تم التحقق من الساعة';
+
+  @override
+  String get usbMuteDac => 'كتم صوت DAC';
+
+  @override
+  String get usbUnmuteDac => 'إلغاء كتم صوت DAC';
+
+  @override
+  String get checkForUpdatesTitle => 'التحقق من التحديثات';
+
+  @override
+  String get checkForUpdatesSubtitle =>
+      'التحقق من إصدارات GitHub بحثاً عن نسخة جديدة';
+
+  @override
+  String get settingsQuickControls => 'عناصر التحكم السريعة';
 }

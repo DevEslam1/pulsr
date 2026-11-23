@@ -71,4 +71,39 @@ void main() {
     // Cleanup surface size
     await tester.binding.setSurfaceSize(null);
   });
+
+  testWidgets('H-50 uses right display cutout inset as start padding in RTL',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 700));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      BlocProvider<PlayerCubit>.value(
+        value: mockPlayerCubit,
+        child: MaterialApp(
+          locale: const Locale('ar'),
+          localizationsDelegates: appLocalizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: MediaQuery(
+            data: const MediaQueryData(
+              size: Size(1200, 700),
+              padding: EdgeInsets.only(left: 6, right: 44),
+            ),
+            child: Scaffold(
+              body: LandscapeSidebar(
+                currentIndex: 0,
+                onDestinationSelected: (_) {},
+                isExtended: false,
+                onToggleExtended: () {},
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Desktop expanded rail width (240) + RTL start cutout inset (44) = 284.
+    expect(tester.getSize(find.byType(LandscapeSidebar)).width, closeTo(284.0, 0.5));
+  });
 }

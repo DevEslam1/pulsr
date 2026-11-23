@@ -116,6 +116,7 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
   /// Incremented on every start/cancel so an in-flight capture can detect that
   /// it was superseded and unwind without touching state or the error banner.
   int _runToken = 0;
+  bool _isApplying = false;
 
   static List<String> _pointNames(AppLocalizations l) => [
         l.rcPointListeningCenter,
@@ -210,6 +211,11 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
   static double calculateSnr(Int16List pcm) => _calculateSnr(pcm);
 
   Future<void> _start() async {
+    if (_phase == _RcPhase.measuring ||
+        _phase == _RcPhase.analyzing ||
+        _phase == _RcPhase.verifying) {
+      return;
+    }
     _runToken++;
     _currentPoint = 0;
     _pointResponses.clear();
@@ -330,6 +336,7 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
   }
 
   Future<void> _measureCurrentPoint() async {
+    if (_phase == _RcPhase.measuring || _phase == _RcPhase.analyzing) return;
     setState(() {
       _error = null;
       _phase = _RcPhase.measuring;
@@ -426,14 +433,19 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
   }
 
   Future<void> _apply() async {
-    if (_gains == null) return;
-    await _applyCorrection();
-    if (!mounted) return;
-    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-      SnackBar(content: Text(context.l10n.rcApplied)),
-    );
-    if (Navigator.of(context).canPop()) {
-      Navigator.of(context).pop();
+    if (_gains == null || _isApplying) return;
+    setState(() => _isApplying = true);
+    try {
+      await _applyCorrection();
+      if (!mounted) return;
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        SnackBar(content: Text(context.l10n.rcApplied)),
+      );
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
+    } finally {
+      if (mounted) setState(() => _isApplying = false);
     }
   }
 
@@ -448,7 +460,8 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
   /// gains is deterministic and device-independent, so the verdict is never
   /// based on an uncorrected signal.
   Future<void> _applyAndVerify() async {
-    if (_gains == null) return;
+    if (_gains == null || _isApplying) return;
+    setState(() => _isApplying = true);
     try {
       final effectiveGains = await _applyCorrection();
       if (!mounted) return;
@@ -485,6 +498,8 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
           _error = resolveUiErrorMessage(context, e.toString());
         });
       }
+    } finally {
+      if (mounted) setState(() => _isApplying = false);
     }
   }
 
@@ -514,21 +529,30 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
               Icon(ok ? Icons.verified_rounded : Icons.info_outline_rounded,
                   color: accent, size: 18),
               const SizedBox(width: AppSpacing.xs),
-              Text(
-                l10n.rcVerification,
-                style: TextStyle(
-                  color: p.textPrimary,
-                  fontWeight: FontWeight.w700,
-                  fontSize: AppFontSize.bodySmall,
+              Expanded(
+                child: Text(
+                  l10n.rcVerification,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: p.textPrimary,
+                    fontWeight: FontWeight.w700,
+                    fontSize: AppFontSize.bodySmall,
+                  ),
                 ),
               ),
-              const Spacer(),
-              Text(
-                ok ? l10n.rcConverged : l10n.rcNotConverged,
-                style: TextStyle(
-                  color: accent,
-                  fontWeight: FontWeight.w700,
-                  fontSize: AppFontSize.label,
+              const SizedBox(width: AppSpacing.xs),
+              Flexible(
+                child: Text(
+                  ok ? l10n.rcConverged : l10n.rcNotConverged,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.end,
+                  style: TextStyle(
+                    color: accent,
+                    fontWeight: FontWeight.w700,
+                    fontSize: AppFontSize.label,
+                  ),
                 ),
               ),
             ],
@@ -574,22 +598,31 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                 size: 14,
               ),
               const SizedBox(width: AppSpacing.xxs),
-              Text(
-                v.loopback.isWithinGate
-                    ? l10n.rcTargetGatePassed
-                    : l10n.rcTargetGateFailed,
-                style: TextStyle(
-                  color: p.textSecondary,
-                  fontSize: AppFontSize.caption,
+              Expanded(
+                child: Text(
+                  v.loopback.isWithinGate
+                      ? l10n.rcTargetGatePassed
+                      : l10n.rcTargetGateFailed,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: p.textSecondary,
+                    fontSize: AppFontSize.caption,
+                  ),
                 ),
               ),
-              const Spacer(),
-              Text(
-                l10n.rcMaxDeviation(
-                    v.loopback.maxDeviationDb.toStringAsFixed(2)),
-                style: TextStyle(
-                  color: p.textTertiary,
-                  fontSize: AppFontSize.caption,
+              const SizedBox(width: AppSpacing.xs),
+              Flexible(
+                child: Text(
+                  l10n.rcMaxDeviation(
+                      v.loopback.maxDeviationDb.toStringAsFixed(2)),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.end,
+                  style: TextStyle(
+                    color: p.textTertiary,
+                    fontSize: AppFontSize.caption,
+                  ),
                 ),
               ),
             ],
@@ -651,7 +684,7 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
             clipBehavior: Clip.antiAlias,
             child: SafeArea(
               top: false,
-              child: Padding(
+              child: SingleChildScrollView(
                 padding: EdgeInsetsDirectional.only(
                   start: 20,
                   end: 20,
@@ -835,7 +868,7 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                           icon: const Icon(Icons.graphic_eq_rounded, size: 20),
                           label: Text(
                             _multiPointMode
-                                ? 'Start 3-Point Calibration'
+                                ? l10n.rcStartMultiPoint
                                 : l10n.rcStart,
                             style: const TextStyle(
                                 fontWeight: FontWeight.w700,
@@ -967,12 +1000,16 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            l10n.rcResult,
-                            style: TextStyle(
-                              color: p.textPrimary,
-                              fontWeight: FontWeight.w700,
-                              fontSize: AppFontSize.body,
+                          Expanded(
+                            child: Text(
+                              l10n.rcResult,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: p.textPrimary,
+                                fontWeight: FontWeight.w700,
+                                fontSize: AppFontSize.body,
+                              ),
                             ),
                           ),
                           if (_snrDb != null)
@@ -1027,64 +1064,90 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                       ),
                       const SizedBox(height: AppSpacing.xs),
                       if (_pointResponses.length > 1) ...[
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
+                        Wrap(
+                          alignment: WrapAlignment.center,
+                          spacing: 8,
+                          runSpacing: 4,
                           children: [
-                            Container(
-                                width: 10,
-                                height: 3,
-                                color: AppColors.roomPointCenter),
-                            const SizedBox(width: 4),
-                            Text(context.l10n.roomPositionCenter,
-                                style: TextStyle(
-                                    color: p.textTertiary,
-                                    fontSize: AppFontSize.caption)),
-                            const SizedBox(width: 8),
-                            Container(
-                                width: 10,
-                                height: 3,
-                                color: AppColors.roomPointLeft),
-                            const SizedBox(width: 4),
-                            Text(context.l10n.roomPositionLeft,
-                                style: TextStyle(
-                                    color: p.textTertiary,
-                                    fontSize: AppFontSize.caption)),
-                            const SizedBox(width: 8),
-                            Container(
-                                width: 10,
-                                height: 3,
-                                color: AppColors.roomPointRight),
-                            const SizedBox(width: 4),
-                            Text(context.l10n.roomPositionRight,
-                                style: TextStyle(
-                                    color: p.textTertiary,
-                                    fontSize: AppFontSize.caption)),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                    width: 10,
+                                    height: 3,
+                                    color: AppColors.roomPointCenter),
+                                const SizedBox(width: 4),
+                                Text(context.l10n.roomPositionCenter,
+                                    style: TextStyle(
+                                        color: p.textTertiary,
+                                        fontSize: AppFontSize.caption)),
+                              ],
+                            ),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                    width: 10,
+                                    height: 3,
+                                    color: AppColors.roomPointLeft),
+                                const SizedBox(width: 4),
+                                Text(context.l10n.roomPositionLeft,
+                                    style: TextStyle(
+                                        color: p.textTertiary,
+                                        fontSize: AppFontSize.caption)),
+                              ],
+                            ),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                    width: 10,
+                                    height: 3,
+                                    color: AppColors.roomPointRight),
+                                const SizedBox(width: 4),
+                                Text(context.l10n.roomPositionRight,
+                                    style: TextStyle(
+                                        color: p.textTertiary,
+                                        fontSize: AppFontSize.caption)),
+                              ],
+                            ),
                           ],
                         ),
                         const SizedBox(height: 2),
                       ],
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                      Wrap(
+                        alignment: WrapAlignment.center,
+                        spacing: AppSpacing.md,
+                        runSpacing: 4,
                         children: [
-                          Container(
-                              width: 10,
-                              height: 10,
-                              color: AppColors.ldacViolet),
-                          const SizedBox(width: AppSpacing.s6),
-                          Text(l10n.rcMeasuredResponse,
-                              style: TextStyle(
-                                  color: p.textSecondary,
-                                  fontSize: AppFontSize.caption)),
-                          const SizedBox(width: AppSpacing.md),
-                          Container(
-                              width: 10,
-                              height: 10,
-                              color: AppColors.emeraldDeep),
-                          const SizedBox(width: AppSpacing.s6),
-                          Text(l10n.rcFittedEqGain,
-                              style: TextStyle(
-                                  color: p.textSecondary,
-                                  fontSize: AppFontSize.caption)),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                  width: 10,
+                                  height: 10,
+                                  color: AppColors.ldacViolet),
+                              const SizedBox(width: AppSpacing.s6),
+                              Text(l10n.rcMeasuredResponse,
+                                  style: TextStyle(
+                                      color: p.textSecondary,
+                                      fontSize: AppFontSize.caption)),
+                            ],
+                          ),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                  width: 10,
+                                  height: 10,
+                                  color: AppColors.emeraldDeep),
+                              const SizedBox(width: AppSpacing.s6),
+                              Text(l10n.rcFittedEqGain,
+                                  style: TextStyle(
+                                      color: p.textSecondary,
+                                      fontSize: AppFontSize.caption)),
+                            ],
+                          ),
                         ],
                       ),
                       const SizedBox(height: AppSpacing.xs),
@@ -1160,9 +1223,11 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                                   style: const TextStyle(
                                       fontWeight: FontWeight.w700),
                                 ),
-                                onPressed: _verification == null
-                                    ? _applyAndVerify
-                                    : _apply,
+                                onPressed: _isApplying
+                                    ? null
+                                    : (_verification == null
+                                        ? _applyAndVerify
+                                        : _apply),
                               ),
                             ),
                           ),

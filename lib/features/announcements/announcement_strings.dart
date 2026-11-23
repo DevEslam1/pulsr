@@ -175,6 +175,14 @@ abstract final class AnnouncementStrings {
   /// Refresh action for the voice list.
   static String get voiceRefresh => _l10n().annVoiceRefresh;
 
+  /// Formats the spoken release year phrase (`from 1959`).
+  static String yearLabel(int year, [AppLocalizations? l10n]) =>
+      _l10n(l10n).annFromYear(year);
+
+  /// Formats the spoken track number phrase (`track 3`).
+  static String trackNumberLabel(int number, [AppLocalizations? l10n]) =>
+      _l10n(l10n).annTrackNumber(number);
+
   /// Formats one voice dropdown entry as `Name (locale)`.
   static String voiceOption(String name, String localeCode) =>
       localeCode.isEmpty ? name : '$name ($localeCode)';

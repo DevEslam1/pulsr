@@ -28,6 +28,7 @@ class SettingSliderRow extends StatelessWidget {
   final double defaultValue;
 
   final ValueChanged<double> onChanged;
+  final ValueChanged<double>? onChangeEnd;
 
   /// Formats both the current-value display and the reset tooltip
   /// (e.g. `(v) => '${v.toStringAsFixed(1)}s'`).
@@ -45,6 +46,7 @@ class SettingSliderRow extends StatelessWidget {
     required this.max,
     required this.defaultValue,
     required this.onChanged,
+    this.onChangeEnd,
     this.subtitle,
     this.onInfo,
     this.divisions,
@@ -114,7 +116,7 @@ class SettingSliderRow extends StatelessWidget {
                 ),
                 onPressed: _isDefault || !enabled
                     ? null
-                    : () => onChanged(defaultValue),
+                    : () => (onChangeEnd ?? onChanged)(defaultValue),
               ),
             ],
           ),
@@ -142,6 +144,7 @@ class SettingSliderRow extends StatelessWidget {
                 semanticLabel: label,
                 semanticFormatterCallback: _fmt,
                 onChanged: onChanged,
+                onChangeEnd: onChangeEnd,
               ),
             ),
           ),

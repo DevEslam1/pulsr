@@ -198,4 +198,27 @@ void main() {
         secureValues.containsKey(ScrobblerService.keyListenBrainzTokenSecure),
         isFalse);
   });
+
+  testWidgets('M-08 obscures scrobbler credential fields by default with reveal toggle',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await pumpSheet(tester);
+
+    await tester.tap(find.text(l10n.enableListenBrainz));
+    await tester.pump();
+
+    final lbTokenField = find.widgetWithText(
+      TextField,
+      l10n.enterListenBrainzUserToken,
+    );
+    expect(tester.widget<TextField>(lbTokenField).obscureText, isTrue);
+
+    await tester.tap(find.byTooltip(l10n.showPassword).first);
+    await tester.pump();
+    expect(tester.widget<TextField>(lbTokenField).obscureText, isFalse);
+
+    await tester.tap(find.byTooltip(l10n.hidePassword).first);
+    await tester.pump();
+    expect(tester.widget<TextField>(lbTokenField).obscureText, isTrue);
+  });
 }

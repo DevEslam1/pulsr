@@ -37,8 +37,13 @@ class _FakeNavigationShell extends StatefulWidget
   @override
   final int currentIndex;
   final void Function(int, {bool initialLocation})? onGoBranch;
+  final Widget? child;
 
-  const _FakeNavigationShell({this.currentIndex = 0, this.onGoBranch});
+  const _FakeNavigationShell({
+    this.currentIndex = 0,
+    this.onGoBranch,
+    this.child,
+  });
 
   @override
   void goBranch(int index, {bool initialLocation = false}) {
@@ -54,7 +59,7 @@ class _FakeNavigationShell extends StatefulWidget
 
 class _FakeNavigationShellState extends State<_FakeNavigationShell> {
   @override
-  Widget build(BuildContext context) => const SizedBox.shrink();
+  Widget build(BuildContext context) => widget.child ?? const SizedBox.shrink();
 }
 
 void main() {
@@ -358,5 +363,111 @@ void main() {
     verify(() => player.toggleLyrics()).called(greaterThanOrEqualTo(1));
     verify(() => player.toggleQueue()).called(greaterThanOrEqualTo(1));
     verify(() => player.toggleFavorite()).called(greaterThanOrEqualTo(1));
+  });
+
+  testWidgets('H-50 tablet SafeArea mirrors left/right cutout protection in RTL',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1280, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      MultiBlocProvider(
+        providers: [
+          BlocProvider<PlayerCubit>.value(value: player),
+          BlocProvider<SettingsCubit>.value(value: settings),
+        ],
+        child: MaterialApp(
+          locale: const Locale('ar'),
+          localizationsDelegates: appLocalizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: MediaQuery(
+            data: const MediaQueryData(
+              size: Size(1280, 900),
+              padding: EdgeInsets.only(left: 44, right: 0),
+              disableAnimations: true,
+            ),
+            child: AppShell(
+              navigationShell: _FakeNavigationShell(
+                currentIndex: 0,
+                onGoBranch: (_, {initialLocation = false}) {},
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final safeAreas = tester.widgetList<SafeArea>(find.byType(SafeArea));
+    expect(
+      safeAreas.any((sa) => sa.left == true && sa.right == false),
+      isTrue,
+    );
+  });
+
+  testWidgets(
+      'M-08 re-tapping active branch jumps active visible Scrollable to top under Reduce Motion without touching Offstage branches',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final activeController = ScrollController(initialScrollOffset: 240);
+    final hiddenController = ScrollController(initialScrollOffset: 240);
+    addTearDown(activeController.dispose);
+    addTearDown(hiddenController.dispose);
+
+    await tester.pumpWidget(
+      MultiBlocProvider(
+        providers: [
+          BlocProvider<PlayerCubit>.value(value: player),
+        ],
+        child: MaterialApp(
+          localizationsDelegates: appLocalizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: MediaQuery(
+            data: const MediaQueryData(
+              size: Size(390, 844),
+              disableAnimations: true,
+            ),
+            child: AppShell(
+              navigationShell: _FakeNavigationShell(
+                currentIndex: 0,
+                onGoBranch: (_, {initialLocation = false}) {},
+                child: Stack(
+                  children: [
+                    Offstage(
+                      offstage: true,
+                      child: ListView.builder(
+                        controller: hiddenController,
+                        itemCount: 50,
+                        itemBuilder: (_, i) => SizedBox(height: 60, child: Text('Hidden $i')),
+                      ),
+                    ),
+                    ListView.builder(
+                      controller: activeController,
+                      itemCount: 50,
+                      itemBuilder: (_, i) => SizedBox(height: 60, child: Text('Visible $i')),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(activeController.offset, 240.0);
+    expect(hiddenController.offset, 240.0);
+
+    final dock =
+        tester.widget<StackedBottomDock>(find.byType(StackedBottomDock));
+    dock.onTapNav(0);
+    await tester.pump();
+
+    expect(activeController.offset, 0.0);
+    expect(hiddenController.offset, 240.0);
+    expect(tester.takeException(), isNull);
   });
 }

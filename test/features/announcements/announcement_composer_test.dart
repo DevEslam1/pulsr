@@ -1,6 +1,12 @@
 // test/features/announcements/announcement_composer_test.dart
+import 'dart:ui';
+
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/features/announcements/announcement_composer.dart';
+import 'package:pulsr/features/announcements/announcement_strings.dart';
+import 'package:pulsr/features/announcements/tts_engine.dart';
+import 'package:pulsr/l10n/generated/app_localizations.dart';
 
 void main() {
   const track = AnnouncementTrack(
@@ -155,6 +161,49 @@ void main() {
 
     test('returns empty text for a non-positive limit', () {
       expect(truncateOnWordBoundary('anything', 0), '');
+    });
+  });
+
+  group('H-47 & M-08 regressions', () {
+    test('composes localized year and track number across en/ar/es', () {
+      for (final code in ['en', 'ar', 'es']) {
+        final l10n = lookupAppLocalizations(Locale(code));
+        final spoken = composeAnnouncement(
+          [
+            AnnouncementElement.title,
+            AnnouncementElement.year,
+            AnnouncementElement.trackNumber,
+          ],
+          track,
+          formatYear: (y) => AnnouncementStrings.yearLabel(y, l10n),
+          formatTrackNumber: (n) =>
+              AnnouncementStrings.trackNumberLabel(n, l10n),
+        );
+        expect(spoken, contains(l10n.annFromYear(1959)), reason: code);
+        expect(spoken, contains(l10n.annTrackNumber(3)), reason: code);
+      }
+    });
+
+    test('MethodChannelTtsEngine.init deduplicates concurrent calls', () async {
+      TestWidgetsFlutterBinding.ensureInitialized();
+      const channel = MethodChannel('test.pulsr/tts_dedup');
+      var initCalls = 0;
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+        if (call.method == 'init') {
+          initCalls++;
+          await Future<void>.delayed(const Duration(milliseconds: 10));
+          return true;
+        }
+        return null;
+      });
+      addTearDown(() => TestDefaultBinaryMessengerBinding
+          .instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, null));
+
+      final engine = MethodChannelTtsEngine(channel: channel);
+      await Future.wait([engine.init(), engine.init(), engine.init()]);
+      expect(initCalls, 1);
     });
   });
 }

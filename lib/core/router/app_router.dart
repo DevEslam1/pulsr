@@ -5,6 +5,7 @@ import '../../data/db/app_database.dart';
 import '../../data/scanner/media_scanner_service.dart';
 import '../config/app_config.dart';
 import '../errors/failures.dart';
+import '../motion/pulsr_motion.dart';
 import '../theme/pulsr_page_transitions.dart';
 import '../utils/l10n_extensions.dart';
 import '../widgets/ticker_gated_branch_container.dart';
@@ -35,6 +36,7 @@ import '../../features/search/presentation/search_screen.dart';
 import '../../features/settings/presentation/proxy_settings_screen.dart';
 import '../../features/settings/presentation/settings_screen.dart';
 import '../../features/shell/presentation/app_shell.dart';
+import '../../features/shell/presentation/widgets/player_shortcut_scope.dart';
 import '../../features/smart_playlist_builder/smart_playlist_builder_screen.dart';
 import '../../features/splash/presentation/splash_screen.dart';
 import '../../features/tag_editor/tag_editor_screen.dart';
@@ -88,20 +90,108 @@ String _resolveCurrentOutputDeviceKey() {
   return '${type}_$name';
 }
 
+class _ShortcutMaterialPage<T> extends MaterialPage<T> {
+  const _ShortcutMaterialPage({
+    required super.child,
+    super.key,
+    super.restorationId,
+  });
+
+  @override
+  Route<T> createRoute(BuildContext context) {
+    return _ShortcutMaterialPageRoute<T>(
+      page: this,
+      allowSnapshotting: allowSnapshotting,
+    );
+  }
+}
+
+class _ShortcutMaterialPageRoute<T> extends PageRoute<T>
+    with MaterialRouteTransitionMixin<T> {
+  _ShortcutMaterialPageRoute({
+    required MaterialPage<T> page,
+    super.allowSnapshotting,
+  }) : super(settings: page) {
+    assert(opaque);
+  }
+
+  MaterialPage<T> get _page => settings as MaterialPage<T>;
+
+  @override
+  Widget buildContent(BuildContext context) =>
+      PlayerShortcutScope.wrapPlayer(child: _page.child);
+
+  @override
+  bool get maintainState => _page.maintainState;
+
+  @override
+  bool get fullscreenDialog => _page.fullscreenDialog;
+
+  @override
+  String get debugLabel => '${super.debugLabel}(${_page.name})';
+}
+
+class _ShortcutPulsrNowPlayingPage<T> extends PulsrNowPlayingPage<T> {
+  const _ShortcutPulsrNowPlayingPage({
+    required super.child,
+    super.key,
+    super.name,
+    super.restorationId,
+  });
+
+  @override
+  Route<T> createRoute(BuildContext context) {
+    return PageRouteBuilder<T>(
+      settings: this,
+      opaque: false,
+      barrierColor: Colors.transparent,
+      transitionDuration: PulsrMotion.page,
+      reverseTransitionDuration: PulsrMotion.layout,
+      pageBuilder: (routeContext, animation, secondaryAnimation) =>
+          PlayerShortcutScope.wrapPlayer(child: child),
+      transitionsBuilder:
+          (routeContext, animation, secondaryAnimation, builtChild) {
+        if (!routeContext.motionEnabled) return builtChild;
+        final curved = CurvedAnimation(
+          parent: animation,
+          curve: PulsrMotion.enter,
+          reverseCurve: PulsrMotion.exit,
+        );
+        return SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(0.0, 1.0),
+            end: Offset.zero,
+          ).animate(curved),
+          child: builtChild,
+        );
+      },
+    );
+  }
+}
+
 Page<dynamic> _buildPulsrPageRoute({
   required LocalKey key,
   required Widget child,
+  bool wrapShortcuts = true,
 }) {
   // A MaterialPage (not a CustomTransitionPage) is what lets
   // PageTransitionsTheme run: Android gets the predictive-back preview,
   // iOS/macOS keep the interactive edge-swipe, desktop keeps Pulsr's tuned
   // slide via PulsrPageTransitionsBuilder.
+  // Route-derived keys (ValueKey('/album/42')) are stable across relaunches,
+  // so the navigator can restore the stack after process death.
+  final restorationId = key is ValueKey<String> ? key.value : null;
+  if (wrapShortcuts) {
+    return _ShortcutMaterialPage<void>(
+      key: key,
+      child: child,
+      restorationId: restorationId,
+    );
+  }
   return MaterialPage<void>(
     key: key,
     child: child,
-    // Route-derived keys (ValueKey('/album/42')) are stable across relaunches,
-    // so the navigator can restore the stack after process death.
-    restorationId: key is ValueKey<String> ? key.value : null,
+    restorationId: restorationId,
   );
 }
 
@@ -417,6 +507,7 @@ GoRouter createRouter(MediaScannerService scannerService,
         pageBuilder: (context, state) => _buildPulsrPageRoute(
           key: state.pageKey,
           child: const SplashScreen(),
+          wrapShortcuts: false,
         ),
       ),
       GoRoute(
@@ -425,6 +516,7 @@ GoRouter createRouter(MediaScannerService scannerService,
         pageBuilder: (context, state) => _buildPulsrPageRoute(
           key: state.pageKey,
           child: OnboardingScreen(scannerService: scannerService),
+          wrapShortcuts: false,
         ),
       ),
       StatefulShellRoute(
@@ -549,7 +641,7 @@ GoRouter createRouter(MediaScannerService scannerService,
         path: '/now-playing',
         name: 'now-playing',
         parentNavigatorKey: rootNavigatorKey,
-        pageBuilder: (context, state) => PulsrNowPlayingPage<void>(
+        pageBuilder: (context, state) => _ShortcutPulsrNowPlayingPage<void>(
           key: state.pageKey,
           name: state.name,
           restorationId: state.name,

@@ -45,17 +45,8 @@ class SettingsQuickControlsStrip extends StatelessWidget {
     this.onOpenAudioEngine,
   });
 
-  static String quickControlsHeading(BuildContext context) {
-    final code = Localizations.maybeLocaleOf(context)?.languageCode ?? 'en';
-    switch (code) {
-      case 'ar':
-        return 'عناصر التحكم السريعة';
-      case 'es':
-        return 'Controles rápidos';
-      default:
-        return 'Quick Controls';
-    }
-  }
+  static String quickControlsHeading(BuildContext context) =>
+      context.l10n.settingsQuickControls;
 
   @override
   Widget build(BuildContext context) {

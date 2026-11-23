@@ -203,6 +203,7 @@ mixin SettingsProxyActions on PulsrCubit<SettingsState> {
     }
 
     if (addedCount > 0) {
+      markDirty('proxyList');
       safeEmit(state.copyWith(proxyList: existing));
       await _saveProxyList(existing);
       if (autoSelectFirst && existing.isNotEmpty) {
@@ -226,6 +227,7 @@ mixin SettingsProxyActions on PulsrCubit<SettingsState> {
     } else {
       existing.add(entry);
     }
+    markDirty('proxyList');
     safeEmit(state.copyWith(proxyList: existing));
     await _saveProxyList(existing);
     if (autoSelect) {
@@ -236,12 +238,14 @@ mixin SettingsProxyActions on PulsrCubit<SettingsState> {
   /// Removes a proxy from the pool by ID.
   Future<void> removeProxyEntry(String id) async {
     final updated = state.proxyList.where((e) => e.id != id).toList();
+    markDirty('proxyList');
     safeEmit(state.copyWith(proxyList: updated));
     await _saveProxyList(updated);
   }
 
   /// Clears the entire proxy pool.
   Future<void> clearProxyList() async {
+    markDirty('proxyList');
     safeEmit(state.copyWith(proxyList: []));
     await _saveProxyList([]);
   }
@@ -285,6 +289,7 @@ mixin SettingsProxyActions on PulsrCubit<SettingsState> {
         if (isClosed) return;
         _mergeProxyEntries({for (final e in probed) e.id: e});
       }
+      markDirty('proxyList');
       await _saveProxyList(state.proxyList);
     } finally {
       safeEmit(state.copyWith(isTestingAllProxies: false));
@@ -335,6 +340,7 @@ mixin SettingsProxyActions on PulsrCubit<SettingsState> {
 
     final probed = await _probeProxyEntry(entry);
     if (isClosed) return;
+    markDirty('proxyList');
     _mergeProxyEntries({id: probed});
     await _saveProxyList(state.proxyList);
   }
@@ -350,12 +356,14 @@ mixin SettingsProxyActions on PulsrCubit<SettingsState> {
       if (a.isWorking != true && b.isWorking == true) return 1;
       return 0;
     });
+    markDirty('proxyList');
     safeEmit(state.copyWith(proxyList: list));
     await _saveProxyList(list);
   }
 
   // Requires: provided by the composing class (same library).
   FlutterSecureStorage get _secureStorage;
+  void markDirty(String field);
 
   // Requires: provided by the composing class (same library).
   // ignore: unused_element

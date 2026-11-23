@@ -184,10 +184,7 @@ mixin SettingsAppearanceSection
           value: state.autoThemeByTime,
           onChanged: cubit.setAutoThemeByTime,
         ),
-        if (state.autoThemeByTime) ...[
-          const ThemeScheduleRow(),
-          _divider(p),
-        ],
+        if (state.autoThemeByTime) const ThemeScheduleRow(),
         _divider(p),
         _navTile(
           context,
@@ -397,8 +394,8 @@ mixin SettingsAppearanceSection
             return _switchTile(
               context,
               Icons.volume_up_rounded,
-              'UI Sound Effects',
-              'Play subtle audio feedback for interactions',
+              context.l10n.settingsUiSoundEffects,
+              context.l10n.settingsUiSoundEffectsSubtitle,
               value: soundEnabled,
               onChanged: (val) => SoundFeedbackService.setEnabled(val),
             );
@@ -408,8 +405,8 @@ mixin SettingsAppearanceSection
         _switchTile(
           context,
           Icons.motion_photos_on_rounded,
-          'Spotify Canvas / Motion Artwork',
-          'Play looping video backdrops for supported tracks (Spotify, Apple Music, Tidal)',
+          context.l10n.settingsCanvasTitle,
+          context.l10n.settingsCanvasSubtitle,
           value: state.canvasEnabled,
           onChanged: cubit.toggleCanvasEnabled,
         ),
@@ -418,8 +415,8 @@ mixin SettingsAppearanceSection
           _switchTile(
             context,
             Icons.fullscreen_rounded,
-            'Full-Screen Ambient Backdrop',
-            'Display looping video blurred behind Now Playing controls instead of inside artwork card',
+            context.l10n.settingsCanvasBackdropTitle,
+            context.l10n.settingsCanvasBackdropSubtitle,
             value: state.canvasAsBackdrop,
             onChanged: cubit.setCanvasAsBackdrop,
           ),
@@ -482,7 +479,8 @@ mixin SettingsAppearanceSection
                   min: 0.0,
                   max: 1.0,
                   divisions: 20,
-                  onChanged: cubit.setLiquidGlassTint,
+                  onChanged: cubit.previewLiquidGlassTint,
+                  onChangeEnd: cubit.setLiquidGlassTint,
                 ),
               ),
             ],
