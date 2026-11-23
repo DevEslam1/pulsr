@@ -34,8 +34,8 @@ void main() {
     }
 
     Set<String> navigationTargets() {
-      // Matches context.push('/x'), context.go('/y'), .push('/z'), .go('/w').
-      final exp = RegExp(r"""(?:\.push|\.go)\(\s*'([^'?]+)""");
+      // Matches context.push('/x'), context.pushDebounced('/x'), context.go('/y'), .push('/z'), .go('/w').
+      final exp = RegExp(r"""(?:\.push(?:Debounced)?|\.go)\(\s*'([^'?]+)""");
       final targets = <String>{};
       for (final source in libSources.values) {
         for (final m in exp.allMatches(source)) {
@@ -84,7 +84,7 @@ void main() {
       // These routes accept data via `extra:` only; pushing a sub-path
       // (e.g. /album/5) always lands on Page Not Found.
       final exp = RegExp(
-        r"""\.push\(\s*'((?:/album|/artist|/genre|/year|/playlist|/folder|/tag-editor)/[^']*)'""",
+        r"""\.push(?:Debounced)?\(\s*'((?:/album|/artist|/genre|/year|/playlist|/folder|/tag-editor)/[^']*)'""",
       );
       final offenders = <String>[];
       for (final entry in libSources.entries) {

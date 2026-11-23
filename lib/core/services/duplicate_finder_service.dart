@@ -77,9 +77,10 @@ class DuplicateFinderService {
       }
       final normTitle = _normalizeString(song.title);
       final normArtist = _normalizeString(song.artist);
-      final titleArtistKey = '$normTitle-$normArtist';
-
-      byTitleArtist.putIfAbsent(titleArtistKey, () => []).add(song);
+      if (normTitle.isNotEmpty && normArtist.isNotEmpty) {
+        final titleArtistKey = '$normTitle-$normArtist';
+        byTitleArtist.putIfAbsent(titleArtistKey, () => []).add(song);
+      }
 
       if (song.durationMs > 10000 && song.fileSize != null) {
         final durationBucket = (song.durationMs / 1000).round();
@@ -197,9 +198,6 @@ class DuplicateFinderService {
       return !unknownA && !unknownB && albumA == albumB;
     }
     final diffMs = (a.durationMs - b.durationMs).abs();
-    if ((unknownA || unknownB) && diffMs > 2000) {
-      return false;
-    }
     final tagsA = _extractVersionTags(a.title);
     final tagsB = _extractVersionTags(b.title);
     if (tagsA != tagsB && (tagsA.isNotEmpty || tagsB.isNotEmpty)) {

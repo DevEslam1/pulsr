@@ -400,6 +400,7 @@ class TabletSideInspectorState extends State<TabletSideInspector> {
 
             // Start-edge non-overlapping drag-to-resize divider handle (12dp strip)
             SizedBox(
+              key: const Key('tablet_inspector_resize_handle'),
               width: 12,
               child: MouseRegion(
                 cursor: SystemMouseCursors.resizeLeftRight,

@@ -3,6 +3,13 @@ import 'package:flutter/widgets.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../utils/l10n_holder.dart';
 
+AppLocalizations? _safeL10n(BuildContext context) {
+  if (context is Element && context.mounted) {
+    return AppLocalizations.of(context) ?? L10nHolder.current;
+  }
+  return L10nHolder.current;
+}
+
 /// Localizes English-only error strings emitted by cubits and services (which
 /// have no `BuildContext`) at the display site. Covers player, YouTube Music,
 /// auth, downloads, and library errors.
@@ -10,7 +17,7 @@ import '../utils/l10n_holder.dart';
 /// Unknown or changed literals pass through untouched, so the UI never breaks
 /// when a new message appears before a key exists for it.
 String resolveUiErrorMessage(BuildContext context, String message) {
-  final l10n = AppLocalizations.of(context) ?? L10nHolder.current;
+  final l10n = _safeL10n(context);
   if (l10n == null) return message;
 
   switch (message) {
@@ -239,7 +246,7 @@ class ErrorMessageResolver {
   const ErrorMessageResolver._();
 
   static String resolveUserFriendly(BuildContext context, Object error) {
-    final l10n = AppLocalizations.of(context) ?? L10nHolder.current;
+    final l10n = _safeL10n(context);
 
     final raw = error.toString().toLowerCase();
     if (raw.contains('socketexception') ||

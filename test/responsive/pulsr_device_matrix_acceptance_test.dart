@@ -247,10 +247,8 @@ void main() {
     );
     expect(state.customWidth, 420.0);
 
-    // Find the 48px-wide handle PositionedDirectional
-    final handleFinder = find.byWidgetPredicate(
-      (w) => w is PositionedDirectional && w.width == 48.0,
-    );
+    // Find the start-edge resize handle
+    final handleFinder = find.byKey(const Key('tablet_inspector_resize_handle'));
     expect(handleFinder, findsOneWidget);
 
     final handleCenter = tester.getCenter(handleFinder);
