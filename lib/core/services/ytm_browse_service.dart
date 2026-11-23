@@ -65,6 +65,7 @@ class YtmBrowseService {
   DateTime? _lastFetchTime;
   List<YtmBrowseSection>? _cachedSections;
   Completer<List<YtmBrowseSection>>? _pendingFeed;
+  int _cacheEpoch = 0;
 
   @factoryMethod
   static YtmBrowseService create(YtmService ytmService) =>
@@ -83,6 +84,7 @@ class YtmBrowseService {
   /// dropped; otherwise callers already awaiting [_pendingFeed] would hang
   /// forever once the reference is nulled.
   void clearCache() {
+    _cacheEpoch++;
     _cachedSections = null;
     _lastFetchTime = null;
     final pending = _pendingFeed;
@@ -104,6 +106,7 @@ class YtmBrowseService {
       }
     }
     if (_pendingFeed != null) return _pendingFeed!.future;
+    final epoch = _cacheEpoch;
     final completer = _pendingFeed = Completer<List<YtmBrowseSection>>();
     try {
       Object? firstError;
@@ -163,7 +166,7 @@ class YtmBrowseService {
       if (sections.isEmpty && error != null) {
         Error.throwWithStackTrace(error, firstStack ?? StackTrace.current);
       }
-      if (sections.isNotEmpty) {
+      if (epoch == _cacheEpoch && sections.isNotEmpty) {
         _cachedSections = sections;
         _lastFetchTime = _now();
       }
@@ -204,6 +207,7 @@ class YtmBrowseService {
       throw ArgumentError.value(section.title, 'section', 'Unknown section');
     }
 
+    final epoch = _cacheEpoch;
     final items = switch (id) {
       YtmBrowseSection.chartsId => await _getTrendingCharts(strict: true),
       YtmBrowseSection.newReleasesId => await _getNewReleases(strict: true),
@@ -218,11 +222,22 @@ class YtmBrowseService {
       items: items,
     );
     final cached = _cachedSections;
-    if (cached != null && items.isNotEmpty) {
-      _cachedSections = List<YtmBrowseSection>.unmodifiable([
+    if (epoch == _cacheEpoch && cached != null && items.isNotEmpty) {
+      var found = false;
+      final updated = <YtmBrowseSection>[
         for (final existing in cached)
-          if (existing.id == id) refreshed else existing,
-      ]);
+          if (existing.id == id)
+            () {
+              found = true;
+              return refreshed;
+            }()
+          else
+            existing,
+      ];
+      if (!found) {
+        updated.add(refreshed);
+      }
+      _cachedSections = List<YtmBrowseSection>.unmodifiable(updated);
       _lastFetchTime = _now();
     }
     return refreshed;
@@ -298,6 +313,17 @@ class YtmBrowseService {
   Future<List<YtmBrowseItem>> _getNewReleases({bool strict = false}) async {
     Object? lastError;
     StackTrace? lastStack;
+    try {
+      final browseTracks = await _ytmService.browseMusicSection(
+        'FEmusic_new_releases',
+        limit: 15,
+      );
+      if (browseTracks.isNotEmpty) return _mapTracks(browseTracks);
+    } catch (e, st) {
+      lastError = e;
+      lastStack = st;
+    }
+
     try {
       final onlineTracks =
           await _ytmService.searchWithFallback('New Music Releases', limit: 15);

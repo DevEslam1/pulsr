@@ -35,6 +35,8 @@ mixin _MusicRepositoryTagsAndFacets {
     int? year,
     int? trackNumber,
     int? discNumber,
+    String? albumArtist,
+    bool? isCompilation,
   }) async {
     try {
       final existing = await (_db.select(_db.songsTable)
@@ -64,6 +66,7 @@ mixin _MusicRepositoryTagsAndFacets {
           final oldArtistId = existing.artistId;
           final trimmedArtist = safeArtist.trim();
           final trimmedAlbum = safeAlbum.trim();
+          final explicitAlbumArtist = albumArtist?.trim();
 
           // Rename single-owner artist/album rows in place so IDs stay stable,
           // while splitting out shared rows or resolving existing target rows
@@ -99,43 +102,61 @@ mixin _MusicRepositoryTagsAndFacets {
 
           int? newAlbumId;
           if (trimmedAlbum.isNotEmpty) {
+            final oldAlbumRow = oldAlbumId != null
+                ? await (_db.select(_db.albumsTable)
+                      ..where((t) => t.id.equals(oldAlbumId))
+                      ..limit(1))
+                    .getSingleOrNull()
+                : null;
+            final otherWithAlbum = oldAlbumId != null
+                ? await (_db.select(_db.songsTable)
+                      ..where((t) =>
+                          t.albumId.equals(oldAlbumId) &
+                          t.id.equals(existing.id).not())
+                      ..limit(1))
+                    .getSingleOrNull()
+                : null;
+            final preservesCompilationOwner = oldAlbumRow != null &&
+                oldAlbumRow.title.toLowerCase() == trimmedAlbum.toLowerCase() &&
+                (otherWithAlbum != null ||
+                    oldAlbumRow.artist.toLowerCase() == 'various artists');
+            final effectiveAlbumArtist = (explicitAlbumArtist != null &&
+                    explicitAlbumArtist.isNotEmpty)
+                ? explicitAlbumArtist
+                : (isCompilation == true
+                    ? 'Various Artists'
+                    : (preservesCompilationOwner
+                        ? oldAlbumRow.artist
+                        : trimmedArtist));
+            final albumArtistId = effectiveAlbumArtist.toLowerCase() ==
+                    trimmedArtist.toLowerCase()
+                ? newArtistId
+                : await _findOrCreateArtistId(effectiveAlbumArtist);
+
             final existingAlbum = await (_db.select(_db.albumsTable)
                   ..where((t) =>
                       t.title.lower().equals(trimmedAlbum.toLowerCase()) &
-                      t.artist.lower().equals(trimmedArtist.toLowerCase()))
+                      t.artist
+                          .lower()
+                          .equals(effectiveAlbumArtist.toLowerCase()))
                   ..limit(1))
                 .getSingleOrNull();
             if (existingAlbum != null) {
               newAlbumId = existingAlbum.id;
-            } else if (oldAlbumId != null) {
-              final otherWithAlbum = await (_db.select(_db.songsTable)
-                    ..where((t) =>
-                        t.albumId.equals(oldAlbumId) &
-                        t.id.equals(existing.id).not())
-                    ..limit(1))
-                  .getSingleOrNull();
-              if (otherWithAlbum == null) {
-                await (_db.update(_db.albumsTable)
-                      ..where((t) => t.id.equals(oldAlbumId)))
-                    .write(AlbumsTableCompanion(
-                  title: Value(trimmedAlbum),
-                  artist: Value(trimmedArtist),
-                  artistId: Value(newArtistId),
-                ));
-                newAlbumId = oldAlbumId;
-              } else {
-                newAlbumId = await _findOrCreateAlbumId(
-                  albumTitle: safeAlbum,
-                  artistName: safeArtist,
-                  artistId: newArtistId,
-                  artworkUri: existing.artworkUri,
-                );
-              }
+            } else if (oldAlbumId != null && otherWithAlbum == null) {
+              await (_db.update(_db.albumsTable)
+                    ..where((t) => t.id.equals(oldAlbumId)))
+                  .write(AlbumsTableCompanion(
+                title: Value(trimmedAlbum),
+                artist: Value(effectiveAlbumArtist),
+                artistId: Value(albumArtistId),
+              ));
+              newAlbumId = oldAlbumId;
             } else {
               newAlbumId = await _findOrCreateAlbumId(
                 albumTitle: safeAlbum,
-                artistName: safeArtist,
-                artistId: newArtistId,
+                artistName: effectiveAlbumArtist,
+                artistId: albumArtistId,
                 artworkUri: existing.artworkUri,
               );
             }
@@ -154,6 +175,22 @@ mixin _MusicRepositoryTagsAndFacets {
               year: Value(year),
               trackNumber: Value(trackNumber),
               discNumber: Value(discNumber),
+            ),
+          );
+
+          // Propagate container-level album/genre/year metadata to CUE chapter
+          // rows sharing this file path without clobbering chapter titles/numbers.
+          await (_db.update(_db.songsTable)
+                ..where((t) =>
+                    t.path.lower().equals(path.toLowerCase()) &
+                    t.source.equals(SongSource.local) &
+                    t.cueStartMs.isNotNull()))
+              .write(
+            SongsTableCompanion(
+              album: Value(safeAlbum),
+              albumId: Value(newAlbumId),
+              genre: Value(genre),
+              year: Value(year),
             ),
           );
 
@@ -249,6 +286,20 @@ mixin _MusicRepositoryTagsAndFacets {
   Stream<Result<List<GenreItem>>> watchGenres({
     List<String> excludedFolders = const [],
   }) {
+    if (excludedFolders.isEmpty) {
+      return _db
+          .select(_db.excludedFoldersTable)
+          .watch()
+          .switchMap((rows) => _watchGenresInternal(
+                rows.map((r) => r.folderPath).toList(growable: false),
+              ));
+    }
+    return _watchGenresInternal(excludedFolders);
+  }
+
+  Stream<Result<List<GenreItem>>> _watchGenresInternal(
+    List<String> excludedFolders,
+  ) {
     try {
       final countExp = _db.songsTable.id.count();
       final query = _db.selectOnly(_db.songsTable)
@@ -391,6 +442,20 @@ mixin _MusicRepositoryTagsAndFacets {
   Stream<Result<List<YearItem>>> watchYears({
     List<String> excludedFolders = const [],
   }) {
+    if (excludedFolders.isEmpty) {
+      return _db
+          .select(_db.excludedFoldersTable)
+          .watch()
+          .switchMap((rows) => _watchYearsInternal(
+                rows.map((r) => r.folderPath).toList(growable: false),
+              ));
+    }
+    return _watchYearsInternal(excludedFolders);
+  }
+
+  Stream<Result<List<YearItem>>> _watchYearsInternal(
+    List<String> excludedFolders,
+  ) {
     try {
       final countExp = _db.songsTable.id.count();
       final query = _db.selectOnly(_db.songsTable)

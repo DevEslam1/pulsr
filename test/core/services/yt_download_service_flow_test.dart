@@ -516,17 +516,39 @@ void main() {
           reason: 'the transfer must never start on a full disk');
     });
 
-    test('reports a body shorter than half the estimate as incomplete',
+    test(
+        'reports an unknown-length body shorter than half the estimate as incomplete',
+        () async {
+      server = (request) async => FakeResponse(
+            statusCode: 200,
+            body: _m4aBody(3000),
+            fixedContentLength: -1,
+          );
+
+      final result = await service.download(_song());
+
+      result.match(
+        (failure) => expect(
+          failure.message,
+          anyOf(
+            startsWith('Download incomplete'),
+            contains('Suspiciously small download'),
+          ),
+        ),
+        (_) => fail('expected a failure'),
+      );
+      expect(writeTagsCalls, 0);
+    });
+
+    test(
+        'accepts a short VBR body when HTTP Content-Length verifies the full payload',
         () async {
       server = (request) async => sequential(_m4aBody(3000));
 
       final result = await service.download(_song());
 
-      result.match(
-        (failure) => expect(failure.message, startsWith('Download incomplete')),
-        (_) => fail('expected a failure'),
-      );
-      expect(writeTagsCalls, 0);
+      expect(result.isRight(), isTrue);
+      expect(writeTagsCalls, 1);
     });
 
     test('fails when MediaStore returns no path', () async {

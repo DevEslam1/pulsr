@@ -59,6 +59,9 @@ class DownloadRepositoryImpl implements IDownloadRepository {
   final Set<String> _activeVideoIds = {};
   final Set<String> _pausedVideoIds = {};
   final Set<String> _pausingVideoIds = {};
+  final Set<String> _deletingVideoIds = {};
+  int _nextExecutionToken = 0;
+  final Map<String, int> _activeRunTokens = {};
 
   /// Tasks paused automatically — by the Wi-Fi/offline policy or by a lost
   /// connection — not by the user. Only these are auto-resumed when the
@@ -160,6 +163,17 @@ class DownloadRepositoryImpl implements IDownloadRepository {
     }
 
     await _reloadSettings();
+
+    // If an earlier canceled/deleted run for this videoId is still unwinding,
+    // wait for it to finish cleanly before queuing a fresh attempt.
+    final prior = _tasks[videoId];
+    final priorCompleter = _activeCompleters[videoId];
+    if (priorCompleter != null &&
+        !priorCompleter.isCompleted &&
+        (prior == null || !prior.status.isActive)) {
+      await priorCompleter.future
+          .timeout(const Duration(seconds: 10), onTimeout: () {});
+    }
 
     // Refuse before admitting the task: a Wi-Fi-only/offline-only download used
     // to be accepted, shown as queued, and only then fail mid-transfer.
@@ -457,7 +471,8 @@ class DownloadRepositoryImpl implements IDownloadRepository {
 
   @override
   Future<Either<AppFailure, Unit>> deleteDownload(String videoId) async {
-    var task = _tasks[videoId];
+    final task = _tasks.remove(videoId);
+    _deletingVideoIds.add(videoId);
     _pausedVideoIds.remove(videoId);
     _pausingVideoIds.remove(videoId);
     _autoPausedVideoIds.remove(videoId);
@@ -466,78 +481,69 @@ class DownloadRepositoryImpl implements IDownloadRepository {
     // paused marker (C-7).
     _ytDownloadService.clearPaused(videoId);
 
-    // Delete-while-downloading race: cancel → await job completion → then delete
-    if (_activeVideoIds.contains(videoId)) {
-      _ytDownloadService.cancel(videoId);
+    try {
+      // Delete-while-downloading race: cancel → await job completion → then delete
       final completer = _activeCompleters[videoId];
-      if (completer != null && !completer.isCompleted) {
-        try {
-          await completer.future.timeout(const Duration(seconds: 5));
-        } catch (_) {}
-      }
-      // Re-read: the job may have completed during the wait, and only the
-      // completed row knows the local id/file path that must be removed.
-      task = _tasks[videoId] ?? task;
-      final filePath = task?.filePath;
-      if (filePath != null) {
-        try {
-          final f = File(filePath);
-          if (await f.exists()) {
-            final len1 = await f.length();
-            await Future<void>.delayed(const Duration(milliseconds: 500));
+      if (_activeVideoIds.contains(videoId) || completer != null) {
+        _ytDownloadService.cancel(videoId);
+        if (completer != null && !completer.isCompleted) {
+          try {
+            await completer.future.timeout(const Duration(seconds: 10));
+          } catch (_) {}
+        }
+        final filePath =
+            task?.filePath ?? _ytDownloadService.getDownloadedPath(videoId);
+        if (filePath != null) {
+          try {
+            final f = File(filePath);
             if (await f.exists()) {
-              final len2 = await f.length();
-              if (len2 > len1) {
-                // File is still being actively written, wait additional grace period
-                await Future<void>.delayed(const Duration(seconds: 5));
+              final len1 = await f.length();
+              await Future<void>.delayed(const Duration(milliseconds: 500));
+              if (await f.exists()) {
+                final len2 = await f.length();
+                if (len2 > len1) {
+                  // File is still being actively written, wait additional grace period
+                  await Future<void>.delayed(const Duration(seconds: 5));
+                }
               }
             }
-          }
+          } catch (_) {}
+        }
+      }
+
+      _ytDownloadService.releaseForeground(videoId);
+      // A late progress tick or a queued flush must not keep the deleted task's
+      // bookkeeping alive.
+      _throttleFlushTimers.remove(videoId)?.cancel();
+      _pendingThrottledTasks.remove(videoId);
+      _lastProgressEmitMs.remove(videoId);
+      _lastProgressPersistMs.remove(videoId);
+
+      // Clean scratch files only once no active execution holds them; if a
+      // platform hang timed out, _executeTask's finally will clean once released.
+      if (!_activeVideoIds.contains(videoId)) {
+        try {
+          await _ytDownloadService.deleteArtifactsFor(videoId);
+          await _ytDownloadService.cleanOrphanPartFiles(
+              protectedVideoIds: _tasks.keys.toSet());
         } catch (_) {}
       }
-      _activeVideoIds.remove(videoId);
-      _activeCompleters.remove(videoId);
+
+      await _libraryMaintenance.removeDownloadedArtifacts(
+        localSongId: task?.localSongId,
+        filePath: task?.filePath,
+        contentUri: task?.contentUri ??
+            _ytDownloadService.getDownloadedContentUri(videoId),
+      );
+      _ytDownloadService.forgetDownloadedPath(videoId);
+
+      _cachedStorageStats = null; // Invalidate storage cache
+      _schedulePersist();
+      return const Right(unit);
+    } finally {
+      _deletingVideoIds.remove(videoId);
+      _processQueue();
     }
-
-    _tasks.remove(videoId);
-    _ytDownloadService.releaseForeground(videoId);
-    // A late progress tick or a queued flush must not keep the deleted task's
-    // bookkeeping alive.
-    _throttleFlushTimers.remove(videoId)?.cancel();
-    _pendingThrottledTasks.remove(videoId);
-    _lastProgressEmitMs.remove(videoId);
-    _lastProgressPersistMs.remove(videoId);
-
-    // Scratch files: the service owns the cache directory and the naming, so it
-    // does the targeted delete. The orphan sweep is a second pass for genuine
-    // leftovers, and every task still on the books is named so that a paused
-    // download's partial survives it — the old call passed `activePartNames: {}`,
-    // protecting nothing.
-    try {
-      await _ytDownloadService.deleteArtifactsFor(videoId);
-      await _ytDownloadService.cleanOrphanPartFiles(
-          protectedVideoIds: _tasks.keys.toSet());
-    } catch (_) {}
-
-    // Delete the library row and file this download produced. Leaving the row
-    // behind was the "ghost track" bug: it stayed in the library until a full
-    // scan, and `downloadAllDetailed` then refused to re-download an
-    // `isDownloaded` row whose file was gone.
-    await _libraryMaintenance.removeDownloadedArtifacts(
-      localSongId: task?.localSongId,
-      filePath: task?.filePath,
-      contentUri: task?.contentUri ??
-          _ytDownloadService.getDownloadedContentUri(videoId),
-    );
-    _ytDownloadService.forgetDownloadedPath(videoId);
-
-    _cachedStorageStats = null; // Invalidate storage cache
-    // No stopDownloadForeground here: deleting one entry says nothing about the
-    // other two that may still be transferring, and this used to stop the
-    // service unconditionally.
-    _schedulePersist();
-    _processQueue();
-    return const Right(unit);
   }
 
   @override
@@ -1254,10 +1260,17 @@ class DownloadRepositoryImpl implements IDownloadRepository {
   void _processQueue() {
     if (_enforcingPolicy) return;
     _ensurePolicyWatchdog();
+    final deferred = <String>[];
     while (_activeVideoIds.length < _maxConcurrent && _queue.isNotEmpty) {
       final videoId = _queue.removeFirst();
 
-      if (_pausedVideoIds.contains(videoId)) {
+      if (_pausedVideoIds.contains(videoId) ||
+          _deletingVideoIds.contains(videoId)) {
+        continue;
+      }
+
+      if (_activeVideoIds.contains(videoId)) {
+        deferred.add(videoId);
         continue;
       }
 
@@ -1266,8 +1279,15 @@ class DownloadRepositoryImpl implements IDownloadRepository {
         continue;
       }
 
+      final runToken = ++_nextExecutionToken;
       _activeVideoIds.add(videoId);
-      _executeTask(task);
+      _activeRunTokens[videoId] = runToken;
+      _executeTask(task, runToken);
+    }
+    if (deferred.isNotEmpty) {
+      for (final id in deferred.reversed) {
+        _queue.addFirst(id);
+      }
     }
     // The notification's lifetime belongs to YtDownloadService: its queue is the
     // one that actually has jobs in it, and it drains after this one does. This
@@ -1334,10 +1354,35 @@ class DownloadRepositoryImpl implements IDownloadRepository {
     }
   }
 
+  void _releaseExecutionSlot(
+      String videoId, int runToken, Completer<void> completer) {
+    if (_activeRunTokens[videoId] == runToken) {
+      _activeRunTokens.remove(videoId);
+      _activeVideoIds.remove(videoId);
+      _pausingVideoIds.remove(videoId);
+      if (identical(_activeCompleters[videoId], completer)) {
+        _activeCompleters.remove(videoId);
+      }
+    }
+    if (!completer.isCompleted) completer.complete();
+  }
+
   /// Failures worth an automatic retry (network blip, rate limit, bot
   /// challenge, timeout, YouTube 5xx). Permanent ones (video gone, geo block,
-  /// auth required) fail immediately so a dead track doesn't hold a slot.
+  /// auth required, storage exhaustion, 416 range failures) fail immediately.
   static bool _isTransientFailure(AppFailure failure) {
+    if (failure is StorageFailure) return false;
+    final msg = failure.message.toLowerCase();
+    if (msg.contains('canceled') ||
+        msg.contains('cancelled') ||
+        msg.contains('invalid video id') ||
+        msg.contains('storage') ||
+        msg.contains('no space') ||
+        msg.contains('enospc') ||
+        msg.contains('416') ||
+        msg.contains('resume range')) {
+      return false;
+    }
     final cause = failure.error;
     final info = YtmErrorClassifier.classify(cause ?? failure.message);
     switch (info.recoveryAction) {

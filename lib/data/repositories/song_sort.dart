@@ -51,7 +51,7 @@ Expression<String> articleInsensitive(Expression<String> column) {
       CaseWhen(startsWith(lower, 'a '), then: column.substr(3)),
     ],
     orElse: column,
-  );
+  ).collate(Collate.noCase);
 }
 
 /// Ordering terms for the album library: article-insensitive title, then `id`
@@ -96,8 +96,8 @@ void applySongSort(
     'sampleRate' => (t) => OrderingTerm(expression: t.sampleRate, mode: mode),
     'title' =>
       (t) => OrderingTerm(expression: articleInsensitive(t.title), mode: mode),
-    // Unknown keys keep the historical plain-title fallback unchanged.
-    _ => (t) => OrderingTerm(expression: t.title, mode: mode),
+    // Unknown keys keep a case-insensitive title fallback.
+    _ => (t) => OrderingTerm(expression: t.title.collate(Collate.noCase), mode: mode),
   };
   final bool articleOrdered =
       sortBy == 'title' || sortBy == 'artist' || sortBy == 'album';

@@ -31,11 +31,30 @@ extension YtmAccountParsing on YtmAccountService {
       final mainApp = rc['mainAppWebResponseContext'];
       if (mainApp is Map<String, dynamic>) {
         if (mainApp['loggedOut'] == true) return true;
-        if (mainApp['datasyncId'] != null &&
-            (mainApp['datasyncId'] as String).isNotEmpty) {
+        final datasyncId = mainApp['datasyncId'];
+        if (datasyncId is String && datasyncId.isNotEmpty) {
           return false;
         }
       }
+    }
+    final err = json['error'];
+    if (err is Map &&
+        (err['code'] == 401 || err['status'] == 'UNAUTHENTICATED')) {
+      return true;
+    }
+    final alerts = json['alerts'];
+    if (alerts is List) {
+      for (final a in alerts) {
+        final alertText = a.toString().toLowerCase();
+        if (alertText.contains('sign in') ||
+            alertText.contains('login') ||
+            alertText.contains('signed out')) {
+          return true;
+        }
+      }
+    }
+    if (_hasSignInEndpoint(json)) {
+      return true;
     }
     if (json.containsKey('contents') ||
         json.containsKey('header') ||
@@ -44,13 +63,20 @@ extension YtmAccountParsing on YtmAccountService {
         json.containsKey('frameworkUpdates')) {
       return false;
     }
-    final alerts = json['alerts'];
-    if (alerts is List) {
-      for (final a in alerts) {
-        final alertText = a.toString().toLowerCase();
-        if (alertText.contains('sign in') || alertText.contains('login')) {
-          return true;
-        }
+    return false;
+  }
+
+  bool _hasSignInEndpoint(dynamic node, [int depth = 0]) {
+    if (depth > 20) return false;
+    if (node is Map) {
+      if (node.containsKey('signInEndpoint')) return true;
+      for (final val in node.values) {
+        if (_hasSignInEndpoint(val, depth + 1)) return true;
+      }
+    } else if (node is List) {
+      final limit = node.length > 100 ? 100 : node.length;
+      for (var i = 0; i < limit; i++) {
+        if (_hasSignInEndpoint(node[i], depth + 1)) return true;
       }
     }
     return false;
@@ -63,10 +89,13 @@ extension YtmAccountParsing on YtmAccountService {
     if (node is Map<String, dynamic>) {
       // Canonical format: nextContinuationData.continuation
       if (node.containsKey('nextContinuationData')) {
-        return node['nextContinuationData']?['continuation'] as String?;
+        final token = node['nextContinuationData']?['continuation'] as String?;
+        if (token != null && token.isNotEmpty) return token;
       }
       if (node.containsKey('reloadContinuationData')) {
-        return node['reloadContinuationData']?['continuation'] as String?;
+        final token =
+            node['reloadContinuationData']?['continuation'] as String?;
+        if (token != null && token.isNotEmpty) return token;
       }
       // Newer InnerTube format: continuationEndpoint.continuationCommand.token
       if (node.containsKey('continuationEndpoint')) {
@@ -75,24 +104,34 @@ extension YtmAccountParsing on YtmAccountService {
         if (token != null && token.isNotEmpty) return token;
       }
       if (node.containsKey('continuationCommand')) {
-        return node['continuationCommand']?['token'] as String?;
+        final token = node['continuationCommand']?['token'] as String?;
+        if (token != null && token.isNotEmpty) return token;
       }
       if (node.containsKey('nextRadioContinuationData')) {
-        return node['nextRadioContinuationData']?['continuation'] as String?;
+        final token =
+            node['nextRadioContinuationData']?['continuation'] as String?;
+        if (token != null && token.isNotEmpty) return token;
       }
       for (final val in node.values) {
         final token = _extractContinuationToken(val, depth + 1);
-        if (token != null) return token;
+        if (token != null && token.isNotEmpty) return token;
       }
     } else if (node is List) {
       // Cap fan-out to avoid pathological payloads pinning the UI thread.
       final limit = node.length > 500 ? 500 : node.length;
       for (var i = 0; i < limit; i++) {
         final token = _extractContinuationToken(node[i], depth + 1);
-        if (token != null) return token;
+        if (token != null && token.isNotEmpty) return token;
       }
     }
     return null;
+  }
+
+  String _joinRunsText(List<dynamic>? runs, String fallback) {
+    if (runs == null || runs.isEmpty) return fallback;
+    final joined =
+        runs.map((r) => (r is Map ? r['text']?.toString() : null) ?? '').join().trim();
+    return joined.isNotEmpty ? joined : fallback;
   }
 
   List<YtmTrack> _parseInnertubePlaylistTracks(
@@ -159,14 +198,11 @@ extension YtmAccountParsing on YtmAccountService {
               node['playlistPanelVideoRenderer'] as Map<String, dynamic>;
           final videoId = renderer['videoId'] as String?;
           final titleRuns = renderer['title']?['runs'] as List<dynamic>?;
-          final title = titleRuns?.isNotEmpty == true
-              ? titleRuns![0]['text'] as String? ?? 'Unknown Title'
-              : 'Unknown Title';
+          final title = _joinRunsText(titleRuns, 'Unknown Title');
           final artistRuns =
               renderer['shortBylineText']?['runs'] as List<dynamic>?;
-          final artist = artistRuns?.isNotEmpty == true
-              ? artistRuns![0]['text'] as String? ?? 'Unknown Artist'
-              : 'Unknown Artist';
+          final artist =
+              YtmMediaHelpers.firstArtistRun(artistRuns) ?? 'Unknown Artist';
           final lengthRuns = renderer['lengthText']?['runs'] as List<dynamic>?;
           final lengthText = lengthRuns?.isNotEmpty == true
               ? lengthRuns![0]['text'] as String?
@@ -202,9 +238,7 @@ extension YtmAccountParsing on YtmAccountService {
               node['playlistVideoRenderer'] as Map<String, dynamic>;
           final videoId = renderer['videoId'] as String?;
           final titleRuns = renderer['title']?['runs'] as List<dynamic>?;
-          final title = titleRuns?.isNotEmpty == true
-              ? titleRuns![0]['text'] as String? ?? 'Unknown Title'
-              : 'Unknown Title';
+          final title = _joinRunsText(titleRuns, 'Unknown Title');
           final bylineRuns =
               renderer['shortBylineText']?['runs'] as List<dynamic>?;
           final artist =
@@ -247,9 +281,7 @@ extension YtmAccountParsing on YtmAccountService {
 
           if (vid != null && vid.length == 11) {
             final titleRuns = renderer['title']?['runs'] as List<dynamic>?;
-            final title = titleRuns?.isNotEmpty == true
-                ? titleRuns![0]['text'] as String? ?? 'Unknown Title'
-                : 'Unknown Title';
+            final title = _joinRunsText(titleRuns, 'Unknown Title');
 
             String artist = 'Unknown Artist';
             int durationMs = 0;
@@ -406,9 +438,11 @@ extension YtmAccountParsing on YtmAccountService {
 
       final fixedCols = renderer['fixedColumns'] as List<dynamic>? ?? const [];
       if (fixedCols.isNotEmpty) {
-        final durText = fixedCols[0]
-                ['musicResponsiveListItemFixedColumnRenderer']?['text']?['runs']
-            ?[0]?['text'] as String?;
+        final durRuns = fixedCols[0]
+            ['musicResponsiveListItemFixedColumnRenderer']?['text']?['runs'];
+        final durText = (durRuns is List && durRuns.isNotEmpty)
+            ? durRuns[0]['text'] as String?
+            : null;
         if (durText != null) {
           final parts =
               durText.split(':').map((e) => int.tryParse(e) ?? 0).toList();

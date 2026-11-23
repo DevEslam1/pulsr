@@ -242,6 +242,19 @@ class MusicRepository
     return '"$clean"';
   }
 
+  static String _articleInsensitiveSql(String col) =>
+      '(CASE '
+      "WHEN SUBSTR($col, 1, 1) IN ('\"', '''', '(', '[', '{', '\u201c', '\u2018') "
+      "AND LOWER(SUBSTR($col, 2, 4)) = 'the ' THEN SUBSTR($col, 6) "
+      "WHEN SUBSTR($col, 1, 1) IN ('\"', '''', '(', '[', '{', '\u201c', '\u2018') "
+      "AND LOWER(SUBSTR($col, 2, 3)) = 'an ' THEN SUBSTR($col, 5) "
+      "WHEN SUBSTR($col, 1, 1) IN ('\"', '''', '(', '[', '{', '\u201c', '\u2018') "
+      "AND LOWER(SUBSTR($col, 2, 2)) = 'a ' THEN SUBSTR($col, 4) "
+      "WHEN LOWER(SUBSTR($col, 1, 4)) = 'the ' THEN SUBSTR($col, 5) "
+      "WHEN LOWER(SUBSTR($col, 1, 3)) = 'an ' THEN SUBSTR($col, 4) "
+      "WHEN LOWER(SUBSTR($col, 1, 2)) = 'a ' THEN SUBSTR($col, 3) "
+      'ELSE $col END) COLLATE NOCASE';
+
   Stream<Result<List<SongsTableData>>> _watchSongsFts({
     required String ftsQuery,
     required String sortBy,
@@ -255,21 +268,24 @@ class MusicRepository
       final ftsTable = (useTrigram && AppDatabase.ftsTrigramSupported)
           ? 'songs_fts_trigram'
           : 'songs_fts';
-      // Text sorts are NOCASE so Arabic/diacritic titles order like the
-      // indexed watchAllSongs path; numeric sorts stay binary.
-      final orderCol = switch (sortBy) {
-        'artist' => 's.artist COLLATE NOCASE',
-        'dateAdded' => 's.date_added',
-        'duration' => 's.duration_ms',
-        'album' => 's.album COLLATE NOCASE',
-        'playCount' => 's.play_count',
-        'lastPlayed' => 's.last_played',
-        'fileSize' => 's.file_size',
-        'sampleRate' => 's.sample_rate',
-        'year' => 's.year',
-        _ => 's.title COLLATE NOCASE',
-      };
       final dir = ascending ? 'ASC' : 'DESC';
+      // Mirror applySongSort: article-insensitive + NOCASE on text keys so FTS
+      // ordering matches the main songs stream across case and articles.
+      final orderExpr = switch (sortBy) {
+        'artist' =>
+          '${_articleInsensitiveSql('s.artist')} $dir, ${_articleInsensitiveSql('s.title')} $dir, s.id ASC',
+        'dateAdded' => 's.date_added $dir, s.id ASC',
+        'duration' => 's.duration_ms $dir, s.id ASC',
+        'album' =>
+          '${_articleInsensitiveSql('s.album')} $dir, ${_articleInsensitiveSql('s.title')} $dir, s.id ASC',
+        'playCount' => 's.play_count $dir, s.id ASC',
+        'lastPlayed' => 's.last_played $dir, s.id ASC',
+        'fileSize' => 's.file_size $dir, s.id ASC',
+        'sampleRate' => 's.sample_rate $dir, s.id ASC',
+        'year' => 's.year $dir, s.id ASC',
+        'title' => '${_articleInsensitiveSql('s.title')} $dir, s.id ASC',
+        _ => 's.title COLLATE NOCASE $dir, s.id ASC',
+      };
       final buffer = StringBuffer(
         'SELECT s.* FROM songs s '
         'JOIN $ftsTable f ON s.id = f.rowid '
@@ -294,7 +310,7 @@ class MusicRepository
         vars.add(Variable.withString('$slashPrefix%'));
         vars.add(Variable.withString('$backslashPrefix%'));
       }
-      buffer.write('ORDER BY $orderCol $dir, s.id ASC LIMIT ? ');
+      buffer.write('ORDER BY $orderExpr LIMIT ? ');
       vars.add(Variable.withInt(limit));
       if (offset != null) {
         buffer.write('OFFSET ?');
@@ -365,7 +381,8 @@ class MusicRepository
         ..where(_db.songsTable.isMissing.equals(false) &
             _db.songsTable.source.equals(SongSource.local) &
             _db.songsTable.path.like('ytmusic://%').not() &
-            _db.songsTable.cueStartMs.isNull());
+            (_db.songsTable.cueFile.isNull() |
+                _db.songsTable.cueStartMs.isNotNull()));
       final rows = await query.get();
       final entries = rows
           .map((r) {
@@ -425,10 +442,15 @@ class MusicRepository
         ..where((t) =>
             t.isMissing.equals(false) &
             t.source.equals(SongSource.local) &
+            t.path.like('ytmusic://%').not() &
             (t.path.like('${_likeEscape(slashPrefix)}%', escapeChar: r'\') |
                 t.path.like('${_likeEscape(backPrefix)}%', escapeChar: r'\') |
                 t.path.like('${_likeEscape(target)}%', escapeChar: r'\')) &
-            (t.cueFile.isNull() | t.cueStartMs.isNotNull()));
+            (t.cueFile.isNull() | t.cueStartMs.isNotNull()))
+        ..orderBy([
+          (t) => OrderingTerm(expression: articleInsensitive(t.title)),
+          (t) => OrderingTerm.asc(t.id),
+        ]);
       return query.watch().map((songs) {
         final filtered = songs
             .where((s) => _normalizeDirPath(_parentDirPath(s.path)) == target)
@@ -1152,12 +1174,39 @@ class MusicRepository
   @override
   Stream<Result<List<AlbumsTableData>>> watchAlbums() {
     try {
-      return (_db.select(_db.albumsTable)
-            ..where((t) => t.songCount.isBiggerThanValue(0))
-            ..orderBy(albumSortOrder()))
+      return _db
+          .select(_db.excludedFoldersTable)
           .watch()
-          .map((albums) => Right<AppFailure, List<AlbumsTableData>>(albums))
-          .onResultError((e, st) => Left<AppFailure, List<AlbumsTableData>>(
+          .switchMap((rows) {
+        final excluded = rows.map((r) => r.folderPath).toList(growable: false);
+        if (excluded.isEmpty) {
+          return (_db.select(_db.albumsTable)
+                ..where((t) => t.songCount.isBiggerThanValue(0))
+                ..orderBy(albumSortOrder()))
+              .watch()
+              .map((albums) => Right<AppFailure, List<AlbumsTableData>>(albums))
+              .onResultError((e, st) => Left<AppFailure, List<AlbumsTableData>>(
+                  DatabaseFailure('Failed to watch albums', e)));
+        }
+        final nonExcludedAlbumIds = _db.selectOnly(_db.songsTable)
+          ..addColumns([_db.songsTable.albumId])
+          ..where(_db.songsTable.albumId.isNotNull() &
+              _db.songsTable.isMissing.equals(false) &
+              _db.songsTable.source.equals(SongSource.local) &
+              _db.songsTable.path.like('ytmusic://%').not() &
+              (_db.songsTable.cueFile.isNull() |
+                  _db.songsTable.cueStartMs.isNotNull()) &
+              _notInExcludedFolders(excluded));
+        return (_db.select(_db.albumsTable)
+              ..where((t) =>
+                  t.songCount.isBiggerThanValue(0) &
+                  t.id.isInQuery(nonExcludedAlbumIds))
+              ..orderBy(albumSortOrder()))
+            .watch()
+            .map((albums) => Right<AppFailure, List<AlbumsTableData>>(albums))
+            .onResultError((e, st) => Left<AppFailure, List<AlbumsTableData>>(
+                DatabaseFailure('Failed to watch albums', e)));
+      }).onResultError((e, st) => Left<AppFailure, List<AlbumsTableData>>(
               DatabaseFailure('Failed to watch albums', e)));
     } catch (e) {
       return Stream.value(Left(DatabaseFailure('Failed to watch albums', e)));
@@ -1167,22 +1216,33 @@ class MusicRepository
   @override
   Stream<Result<List<SongsTableData>>> watchAlbumSongs(int albumId) {
     try {
-      return (_db.select(_db.songsTable)
-            ..where((t) =>
-                t.albumId.equals(albumId) &
-                t.isMissing.equals(false) &
-                t.source.equals(SongSource.local) &
-                t.path.like('ytmusic://%').not() &
-                (t.cueFile.isNull() | t.cueStartMs.isNotNull()))
-            ..orderBy([
-              (t) => OrderingTerm(
-                  expression: t.discNumber, mode: OrderingMode.asc),
-              (t) => OrderingTerm(
-                  expression: t.trackNumber, mode: OrderingMode.asc),
-            ]))
+      return _db
+          .select(_db.excludedFoldersTable)
           .watch()
-          .map((songs) => Right<AppFailure, List<SongsTableData>>(songs))
-          .onResultError((e, st) => Left<AppFailure, List<SongsTableData>>(
+          .switchMap((rows) {
+        final excluded = rows.map((r) => r.folderPath).toList(growable: false);
+        final query = _db.select(_db.songsTable)
+          ..where((t) =>
+              t.albumId.equals(albumId) &
+              t.isMissing.equals(false) &
+              t.source.equals(SongSource.local) &
+              t.path.like('ytmusic://%').not() &
+              (t.cueFile.isNull() | t.cueStartMs.isNotNull()))
+          ..orderBy([
+            (t) => OrderingTerm(
+                expression: t.discNumber, mode: OrderingMode.asc),
+            (t) => OrderingTerm(
+                expression: t.trackNumber, mode: OrderingMode.asc),
+            (t) => OrderingTerm(expression: articleInsensitive(t.title)),
+            (t) => OrderingTerm.asc(t.id),
+          ]);
+        _applyExcludedFolders(query, excluded);
+        return query
+            .watch()
+            .map((songs) => Right<AppFailure, List<SongsTableData>>(songs))
+            .onResultError((e, st) => Left<AppFailure, List<SongsTableData>>(
+                DatabaseFailure('Failed to watch album songs', e)));
+      }).onResultError((e, st) => Left<AppFailure, List<SongsTableData>>(
               DatabaseFailure('Failed to watch album songs', e)));
     } catch (e) {
       return Stream.value(
@@ -1269,16 +1329,31 @@ class MusicRepository
   @override
   Stream<Result<List<SongsTableData>>> watchArtistSongs(int artistId) {
     try {
-      return (_db.select(_db.songsTable)
-            ..where((t) =>
-                t.artistId.equals(artistId) &
-                t.isMissing.equals(false) &
-                t.source.equals(SongSource.local) &
-                t.path.like('ytmusic://%').not() &
-                (t.cueFile.isNull() | t.cueStartMs.isNotNull())))
+      return _db
+          .select(_db.excludedFoldersTable)
           .watch()
-          .map((songs) => Right<AppFailure, List<SongsTableData>>(songs))
-          .onResultError((e, st) => Left<AppFailure, List<SongsTableData>>(
+          .switchMap((rows) {
+        final excluded = rows.map((r) => r.folderPath).toList(growable: false);
+        final query = _db.select(_db.songsTable)
+          ..where((t) =>
+              t.artistId.equals(artistId) &
+              t.isMissing.equals(false) &
+              t.source.equals(SongSource.local) &
+              t.path.like('ytmusic://%').not() &
+              (t.cueFile.isNull() | t.cueStartMs.isNotNull()))
+          ..orderBy([
+            (t) =>
+                OrderingTerm(expression: t.playCount, mode: OrderingMode.desc),
+            (t) => OrderingTerm(expression: t.title.collate(Collate.noCase)),
+            (t) => OrderingTerm.asc(t.id),
+          ]);
+        _applyExcludedFolders(query, excluded);
+        return query
+            .watch()
+            .map((songs) => Right<AppFailure, List<SongsTableData>>(songs))
+            .onResultError((e, st) => Left<AppFailure, List<SongsTableData>>(
+                DatabaseFailure('Failed to watch artist songs', e)));
+      }).onResultError((e, st) => Left<AppFailure, List<SongsTableData>>(
               DatabaseFailure('Failed to watch artist songs', e)));
     } catch (e) {
       return Stream.value(
@@ -3074,11 +3149,11 @@ class MusicRepository
       'UPDATE albums SET song_count = ('
       'SELECT COUNT(*) FROM songs '
       'WHERE songs.album_id = albums.id AND $_activeLocalNonCueSongSqlPredicate'
-      '), year = COALESCE(albums.year, ('
+      '), year = ('
       'SELECT MAX(songs.year) FROM songs '
       'WHERE songs.album_id = albums.id AND songs.year IS NOT NULL AND songs.year > 0 '
       'AND $_activeLocalNonCueSongSqlPredicate'
-      '));',
+      ');',
     );
     await _db.customStatement(
       'UPDATE artists SET song_count = ('
@@ -3109,11 +3184,11 @@ class MusicRepository
         'UPDATE albums SET song_count = ('
         'SELECT COUNT(*) FROM songs '
         'WHERE songs.album_id = albums.id AND $_activeLocalNonCueSongSqlPredicate'
-        '), year = COALESCE(albums.year, ('
+        '), year = ('
         'SELECT MAX(songs.year) FROM songs '
         'WHERE songs.album_id = albums.id AND songs.year IS NOT NULL AND songs.year > 0 '
         'AND $_activeLocalNonCueSongSqlPredicate'
-        ')) WHERE id = ?;',
+        ') WHERE id = ?;',
         [albumId],
       );
       await _db.customStatement(
@@ -3777,8 +3852,13 @@ class MusicRepository
   }
 }
 
-String _normalizeDirPath(String path) =>
-    path.replaceAll('\\', '/').toLowerCase().trim();
+String _normalizeDirPath(String path) {
+  var normalized = path.replaceAll('\\', '/').trim();
+  if (normalized.length > 1) {
+    normalized = normalized.replaceAll(RegExp(r'/+$'), '');
+  }
+  return normalized.toLowerCase();
+}
 
 String _parentDirPath(String path) {
   final slash = path.lastIndexOf('/');

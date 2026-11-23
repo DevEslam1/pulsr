@@ -31,9 +31,18 @@ class YtDownloadHttpSupport {
   /// failure the retry scheduler understands.
   static Never throwStorageOrOriginal(FileSystemException error) {
     final message = error.message.toLowerCase();
+    final osMsg = (error.osError?.message ?? '').toLowerCase();
+    final code = error.osError?.errorCode;
     if (message.contains('no space') ||
         message.contains('enospc') ||
-        error.osError?.errorCode == 28) {
+        message.contains('disk full') ||
+        message.contains('not enough space') ||
+        osMsg.contains('no space') ||
+        osMsg.contains('disk full') ||
+        osMsg.contains('not enough space') ||
+        code == 28 ||
+        code == 112 ||
+        code == 39) {
       throw const StorageFailure('Storage full while writing download');
     }
     throw error;

@@ -105,27 +105,25 @@ class YtDownloadService {
 
   final Queue<_QueuedDownload> _queue = Queue<_QueuedDownload>();
   final Map<String, _QueuedDownload> _activeDownloads = {};
-  final Map<String, Set<HttpClientRequest>> _activeRequests = {};
-  static const int _maxCanceledIds = 200;
-  final Set<String> _canceledVideoIds = <String>{};
+  final Map<int, Set<HttpClientRequest>> _activeRequestsByRun = {};
+  final Map<String, int> _cancelEpoch = {};
+  final Map<String, int> _activeRunGeneration = {};
   DateTime _lastTransferPolicyCheck = DateTime.fromMillisecondsSinceEpoch(0);
 
-  void _trackRequest(String? videoId, HttpClientRequest request) {
-    if (videoId == null || videoId.isEmpty) return;
-    (_activeRequests[videoId] ??= <HttpClientRequest>{}).add(request);
+  void _trackRequest(int runId, HttpClientRequest request) {
+    (_activeRequestsByRun[runId] ??= <HttpClientRequest>{}).add(request);
   }
 
-  void _untrackRequest(String? videoId, HttpClientRequest request) {
-    if (videoId == null || videoId.isEmpty) return;
-    final set = _activeRequests[videoId];
+  void _untrackRequest(int runId, HttpClientRequest request) {
+    final set = _activeRequestsByRun[runId];
     if (set != null) {
       set.remove(request);
-      if (set.isEmpty) _activeRequests.remove(videoId);
+      if (set.isEmpty) _activeRequestsByRun.remove(runId);
     }
   }
 
-  void _abortRequestsFor(String videoId) {
-    final requests = _activeRequests.remove(videoId);
+  void _abortRequestsForRun(int runId) {
+    final requests = _activeRequestsByRun.remove(runId);
     if (requests != null) {
       for (final req in requests) {
         try {
@@ -256,17 +254,15 @@ class YtDownloadService {
   /// cancellation marker its loops poll.
   void cancel(String videoId) {
     _qualityPolicy.discardPending(videoId);
-    _abortRequestsFor(videoId);
+    _cancelEpoch[videoId] = (_cancelEpoch[videoId] ?? 0) + 1;
 
     final active = _activeDownloads[videoId];
     if (active != null) {
-      while (_canceledVideoIds.length >= _maxCanceledIds) {
-        _canceledVideoIds.remove(_canceledVideoIds.first);
-      }
-      _canceledVideoIds.add(videoId);
+      _abortRequestsForRun(active.runId);
       active.isCanceled = true;
       active.onProgress
           ?.call(const YtDownloadProgress(YtDownloadStage.canceled));
+      _foreground.release(videoId);
     }
 
     final queued = _queue
@@ -275,6 +271,7 @@ class YtDownloadService {
     for (final task in queued) {
       _queue.remove(task);
       task.isCanceled = true;
+      _foreground.release(videoId);
       if (!task.completer.isCompleted) {
         task.completer
             .complete(const Left(DownloadFailure('Download canceled')));
@@ -311,7 +308,7 @@ class YtDownloadService {
       return const Left(DownloadFailure('Track has no video id'));
     }
 
-    _canceledVideoIds.remove(videoId);
+    final entryCancelEpoch = _cancelEpoch[videoId] ?? 0;
 
     // A canceled transfer can still be unwinding (resolver mid-call, sink
     // flushing); a second writer now would interleave bytes in the same
@@ -327,8 +324,7 @@ class YtDownloadService {
     }
     // A cancel that arrived while this call was waiting applies to this
     // request too: do not start the transfer the user just cancelled.
-    if (_canceledVideoIds.contains(videoId)) {
-      _canceledVideoIds.remove(videoId);
+    if ((_cancelEpoch[videoId] ?? 0) != entryCancelEpoch) {
       return const Left(DownloadFailure('Download canceled'));
     }
 
@@ -361,8 +357,6 @@ class YtDownloadService {
       completer: completer,
       quality: requestedQuality,
     );
-
-    _foreground.start(videoId, song.title);
 
     if (bypassInternalQueue) {
       ErrorLogger.addBreadcrumb(
@@ -404,8 +398,7 @@ class YtDownloadService {
         final task = _queue.removeFirst();
         final videoId = task.song.remoteId!;
 
-        if (_canceledVideoIds.contains(videoId) || task.isCanceled) {
-          _canceledVideoIds.remove(videoId);
+        if (task.isCanceled) {
           if (!task.completer.isCompleted) {
             task.completer
                 .complete(const Left(DownloadFailure('Download canceled')));
@@ -438,16 +431,25 @@ class YtDownloadService {
   void _startTaskExecution(_QueuedDownload task) {
     final videoId = task.song.remoteId!;
     _activeDownloads[videoId] = task;
+    _activeRunGeneration[videoId] = task.runId;
+    _foreground.start(videoId, task.song.title);
     _executeDownload(task).then((result) {
+      if (result.isLeft()) {
+        _foreground.release(videoId);
+      }
       if (!task.completer.isCompleted) {
         task.completer.complete(result);
       }
     }).catchError((e) {
+      _foreground.release(videoId);
       if (!task.completer.isCompleted) {
         task.completer.complete(Left(DownloadFailure('Download error: $e')));
       }
     }).whenComplete(() {
-      _activeDownloads.remove(videoId);
+      if (identical(_activeDownloads[videoId], task)) {
+        _activeDownloads.remove(videoId);
+      }
+      _activeRequestsByRun.remove(task.runId);
       if (_queue.isNotEmpty) {
         Future.microtask(_processQueue);
       } else {
@@ -510,7 +512,7 @@ class YtDownloadService {
     File? tempArt;
     Future<String?>? artworkFuture;
     try {
-      if (task.isCanceled || _canceledVideoIds.contains(videoId)) {
+      if (task.isCanceled) {
         return const Left(DownloadFailure('Download canceled'));
       }
 
@@ -529,14 +531,16 @@ class YtDownloadService {
       );
       final dir = await getTemporaryDirectory();
       // Download high-res master artwork in parallel with stream resolution
+      // in a run-scoped path so a winding-down cancel never races a retry.
       final rawArtUrl = song.remoteArtworkUrl;
       if (rawArtUrl != null && rawArtUrl.isNotEmpty) {
         final artUrl = CachedArtwork.upgradeToHighResArtwork(rawArtUrl);
         artworkFuture = Future(() async {
-          final artFile = File(p.join(dir.path, 'ytdl_art_$videoId.jpg'));
+          final artFile =
+              File(p.join(dir.path, 'ytdl_art_${videoId}_${task.runId}.jpg'));
           for (var attempt = 1; attempt <= 2; attempt++) {
             try {
-              if (task.isCanceled || _canceledVideoIds.contains(videoId)) {
+              if (task.isCanceled) {
                 return null;
               }
               await _downloadFileResilient(artUrl, artFile, task, null);
@@ -567,6 +571,8 @@ class YtDownloadService {
         videoId,
         ext,
         minExpectedBytes: minExpected,
+        quality: quality,
+        container: ext,
       );
       var mimeType = stream.mimeType;
 
@@ -580,12 +586,12 @@ class YtDownloadService {
         if (!await YtDownloadArtifactStore.hasFreeDiskSpace(
             requiredPreflightBytes(stream))) {
           return const Left(
-              DownloadFailure('Insufficient storage space for download'));
+              StorageFailure('Insufficient storage space for download'));
         }
 
         temp = File(p.join(dir.path, 'ytdl_$videoId.$ext'));
 
-        if (task.isCanceled || _canceledVideoIds.contains(videoId)) {
+        if (task.isCanceled) {
           return const Left(DownloadFailure('Download canceled'));
         }
 
@@ -611,7 +617,7 @@ class YtDownloadService {
         }
 
         // 2. Download audio with transparent 403 re-resolution & resume (206 verified)
-        stream = await _downloadAudioWithRetry(
+        final transferResult = await _downloadAudioWithRetry(
           stream: stream,
           videoId: videoId,
           quality: quality,
@@ -619,8 +625,9 @@ class YtDownloadService {
           task: task,
           onProgress: reportProgress,
         );
+        stream = transferResult.stream;
 
-        if (task.isCanceled || _canceledVideoIds.contains(videoId)) {
+        if (task.isCanceled) {
           return const Left(DownloadFailure('Download canceled'));
         }
 
@@ -633,12 +640,14 @@ class YtDownloadService {
           return const Left(DownloadFailure(
               'Downloaded audio file is corrupt or incomplete'));
         }
-        // A body served without a Content-Length cannot be size-checked against
-        // the response, so check it against what the stream said it was. Below
-        // half the expected bytes the transfer was truncated, and committing it
-        // produced a track that plays for twenty seconds and stops.
+        // Only apply the heuristic bitrate/duration estimate when the server
+        // did NOT give an exact Content-Length / Content-Range (M-06: prevents
+        // false rejection of valid low-bitrate VBR files whose full HTTP body
+        // was already verified byte-for-byte).
         final expectedBytes = estimateBytes(stream);
-        if (stream.duration.inSeconds > 0 && tempSize < expectedBytes ~/ 2) {
+        if (!transferResult.transfer.hasVerifiedHttpLength &&
+            stream.duration.inSeconds > 0 &&
+            tempSize < expectedBytes ~/ 2) {
           return Left(DownloadFailure(
               'Download incomplete: ${tempSize ~/ 1024}KB of ~${expectedBytes ~/ 1024}KB'));
         }
@@ -668,9 +677,6 @@ class YtDownloadService {
             if (renamed != null) temp = renamed;
           }
         }
-
-        bodyCommitted = true;
-        await YtDownloadArtifactStore.markCommitted(temp, videoId);
       }
 
       // Repair placeholder metadata from the stream resolver before tagging,
@@ -704,12 +710,30 @@ class YtDownloadService {
         onProgress?.call(const YtDownloadProgress(YtDownloadStage.tagging));
         ErrorLogger.addBreadcrumb('Download tagging: $videoId',
             category: 'download');
-        final artPath = artworkFuture != null ? await artworkFuture : null;
+        final artPath = artworkFuture != null
+            ? await artworkFuture.timeout(
+                const Duration(seconds: 10),
+                onTimeout: () => null,
+              )
+            : null;
         embeddedLyrics = await _tag(temp.path, effectiveSong,
             artworkPath: artPath, lyrics: lrcText);
       }
 
-      if (task.isCanceled || _canceledVideoIds.contains(videoId)) {
+      if (!bodyCommitted) {
+        final verifiedLen =
+            await temp.exists() ? await temp.length() : null;
+        await YtDownloadArtifactStore.markCommitted(
+          temp,
+          videoId,
+          quality: quality,
+          container: ext,
+          sizeBytes: verifiedLen,
+        );
+        bodyCommitted = true;
+      }
+
+      if (task.isCanceled) {
         return const Left(DownloadFailure('Download canceled'));
       }
 
@@ -722,13 +746,19 @@ class YtDownloadService {
       // and MediaStore refused the insert with an opaque failure.
       final displayName =
           sanitizeFilename(effectiveSong.artist, effectiveSong.title, ext);
-      final saved =
-          await _downloadChannel.invokeMethod<Object?>('saveToMusic', {
-        'sourcePath': temp.path,
-        'displayName': displayName,
-        'title': effectiveSong.title,
-        'mimeType': mimeType,
-      });
+      Object? saved;
+      try {
+        saved = await _downloadChannel.invokeMethod<Object?>('saveToMusic', {
+          'sourcePath': temp.path,
+          'displayName': displayName,
+          'title': effectiveSong.title,
+          'mimeType': mimeType,
+        });
+      } on MissingPluginException {
+        // Non-Android / desktop builds without the native MediaStore channel
+        // copy directly into the app's Downloads music folder.
+        saved = await _saveToLocalMusicFallback(temp, displayName);
+      }
       // New platform builds return {path, contentUri}; older ones returned the
       // path directly, so accept both while the Kotlin side rolls forward.
       final finalPath = saved is Map
@@ -744,7 +774,7 @@ class YtDownloadService {
       if ((!embeddedLyrics || !DownloadService.carriesTags(ext)) &&
           lrcText != null &&
           lrcText.trim().isNotEmpty) {
-        await DownloadService.writeSidecarLrc(finalPath, lrcText);
+        await _saveSidecarLrc(finalPath, lrcText, contentUri: contentUri);
       }
 
       onProgress?.call(const YtDownloadProgress(YtDownloadStage.indexing));
@@ -800,6 +830,10 @@ class YtDownloadService {
       ErrorLogger.addBreadcrumb('Download done: $videoId',
           category: 'download', data: {'newId': newId});
       return Right<AppFailure, int>(newId);
+    } on StorageFailure catch (e) {
+      ErrorLogger.log('YT download storage error: ${e.message}',
+          error: e, category: 'download');
+      return Left(e);
     } on YtmException catch (e) {
       final classified = YtmErrorClassifier.classify(e);
       ErrorLogger.log(
@@ -821,19 +855,26 @@ class YtDownloadService {
           error: e, category: 'YTM');
       return Left(
           DownloadFailure(e.message ?? 'Failed to save the download', e));
+    } on FileSystemException catch (e) {
+      try {
+        YtDownloadHttpSupport.throwStorageOrOriginal(e);
+      } on StorageFailure catch (sf) {
+        return Left(sf);
+      } catch (_) {
+        return Left(DownloadFailure('Download file error: ${e.message}', e));
+      }
     } catch (e, st) {
       ErrorLogger.log('YT download failed',
           error: e, stackTrace: st, category: 'YTM');
       return Left(DownloadFailure('Download failed: $e', e));
     } finally {
-      final wasCanceled =
-          task.isCanceled || _canceledVideoIds.contains(videoId);
-      _canceledVideoIds.remove(videoId);
+      final wasCanceled = task.isCanceled;
       await YtDownloadArtifactStore.cleanupScratch(
         temp: (wasCanceled && bodyCommitted) ? null : temp,
         tempArt: tempArt,
         artworkFuture: artworkFuture,
         wasCanceled: wasCanceled,
+        isCurrentRun: () => _activeRunGeneration[videoId] == task.runId,
       );
     }
   }
@@ -878,9 +919,10 @@ class YtDownloadService {
       resolveDownloadStream(videoId, quality, forceRefresh, title, artist);
 
   /// Downloads the audio into [dest], re-resolving when the URL is the problem.
-  /// Returns the stream the bytes actually came from — its container decides the
-  /// file extension, the MIME type and whether the MP4 tagger may run.
-  Future<YtmStream> _downloadAudioWithRetry({
+  /// Returns the stream the bytes actually came from plus whether HTTP verified
+  /// exact length — its container decides the file extension and tagging support.
+  Future<({YtmStream stream, _TransferOutcome transfer})>
+      _downloadAudioWithRetry({
     required YtmStream stream,
     required String videoId,
     required String quality,
@@ -896,7 +938,7 @@ class YtDownloadService {
 
     while (true) {
       try {
-        if (task.isCanceled || _canceledVideoIds.contains(videoId)) {
+        if (task.isCanceled) {
           throw const DownloadFailure('Download canceled');
         }
 
@@ -912,7 +954,7 @@ class YtDownloadService {
               artist: task.song.artist);
         }
 
-        await _downloadFileResilient(
+        final transfer = await _downloadFileResilient(
           currentStream.url,
           dest,
           task,
@@ -922,7 +964,7 @@ class YtDownloadService {
           expectedBytes: estimateBytes(currentStream),
           container: currentStream.container,
         );
-        return currentStream;
+        return (stream: currentStream, transfer: transfer);
       } catch (e) {
         // A mid-transfer policy flip (Wi-Fi -> cellular in Wi-Fi-only mode)
         // must park the task instead of burning five retries on the blocked
@@ -934,29 +976,35 @@ class YtDownloadService {
 
         if (e is FileSystemException ||
             e is StorageFailure ||
+            e is FormatException ||
             attempts >= maxAttempts ||
-            task.isCanceled ||
-            _canceledVideoIds.contains(videoId)) {
+            task.isCanceled) {
           rethrow;
         }
 
         // 429 → honour Retry-After (capped by the limiter) before anything else,
         // and tell the shared limiter: this is googlevideo answering *this*
         // device, so the native bucket is exactly the right one to cool down.
+        var backedOffFor429 = false;
         if (e is YtmException &&
             (e.code == 'YTM_429' ||
                 e.details?.contains('Retry-After') == true)) {
+          backedOffFor429 = true;
           final retryMatch =
               RegExp(r'Retry-After:\s*(\d+)').firstMatch(e.details ?? '');
           final retrySec =
               retryMatch != null ? int.tryParse(retryMatch.group(1)!) : null;
           YtmRateLimiter.shared.onRateLimited(retrySec);
           final backoff = YtmRateLimiter.shared.cooldownRemaining;
-          await Future.delayed(backoff > Duration.zero
-              ? backoff
+          final wait = backoff > Duration.zero
+              ? (backoff <= const Duration(seconds: 30)
+                  ? backoff
+                  : const Duration(seconds: 30))
               : Duration(
                   milliseconds:
-                      (1000 * (1 << (attempts - 1))).clamp(1000, 15000)));
+                      (1000 * (1 << (attempts - 1))).clamp(1000, 15000));
+          await Future.delayed(wait);
+          if (task.isCanceled) rethrow;
         }
 
         final expiredSignature =
@@ -968,8 +1016,10 @@ class YtDownloadService {
           // next lines used to run unconditionally — invalidated a working
           // poToken and paid for a fresh BotGuard round every time a socket
           // hiccuped.
-          await Future.delayed(Duration(
-              milliseconds: (400 * (1 << (attempts - 1))).clamp(400, 8000)));
+          if (!backedOffFor429) {
+            await Future.delayed(Duration(
+                milliseconds: (400 * (1 << (attempts - 1))).clamp(400, 8000)));
+          }
           continue;
         }
 
@@ -977,24 +1027,26 @@ class YtDownloadService {
         // re-resolving, otherwise the fresh resolve fails fast against the
         // cooldown and burns through all attempts in milliseconds — the
         // "first N succeed, rest fail instantly" batch pattern.
-        final cooldown = YtmRateLimiter.shared.cooldownRemaining;
-        if (cooldown > Duration.zero) {
-          // Cap the wait so one 429 doesn't wedge a slot for minutes; the
-          // outer repository retry covers longer blocks.
-          final wait = cooldown <= const Duration(seconds: 30)
-              ? cooldown
-              : const Duration(seconds: 30);
-          await Future.delayed(wait);
-          if (task.isCanceled || _canceledVideoIds.contains(videoId)) {
-            rethrow;
-          }
-        } else if (!expiredSignature && _ytmService.isBotCoolingDown) {
-          // Egress/bot block with no rate-limiter window: back off briefly so
-          // the re-resolve below doesn't slam straight into the fail-fast.
-          await Future.delayed(Duration(
-              milliseconds: (1000 * (1 << (attempts - 1))).clamp(1000, 8000)));
-          if (task.isCanceled || _canceledVideoIds.contains(videoId)) {
-            rethrow;
+        if (!backedOffFor429) {
+          final cooldown = YtmRateLimiter.shared.cooldownRemaining;
+          if (cooldown > Duration.zero) {
+            // Cap the wait so one 429 doesn't wedge a slot for minutes; the
+            // outer repository retry covers longer blocks.
+            final wait = cooldown <= const Duration(seconds: 30)
+                ? cooldown
+                : const Duration(seconds: 30);
+            await Future.delayed(wait);
+            if (task.isCanceled) {
+              rethrow;
+            }
+          } else if (!expiredSignature && _ytmService.isBotCoolingDown) {
+            // Egress/bot block with no rate-limiter window: back off briefly so
+            // the re-resolve below doesn't slam straight into the fail-fast.
+            await Future.delayed(Duration(
+                milliseconds: (1000 * (1 << (attempts - 1))).clamp(1000, 8000)));
+            if (task.isCanceled) {
+              rethrow;
+            }
           }
         }
 
@@ -1013,7 +1065,7 @@ class YtDownloadService {
     }
   }
 
-  Future<void> _downloadFileResilient(
+  Future<_TransferOutcome> _downloadFileResilient(
     String url,
     File dest,
     _QueuedDownload task,
@@ -1027,16 +1079,10 @@ class YtDownloadService {
     int total = -1;
     var rangesSupported = false;
 
-    // The probe is allowed to fail — a server that dislikes `bytes=0-0` still
-    // serves the whole body — but the transfer that follows is not. Both used to
-    // sit in this one `try`, so a StorageFailure or a dropped socket four chunks
-    // into the parallel download was swallowed and answered by re-downloading
-    // the entire file sequentially: on a full disk, twice the writing for the
-    // same ENOSPC, and on a flaky link, no resume and no error the caller could
-    // classify.
     try {
-      final probeReq = await _http.openUrl('GET', uri);
-      _trackRequest(task.song.remoteId, probeReq);
+      final probeReq =
+          await _http.openUrl('GET', uri).timeout(_stallTimeout);
+      _trackRequest(task.runId, probeReq);
       try {
         YtDownloadTransferPolicy.applyHeaders(probeReq, userAgent,
             cookies: cookies, range: 'bytes=0-0');
@@ -1064,39 +1110,35 @@ class YtDownloadService {
         rangesSupported =
             status == HttpStatus.partialContent && acceptRanges != 'none';
         if (rangesSupported || status != HttpStatus.ok) {
-          // A 1-byte 206 (or an HTTP error) has a negligible body. Draining it
-          // releases the connection for reuse.
           await YtDownloadHttpSupport.drainSmall(probeResp);
         } else {
-          // 200 to a 1-byte Range means the server ignored Range and is sending
-          // the whole file. Draining it used to download the entire body just to
-          // throw it away — then the fallback downloaded it a second time.
           await YtDownloadHttpSupport.abortBody(probeResp);
         }
       } finally {
-        _untrackRequest(task.song.remoteId, probeReq);
+        _untrackRequest(task.runId, probeReq);
       }
     } catch (e) {
-      if (e is YtmException || e is DownloadFailure) rethrow;
+      if (e is YtmException || e is DownloadFailure || e is StorageFailure) {
+        rethrow;
+      }
       debugPrint(
           '[YtDownloadService] Range probe failed ($e); using a single request');
     }
 
     if (rangesSupported &&
         total >= YtDownloadTransferPolicy.minChunkThreshold) {
-      await _downloadParallel(uri, dest, total, task, onProgress,
+      return await _downloadParallel(uri, dest, total, task, onProgress,
           userAgent: userAgent, cookies: cookies, container: container);
-      return;
     }
 
-    await _downloadSequential(uri, dest, task, onProgress,
+    return await _downloadSequential(uri, dest, task, onProgress,
         userAgent: userAgent,
         cookies: cookies,
         expectedBytes: expectedBytes,
         container: container);
   }
 
-  Future<void> _downloadParallel(
+  Future<_TransferOutcome> _downloadParallel(
     Uri uri,
     File dest,
     int total,
@@ -1107,12 +1149,11 @@ class YtDownloadService {
     String? container,
   }) async {
     if (total < YtDownloadTransferPolicy.minChunkThreshold) {
-      await _downloadSequential(uri, dest, task, onProgress,
+      return await _downloadSequential(uri, dest, task, onProgress,
           userAgent: userAgent,
           cookies: cookies,
           expectedBytes: total,
           container: container);
-      return;
     }
 
     final stopwatch = Stopwatch()..start();
@@ -1136,12 +1177,7 @@ class YtDownloadService {
     final stamp = File('${dest.path}.parts');
 
     // Parts left behind by an earlier attempt are reusable only if they were
-    // written for a body of exactly this size and container: `total` fixes
-    // every chunk boundary, and a retry that re-resolves to a different format
-    // (webm where the first attempt got m4a) carries different bytes at the
-    // same offsets. Identity is not the URL, so a 403 re-resolution of the
-    // same body still resumes. The legacy `'$total'` stamp is deliberately not
-    // accepted: it cannot prove the container matches.
+    // written for a body of exactly this size and container.
     final baseStamp = resumeStampFor(
         container: container ?? 'bin',
         expectedBytes: total,
@@ -1151,8 +1187,6 @@ class YtDownloadService {
     try {
       if (await stamp.exists()) {
         final existing = (await stamp.readAsString()).trim();
-        // Reuse the previous split when the body identity matches: a new
-        // chunk count would invalidate every partial byte (offsets shift).
         final prefix = '$baseStamp|chunks=';
         if (existing.startsWith(prefix)) {
           final previousChunks =
@@ -1169,6 +1203,20 @@ class YtDownloadService {
     } catch (_) {
       // Best-effort: failure intentionally ignored on this non-critical path.
     }
+    if (!resumable) {
+      // Clean any stale numbered parts left by an earlier chunk split.
+      final partPrefix = '${p.basename(dest.path)}.part';
+      try {
+        await for (final entity in dir.list()) {
+          if (entity is! File) continue;
+          final name = p.basename(entity.path);
+          if (name.startsWith(partPrefix) &&
+              int.tryParse(name.substring(partPrefix.length)) != null) {
+            await entity.delete().catchError((_) => entity);
+          }
+        }
+      } catch (_) {}
+    }
     final chunkSize = (total / concurrentChunks).ceil();
     try {
       await stamp.writeAsString(expectedStamp, flush: true);
@@ -1177,9 +1225,6 @@ class YtDownloadService {
     }
 
     final chunkReceived = List<int>.filled(concurrentChunks, 0);
-    // Bytes moved by this attempt only. A resumed download starts at 90% but
-    // has transferred 10%; dividing the whole progress by elapsed time
-    // reported a fake burst speed and a near-zero ETA until it finished.
     var sessionBytes = 0;
     var lastEmitTime = 0;
     var mergeCompleted = false;
@@ -1203,18 +1248,12 @@ class YtDownloadService {
         try {
           final freeBytes =
               await _downloadChannel.invokeMethod<int>('getFreeDiskSpace') ?? 0;
-          // Peak usage is twice the body: the four parts all exist while the
-          // merged copy is being written. Checking against `total` alone let a
-          // download start with just enough room for the parts and hit ENOSPC
-          // halfway through the merge, which threw away the whole transfer.
           if (freeBytes > 0 && freeBytes < total * 2) {
-            throw const DownloadFailure('Insufficient storage space');
+            throw const StorageFailure('Insufficient storage space');
           }
         } catch (e) {
-          if (e is DownloadFailure) rethrow;
+          if (e is StorageFailure || e is DownloadFailure) rethrow;
         }
-
-        final videoId = task.song.remoteId;
 
         for (var i = 0; i < concurrentChunks; i++) {
           final chunkIndex = i;
@@ -1233,8 +1272,6 @@ class YtDownloadService {
             try {
               if (await partFile.exists()) {
                 have = resumable ? await partFile.length() : 0;
-                // Longer than its slot means the part was written for different
-                // boundaries; there is nothing safe to keep.
                 if (have > expectedSize) have = 0;
                 if (have == 0) await partFile.delete();
               }
@@ -1242,122 +1279,113 @@ class YtDownloadService {
               have = 0;
             }
             chunkReceived[chunkIndex] = have;
-            // Already complete from an earlier attempt. Asking anyway would send
-            // `bytes=${end + 1}-$end` and come back 416.
             if (have == expectedSize) return;
 
-            if (task.isCanceled ||
-                _canceledVideoIds.contains(task.song.remoteId)) {
+            if (task.isCanceled) {
               throw const DownloadFailure('Download canceled');
             }
 
-            final req = await _http.getUrl(uri);
-            _trackRequest(videoId, req);
+            final req = await _http.getUrl(uri).timeout(_stallTimeout);
+            _trackRequest(task.runId, req);
             chunkRequests.add(req);
             try {
               YtDownloadTransferPolicy.applyHeaders(req, userAgent,
                   cookies: cookies, range: 'bytes=${start + have}-$end');
-            final resp = await req.close().timeout(_stallTimeout);
+              final resp = await req.close().timeout(_stallTimeout);
 
-            if (resp.statusCode == 429) {
-              final retryAfter =
-                  resp.headers.value(HttpHeaders.retryAfterHeader);
-              final retrySec = int.tryParse(retryAfter ?? '');
-              await resp.drain<void>();
-              throw YtmException('YTM_429',
-                  'HTTP 429 Rate limited${retrySec != null ? ' Retry-After: $retrySec' : ''}');
-            }
-            if (resp.statusCode == HttpStatus.forbidden ||
-                resp.statusCode == HttpStatus.unauthorized) {
-              await resp.drain<void>();
-              throw YtmException('YTM_STREAM_EXPIRED',
-                  'HTTP ${resp.statusCode} on chunk $chunkIndex');
-            }
-            // A 200 to a ranged request means the whole body is coming: written
-            // into this part it is neither the chunk that was asked for nor a
-            // resume, so the transfer goes to the sequential path instead of
-            // merging four copies of the same file.
-            if (resp.statusCode == HttpStatus.ok) {
-              // Do not download the whole body just to discard it; the
-              // sequential fallback is about to fetch the same bytes.
-              await YtDownloadHttpSupport.abortBody(resp);
-              throw const _RangeIgnored();
-            }
-            if (resp.statusCode != HttpStatus.partialContent) {
-              await resp.drain<void>();
-              throw DownloadFailure(
-                  'HTTP ${resp.statusCode} for chunk $chunkIndex');
-            }
-
-            final sink = partFile.openWrite(
-                mode: have > 0 ? FileMode.append : FileMode.write);
-            var unflushedBytes = 0;
-            const flushThresholdBytes = 512 * 1024;
-            try {
-              // Per-event watchdog. A googlevideo edge that accepts the request
-              // and then stops sending used to hang the download until the OS
-              // gave up minutes later, with the notification frozen at whatever
-              // percentage it had reached and no retry ever attempted.
-              await for (final chunk in resp.timeout(_stallTimeout)) {
-                if (task.isCanceled ||
-                    _canceledVideoIds.contains(task.song.remoteId)) {
-                  throw const DownloadFailure('Download canceled');
+              if (resp.statusCode == 429) {
+                final retryAfter =
+                    resp.headers.value(HttpHeaders.retryAfterHeader);
+                final retrySec = int.tryParse(retryAfter ?? '');
+                await YtDownloadHttpSupport.drainSmall(resp);
+                throw YtmException('YTM_429',
+                    'HTTP 429 Rate limited${retrySec != null ? ' Retry-After: $retrySec' : ''}');
+              }
+              if (resp.statusCode == HttpStatus.forbidden ||
+                  resp.statusCode == HttpStatus.unauthorized) {
+                await YtDownloadHttpSupport.drainSmall(resp);
+                throw YtmException('YTM_STREAM_EXPIRED',
+                    'HTTP ${resp.statusCode} on chunk $chunkIndex');
+              }
+              if (resp.statusCode == HttpStatus.ok ||
+                  resp.statusCode == HttpStatus.requestedRangeNotSatisfiable) {
+                if (resp.statusCode == HttpStatus.ok) {
+                  await YtDownloadHttpSupport.abortBody(resp);
+                } else {
+                  await YtDownloadHttpSupport.drainSmall(resp);
                 }
-                await _assertTransferPolicy();
-                try {
-                  sink.add(chunk);
-                  unflushedBytes += chunk.length;
-                  if (unflushedBytes >= flushThresholdBytes) {
-                    unflushedBytes = 0;
-                    await sink.flush();
+                throw const _RangeIgnored();
+              }
+              if (resp.statusCode != HttpStatus.partialContent) {
+                await YtDownloadHttpSupport.drainSmall(resp);
+                throw DownloadFailure(
+                    'HTTP ${resp.statusCode} for chunk $chunkIndex');
+              }
+
+              final sink = partFile.openWrite(
+                  mode: have > 0 ? FileMode.append : FileMode.write);
+              var unflushedBytes = 0;
+              const flushThresholdBytes = 512 * 1024;
+              try {
+                await for (final chunk in resp.timeout(_stallTimeout)) {
+                  if (task.isCanceled) {
+                    throw const DownloadFailure('Download canceled');
                   }
+                  await _assertTransferPolicy();
+                  try {
+                    sink.add(chunk);
+                    unflushedBytes += chunk.length;
+                    if (unflushedBytes >= flushThresholdBytes) {
+                      unflushedBytes = 0;
+                      await sink.flush();
+                    }
+                  } on FileSystemException catch (e) {
+                    YtDownloadHttpSupport.throwStorageOrOriginal(e);
+                  }
+                  chunkReceived[chunkIndex] += chunk.length;
+                  sessionBytes += chunk.length;
+                  final totalReceived = chunkReceived.reduce((a, b) => a + b);
+                  if (onProgress != null && total > 0) {
+                    final now = DateTime.now().millisecondsSinceEpoch;
+                    if (now - lastEmitTime > 80 || totalReceived >= total) {
+                      lastEmitTime = now;
+                      final elapsedSeconds =
+                          stopwatch.elapsedMilliseconds / 1000.0;
+                      final speedKbps = elapsedSeconds > 0
+                          ? (sessionBytes / elapsedSeconds) / 1024.0
+                          : 0.0;
+                      final fraction = (totalReceived / total).clamp(0.0, 1.0);
+                      final remainingBytes =
+                          (total - totalReceived).clamp(0, total);
+                      final etaSeconds = (speedKbps > 0 && remainingBytes > 0)
+                          ? (remainingBytes / (speedKbps * 1024.0)).round()
+                          : null;
+
+                      onProgress(YtDownloadProgress(
+                        YtDownloadStage.downloading,
+                        fraction,
+                        speedKbps,
+                        etaSeconds,
+                      ));
+                    }
+                  }
+                }
+                try {
+                  await sink.flush();
                 } on FileSystemException catch (e) {
                   YtDownloadHttpSupport.throwStorageOrOriginal(e);
                 }
-                chunkReceived[chunkIndex] += chunk.length;
-                sessionBytes += chunk.length;
-                final totalReceived = chunkReceived.reduce((a, b) => a + b);
-                if (onProgress != null && total > 0) {
-                  final now = DateTime.now().millisecondsSinceEpoch;
-                  if (now - lastEmitTime > 80 || totalReceived >= total) {
-                    lastEmitTime = now;
-                    final elapsedSeconds =
-                        stopwatch.elapsedMilliseconds / 1000.0;
-                    final speedKbps = elapsedSeconds > 0
-                        ? (sessionBytes / elapsedSeconds) / 1024.0
-                        : 0.0;
-                    final fraction = (totalReceived / total).clamp(0.0, 1.0);
-                    final remainingBytes =
-                        (total - totalReceived).clamp(0, total);
-                    final etaSeconds = (speedKbps > 0 && remainingBytes > 0)
-                        ? (remainingBytes / (speedKbps * 1024.0)).round()
-                        : null;
-
-                    onProgress(YtDownloadProgress(
-                      YtDownloadStage.downloading,
-                      fraction,
-                      speedKbps,
-                      etaSeconds,
-                    ));
-                  }
+              } on FileSystemException catch (e) {
+                YtDownloadHttpSupport.throwStorageOrOriginal(e);
+              } finally {
+                try {
+                  await sink.close();
+                } on FileSystemException catch (e) {
+                  YtDownloadHttpSupport.throwStorageOrOriginal(e);
                 }
               }
-              try {
-                await sink.flush();
-              } on FileSystemException catch (e) {
-                YtDownloadHttpSupport.throwStorageOrOriginal(e);
-              }
-            } on FileSystemException catch (e) {
-              YtDownloadHttpSupport.throwStorageOrOriginal(e);
             } finally {
-              try {
-                await sink.close();
-              } on FileSystemException catch (e) {
-                YtDownloadHttpSupport.throwStorageOrOriginal(e);
-              }
-            }
-            } finally {
-              _untrackRequest(videoId, req);
+              _untrackRequest(task.runId, req);
               chunkRequests.remove(req);
             }
           }());
@@ -1369,7 +1397,7 @@ class YtDownloadService {
         }
 
         // Check cancellation BEFORE merge to prevent corrupt file
-        if (task.isCanceled || _canceledVideoIds.contains(task.song.remoteId)) {
+        if (task.isCanceled) {
           throw const DownloadFailure('Download canceled');
         }
 
@@ -1398,7 +1426,7 @@ class YtDownloadService {
         }
 
         // Final cancellation check right before merge
-        if (task.isCanceled || _canceledVideoIds.contains(task.song.remoteId)) {
+        if (task.isCanceled) {
           throw const DownloadFailure('Download canceled');
         }
 
@@ -1406,8 +1434,7 @@ class YtDownloadService {
         final outSink = mergePartFile.openWrite();
         try {
           for (final part in tempParts) {
-            if (task.isCanceled ||
-                _canceledVideoIds.contains(task.song.remoteId)) {
+            if (task.isCanceled) {
               throw const DownloadFailure('Download canceled');
             }
             if (await part.exists()) {
@@ -1442,10 +1469,14 @@ class YtDownloadService {
         }
         mergeCompleted = true;
         await YtDownloadArtifactStore.deleteLegacySequentialPart(dest.path);
+        return _TransferOutcome(
+          verifiedHttpBytes: total,
+          hasVerifiedHttpLength: total > 0,
+        );
       } catch (e) {
         abortSiblingRequests();
-        await Future.wait(futures.map((f) => f.catchError((_) {})))
-            .timeout(const Duration(seconds: 2), onTimeout: () => const []);
+        _abortRequestsForRun(task.runId);
+        await Future.wait(futures.map((f) => f.catchError((_) {})));
         if (e is _RangeIgnored) {
           rethrow; // FIX-A02: Bubble _RangeIgnored to outer catch
         }
@@ -1461,9 +1492,6 @@ class YtDownloadService {
           // Best-effort: failure intentionally ignored on this non-critical path.
         }
 
-        // Parts used to be deleted unconditionally, so a cancel or a single
-        // dropped socket at 95% threw away every byte of all four chunks and the
-        // next attempt started from zero.
         if (mergeCompleted || !keepParts) {
           for (final part in tempParts) {
             try {
@@ -1494,11 +1522,6 @@ class YtDownloadService {
         }
       }
     } on _RangeIgnored {
-      // A server that ignores Range mid-transfer leaves `.part0..3` full-body
-      // duplicates and a `.parts` stamp that do not describe the sequential
-      // retry's output. Sweep them before it runs so the committed file is the
-      // only artifact left behind (deleting an already-removed file is a
-      // no-op, and this stays correct even if the inner finally changes).
       for (final part in tempParts) {
         try {
           if (await part.exists()) {
@@ -1517,7 +1540,7 @@ class YtDownloadService {
       }
       debugPrint(
           '[YtDownloadService] Server ignored Range mid-transfer; retrying as a single request');
-      await _downloadSequential(uri, dest, task, onProgress,
+      return await _downloadSequential(uri, dest, task, onProgress,
           userAgent: userAgent,
           cookies: cookies,
           expectedBytes: total,
@@ -1525,8 +1548,61 @@ class YtDownloadService {
     }
   }
 
-  /// Sweeps stale download scratch files while preserving active, queued and
-  /// explicitly protected ids.
+  Future<String?> _saveToLocalMusicFallback(
+      File temp, String displayName) async {
+    try {
+      final docs = await getApplicationDocumentsDirectory();
+      final dir = Directory(p.join(docs.path, 'PulsrDownloads'));
+      if (!await dir.exists()) {
+        await dir.create(recursive: true);
+      }
+      final target = File(p.join(dir.path, displayName));
+      await temp.copy(target.path);
+      return target.path;
+    } on FileSystemException catch (e) {
+      YtDownloadHttpSupport.throwStorageOrOriginal(e);
+    }
+  }
+
+  Future<void> _saveSidecarLrc(
+    String finalPath,
+    String lrcText, {
+    String? contentUri,
+  }) async {
+    await DownloadService.writeSidecarLrc(finalPath, lrcText);
+    final sibling = File('${p.withoutExtension(finalPath)}.lrc');
+    try {
+      if (await sibling.exists()) return;
+    } catch (_) {}
+
+    // Android scoped storage can deny direct sibling writes inside public
+    // /Music directories; try platform helper and /Music/Lyrics fallback.
+    try {
+      await _downloadChannel.invokeMethod<Object?>('writeSidecarLrc', {
+        'audioPath': finalPath,
+        'contentUri': contentUri,
+        'lrcContent': lrcText,
+      });
+      if (await sibling.exists()) return;
+    } catch (_) {}
+
+    try {
+      final parentDir = Directory(p.dirname(finalPath));
+      if (!await parentDir.exists()) return;
+      final lyricsDir = Directory(p.join(parentDir.path, 'Lyrics'));
+      if (!await lyricsDir.exists()) {
+        await lyricsDir.create();
+      }
+      final alt = File(
+          p.join(lyricsDir.path, '${p.basenameWithoutExtension(finalPath)}.lrc'));
+      await alt.writeAsString(lrcText);
+    } catch (_) {
+      // Best-effort: local app cache remains available via LyricsRepository.
+    }
+  }
+
+  /// Sweeps stale download scratch files while preserving active, queued, paused
+  /// and explicitly protected ids.
   Future<void> cleanOrphanPartFiles({
     Set<String>? activePartNames,
     Set<String>? protectedVideoIds,
@@ -1535,10 +1611,30 @@ class YtDownloadService {
       busyVideoIds: {
         ..._activeDownloads.keys,
         ..._queue.map((t) => t.song.remoteId).whereType<String>(),
+        ..._pauses.ids,
         ...?protectedVideoIds,
       },
       activePartNames: activePartNames,
     );
+  }
+
+  @disposeMethod
+  void dispose() {
+    for (final videoId in _activeDownloads.keys.toList()) {
+      cancel(videoId);
+    }
+    for (final reqSet in _activeRequestsByRun.values) {
+      for (final req in reqSet) {
+        try {
+          req.abort();
+        } catch (_) {}
+      }
+    }
+    _activeRequestsByRun.clear();
+    _pauses.dispose();
+    try {
+      _http.close(force: true);
+    } catch (_) {}
   }
 
   /// Removes every scratch file for [videoId].

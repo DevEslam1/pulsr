@@ -117,7 +117,16 @@ void main() {
         () async {
       await insertSong(id: 1, title: 'A', path: '/music/a.mp3');
       await insertSong(
-          id: 2, title: 'V', path: '/music/a.mp3', cueStartMs: 1000);
+          id: 2,
+          title: 'V',
+          path: '/music/a.cue.flac',
+          cueFile: '/music/a.cue',
+          cueStartMs: 1000);
+      await insertSong(
+          id: 5,
+          title: 'CueContainer',
+          path: '/music/a.cue.flac',
+          cueFile: '/music/a.cue');
       await insertSong(
           id: 3,
           title: 'Ytm',
@@ -128,11 +137,13 @@ void main() {
           id: 4, title: 'Missing', path: '/music/m.mp3', isMissing: true);
 
       final paths = (await repo.getLocalSongPaths()).getOrElse((_) => []);
-      expect(paths, ['/music/a.mp3']);
+      expect(paths, unorderedEquals(['/music/a.mp3', '/music/a.cue.flac']));
 
+      // H-30: getLocalSongEntries aligns with watchSongsInFolder: excludes CUE
+      // container placeholders (cueFile != null && cueStartMs == null) and
+      // keeps playable standalone songs + CUE chapter tracks.
       final entries = (await repo.getLocalSongEntries()).getOrElse((_) => []);
-      expect(entries.length, 1);
-      expect(entries.first.id, 1);
+      expect(entries.map((e) => e.id).toList(), unorderedEquals([1, 2]));
     });
 
     test('watchSongsInFolder returns only direct children', () async {

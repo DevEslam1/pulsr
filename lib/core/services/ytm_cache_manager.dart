@@ -14,7 +14,8 @@ class YtmCacheManager {
   static const String keyMaxCacheSizeMb = 'setting_stream_cache_max_mb';
   static const int defaultMaxCacheSizeMb = 1024; // 1 GB default
 
-  final AsyncMutex _fileMutex = AsyncMutex();
+  static final AsyncMutex _sharedFileMutex = AsyncMutex();
+  AsyncMutex get _fileMutex => _sharedFileMutex;
 
   Future<Directory> getCacheDirectory() async {
     final base = await getApplicationSupportDirectory();
@@ -45,8 +46,11 @@ class YtmCacheManager {
   /// streaming quality could be served for another. `high` keeps the historical
   /// un-keyed name so bodies written before this keying are still found.
   static String cacheFileName(String hash, String quality, String ext) {
-    final q = quality.trim().toLowerCase();
-    return q.isEmpty || q == 'high' ? '$hash.$ext' : '$hash.$q.$ext';
+    final safeQuality =
+        quality.trim().toLowerCase().replaceAll(RegExp(r'[^a-z0-9._-]'), '_');
+    return safeQuality.isEmpty || safeQuality == 'high'
+        ? '$hash.$ext'
+        : '$hash.$safeQuality.$ext';
   }
 
   /// Every name any version may have used for [hash]. Cleanup sweeps only.
@@ -99,22 +103,24 @@ class YtmCacheManager {
       });
 
   /// Returns total disk space used by stream cache in bytes.
-  Future<int> getCacheSizeBytes() async {
-    try {
-      final dir = await getCacheDirectory();
-      if (!await dir.exists()) return 0;
-      int total = 0;
-      final entities = await dir.list().toList();
-      for (final entity in entities) {
-        if (entity is File) {
-          total += await entity.length();
+  Future<int> getCacheSizeBytes() => _fileMutex.run(() async {
+        try {
+          final dir = await getCacheDirectory();
+          if (!await dir.exists()) return 0;
+          int total = 0;
+          final entities = await dir.list().toList();
+          for (final entity in entities) {
+            if (entity is File) {
+              try {
+                total += await entity.length();
+              } catch (_) {}
+            }
+          }
+          return total;
+        } catch (e) {
+          return 0;
         }
-      }
-      return total;
-    } catch (e) {
-      return 0;
-    }
-  }
+      });
 
   /// Clears all cached stream files from disk.
   Future<void> clearCache() => _fileMutex.run(() async {
@@ -155,10 +161,14 @@ class YtmCacheManager {
           int totalSize = 0;
           final fileList = <({File file, int size, DateTime modified})>[];
           for (final f in entities) {
-            final size = await f.length();
-            final modified = await f.lastModified();
-            totalSize += size;
-            fileList.add((file: f, size: size, modified: modified));
+            try {
+              final size = await f.length();
+              final modified = await f.lastModified();
+              totalSize += size;
+              fileList.add((file: f, size: size, modified: modified));
+            } on FileSystemException catch (_) {
+              // Concurrent delete or transient I/O error: skip just this file.
+            }
           }
 
           if (totalSize <= maxBytes) return;

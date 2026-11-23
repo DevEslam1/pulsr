@@ -12,6 +12,7 @@ import '../utils/error_logger.dart';
 @lazySingleton
 class YtmClientVersionResolver {
   static const String _prefKeyClientVersion = 'ytm_cached_client_version';
+  static const String _prefKeyWebVersion = 'ytm_cached_web_version';
   static const String _prefKeyApiKey = 'ytm_cached_api_key';
   static const String _prefKeyLastFetchTime = 'ytm_client_version_fetch_ts';
 
@@ -64,11 +65,19 @@ class YtmClientVersionResolver {
   set debugHttpClient(http.Client? client) => _debugClient = client;
 
   late String _clientVersion = fallbackClientVersion;
+  String? _webVersion;
   String _apiKey = fallbackApiKey;
   int? _sts;
   bool _isInitialized = false;
+  Future<void>? _initFuture;
+  Future<void>? _refreshInFlight;
 
   String get clientVersion => _clientVersion;
+  String get webClientVersion =>
+      _webVersion ??
+      (_clientVersion.startsWith('1.')
+          ? '2.${_clientVersion.substring(2)}'
+          : _clientVersion);
   String get apiKey => _apiKey;
   int get sts =>
       _sts ?? (DateTime.now().toUtc().millisecondsSinceEpoch ~/ 86400000);
@@ -95,6 +104,8 @@ class YtmClientVersionResolver {
       case 'MWEB':
       case 'WEB_EMBEDDED_PLAYER':
         return _clientVersion;
+      case 'WEB':
+        return webClientVersion;
       case 'ANDROID_MUSIC':
         return androidMusicVersion;
       case 'IOS_MUSIC':
@@ -114,11 +125,18 @@ class YtmClientVersionResolver {
     }
   }
 
-  Future<void> init() async {
-    if (_isInitialized) return;
+  Future<void> init() {
+    if (_isInitialized) return Future.value();
+    return _initFuture ??= _initImpl().whenComplete(() {
+      _initFuture = null;
+    });
+  }
+
+  Future<void> _initImpl() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final savedVersion = prefs.getString(_prefKeyClientVersion);
+      final savedWebVersion = prefs.getString(_prefKeyWebVersion);
       final savedKey = prefs.getString(_prefKeyApiKey);
       final lastFetch = prefs.getInt(_prefKeyLastFetchTime) ?? 0;
       final now = DateTime.now().millisecondsSinceEpoch;
@@ -130,6 +148,9 @@ class YtmClientVersionResolver {
       } else {
         _clientVersion = fallbackClientVersion;
         unawaited(_pushToNative(_clientVersion));
+      }
+      if (!isStale && savedWebVersion != null && savedWebVersion.isNotEmpty) {
+        _webVersion = savedWebVersion;
       }
       if (!isStale && savedKey != null && savedKey.isNotEmpty) {
         _apiKey = savedKey;
@@ -151,13 +172,30 @@ class YtmClientVersionResolver {
     }
   }
 
-  Future<void> refresh({http.Client? client}) async {
+  Future<void> refresh({http.Client? client}) {
+    if (client == null && _refreshInFlight != null) {
+      return _refreshInFlight!;
+    }
+    late final Future<void> future;
+    future = _refreshImpl(client: client).whenComplete(() {
+      if (identical(_refreshInFlight, future)) {
+        _refreshInFlight = null;
+      }
+    });
+    if (client == null) {
+      _refreshInFlight = future;
+    }
+    return future;
+  }
+
+  Future<void> _refreshImpl({http.Client? client}) async {
     final clientToUse =
         client ?? _debugClient ?? _injectedClient ?? http.Client();
     final shouldClose =
         client == null && _debugClient == null && _injectedClient == null;
     try {
       http.Response? response;
+      var fromMainWeb = false;
       try {
         response = await clientToUse.get(
           Uri.parse('https://music.youtube.com'),
@@ -168,6 +206,7 @@ class YtmClientVersionResolver {
         ).timeout(const Duration(seconds: 15));
       } catch (_) {
         try {
+          fromMainWeb = true;
           response = await clientToUse.get(
             Uri.parse('https://www.youtube.com'),
             headers: {
@@ -179,6 +218,10 @@ class YtmClientVersionResolver {
       }
 
       if (response != null && response.statusCode == 200) {
+        final requestHost = response.request?.url.host ?? '';
+        if (requestHost.contains('consent.')) {
+          return;
+        }
         final body = response.body;
 
         // 1. Extract clientVersion
@@ -200,11 +243,13 @@ class YtmClientVersionResolver {
             RegExp(r'"signatureTimestamp":\s*(\d+)').firstMatch(body);
 
         final prefs = await SharedPreferences.getInstance();
+        var matchedAny = false;
 
         if (stsMatch != null && stsMatch.group(1) != null) {
           final parsed = int.tryParse(stsMatch.group(1)!);
           if (parsed != null && parsed > 0) {
             _sts = parsed;
+            matchedAny = true;
             await prefs.setInt(_prefKeySts, parsed);
           }
         }
@@ -212,11 +257,22 @@ class YtmClientVersionResolver {
         if (versionMatch != null && versionMatch.group(1) != null) {
           final resolvedVersion = versionMatch.group(1)!;
           if (resolvedVersion.isNotEmpty) {
-            _clientVersion = resolvedVersion;
-            await prefs.setString(_prefKeyClientVersion, resolvedVersion);
-            unawaited(_pushToNative(resolvedVersion));
-            debugPrint(
-                '[YTM_VERSION] Resolved Innertube clientVersion: $_clientVersion');
+            matchedAny = true;
+            // Isolate non-WEB_REMIX (typically `2.x` WEB) stamps scraped from
+            // www.youtube.com so they never corrupt music WEB_REMIX (`1.x`)
+            // requests or native playback extraction.
+            if (fromMainWeb && !resolvedVersion.startsWith('1.')) {
+              _webVersion = resolvedVersion;
+              await prefs.setString(_prefKeyWebVersion, resolvedVersion);
+              debugPrint(
+                  '[YTM_VERSION] Resolved WEB fallback clientVersion: $_webVersion');
+            } else {
+              _clientVersion = resolvedVersion;
+              await prefs.setString(_prefKeyClientVersion, resolvedVersion);
+              unawaited(_pushToNative(resolvedVersion));
+              debugPrint(
+                  '[YTM_VERSION] Resolved Innertube clientVersion: $_clientVersion');
+            }
           }
         }
 
@@ -224,13 +280,16 @@ class YtmClientVersionResolver {
           final resolvedKey = apiKeyMatch.group(1)!;
           if (resolvedKey.isNotEmpty) {
             _apiKey = resolvedKey;
+            matchedAny = true;
             await prefs.setString(_prefKeyApiKey, resolvedKey);
             debugPrint('[YTM_VERSION] Successfully resolved Innertube apiKey');
           }
         }
 
-        await prefs.setInt(
-            _prefKeyLastFetchTime, DateTime.now().millisecondsSinceEpoch);
+        if (matchedAny) {
+          await prefs.setInt(
+              _prefKeyLastFetchTime, DateTime.now().millisecondsSinceEpoch);
+        }
       }
     } catch (e) {
       debugPrint(

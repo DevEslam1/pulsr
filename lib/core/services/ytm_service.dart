@@ -62,12 +62,20 @@ class YtmService {
   /// fallback). Keep-alive reuses TCP+TLS across requests; the previous
   /// top-level `http.post` paid a fresh handshake per call (~100-400ms).
   /// (Field, not a ctor param, so injectable codegen stays untouched.)
-  http.Client _httpClient = http.Client();
+  http.Client? _httpClientField;
+  http.Client get _httpClient => _httpClientField ??= http.Client();
 
   /// Swaps in a scripted client so tests can drive the InnerTube search
   /// fallback's timing without touching the network.
   @visibleForTesting
-  set debugHttpClient(http.Client client) => _httpClient = client;
+  set debugHttpClient(http.Client client) {
+    if (!identical(_httpClientField, client)) {
+      _httpClientField?.close();
+    }
+    _httpClientField = client;
+  }
+
+  int _egressEpoch = 0;
 
   bool? _available;
 
@@ -359,7 +367,8 @@ class YtmService {
     botCooldownNotifier.dispose();
     _authExpiredController.close();
     try {
-      _httpClient.close();
+      _httpClientField?.close();
+      _httpClientField = null;
     } catch (e, st) {
       ErrorLogger.log('Failed to close YTM HTTP client during dispose',
           error: e, stackTrace: st, category: 'YTM');
@@ -593,6 +602,7 @@ class YtmService {
   /// native tiers on the new one — and the native DNS TTL cache is dropped so
   /// the next resolve re-resolves the edge for the new route.
   Future<void> handleNetworkChange() async {
+    _egressEpoch++;
     debugClearBotCooldown();
     // Futures already running cannot be cancelled, but no new caller should
     // attach to a resolve bound to the old egress.
@@ -711,6 +721,10 @@ class YtmService {
     final winner = Completer<List<YtmTrack>>();
     List<YtmTrack> nativeResults = const [];
     List<YtmTrack>? fallbackResults;
+    Object? nativeError;
+    StackTrace? nativeStack;
+    Object? fallbackError;
+    StackTrace? fallbackStack;
     var nativeDone = false;
     var fallbackDone = false;
     var fallbackStarted = false;
@@ -723,7 +737,14 @@ class YtmService {
       } else if (fallbackResults != null && fallbackResults!.isNotEmpty) {
         winner.complete(fallbackResults!);
       } else if (nativeDone && fallbackDone) {
-        winner.complete(const []);
+        if (nativeError != null && fallbackError != null) {
+          winner.completeError(
+            fallbackError!,
+            fallbackStack ?? nativeStack ?? StackTrace.current,
+          );
+        } else {
+          winner.complete(const []);
+        }
       }
     }
 
@@ -734,8 +755,10 @@ class YtmService {
         fallbackResults = results;
         fallbackDone = true;
         decide();
-      }).catchError((Object e) {
+      }).catchError((Object e, StackTrace st) {
         debugPrint('[YTM_SERVICE] Innertube fallback search failed: $e');
+        fallbackError = e;
+        fallbackStack = st;
         fallbackDone = true;
         decide();
       });
@@ -754,8 +777,10 @@ class YtmService {
       } else {
         startFallback();
       }
-    }).catchError((Object e) {
+    }).catchError((Object e, StackTrace st) {
       debugPrint('[YTM_SERVICE] Native search failed, trying fallbacks: $e');
+      nativeError = e;
+      nativeStack = st;
       nativeDone = true;
       hedge?.cancel();
       startFallback();
@@ -764,93 +789,119 @@ class YtmService {
     return winner.future;
   }
 
-  Future<List<YtmTrack>> _searchInnertube(String query,
-      {int limit = 30}) async {
-    try {
-      String apiKey = YtmClientVersionResolver.fallbackApiKey;
-      String clientVersion = YtmClientVersionResolver.fallbackClientVersion;
-      if (getIt.isRegistered<YtmClientVersionResolver>()) {
-        final resolver = getIt<YtmClientVersionResolver>();
-        apiKey = resolver.apiKey;
-        clientVersion = resolver.clientVersion;
-      }
+  Future<List<YtmTrack>> _innertubePostTracks(
+    String path,
+    Map<String, dynamic> payloadFields, {
+    int limit = 30,
+  }) async {
+    String apiKey = YtmClientVersionResolver.fallbackApiKey;
+    String clientVersion = YtmClientVersionResolver.fallbackClientVersion;
+    if (getIt.isRegistered<YtmClientVersionResolver>()) {
+      final resolver = getIt<YtmClientVersionResolver>();
+      apiKey = resolver.apiKey;
+      clientVersion = resolver.clientVersion;
+    }
 
-      final localeArgs = _localeArgs();
-      final body = jsonEncode({
-        'context': {
-          'client': {
-            'clientName': 'WEB_REMIX',
-            'clientVersion': clientVersion,
-            'hl': localeArgs['lang'] ?? 'en',
-            'gl': localeArgs['country'] ?? 'US',
-          },
+    final localeArgs = _localeArgs();
+    final body = jsonEncode({
+      'context': {
+        'client': {
+          'clientName': 'WEB_REMIX',
+          'clientVersion': clientVersion,
+          'hl': localeArgs['lang'] ?? 'en',
+          'gl': localeArgs['country'] ?? 'US',
         },
-        'query': query,
-      });
+      },
+      ...payloadFields,
+    });
 
-      final headers = <String, String>{
-        'Content-Type': 'application/json',
-        'User-Agent': EmbeddedBrowserUa.desktop,
-        'Origin': 'https://music.youtube.com',
-        'Referer': 'https://music.youtube.com/',
-        'x-origin': 'https://music.youtube.com',
-        'x-youtube-client-name': '67',
-        'x-youtube-client-version': clientVersion,
-        'x-goog-authuser': '0',
-        'X-Goog-Api-Key': apiKey,
-      };
+    final headers = <String, String>{
+      'Content-Type': 'application/json',
+      'User-Agent': EmbeddedBrowserUa.desktop,
+      'Origin': 'https://music.youtube.com',
+      'Referer': 'https://music.youtube.com/',
+      'x-origin': 'https://music.youtube.com',
+      'x-youtube-client-name': '67',
+      'x-youtube-client-version': clientVersion,
+      'x-goog-authuser': '0',
+      'X-Goog-Api-Key': apiKey,
+    };
 
-      if (getIt.isRegistered<YtmAccountService>()) {
-        final account = getIt<YtmAccountService>();
-        final visitorData = account.sessionVisitorData;
-        if (visitorData != null && visitorData.isNotEmpty) {
-          headers['X-Goog-Visitor-Id'] = visitorData;
-        }
-        if (account.isLoggedIn) {
-          final cookies = account.cookies;
-          if (cookies != null && cookies.isNotEmpty) {
-            headers['Cookie'] = cookies;
-            final authHeader =
-                YtmAccountService.buildAuthorizationHeader(cookies);
-            if (authHeader != null) {
-              headers['Authorization'] = authHeader;
-            }
+    if (getIt.isRegistered<YtmAccountService>()) {
+      final account = getIt<YtmAccountService>();
+      final visitorData = account.sessionVisitorData;
+      if (visitorData != null && visitorData.isNotEmpty) {
+        headers['X-Goog-Visitor-Id'] = visitorData;
+      }
+      if (account.isLoggedIn) {
+        final cookies = account.cookies;
+        if (cookies != null && cookies.isNotEmpty) {
+          headers['Cookie'] = cookies;
+          final authHeader =
+              YtmAccountService.buildAuthorizationHeader(cookies);
+          if (authHeader != null) {
+            headers['Authorization'] = authHeader;
           }
         }
       }
-
-      await YtmRateLimiter.shared
-          .acquirePermit(maxWait: const Duration(seconds: 15));
-      final response = await _httpClient
-          .post(
-            Uri.parse(
-                'https://music.youtube.com/youtubei/v1/search?prettyPrint=false&key=$apiKey'),
-            headers: headers,
-            body: body,
-          )
-          .timeout(const Duration(seconds: 10));
-
-      if (response.statusCode == 200) {
-        final json = jsonDecode(response.body) as Map<String, dynamic>;
-        final tracks = <YtmTrack>[];
-
-        _collectSearchTracks(json, tracks);
-        YtmRateLimiter.shared.onSuccess();
-        return tracks.take(limit).toList();
-      }
-
-      // Non-200 from Innertube search: feed the shared limiter so the block
-      // signal survives (previously swallowed, indistinguishable from "empty").
-      if (response.statusCode == 429) {
-        YtmRateLimiter.shared.onRateLimited(
-          int.tryParse(response.headers['retry-after'] ?? ''),
-        );
-      }
-      debugPrint('[YTM_SERVICE] Innertube search HTTP ${response.statusCode}');
-    } catch (e) {
-      debugPrint('[YTM_SERVICE] Innertube search error: $e');
     }
-    return const [];
+
+    await YtmRateLimiter.shared
+        .acquirePermit(maxWait: const Duration(seconds: 15));
+    final response = await _httpClient
+        .post(
+          Uri.parse('https://music.youtube.com/youtubei/v1/$path?prettyPrint=false&key=$apiKey'),
+          headers: headers,
+          body: body,
+        )
+        .timeout(const Duration(seconds: 10));
+
+    if (response.statusCode == 200) {
+      final dynamic decoded;
+      try {
+        decoded = jsonDecode(response.body);
+      } on FormatException catch (e) {
+        debugPrint('[YTM_SERVICE] Innertube $path malformed JSON: $e');
+        return const [];
+      }
+      if (decoded is! Map<String, dynamic>) return const [];
+      final tracks = <YtmTrack>[];
+      _collectSearchTracks(decoded, tracks);
+      YtmRateLimiter.shared.onSuccess();
+      return tracks.take(limit).toList();
+    }
+
+    if (response.statusCode == 429) {
+      YtmRateLimiter.shared.onRateLimited(
+        int.tryParse(response.headers['retry-after'] ?? ''),
+      );
+      throw const YtmException('RATE_LIMITED', 'Innertube HTTP 429');
+    }
+    debugPrint('[YTM_SERVICE] Innertube $path HTTP ${response.statusCode}');
+    throw YtmException('YTM_HTTP_${response.statusCode}',
+        'Innertube $path HTTP ${response.statusCode}');
+  }
+
+  Future<List<YtmTrack>> _searchInnertube(String query,
+      {int limit = 30}) async {
+    return _innertubePostTracks('search', {'query': query}, limit: limit);
+  }
+
+  /// Browses an InnerTube browse section directly (e.g. `FEmusic_new_releases`).
+  Future<List<YtmTrack>> browseMusicSection(String browseId,
+      {int limit = 15}) async {
+    final trimmed = browseId.trim();
+    if (trimmed.isEmpty) return const [];
+    try {
+      return await _innertubePostTracks(
+        'browse',
+        {'browseId': trimmed},
+        limit: limit,
+      );
+    } catch (e) {
+      debugPrint('[YTM_SERVICE] Innertube browse ($trimmed) error: $e');
+      rethrow;
+    }
   }
 
   Future<List<YtmTrack>> trending({int limit = 30}) async {
@@ -1014,7 +1065,8 @@ class YtmService {
       bool preferM4a = false,
       String? title,
       String? artist,
-      Duration? duration}) {
+      Duration? duration,
+      bool allowAlternateFallback = true}) {
     if (forceRefresh) {
       return _resolveStreamInner(videoId,
           quality: quality,
@@ -1022,7 +1074,8 @@ class YtmService {
           preferM4a: preferM4a,
           title: title,
           artist: artist,
-          duration: duration);
+          duration: duration,
+          allowAlternateFallback: allowAlternateFallback);
     }
     if (!coalesce) {
       return _resolveStreamInner(videoId,
@@ -1031,7 +1084,8 @@ class YtmService {
           preferM4a: preferM4a,
           title: title,
           artist: artist,
-          duration: duration);
+          duration: duration,
+          allowAlternateFallback: allowAlternateFallback);
     }
     final key =
         '$videoId:${YtmUrlCache.qualitySlot(quality, preferM4a: preferM4a)}';
@@ -1051,7 +1105,8 @@ class YtmService {
         preferM4a: preferM4a,
         title: title,
         artist: artist,
-        duration: duration);
+        duration: duration,
+        allowAlternateFallback: allowAlternateFallback);
     _inFlightStreamResolves[key] = fut;
     return fut.whenComplete(() {
       if (identical(_inFlightStreamResolves[key], fut)) {
@@ -1095,8 +1150,14 @@ class YtmService {
       bool preferM4a = false,
       String? title,
       String? artist,
-      Duration? duration}) async {
-    if (!forceRefresh && _alternateVideoIds.containsKey(videoId)) {
+      Duration? duration,
+      bool allowAlternateFallback = true}) async {
+    final startEpoch = _egressEpoch;
+    bool sameEgress() => _egressEpoch == startEpoch;
+
+    if (!forceRefresh &&
+        allowAlternateFallback &&
+        _alternateVideoIds.containsKey(videoId)) {
       final altId = _alternateVideoIds[videoId];
       if (altId != null && altId != videoId) {
         try {
@@ -1108,6 +1169,7 @@ class YtmService {
             title: title,
             artist: artist,
             duration: duration,
+            allowAlternateFallback: false,
           );
         } catch (_) {
           _alternateVideoIds.remove(videoId);
@@ -1159,8 +1221,10 @@ class YtmService {
       }
     }
 
-    // FIX-C01: Check per-video cooldown as well as global IP cooldown
-    var inBotCooldown = isBotCoolingDown || isVideoCoolingDown(videoId);
+    // FIX-C01: Check per-video cooldown separately from global IP cooldown so
+    // non-bot track failures do not misreport as a BOT_CHALLENGE.
+    var inBotCooldown = isBotCoolingDown;
+    final videoCoolingDown = isVideoCoolingDown(videoId);
     if (inBotCooldown) {
       // Only a stale-attestation block can be cured by a fresh token. A generic
       // bot challenge or an IP block is an egress verdict: the native token is
@@ -1173,7 +1237,7 @@ class YtmService {
         try {
           final ready =
               await ensurePoTokenReady().timeout(const Duration(seconds: 4));
-          if (ready) {
+          if (ready && sameEgress()) {
             debugPrint(
                 '[YTM_SERVICE] Fresh poToken ready, lifting token cooldown for $videoId');
             _noteResolveSuccess(videoId: videoId);
@@ -1188,9 +1252,10 @@ class YtmService {
             '[YTM_SERVICE] Block cooldown active (${lastSignal?.name ?? 'unknown'}); failing fast for $videoId');
       }
     }
-    if (inBotCooldown) {
+    final skipPrimaryTiers = inBotCooldown || videoCoolingDown;
+    if (skipPrimaryTiers) {
       debugPrint(
-          '[YTM_SERVICE] Bot cooldown active, skipping native tiers for $videoId');
+          '[YTM_SERVICE] Cooldown active (global=$inBotCooldown, video=$videoCoolingDown), skipping native tiers for $videoId');
     }
 
     try {
@@ -1228,7 +1293,7 @@ class YtmService {
     // 1. Direct authenticated YouTube Music InnerTube Player API if logged in
     Future<YtmStream?> runAccountTier() async {
       try {
-        if (!inBotCooldown && accountService != null) {
+        if (!skipPrimaryTiers && accountService != null) {
           final account = accountService;
           if (account.isLoggedIn) {
             // Do NOT skip Tier-1 on a missing dataSyncId, and do not hand the
@@ -1276,9 +1341,11 @@ class YtmService {
               // putStream, not put: the entry keeps the real container, MIME and
               // bitrate. put() alone let a later cache hit rebuild the stream by
               // guessing them from the URL, which wrote Opus bytes into a .m4a.
-              urlCache?.putStream(directStream, quality: cacheQuality);
-              _noteResolveSuccess(videoId: videoId);
-              recordLoudness(videoId, directStream.loudnessDb);
+              if (sameEgress()) {
+                urlCache?.putStream(directStream, quality: cacheQuality);
+                _noteResolveSuccess(videoId: videoId);
+                recordLoudness(videoId, directStream.loudnessDb);
+              }
               return directStream;
             }
           }
@@ -1303,7 +1370,8 @@ class YtmService {
         // same result. A transport failure is excluded on purpose: the next tier
         // may well have a route (remote backend), and cooling down on an offline
         // blip is what made a one-second signal drop look like an IP block.
-        if (!inBotCooldown &&
+        if (sameEgress() &&
+            !inBotCooldown &&
             e is YtmException &&
             (e.isBotBlocked || e.isThrottled || e.isIpBlocked)) {
           _noteBotChallenge(e, videoId: videoId);
@@ -1319,8 +1387,9 @@ class YtmService {
         // pastes another video's id + trace id into this video's logs and makes a
         // stale verdict look like a new native failure. The stored challenge is
         // only kept for the cooldown window timing.
-        if (inBotCooldown) {
-          throw YtmException('BOT_CHALLENGE',
+        if (skipPrimaryTiers) {
+          throw YtmException(
+              inBotCooldown ? 'BOT_CHALLENGE' : 'YTM_UNAVAILABLE',
               'Cooling down after YouTube verification challenge ($videoId)');
         }
         try {
@@ -1354,9 +1423,11 @@ class YtmService {
             ErrorLogger.log('Non-critical YTM operation failed',
                 error: e, stackTrace: st, category: 'YTM');
           }
-          urlCache?.putStream(stream, quality: cacheQuality);
-          _noteResolveSuccess(videoId: videoId);
-          recordLoudness(videoId, stream.loudnessDb);
+          if (sameEgress()) {
+            urlCache?.putStream(stream, quality: cacheQuality);
+            _noteResolveSuccess(videoId: videoId);
+            recordLoudness(videoId, stream.loudnessDb);
+          }
           return stream;
         }
       } catch (e) {
@@ -1368,7 +1439,8 @@ class YtmService {
         nativeError = e;
         // The cooldown short-circuit itself must not extend the window, or a
         // retry loop would hold it open forever (fixed window from first hit).
-        if (!inBotCooldown &&
+        if (sameEgress() &&
+            !inBotCooldown &&
             e is YtmException &&
             (e.isBotBlocked || e.isThrottled || e.isIpBlocked)) {
           _noteBotChallenge(e, videoId: videoId);
@@ -1444,12 +1516,16 @@ class YtmService {
     // formats straight back to the native side, while the extractor was held
     // behind [_tier1HedgeDelay] — measured as seconds added to tap-to-sound.
     startNativeTier();
-    if (accountLoggedIn) {
+    if (accountLoggedIn && !skipPrimaryTiers) {
       accountHedge = Timer(_tier1HedgeDelay, startAccountTier);
     }
 
-    final racedStream = await winner.future;
-    accountHedge?.cancel();
+    final YtmStream? racedStream;
+    try {
+      racedStream = await winner.future;
+    } finally {
+      accountHedge?.cancel();
+    }
     if (racedStream != null) return racedStream;
 
     // 2.5 PoToken refresh-and-retry (on-device only, no XDM backend).
@@ -1489,15 +1565,17 @@ class YtmService {
               ErrorLogger.log('Non-critical YTM operation failed',
                   error: e, stackTrace: st, category: 'YTM');
             }
-            urlCache?.putStream(stream, quality: cacheQuality);
-            _noteResolveSuccess(videoId: videoId);
-            recordLoudness(videoId, stream.loudnessDb);
+            if (sameEgress()) {
+              urlCache?.putStream(stream, quality: cacheQuality);
+              _noteResolveSuccess(videoId: videoId);
+              recordLoudness(videoId, stream.loudnessDb);
+            }
             return stream;
           }
         }
       } catch (e) {
         debugPrint('[YTM_SERVICE] Tier-2.5 retry failed: $e');
-        if (e is YtmException) breaker.classifyAndRecord(e);
+        if (sameEgress() && e is YtmException) breaker.classifyAndRecord(e);
       }
     }
 
@@ -1529,9 +1607,11 @@ class YtmService {
           ErrorLogger.log('Non-critical YTM operation failed',
               error: e, stackTrace: st, category: 'YTM');
         }
-        urlCache?.putStream(rescued, quality: cacheQuality);
-        _noteResolveSuccess(videoId: videoId);
-        recordLoudness(videoId, rescued.loudnessDb);
+        if (sameEgress()) {
+          urlCache?.putStream(rescued, quality: cacheQuality);
+          _noteResolveSuccess(videoId: videoId);
+          recordLoudness(videoId, rescued.loudnessDb);
+        }
         return rescued;
       }
       debugPrint(
@@ -1554,6 +1634,23 @@ class YtmService {
       throw const YtmException('BOT_CHALLENGE',
           'YouTube is blocking this network. Try another connection or a proxy.');
     }
+    if (videoCoolingDown) {
+      if (allowAlternateFallback && title != null && title.trim().isNotEmpty) {
+        final altStream = await resolveAlternateStream(
+          title,
+          artist,
+          originalVideoId: videoId,
+          quality: quality,
+          preferM4a: preferM4a,
+          expectedDuration: duration,
+        );
+        if (altStream != null) {
+          return altStream;
+        }
+      }
+      throw YtmException('YTM_UNAVAILABLE',
+          'Temporarily skipping failing track ($videoId)');
+    }
 
     // 3. Pure-Dart InnerTube Stream Resolver (Desktop / Non-Android / Native Plugin Fallback)
     try {
@@ -1568,9 +1665,11 @@ class YtmService {
           ErrorLogger.log('Non-critical YTM operation failed',
               error: e, stackTrace: st, category: 'YTM');
         }
-        urlCache?.putStream(dartStream, quality: cacheQuality);
-        _noteResolveSuccess(videoId: videoId);
-        recordLoudness(videoId, dartStream.loudnessDb);
+        if (sameEgress()) {
+          urlCache?.putStream(dartStream, quality: cacheQuality);
+          _noteResolveSuccess(videoId: videoId);
+          recordLoudness(videoId, dartStream.loudnessDb);
+        }
         return dartStream;
       }
     } catch (e) {
@@ -1580,7 +1679,8 @@ class YtmService {
 
     // All engines failed: if title is present and error is playability/restriction, attempt alternative track
     final err = firstError;
-    if (title != null &&
+    if (allowAlternateFallback &&
+        title != null &&
         title.trim().isNotEmpty &&
         (err == null || YtmMediaHelpers.isPlayabilityOrRestrictedError(err))) {
       debugPrint(

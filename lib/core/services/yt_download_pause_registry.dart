@@ -19,8 +19,20 @@ class YtDownloadPauseRegistry {
   final Map<String, DateTime> _since = {};
   Timer? _idleTimer;
 
-  bool get isNotEmpty => _ids.isNotEmpty;
-  bool contains(String videoId) => _ids.contains(videoId);
+  bool get isNotEmpty {
+    prune();
+    return _ids.isNotEmpty;
+  }
+
+  bool contains(String videoId) {
+    prune();
+    return _ids.contains(videoId);
+  }
+
+  Set<String> get ids {
+    prune();
+    return Set<String>.unmodifiable(_ids);
+  }
 
   void mark(String videoId) {
     _ids.add(videoId);
@@ -52,8 +64,11 @@ class YtDownloadPauseRegistry {
     _idleTimer = null;
     // clear() explicitly asks the owner to re-check the service; only the
     // timer path needs the callback to release a genuinely idle service.
-    if (_ids.isEmpty) return;
-    _idleTimer = Timer(idleWindow, () {
+    if (_ids.isEmpty || _since.isEmpty) return;
+    final oldest = _since.values.reduce((a, b) => a.isBefore(b) ? a : b);
+    final remaining = oldest.add(idleWindow).difference(DateTime.now());
+    final delay = remaining.isNegative ? Duration.zero : remaining;
+    _idleTimer = Timer(delay, () {
       _idleTimer = null;
       prune();
       if (_ids.isNotEmpty) {
@@ -62,5 +77,10 @@ class YtDownloadPauseRegistry {
         onIdle?.call();
       }
     });
+  }
+
+  void dispose() {
+    _idleTimer?.cancel();
+    _idleTimer = null;
   }
 }

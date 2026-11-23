@@ -63,7 +63,9 @@ class YtDownloadArtifactStore {
         if (!name.startsWith('ytdl_')) continue;
         if (activePartNames != null && activePartNames.contains(name)) continue;
         if (busyVideoIds.any((id) =>
-            name.startsWith('ytdl_$id.') || name.startsWith('ytdl_art_$id.'))) {
+            name.startsWith('ytdl_$id.') ||
+            name.startsWith('ytdl_art_$id.') ||
+            name.startsWith('ytdl_art_${id}_'))) {
           continue;
         }
         try {
@@ -100,11 +102,16 @@ class YtDownloadArtifactStore {
     try {
       if (!await dir.exists()) return;
       final audio = 'ytdl_$videoId.';
-      final art = 'ytdl_art_$videoId.';
+      final artDot = 'ytdl_art_$videoId.';
+      final artRun = 'ytdl_art_${videoId}_';
       await for (final entity in dir.list()) {
         if (entity is! File) continue;
         final name = p.basename(entity.path);
-        if (!name.startsWith(audio) && !name.startsWith(art)) continue;
+        if (!name.startsWith(audio) &&
+            !name.startsWith(artDot) &&
+            !name.startsWith(artRun)) {
+          continue;
+        }
         try {
           await entity.delete();
         } catch (_) {
@@ -123,6 +130,8 @@ class YtDownloadArtifactStore {
     String videoId,
     String preferredExt, {
     int? minExpectedBytes,
+    String? quality,
+    String? container,
   }) async {
     final candidates = <String>[
       preferredExt,
@@ -134,9 +143,29 @@ class YtDownloadArtifactStore {
       final stamp = File('${cand.path}.committed.stamp');
       try {
         if (!await cand.exists() || !await stamp.exists()) continue;
-        if ((await stamp.readAsString()).trim() != videoId) continue;
+        final rawStamp = (await stamp.readAsString()).trim();
+        final parts = rawStamp.split('|');
+        if (parts.isEmpty || parts[0] != videoId) continue;
         final len = await cand.length();
         if (len < 1024) continue;
+        if (parts.length >= 4) {
+          final stampedQuality = parts[1];
+          final stampedContainer = parts[2];
+          final stampedSize = int.tryParse(parts[3]);
+          if (quality != null &&
+              stampedQuality.isNotEmpty &&
+              stampedQuality != quality) {
+            continue;
+          }
+          if (container != null &&
+              stampedContainer.isNotEmpty &&
+              stampedContainer != container) {
+            continue;
+          }
+          if (stampedSize != null && stampedSize > 0 && len != stampedSize) {
+            continue;
+          }
+        }
         if (minExpectedBytes != null && len < minExpectedBytes) continue;
         return (file: cand, ext: candExt);
       } catch (_) {
@@ -148,9 +177,20 @@ class YtDownloadArtifactStore {
 
   /// Writes a committed-body marker next to [temp] so post-download
   /// cancellation does not discard an already-verified audio payload.
-  static Future<void> markCommitted(File temp, String videoId) async {
+  static Future<void> markCommitted(
+    File temp,
+    String videoId, {
+    String? quality,
+    String? container,
+    int? sizeBytes,
+  }) async {
     try {
-      await File('${temp.path}.committed.stamp').writeAsString(videoId);
+      final resolvedSize =
+          sizeBytes ?? (await temp.exists() ? await temp.length() : 0);
+      final stampValue = (quality != null || container != null || sizeBytes != null)
+          ? '$videoId|${quality ?? ''}|${container ?? ''}|$resolvedSize'
+          : videoId;
+      await File('${temp.path}.committed.stamp').writeAsString(stampValue);
     } catch (_) {
       // Best-effort: failure intentionally ignored on this non-critical path.
     }
@@ -162,11 +202,15 @@ class YtDownloadArtifactStore {
     File? tempArt,
     Future<String?>? artworkFuture,
     bool wasCanceled = false,
+    bool Function()? isCurrentRun,
   }) async {
     Future<void> deleteArtFromFuture(Future<String?> future) async {
       try {
-        final resolvedArtPath = await future;
-        if (resolvedArtPath != null) {
+        final resolvedArtPath = await future.timeout(
+          const Duration(seconds: 2),
+          onTimeout: () => null,
+        );
+        if (resolvedArtPath != null && (isCurrentRun?.call() ?? true)) {
           final resolvedArtFile = File(resolvedArtPath);
           if (await resolvedArtFile.exists()) {
             await resolvedArtFile.delete().catchError((_) => resolvedArtFile);
@@ -178,11 +222,7 @@ class YtDownloadArtifactStore {
     }
 
     if (artworkFuture != null) {
-      if (wasCanceled) {
-        unawaited(deleteArtFromFuture(artworkFuture));
-      } else {
-        await deleteArtFromFuture(artworkFuture);
-      }
+      await deleteArtFromFuture(artworkFuture);
     }
     if (temp != null) {
       for (final file in [temp, File('${temp.path}.committed.stamp')]) {

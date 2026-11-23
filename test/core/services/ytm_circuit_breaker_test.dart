@@ -69,15 +69,21 @@ void main() {
       expect(breaker.shouldAllow(signal), isTrue);
     });
 
-    test('a bot challenge cools down on the first hit', () {
+    test('a bot challenge opens only after hitting maxConsecutiveFailures',
+        () {
       const signal = YtmBlockSignal.botChallenge;
+      breaker.recordFailure(signal);
+      breaker.recordFailure(signal);
+      expect(breaker.shouldAllow(signal), isTrue);
       breaker.recordFailure(signal);
       expect(breaker.shouldAllow(signal), isFalse);
     });
 
     test('recordSuccess closes an open breaker window', () {
       const signal = YtmBlockSignal.botChallenge;
-      breaker.recordFailure(signal);
+      for (var i = 0; i < YtmCircuitBreaker.maxConsecutiveFailures; i++) {
+        breaker.recordFailure(signal);
+      }
       expect(breaker.shouldAllow(signal), isFalse);
       breaker.recordSuccess();
       expect(breaker.shouldAllow(signal), isTrue);
@@ -85,12 +91,16 @@ void main() {
 
     test('reset clears a specific signal or all signals', () {
       const signal = YtmBlockSignal.botChallenge;
-      breaker.recordFailure(signal);
+      for (var i = 0; i < YtmCircuitBreaker.maxConsecutiveFailures; i++) {
+        breaker.recordFailure(signal);
+      }
       expect(breaker.shouldAllow(signal), isFalse);
       breaker.reset(signal);
       expect(breaker.shouldAllow(signal), isTrue);
 
-      breaker.recordFailure(signal);
+      for (var i = 0; i < YtmCircuitBreaker.maxConsecutiveFailures; i++) {
+        breaker.recordFailure(signal);
+      }
       expect(breaker.shouldAllow(signal), isFalse);
       breaker.reset();
       expect(breaker.shouldAllow(signal), isTrue);

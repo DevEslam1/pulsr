@@ -73,11 +73,6 @@ class YtmCircuitBreaker {
       if (window > Duration.zero) {
         _openUntil[signal] = _now().add(window);
       }
-    } else if (signal == YtmBlockSignal.botChallenge ||
-        signal == YtmBlockSignal.ipBlocked) {
-      // First bot/IP hit still cools briefly to avoid burning client matrix.
-      final window = cooldowns[signal] ?? const Duration(minutes: 5);
-      _openUntil[signal] = _now().add(window);
     }
   }
 

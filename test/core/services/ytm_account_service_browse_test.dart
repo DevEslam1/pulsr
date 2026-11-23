@@ -426,8 +426,7 @@ void main() {
         () async {
       final service = await loggedIn();
       handler = (request) async {
-        final body = jsonDecode(request.body) as Map<String, dynamic>;
-        if (body['browseId'] == 'FEmusic_home') {
+        if (request.url.path.contains('account_menu')) {
           return _json(401, const {});
         }
         return _loggedOut();
@@ -444,8 +443,7 @@ void main() {
         () async {
       final service = await loggedIn();
       handler = (request) async {
-        final body = jsonDecode(request.body) as Map<String, dynamic>;
-        if (body['browseId'] == 'FEmusic_home') return _authHome();
+        if (request.url.path.contains('account_menu')) return _authHome();
         return _loggedOut();
       };
 
