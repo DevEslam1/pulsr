@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:material_ui/material_ui.dart';
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
@@ -15,6 +16,7 @@ import '../../../../core/widgets/song_tile.dart';
 import '../../../../core/widgets/staggered_reveal.dart';
 import '../../../../data/db/app_database.dart';
 import '../../../../domain/usecases/get_songs_usecase.dart';
+import '../../../library/cubit/library_cubit.dart';
 import '../../../player/cubit/player_cubit.dart';
 import '../../../sheets/song_options_sheet.dart';
 import 'empty_library.dart';
@@ -55,6 +57,16 @@ class _RecentlyAddedSectionState extends State<RecentlyAddedSection> {
   ScrollPosition? _outerPosition;
   Stream<Result<List<SongsTableData>>>? _songsStream;
   int? _streamLimit;
+  List<String> _streamExcluded = const [];
+
+  List<String> _readExcludedFolders(BuildContext context) {
+    final folders = context.watch<LibraryCubit?>()?.state.folders;
+    if (folders == null || folders.isEmpty) return const [];
+    return [
+      for (final f in folders)
+        if (f.isExcluded) f.path,
+    ];
+  }
 
   @override
   void didUpdateWidget(covariant RecentlyAddedSection oldWidget) {
@@ -62,6 +74,7 @@ class _RecentlyAddedSectionState extends State<RecentlyAddedSection> {
     if (!identical(oldWidget.getSongsUseCase, widget.getSongsUseCase)) {
       _songsStream = null;
       _streamLimit = null;
+      _streamExcluded = const [];
     }
   }
 
@@ -124,9 +137,14 @@ class _RecentlyAddedSectionState extends State<RecentlyAddedSection> {
     List<SongsTableData> visibleSongs,
   ) async {
     var queue = visibleSongs;
+    final excluded = _streamExcluded;
     try {
-      final result =
-          await widget.getSongsUseCase.getRecentlyAdded(limit: _queueLimit);
+      final result = excluded.isEmpty
+          ? await widget.getSongsUseCase.getRecentlyAdded(limit: _queueLimit)
+          : await widget.getSongsUseCase.getRecentlyAdded(
+              limit: _queueLimit,
+              excludedFolders: excluded,
+            );
       final full = result.fold<List<SongsTableData>?>((_) => null, (r) => r);
       if (full != null && full.isNotEmpty) {
         queue = full;
@@ -160,11 +178,19 @@ class _RecentlyAddedSectionState extends State<RecentlyAddedSection> {
   Widget build(BuildContext context) {
     final playerCubit = context.read<PlayerCubit>();
     final columns = PulsrAdaptiveGrid.songColumns(context);
+    final excluded = _readExcludedFolders(context);
 
-    if (_songsStream == null || _streamLimit != _currentLimit) {
+    if (_songsStream == null ||
+        _streamLimit != _currentLimit ||
+        !listEquals(_streamExcluded, excluded)) {
       _streamLimit = _currentLimit;
-      _songsStream = widget.getSongsUseCase
-          .watchRecentlyAdded(limit: _currentLimit)
+      _streamExcluded = excluded;
+      _songsStream = (excluded.isEmpty
+              ? widget.getSongsUseCase.watchRecentlyAdded(limit: _currentLimit)
+              : widget.getSongsUseCase.watchRecentlyAdded(
+                  limit: _currentLimit,
+                  excludedFolders: excluded,
+                ))
           .distinct();
     }
 

@@ -10,6 +10,7 @@ import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 import 'package:pulsr/core/motion/pulsr_motion.dart';
 import 'package:pulsr/core/responsive/pulsr_layout_metrics.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/di/injection.dart';
 import '../../../core/errors/failures.dart';
@@ -35,9 +36,7 @@ import '../../../core/widgets/shimmer_skeleton.dart';
 import '../../../core/widgets/song_tile.dart';
 import '../../../data/db/tables.dart' show OnlineLibraryKind;
 import '../../../domain/models/ytm_track.dart';
-import '../../../domain/repositories/music_repository_interface.dart';
 import '../../../domain/usecases/playlist_usecases.dart';
-import '../../library/cubit/library_cubit.dart';
 import '../../player/cubit/player_cubit.dart';
 import '../../playlists/cubit/playlist_cubit.dart';
 import '../../sheets/song_options_sheet.dart';
@@ -87,6 +86,8 @@ class OnlinePlaylistDetailScreen extends StatefulWidget {
 
 class _OnlinePlaylistDetailScreenState
     extends State<OnlinePlaylistDetailScreen> {
+  static const String _renamedOnlinePrefsKey = 'renamed_online_playlist_ids';
+
   late String _title;
   late String _subtitle;
   String? _artworkUrl;
@@ -96,37 +97,70 @@ class _OnlinePlaylistDetailScreenState
   bool _isSaving = false;
   bool _isOfflineCache = false;
   bool _hasCustomOrder = false;
+  bool _hasCustomLocalTitle = false;
   DateTime? _cachedAt;
   String? _errorMessage;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
 
-  late final String _cachePlaylistId;
-  late final String _kind;
+  late String _cachePlaylistId;
+  late String _kind;
   StreamSubscription<Result<List<YtmTrack>>>? _cacheSub;
 
   final Set<String> _selectedVideoIds = {};
   bool _isReordering = false;
+  List<YtmTrack>? _pendingCachedTracks;
+  int _reorderedDuringLock = 0;
 
   PlaylistUseCases get _useCases => getIt<PlaylistUseCases>();
 
   @override
   void initState() {
     super.initState();
+    _initFromArgs();
+  }
+
+  void _initFromArgs() {
     _cachePlaylistId = canonicalYtmPlaylistId(widget.args.playlistId);
     _kind = widget.args.kind;
     _title = widget.args.title ?? 'YouTube Music Playlist';
     _subtitle = widget.args.subtitle ?? 'Online Playlist';
     _artworkUrl = widget.args.artworkUrl;
-
-    if (widget.args.initialTracks != null &&
-        widget.args.initialTracks!.isNotEmpty) {
-      _tracks = List<YtmTrack>.from(widget.args.initialTracks!);
-      _artworkUrl ??= _tracks.firstOrNull?.artworkUrl;
-    }
+    _tracks = widget.args.initialTracks != null &&
+            widget.args.initialTracks!.isNotEmpty
+        ? List<YtmTrack>.from(widget.args.initialTracks!)
+        : [];
+    _artworkUrl ??= _tracks.firstOrNull?.artworkUrl;
+    _hasCustomLocalTitle = false;
+    _hasCustomOrder = false;
+    _cachedAt = null;
+    _errorMessage = null;
+    _isLoading = false;
+    _isOfflineCache = false;
+    _selectedVideoIds.clear();
+    _isReordering = false;
+    _pendingCachedTracks = null;
+    _reorderedDuringLock = 0;
 
     _subscribeToCachedTracks();
     unawaited(_bootstrap());
+  }
+
+  @override
+  void didUpdateWidget(covariant OnlinePlaylistDetailScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final oldId = canonicalYtmPlaylistId(oldWidget.args.playlistId);
+    final newId = canonicalYtmPlaylistId(widget.args.playlistId);
+    if (oldId != newId || oldWidget.args.kind != widget.args.kind) {
+      _fetchGen++;
+      _cacheSub?.cancel();
+      _cacheSub = null;
+      _searchController.clear();
+      setState(() {
+        _searchQuery = '';
+        _initFromArgs();
+      });
+    }
   }
 
   bool _disposed = false;
@@ -147,6 +181,10 @@ class _OnlinePlaylistDetailScreenState
           if (_disposed || !mounted) return;
           result.fold((_) {}, (tracks) {
             if (tracks.isEmpty) return;
+            if (_isReordering) {
+              _pendingCachedTracks = tracks;
+              return;
+            }
             setState(() {
               _tracks = tracks;
               _isLoading = false;
@@ -189,8 +227,34 @@ class _OnlinePlaylistDetailScreenState
     );
   }
 
+  Future<bool> _isLocallyRenamed() async {
+    if (_hasCustomLocalTitle) return true;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final ids = prefs.getStringList(_renamedOnlinePrefsKey) ?? const [];
+      return ids.contains(_cachePlaylistId);
+    } catch (_) {
+      return _hasCustomLocalTitle;
+    }
+  }
+
+  Future<void> _markLocallyRenamed() async {
+    _hasCustomLocalTitle = true;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final ids = List<String>.from(
+        prefs.getStringList(_renamedOnlinePrefsKey) ?? const [],
+      );
+      if (!ids.contains(_cachePlaylistId)) {
+        ids.add(_cachePlaylistId);
+        await prefs.setStringList(_renamedOnlinePrefsKey, ids);
+      }
+    } catch (_) {}
+  }
+
   Future<void> _loadCachedPlaylist() async {
     try {
+      final isRenamed = await _isLocallyRenamed();
       final meta = await _useCases.getOnlinePlaylist(_cachePlaylistId);
       final cachedTracks =
           await _useCases.getOnlinePlaylistTracks(_cachePlaylistId);
@@ -199,8 +263,13 @@ class _OnlinePlaylistDetailScreenState
       meta.fold((_) {}, (row) {
         if (row == null) return;
         setState(() {
-          if (widget.args.title == null && row.title.isNotEmpty) {
+          if (row.title.isNotEmpty) {
             _title = row.title;
+            if (isRenamed ||
+                (widget.args.title != null &&
+                    widget.args.title != row.title)) {
+              _hasCustomLocalTitle = true;
+            }
           }
           if (widget.args.subtitle == null && row.author.isNotEmpty) {
             _subtitle = row.author;
@@ -340,11 +409,15 @@ class _OnlinePlaylistDetailScreenState
         return;
       }
 
+      final preserveCustomTitle = await _isLocallyRenamed();
+      if (_disposed || !mounted || gen != _fetchGen) return;
+
       var resolvedTitle = _title;
       var resolvedSubtitle = _subtitle;
       var resolvedArtwork = _artworkUrl;
       if (details != null) {
-        if (details.title.isNotEmpty &&
+        if (!preserveCustomTitle &&
+            details.title.isNotEmpty &&
             details.title != 'YouTube Playlist' &&
             details.title != 'Playlist') {
           resolvedTitle = details.title;
@@ -534,17 +607,18 @@ class _OnlinePlaylistDetailScreenState
 
       tracksToSave = _applyCurrentOrder(tracksToSave);
 
-      final libraryCubit = context.read<LibraryCubit>();
-      final importedCount =
-          await libraryCubit.importYtmTracksAsFavorites(tracksToSave);
-      if (importedCount < 0) {
+      final songIds = <int>[];
+      for (final track in tracksToSave) {
+        final persistRes =
+            await playlistUseCases.ensureSongPersisted(track.toSongData());
+        persistRes.fold((_) {}, songIds.add);
+      }
+      if (songIds.isEmpty) {
         if (mounted) {
           PulsrToast.show(context, message: saveFailedText, isError: true);
         }
         return;
       }
-
-      final songIds = await _resolveSavedSongIds(tracksToSave);
 
       final playlistRes = await playlistUseCases.createPlaylist(_title);
       final createdId = playlistRes.fold((l) => null, (r) => r);
@@ -604,28 +678,6 @@ class _OnlinePlaylistDetailScreenState
     return ordered;
   }
 
-  Future<List<int>> _resolveSavedSongIds([List<YtmTrack>? sourceTracks]) async {
-    final tracks = sourceTracks ?? _tracks;
-    final fallback = [for (final t in tracks) t.songId];
-    if (!getIt.isRegistered<IMusicRepository>()) return fallback;
-    try {
-      final res = await getIt<IMusicRepository>().getFavorites();
-      final byRemoteId = <String, int>{};
-      res.fold((_) {}, (songs) {
-        for (final song in songs) {
-          final remoteId = song.remoteId;
-          if (remoteId != null && remoteId.isNotEmpty) {
-            byRemoteId[remoteId] = song.id;
-          }
-        }
-      });
-      if (byRemoteId.isEmpty) return fallback;
-      return [for (final t in tracks) byRemoteId[t.videoId] ?? t.songId];
-    } catch (_) {
-      return fallback;
-    }
-  }
-
   Future<void> _enterReorderMode() async {
     if (_tracks.isEmpty || _isReordering) return;
     PulsrHaptics.selectionClick();
@@ -665,9 +717,16 @@ class _OnlinePlaylistDetailScreenState
 
   void _exitReorderMode() {
     PulsrHaptics.selectionClick();
+    final pending = _pendingCachedTracks;
+    final reordered = _reorderedDuringLock > 0;
+    _pendingCachedTracks = null;
+    _reorderedDuringLock = 0;
     setState(() {
       _isReordering = false;
       _selectedVideoIds.clear();
+      if (!reordered && pending != null && pending.isNotEmpty) {
+        _tracks = pending;
+      }
     });
   }
 
@@ -807,6 +866,7 @@ class _OnlinePlaylistDetailScreenState
   }
 
   Future<void> _showRenameDialog() async {
+    final saveFailedText = context.l10n.saveFailed;
     final newTitle = await PulsrDialogHelper.showInputDialog(
       context,
       title: context.l10n.browseRenamePlaylist,
@@ -819,17 +879,48 @@ class _OnlinePlaylistDetailScreenState
     if (newTitle != null &&
         newTitle.trim().isNotEmpty &&
         newTitle.trim() != _title) {
+      final previousTitle = _title;
+      final previousCustomFlag = _hasCustomLocalTitle;
       final trimmed = newTitle.trim();
-      setState(() => _title = trimmed);
+      setState(() {
+        _title = trimmed;
+        _hasCustomLocalTitle = true;
+      });
+      String? failure;
       try {
-        await _useCases.renameOnlinePlaylist(_cachePlaylistId, trimmed);
+        final result =
+            await _useCases.renameOnlinePlaylist(_cachePlaylistId, trimmed);
+        failure = result.fold((f) => f.message, (_) => null);
       } catch (e) {
-        debugPrint('[ONLINE_PLAYLIST] Failed to rename playlist: $e');
+        failure = e.toString();
       }
+      if (!mounted) return;
+      if (failure != null) {
+        debugPrint('[ONLINE_PLAYLIST] Failed to rename playlist: $failure');
+        setState(() {
+          _title = previousTitle;
+          _hasCustomLocalTitle = previousCustomFlag;
+        });
+        PulsrToast.show(context, message: saveFailedText, isError: true);
+        return;
+      }
+      await _markLocallyRenamed();
+      if (!mounted) return;
+      try {
+        context.read<PlaylistCubit?>()?.syncUpdatedPlaylistFromDetail(
+              playlistId: _cachePlaylistId,
+              kind: _kind,
+              title: trimmed,
+              author: _subtitle,
+              artworkUrl: _artworkUrl,
+              tracks: _tracks,
+            );
+      } catch (_) {}
     }
   }
 
   void _queueOrderSave(List<YtmTrack> previous, List<YtmTrack> next) {
+    _reorderedDuringLock++;
     final version = ++_orderSaveVersion;
     final failureText = context.l10n.reorderFailed;
     _orderSaveChain = _orderSaveChain.then((_) async {
@@ -1206,65 +1297,70 @@ class _OnlinePlaylistDetailScreenState
           Expanded(
             child: PulsrRefreshIndicator(
               onRefresh: _fetchTracks,
-              child: ListView(
-                padding: EdgeInsets.only(
-                  bottom: PulsrLayoutMetrics.scrollBottom(context),
-                ),
+              child: CustomScrollView(
                 physics: const AlwaysScrollableScrollPhysics(
                   parent: BouncingScrollPhysics(),
                 ),
                 keyboardDismissBehavior:
                     ScrollViewKeyboardDismissBehavior.onDrag,
-                children: [
-                  Padding(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: Adaptive.pagePadding(context),
-                      vertical: AppSpacing.sm,
+                slivers: [
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: Adaptive.pagePadding(context),
+                        vertical: AppSpacing.sm,
+                      ),
+                      child: _buildHeroCard(context, p, totalDurationMs),
                     ),
-                    child: _buildHeroCard(context, p, totalDurationMs),
                   ),
                   if (_tracks.isNotEmpty)
-                    PulsrSearchField(
-                      controller: _searchController,
-                      debounceDuration: Duration.zero,
-                      hintText: context.l10n.browseSearchWithinPlaylist,
-                      margin: EdgeInsetsDirectional.fromSTEB(
-                        Adaptive.pagePadding(context),
-                        AppSpacing.xxs,
-                        Adaptive.pagePadding(context),
-                        AppSpacing.xs,
+                    SliverToBoxAdapter(
+                      child: PulsrSearchField(
+                        controller: _searchController,
+                        debounceDuration: Duration.zero,
+                        hintText: context.l10n.browseSearchWithinPlaylist,
+                        margin: EdgeInsetsDirectional.fromSTEB(
+                          Adaptive.pagePadding(context),
+                          AppSpacing.xxs,
+                          Adaptive.pagePadding(context),
+                          AppSpacing.xs,
+                        ),
+                        onChanged: (val) => setState(() => _searchQuery = val),
+                        onClear: () => setState(() => _searchQuery = ''),
                       ),
-                      onChanged: (val) => setState(() => _searchQuery = val),
-                      onClear: () => setState(() => _searchQuery = ''),
                     ),
                   if (_isLoading && _tracks.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: AppSpacing.md),
-                      child: SkeletonList(
-                        padding:
-                            EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                    const SliverToBoxAdapter(
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(vertical: AppSpacing.md),
+                        child: SkeletonList(
+                          padding:
+                              EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                        ),
                       ),
                     )
                   else if (_errorMessage != null && _tracks.isEmpty)
-                    PulsrEmptyState(
-                      icon: Icons.cloud_off_rounded,
-                      title: context.l10n.playlistLoadFailed,
-                      subtitle: _errorMessage!,
-                      primaryActionLabel: context.l10n.retry,
-                      primaryActionIcon: Icons.refresh_rounded,
-                      onPrimaryAction: _fetchTracks,
+                    SliverToBoxAdapter(
+                      child: PulsrEmptyState(
+                        icon: Icons.cloud_off_rounded,
+                        title: context.l10n.playlistLoadFailed,
+                        subtitle: _errorMessage!,
+                        primaryActionLabel: context.l10n.retry,
+                        primaryActionIcon: Icons.refresh_rounded,
+                        onPrimaryAction: _fetchTracks,
+                      ),
                     )
                   else if (filtered.isEmpty)
-                    PulsrEmptyState(
-                      icon: Icons.search_off_rounded,
-                      title: _searchQuery.isNotEmpty
-                          ? '${context.l10n.browseNoSongsMatch} "$_searchQuery"'
-                          : context.l10n.browsePlaylistHasNoSongs,
+                    SliverToBoxAdapter(
+                      child: PulsrEmptyState(
+                        icon: Icons.search_off_rounded,
+                        title: _searchQuery.isNotEmpty
+                            ? '${context.l10n.browseNoSongsMatch} "$_searchQuery"'
+                            : context.l10n.browsePlaylistHasNoSongs,
+                      ),
                     )
                   else
-                    ListView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
+                    SliverList.builder(
                       itemCount: filtered.length,
                       itemBuilder: (context, index) {
                         final track = filtered[index];
@@ -1305,6 +1401,11 @@ class _OnlinePlaylistDetailScreenState
                         );
                       },
                     ),
+                  SliverPadding(
+                    padding: EdgeInsets.only(
+                      bottom: PulsrLayoutMetrics.scrollBottom(context),
+                    ),
+                  ),
                 ],
               ),
             ),

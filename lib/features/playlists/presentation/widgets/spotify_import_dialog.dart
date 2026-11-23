@@ -12,7 +12,9 @@ import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/pulsr_dialog.dart';
 import '../../../../core/widgets/pulsr_progress.dart';
+import '../../../../data/db/app_database.dart';
 import '../../../../data/services/spotify_importer_service.dart';
+import '../../../../domain/usecases/playlist_usecases.dart';
 
 import '../../../../core/utils/pulsr_haptics.dart';
 /// Modal dialog for importing a Spotify playlist into Pulsr.
@@ -45,11 +47,21 @@ class _SpotifyImportDialogState extends State<SpotifyImportDialog> {
   double? _progressFraction;
   String? _errorMessage;
   SpotifyImportResult? _importResult;
+  bool _cancelled = false;
+  int _importToken = 0;
 
   @override
   void dispose() {
+    _cancelled = true;
+    _importToken++;
     _urlController.dispose();
     super.dispose();
+  }
+
+  void _cancelImport() {
+    _cancelled = true;
+    _importToken++;
+    Navigator.of(context, rootNavigator: true).pop();
   }
 
   Future<void> _pasteFromClipboard() async {
@@ -78,6 +90,10 @@ class _SpotifyImportDialogState extends State<SpotifyImportDialog> {
       return;
     }
 
+    final token = ++_importToken;
+    _cancelled = false;
+    bool isCancelled() => _cancelled || token != _importToken || !mounted;
+
     setState(() {
       _stage = _ImportStage.loading;
       _statusMessage = context.l10n.spotifyFetchingMetadata;
@@ -90,25 +106,84 @@ class _SpotifyImportDialogState extends State<SpotifyImportDialog> {
           ? getIt<SpotifyImporterService>()
           : SpotifyImporterService();
 
-      final result = await importer.importPlaylist(
-        input,
+      final playlistData = await importer.fetchPlaylistTracks(id);
+      if (isCancelled()) return;
+
+      final matchResult = await importer.resolveTracks(
+        playlistData.tracks,
+        isCancelled: isCancelled,
         onProgress: (completed, total) {
-          if (!mounted) return;
+          if (isCancelled()) return;
           setState(() {
             _statusMessage = context.l10n.spotifyMatchingTracks(completed, total);
             _progressFraction = total > 0 ? completed / total : null;
           });
         },
       );
+      if (isCancelled()) return;
 
-      if (!mounted) return;
+      if (matchResult.resolved.isEmpty) {
+        throw Exception('Could not match any tracks on YouTube Music.');
+      }
+
+      final playlistUseCases = getIt<PlaylistUseCases>();
+      Future<int> saveImported({required bool cleanupOnFailure}) async {
+        final createRes =
+            await playlistUseCases.createPlaylist(playlistData.title);
+        final playlistRowId = createRes.fold(
+          (f) => throw Exception('Failed to create playlist: ${f.message}'),
+          (rowId) => rowId,
+        );
+        try {
+          final songIds = <int>[];
+          for (final track in matchResult.resolved) {
+            final persistRes =
+                await playlistUseCases.ensureSongPersisted(track.toSongData());
+            persistRes.fold((_) {}, songIds.add);
+          }
+          if (songIds.isNotEmpty) {
+            final addRes = await playlistUseCases.addSongsToPlaylist(
+              playlistRowId,
+              songIds,
+            );
+            addRes.fold(
+              (f) => throw Exception(
+                  'Failed to add songs to playlist: ${f.message}'),
+              (_) {},
+            );
+          }
+          return playlistRowId;
+        } catch (e) {
+          if (cleanupOnFailure) {
+            await playlistUseCases.deletePlaylist(playlistRowId);
+          }
+          rethrow;
+        }
+      }
+
+      final createdPlaylistId = getIt.isRegistered<AppDatabase>()
+          ? await getIt<AppDatabase>()
+              .transaction(() => saveImported(cleanupOnFailure: false))
+          : await saveImported(cleanupOnFailure: true);
+      if (isCancelled()) return;
+
+      final result = SpotifyImportResult(
+        playlistId: createdPlaylistId,
+        playlistTitle: playlistData.title,
+        totalTracks: playlistData.tracks.length,
+        resolvedTracks: matchResult.resolved,
+        unmatchedTracks: matchResult.unmatched,
+        truncated: playlistData.truncated,
+      );
+
+      if (isCancelled()) return;
       setState(() {
         _stage = _ImportStage.result;
         _importResult = result;
       });
       widget.onImportFinished?.call();
     } catch (e) {
-      if (!mounted) return;
+      if (isCancelled()) return;
       setState(() {
         _stage = _ImportStage.error;
         _errorMessage = resolveUiErrorMessage(
@@ -406,7 +481,15 @@ class _SpotifyImportDialogState extends State<SpotifyImportDialog> {
         ];
 
       case _ImportStage.loading:
-        return const [];
+        return [
+          TextButton(
+            onPressed: _cancelImport,
+            child: Text(
+              context.l10n.cancel,
+              style: TextStyle(color: p.textSecondary),
+            ),
+          ),
+        ];
 
       case _ImportStage.result:
         return [

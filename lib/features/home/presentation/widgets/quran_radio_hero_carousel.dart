@@ -622,7 +622,8 @@ class _QuranRadioHeroCarouselState extends State<QuranRadioHeroCarousel> {
                 animation: _pageController,
                 builder: (context, child) {
                   double value = 0.0;
-                  if (_pageController.position.haveDimensions) {
+                  if (_pageController.hasClients &&
+                      _pageController.position.haveDimensions) {
                     final page = _pageController.page ??
                         _pageController.initialPage.toDouble();
                     value = (page - index).clamp(-1.0, 1.0).toDouble();

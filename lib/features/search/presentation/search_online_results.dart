@@ -319,80 +319,80 @@ class _OnlineResults extends StatelessWidget {
       },
     );
   }
+}
 
-  Future<void> _showOnlineTrackActions(
-    BuildContext context,
-    SongsTableData song,
-    PulsrPalette p,
-  ) {
-    return PulsrSheetHelper.showPulsrSheet<void>(
-      context: context,
-      builder: (sheetContext) => PulsrBottomSheet(
-        leading: SizedBox(
-          width: 44,
-          height: 44,
-          child: CachedArtwork(
-            id: song.id,
-            remoteUrl: song.remoteArtworkUrl ?? song.artworkUri,
-            albumId: song.albumId,
-            type: ArtworkType.AUDIO,
-            size: 44,
-            borderRadius: 10,
-          ),
-        ),
-        title: Text(
-          song.title,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        subtitle: Text(
-          song.artist,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              minTileHeight: AppSpacing.minTouchTarget,
-              leading: Icon(Icons.playlist_play_rounded, color: p.accent),
-              title: Text(context.l10n.playNext),
-              onTap: () {
-                Navigator.of(sheetContext).pop();
-                context.read<PlayerCubit>().playNext(song);
-              },
-            ),
-            ListTile(
-              minTileHeight: AppSpacing.minTouchTarget,
-              leading: Icon(Icons.queue_music_rounded, color: p.accent),
-              title: Text(context.l10n.addToQueue),
-              onTap: () {
-                Navigator.of(sheetContext).pop();
-                context.read<PlayerCubit>().addAllToQueue([song]);
-              },
-            ),
-            ListTile(
-              minTileHeight: AppSpacing.minTouchTarget,
-              leading: Icon(Icons.download_rounded, color: p.accent),
-              title: Text(context.l10n.browseDownloadOffline),
-              onTap: () {
-                Navigator.of(sheetContext).pop();
-                context.read<YtmDownloadCubit?>()?.download(song);
-              },
-            ),
-            ListTile(
-              minTileHeight: AppSpacing.minTouchTarget,
-              leading: Icon(Icons.playlist_add_rounded, color: p.accent),
-              title: Text(context.l10n.addToPlaylist),
-              onTap: () {
-                Navigator.of(sheetContext).pop();
-                AddToPlaylistSheet.show(context, song: song);
-              },
-            ),
-            const SizedBox(height: AppSpacing.xs),
-          ],
+Future<void> _showOnlineTrackActions(
+  BuildContext context,
+  SongsTableData song,
+  PulsrPalette p,
+) {
+  return PulsrSheetHelper.showPulsrSheet<void>(
+    context: context,
+    builder: (sheetContext) => PulsrBottomSheet(
+      leading: SizedBox(
+        width: 44,
+        height: 44,
+        child: CachedArtwork(
+          id: song.id,
+          remoteUrl: song.remoteArtworkUrl ?? song.artworkUri,
+          albumId: song.albumId,
+          type: ArtworkType.AUDIO,
+          size: 44,
+          borderRadius: 10,
         ),
       ),
-    );
-  }
+      title: Text(
+        song.title,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      subtitle: Text(
+        song.artist,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ListTile(
+            minTileHeight: AppSpacing.minTouchTarget,
+            leading: Icon(Icons.playlist_play_rounded, color: p.accent),
+            title: Text(context.l10n.playNext),
+            onTap: () {
+              Navigator.of(sheetContext).pop();
+              context.read<PlayerCubit>().playNext(song);
+            },
+          ),
+          ListTile(
+            minTileHeight: AppSpacing.minTouchTarget,
+            leading: Icon(Icons.queue_music_rounded, color: p.accent),
+            title: Text(context.l10n.addToQueue),
+            onTap: () {
+              Navigator.of(sheetContext).pop();
+              context.read<PlayerCubit>().addAllToQueue([song]);
+            },
+          ),
+          ListTile(
+            minTileHeight: AppSpacing.minTouchTarget,
+            leading: Icon(Icons.download_rounded, color: p.accent),
+            title: Text(context.l10n.browseDownloadOffline),
+            onTap: () {
+              Navigator.of(sheetContext).pop();
+              context.read<YtmDownloadCubit?>()?.download(song);
+            },
+          ),
+          ListTile(
+            minTileHeight: AppSpacing.minTouchTarget,
+            leading: Icon(Icons.playlist_add_rounded, color: p.accent),
+            title: Text(context.l10n.addToPlaylist),
+            onTap: () {
+              Navigator.of(sheetContext).pop();
+              AddToPlaylistSheet.show(context, song: song);
+            },
+          ),
+          const SizedBox(height: AppSpacing.xs),
+        ],
+      ),
+    ),
+  );
 }

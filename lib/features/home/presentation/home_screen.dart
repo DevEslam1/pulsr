@@ -19,6 +19,7 @@ import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../core/widgets/pulsr_dock_tracker.dart';
+import '../../../core/widgets/source_scope_switcher.dart';
 import '../../../core/responsive/pulsr_layout_metrics.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/services/ytm_account_service.dart';
@@ -99,6 +100,7 @@ class _HomeScreenContent extends StatefulWidget {
 class _HomeScreenContentState extends State<_HomeScreenContent>
     with WidgetsBindingObserver {
   SourceScope _scope = SourceScope.local;
+  bool _scopeLoaded = false;
   int get _selectedTab => _scope == SourceScope.online ? 1 : 0;
   String _selectedOnlineCategory = 'Recommended For You';
 
@@ -203,6 +205,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
   /// `notification_permission_denied` flag, otherwise a real denial would stay
   /// hidden on every subsequent launch.
   bool _notificationBannerDismissed = false;
+  bool _openedAppSettingsForNotification = false;
 
   @override
   void initState() {
@@ -212,6 +215,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
     final isLoggedIn = _ytmAccountService.isLoggedIn;
     _selectedOnlineCategory =
         isLoggedIn ? 'Recommended For You' : 'Trending Egypt';
+    _preloadScope();
     _checkNotificationDenied();
     final libraryCubit = context.read<LibraryCubit?>();
     if (libraryCubit != null) {
@@ -230,6 +234,25 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
     }
   }
 
+  Future<void> _preloadScope() async {
+    var restored = SourceScope.local;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final saved = prefs.getString(SourceScopeSwitcher.storageKey('home'));
+      if (saved == SourceScope.online.name) {
+        restored = SourceScope.online;
+      }
+    } catch (_) {}
+    if (!mounted) return;
+    setState(() {
+      _scope = restored;
+      _scopeLoaded = true;
+    });
+    if (restored == SourceScope.online) {
+      unawaited(_homeCubit.loadCategory(_selectedOnlineCategory));
+    }
+  }
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
@@ -240,7 +263,20 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
   Future<void> _checkNotificationDenied() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final denied = prefs.getBool('notification_permission_denied') ?? false;
+      var denied = prefs.getBool('notification_permission_denied') ?? false;
+      final returningFromSettings = _openedAppSettingsForNotification;
+      _openedAppSettingsForNotification = false;
+      if (denied && returningFromSettings) {
+        try {
+          final status = await Permission.notification.status;
+          if (status.isGranted) {
+            await prefs.setBool('notification_permission_denied', false);
+            denied = false;
+          }
+        } catch (_) {
+          // Permission plugin unavailable (desktop / unit tests): keep prefs flag.
+        }
+      }
       if (mounted && _notificationDenied != denied) {
         setState(() => _notificationDenied = denied);
       }
@@ -334,6 +370,9 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
             _selectedOnlineCategory =
                 _onlineCategories.firstOrNull ?? 'Trending Egypt';
           });
+        }
+        if (showOnlineTab && _scope == SourceScope.online) {
+          unawaited(_homeCubit.loadCategory(_selectedOnlineCategory));
         }
       },
       builder: (context, homeState) => Scaffold(
@@ -548,17 +587,9 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                                         ),
                                         TextButton(
                                           onPressed: () async {
+                                            _openedAppSettingsForNotification =
+                                                true;
                                             await openAppSettings();
-                                            final prefs =
-                                                await SharedPreferences
-                                                    .getInstance();
-                                            await prefs.setBool(
-                                                'notification_permission_denied',
-                                                false);
-                                            if (mounted) {
-                                              setState(() =>
-                                                  _notificationDenied = false);
-                                            }
                                           },
                                           child:
                                               Text(context.l10n.openSettings),
@@ -595,8 +626,13 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                                   child: CompactSourceScopeSwitcher(
                                     persistKey: 'home',
                                     selectedScope: _scope,
-                                    onChanged: (next) =>
-                                        setState(() => _scope = next),
+                                    onChanged: (next) {
+                                      setState(() => _scope = next);
+                                      if (next == SourceScope.online) {
+                                        unawaited(_homeCubit
+                                            .loadCategory(_selectedOnlineCategory));
+                                      }
+                                    },
                                   ),
                                 ),
                               ] else if (offlineOnly) ...[
@@ -632,7 +668,9 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                                     context.motionCurve(Curves.easeInCubic),
                                 child: KeyedSubtree(
                                   key: ValueKey('home_tab_$currentTab'),
-                                  child: currentTab == 0
+                                  child: (showOnlineTab && !_scopeLoaded)
+                                      ? const SizedBox.shrink()
+                                      : currentTab == 0
                                       ? _buildLocalView(
                                           context,
                                           p,
@@ -640,8 +678,12 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                                           playerCubit,
                                           isTablet)
                                       : (showOnlineTab
-                                          ? _buildOnlineView(context, p,
-                                              playerCubit, isTablet)
+                                          ? _buildOnlineView(
+                                              context,
+                                              p,
+                                              playerCubit,
+                                              homeState,
+                                              isTablet)
                                           : const SizedBox.shrink()),
                                 ),
                               ),
@@ -936,6 +978,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
     BuildContext context,
     PulsrPalette p,
     PlayerCubit playerCubit,
+    HomeState homeState,
     bool isTablet,
   ) {
     return Column(
@@ -1056,6 +1099,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                         PulsrHaptics.selectionClick();
                         if (selected) {
                           setState(() => _selectedOnlineCategory = cat);
+                          unawaited(_homeCubit.loadCategory(cat));
                         }
                       },
                       selectedColor: p.accent,
@@ -1093,13 +1137,11 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                 : (_selectedOnlineCategory == 'Trending Egypt'
                     ? context.l10n.browseTrendingInEgypt
                     : '${context.l10n.browsePopular}: ${_categoryLabel(context, _selectedOnlineCategory)}'),
-            future: context
-                .read<HomeCubit>()
-                .categoryFuture(_selectedOnlineCategory),
+            categoryState: homeState.categoryState(_selectedOnlineCategory),
             playerCubit: playerCubit,
             onRetry: () {
-              context.read<HomeCubit>().retryCategory(_selectedOnlineCategory);
-              setState(() {});
+              _homeCubit.retryCategory(_selectedOnlineCategory);
+              unawaited(_homeCubit.loadCategory(_selectedOnlineCategory));
             },
           ),
         ),

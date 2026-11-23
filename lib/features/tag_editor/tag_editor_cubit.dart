@@ -1,5 +1,6 @@
 import 'dart:collection';
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -36,6 +37,46 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
   // Fields the user already edited; an in-flight [loadTags] must not
   // overwrite them.
   final Set<String> _userEditedFields = <String>{};
+  final List<String> _downloadedTempArtworkPaths = <String>[];
+
+  static const Set<String> _smallLyricsLimitExts = {'.wav', '.aiff', '.aif'};
+  static const Set<String> _unsupportedTagExts = {
+    '.cue',
+    '.m3u',
+    '.m3u8',
+    '.pls',
+    '.wpl',
+    '.mid',
+    '.midi',
+  };
+
+  /// Returns a human-readable reason why [song] cannot be tag-edited, or
+  /// `null` when the file is eligible for tag editing.
+  static String? unsupportedTrackReason(SongsTableData song) {
+    if (song.cueStartMs != null ||
+        (song.cueFile != null && song.cueFile!.isNotEmpty)) {
+      return 'Tag editing is not supported for CUE sheet virtual tracks.';
+    }
+    final lowerPath = song.path.trim().toLowerCase();
+    if (lowerPath.isEmpty ||
+        lowerPath.startsWith('ytmusic://') ||
+        lowerPath.startsWith('http://') ||
+        lowerPath.startsWith('https://') ||
+        (song.source == SongSource.youtube && !song.isDownloaded)) {
+      return 'Cannot edit tags on online streaming tracks. Download the track first.';
+    }
+    for (final ext in _unsupportedTagExts) {
+      if (lowerPath.endsWith(ext)) {
+        return 'Tag editing is not supported for this file format.';
+      }
+    }
+    return null;
+  }
+
+  static bool _usesSmallLyricsLimit(String path) {
+    final lower = path.trim().toLowerCase();
+    return _smallLyricsLimitExts.any(lower.endsWith);
+  }
 
   /// Undo stack: diff snapshots before each user edit. Cleared on save.
   // FIX-H12: Use ListQueue for O(1) eviction instead of O(n) removeRange
@@ -256,6 +297,14 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
 
   Future<void> loadTags() async {
     if (isClosed) return;
+    final unsupported = unsupportedTrackReason(state.song);
+    if (unsupported != null) {
+      safeEmit(state.copyWith(
+        status: TagEditorStatus.loaded,
+        error: uiError(unsupported),
+      ));
+      return;
+    }
     safeEmit(state.copyWith(status: TagEditorStatus.loading));
     try {
       final Map<dynamic, dynamic>? tags =
@@ -305,6 +354,9 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
       } else {
         safeEmit(state.copyWith(status: TagEditorStatus.loaded));
       }
+    } on MissingPluginException {
+      if (isClosed) return;
+      safeEmit(state.copyWith(status: TagEditorStatus.loaded));
     } catch (e, st) {
       if (isClosed) return;
       ErrorLogger.log(
@@ -316,11 +368,26 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
     }
   }
 
+  TagEditorStatus? get _clearedFailureStatus =>
+      state.status == TagEditorStatus.failure ? TagEditorStatus.loaded : null;
+
+  void setAutoFetching(bool value) {
+    if (isClosed || state.isAutoFetching == value) return;
+    safeEmit(state.copyWith(
+      isAutoFetching: value,
+      clearError: value,
+    ));
+  }
+
   void updateTitle(String val) {
     if (isClosed) return;
     _pushHistory('title');
     _userEditedFields.add('title');
-    safeEmit(state.copyWith(title: val));
+    safeEmit(state.copyWith(
+      title: val,
+      status: _clearedFailureStatus,
+      clearError: true,
+    ));
   }
 
   void updateArtist(String val) {
@@ -328,7 +395,11 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
     _pushHistory('artist');
     _userEditedFields.add('artist');
     if (state.isBatchMode) _batchArtistEdited = true;
-    safeEmit(state.copyWith(artist: val));
+    safeEmit(state.copyWith(
+      artist: val,
+      status: _clearedFailureStatus,
+      clearError: true,
+    ));
   }
 
   void updateAlbum(String val) {
@@ -336,7 +407,11 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
     _pushHistory('album');
     _userEditedFields.add('album');
     if (state.isBatchMode) _batchAlbumEdited = true;
-    safeEmit(state.copyWith(album: val));
+    safeEmit(state.copyWith(
+      album: val,
+      status: _clearedFailureStatus,
+      clearError: true,
+    ));
   }
 
   void updateGenre(String val) {
@@ -344,7 +419,11 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
     _pushHistory('genre');
     _userEditedFields.add('genre');
     if (state.isBatchMode) _batchGenreEdited = true;
-    safeEmit(state.copyWith(genre: val));
+    safeEmit(state.copyWith(
+      genre: val,
+      status: _clearedFailureStatus,
+      clearError: true,
+    ));
   }
 
   void updateYear(String val) {
@@ -352,7 +431,11 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
     _pushHistory('year');
     _userEditedFields.add('year');
     if (state.isBatchMode) _batchYearEdited = true;
-    safeEmit(state.copyWith(year: val));
+    safeEmit(state.copyWith(
+      year: val,
+      status: _clearedFailureStatus,
+      clearError: true,
+    ));
   }
 
   void updateTrackNumber(String val) {
@@ -360,7 +443,11 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
     _pushHistory('trackNumber');
     _userEditedFields.add('trackNumber');
     if (state.isBatchMode) _batchTrackEdited = true;
-    safeEmit(state.copyWith(trackNumber: val));
+    safeEmit(state.copyWith(
+      trackNumber: val,
+      status: _clearedFailureStatus,
+      clearError: true,
+    ));
   }
 
   void updateDiscNumber(String val) {
@@ -368,7 +455,11 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
     _pushHistory('discNumber');
     _userEditedFields.add('discNumber');
     if (state.isBatchMode) _batchDiscEdited = true;
-    safeEmit(state.copyWith(discNumber: val));
+    safeEmit(state.copyWith(
+      discNumber: val,
+      status: _clearedFailureStatus,
+      clearError: true,
+    ));
   }
 
   void updateComment(String val) {
@@ -376,14 +467,22 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
     _pushHistory('comment');
     _userEditedFields.add('comment');
     if (state.isBatchMode) _batchCommentEdited = true;
-    safeEmit(state.copyWith(comment: val));
+    safeEmit(state.copyWith(
+      comment: val,
+      status: _clearedFailureStatus,
+      clearError: true,
+    ));
   }
 
   void updateLyrics(String val) {
     if (isClosed) return;
     _pushHistory('lyrics');
     _userEditedFields.add('lyrics');
-    safeEmit(state.copyWith(lyrics: val));
+    safeEmit(state.copyWith(
+      lyrics: val,
+      status: _clearedFailureStatus,
+      clearError: true,
+    ));
   }
 
   Future<void> pickArtwork() async {
@@ -409,10 +508,13 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
             return;
           }
         } catch (_) {}
+        _pushHistory('artwork');
         _userEditedFields.add('artwork');
         safeEmit(state.copyWith(
           newArtworkPath: image.path,
           removeArtwork: false,
+          status: _clearedFailureStatus,
+          clearError: true,
         ));
       }
     } on PlatformException catch (e) {
@@ -431,11 +533,14 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
 
   void removeArtworkImage() {
     if (isClosed) return;
+    _pushHistory('artwork');
     _userEditedFields.add('artwork');
     safeEmit(state.copyWith(
       removeArtwork: true,
       clearNewArtworkPath: true,
       clearArtworkBytes: true,
+      status: _clearedFailureStatus,
+      clearError: true,
     ));
   }
 
@@ -452,7 +557,11 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
   }
 
   /// Applies the selected metadata result to the form state.
-  Future<bool> applyMetadataResult(OnlineTrackMetadata match) async {
+  Future<bool> applyMetadataResult(OnlineTrackMetadata match) {
+    return _applyMetadataResultInternal(match);
+  }
+
+  Future<bool> _applyMetadataResultInternal(OnlineTrackMetadata match) async {
     if (isClosed) return false;
     safeEmit(state.copyWith(isAutoFetching: true, clearError: true));
     try {
@@ -460,8 +569,13 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
       if (match.artworkUrl != null) {
         downloadedArtPath = await _metadataSearchService
             .downloadArtworkToTemp(match.artworkUrl!);
+        if (downloadedArtPath != null) {
+          _downloadedTempArtworkPaths.add(downloadedArtPath);
+        }
       }
       if (isClosed) return false;
+
+      _pushHistory('metadata');
 
       // Applied metadata is a deliberate user edit: a slow loadTags that lands
       // afterwards must not overwrite it with the file's stale tags.
@@ -496,6 +610,8 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
                 : state.trackNumber,
         newArtworkPath: downloadedArtPath ?? state.newArtworkPath,
         removeArtwork: false,
+        status: _clearedFailureStatus,
+        clearError: true,
       ));
       return true;
     } catch (e, st) {
@@ -512,7 +628,7 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
 
   /// Automatically searches online (iTunes & MusicBrainz) and updates tags + cover art in 1 tap.
   Future<bool> autoFetchOnlineTags() async {
-    if (isClosed) return false;
+    if (isClosed || state.isAutoFetching) return false;
     safeEmit(state.copyWith(isAutoFetching: true, clearError: true));
     try {
       final results = await searchOnlineMatches();
@@ -524,7 +640,7 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
         ));
         return false;
       }
-      return await applyMetadataResult(results.first);
+      return await _applyMetadataResultInternal(results.first);
     } catch (e, st) {
       if (isClosed) return false;
       ErrorLogger.log('Auto-fetch online tags failed',
@@ -543,7 +659,7 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
   /// A 300ms inter-request delay prevents HTTP 429 rate-limiting (BUG-11).
   /// Returns the number of tracks resolved.
   Future<int> autoFetchBatchTags({int maxTracks = 20}) async {
-    if (isClosed || !state.isBatchMode) return 0;
+    if (isClosed || !state.isBatchMode || state.isAutoFetching) return 0;
     safeEmit(state.copyWith(isAutoFetching: true, clearError: true));
     try {
       final targets = state.batchSongs.take(maxTracks).toList();
@@ -593,6 +709,9 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
       final album = unanimous(albums);
       final genre = unanimous(genres);
       final year = unanimous(years);
+      if (artist != null || album != null || genre != null || year != null) {
+        _pushHistory('metadata');
+      }
       if (artist != null) _batchArtistEdited = true;
       if (album != null) _batchAlbumEdited = true;
       if (genre != null) _batchGenreEdited = true;
@@ -603,6 +722,7 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
         album: album ?? state.album,
         genre: genre ?? state.genre,
         year: year ?? state.year,
+        clearError: resolved > 0,
         error: resolved == 0
             ? uiError('No matching online metadata found for these tracks.')
             : null,
@@ -687,6 +807,7 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
         final total = state.batchSongs.length;
         final List<String> failedFiles = [];
         final List<SongsTableData> taggedSongs = [];
+        bool hadRescanError = false;
         SharedPreferences? prefs;
         List<String> pendingPaths = [];
         try {
@@ -709,6 +830,10 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
               status: TagEditorStatus.saving,
               batchProgress: total > 0 ? (i + 1) / total : 1.0,
             ));
+          }
+          if (unsupportedTrackReason(s) != null) {
+            failedFiles.add(s.title);
+            continue;
           }
           try {
             final payload = <String, dynamic>{
@@ -750,8 +875,14 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
             // FIX-C8: 100ms delay to let native file buffers flush
             await Future.delayed(const Duration(milliseconds: 100));
             if (isClosed) return;
-            await _scannerService.rescanSingleFile(s.path);
-            await CachedArtwork.invalidate(id: s.id);
+            try {
+              await _scannerService.rescanSingleFile(s.path);
+              await CachedArtwork.invalidate(id: s.id);
+            } catch (e, st) {
+              hadRescanError = true;
+              ErrorLogger.log('Tag write succeeded but rescan failed for ${s.path}',
+                  error: e, stackTrace: st, category: 'TagEditor');
+            }
             taggedSongs.add(s);
             pendingPaths.remove(s.path);
             // C-04: Persist the shrinking checkpoint periodically rather than
@@ -804,13 +935,23 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
         } else {
           _clearHistory();
           _userEditedFields.clear();
+          _batchArtistEdited = false;
+          _batchAlbumEdited = false;
+          _batchGenreEdited = false;
+          _batchYearEdited = false;
+          _batchTrackEdited = false;
+          _batchDiscEdited = false;
+          _batchCommentEdited = false;
           // FIX-C08: Inform user that lyrics are not editable in batch mode
-          final batchLyricsNote = state.lyrics.isNotEmpty
-              ? 'Note: lyrics are not editable in batch mode — use single-track editor for lyrics.'
-              : null;
+          final notes = <String>[
+            if (state.lyrics.isNotEmpty)
+              'Note: lyrics are not editable in batch mode — use single-track editor for lyrics.',
+            if (hadRescanError)
+              'Tags were written to the files, but refreshing the library index failed for one or more tracks.',
+          ];
           safeEmit(state.copyWith(
             status: TagEditorStatus.success,
-            error: batchLyricsNote == null ? null : uiError(batchLyricsNote),
+            error: notes.isEmpty ? null : uiError(notes.join(' ')),
             batchFailedCount: 0,
             clearBatchProgress: true,
           ));
@@ -818,9 +959,18 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
         return;
       }
 
+      final singleUnsupported = unsupportedTrackReason(state.song);
+      if (singleUnsupported != null) {
+        safeEmit(state.copyWith(
+          status: TagEditorStatus.failure,
+          error: uiError(singleUnsupported),
+        ));
+        return;
+      }
+
       String lyrics = state.lyrics;
       bool lyricsTruncated = false;
-      if (lyrics.length > 8192) {
+      if (_usesSmallLyricsLimit(state.song.path) && lyrics.length > 8192) {
         lyrics = lyrics.substring(0, 8192);
         lyricsTruncated = true;
       }
@@ -871,26 +1021,37 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
       // FIX-C8: 100ms delay to let native file buffers flush
       await Future.delayed(const Duration(milliseconds: 100));
       if (isClosed) return;
-      await _scannerService.rescanSingleFile(state.song.path);
-      if (isClosed) return;
-      await CachedArtwork.invalidate(id: state.song.id);
+      bool rescanWarning = false;
+      try {
+        await _scannerService.rescanSingleFile(state.song.path);
+        if (isClosed) return;
+        await CachedArtwork.invalidate(id: state.song.id);
+      } catch (e, st) {
+        rescanWarning = true;
+        ErrorLogger.log('Tag write succeeded but rescan failed for ${state.song.path}',
+            error: e, stackTrace: st, category: 'TagEditor');
+      }
 
       _userEditedFields.clear();
-      if (lyricsTruncated && !isClosed) {
-        _clearHistory();
-        safeEmit(state.copyWith(
-          status: TagEditorStatus.success,
-          error: uiError(
-              'Note: lyrics truncated to 8192 chars (device tag limit).'),
-          batchFailedCount: 0,
-        ));
-      } else {
-        _clearHistory();
-        safeEmit(state.copyWith(
-          status: TagEditorStatus.success,
-          batchFailedCount: 0,
-        ));
-      }
+      final notes = <String>[
+        if (lyricsTruncated)
+          'Note: lyrics truncated to 8192 chars (container tag limit).',
+        if (rescanWarning)
+          'Tags were saved to the file, but refreshing the library index failed.',
+      ];
+      _clearHistory();
+      safeEmit(state.copyWith(
+        status: TagEditorStatus.success,
+        error: notes.isEmpty ? null : uiError(notes.join(' ')),
+        batchFailedCount: 0,
+      ));
+    } on MissingPluginException {
+      if (isClosed) return;
+      safeEmit(state.copyWith(
+        status: TagEditorStatus.failure,
+        error: uiError(
+            'Tag editing is not supported on this platform (no native tag writer available).'),
+      ));
     } on _TagWriteRejectedException {
       if (isClosed) return;
       safeEmit(state.copyWith(
@@ -927,22 +1088,18 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
         status: TagEditorStatus.failure,
         error: uiError('Failed to save tags: $e'),
       ));
-    } finally {
-      // P0-5 follow-up: clear the batch dirty flags on every exit path (success,
-      // failure, or cancellation) so a failed/aborted save cannot leak stale
-      // field edits into the next save.
-      _batchArtistEdited = false;
-      _batchAlbumEdited = false;
-      _batchGenreEdited = false;
-      _batchYearEdited = false;
-      _batchTrackEdited = false;
-      _batchDiscEdited = false;
-      _batchCommentEdited = false;
     }
   }
 
   @override
   Future<void> close() {
+    for (final path in _downloadedTempArtworkPaths) {
+      try {
+        final file = File(path);
+        if (file.existsSync()) file.deleteSync();
+      } catch (_) {}
+    }
+    _downloadedTempArtworkPaths.clear();
     _clearHistory();
     _userEditedFields.clear();
     return super.close();
@@ -1054,6 +1211,10 @@ class _TagEditorDiff {
         removeArtwork: removeArtwork,
         artworkBytes: artworkBytes,
         clearArtworkBytes: artworkBytes == null,
+        status: s.status == TagEditorStatus.failure
+            ? TagEditorStatus.loaded
+            : s.status,
+        clearError: true,
       );
 }
 

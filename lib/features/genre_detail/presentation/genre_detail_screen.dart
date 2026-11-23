@@ -1,11 +1,9 @@
 // lib/features/genre_detail/presentation/genre_detail_screen.dart
-import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/theme/aura_theme.dart';
-import '../../../core/utils/error_logger.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/responsive/detail_scaffold.dart';
 import '../../../core/widgets/async_state_builder.dart';
@@ -16,8 +14,6 @@ import '../../../core/widgets/shimmer_skeleton.dart';
 import '../../../core/widgets/song_tile.dart';
 import '../../../data/db/app_database.dart';
 import '../../../domain/models/genre_item.dart';
-import '../../../domain/repositories/music_repository_interface.dart';
-import '../../../domain/usecases/folder_usecases.dart';
 import '../../../domain/usecases/get_genres_usecase.dart';
 import '../../player/cubit/player_cubit.dart';
 import '../../sheets/song_options_sheet.dart';
@@ -43,41 +39,14 @@ class GenreDetailScreen extends StatefulWidget {
 
 class _GenreDetailScreenState extends State<GenreDetailScreen> {
   late GetGenresUseCase _useCase;
-  late List<String> _excludedFolders;
   late Stream<Result<List<SongsTableData>>> _songsStream;
 
   @override
   void initState() {
     super.initState();
     _useCase = widget.getGenresUseCase ?? getIt<GetGenresUseCase>();
-    _excludedFolders = List<String>.unmodifiable(widget.excludedFolders);
-    // Recreated only on retry or exclusion change so rebuilds (scroll/theme)
-    // do not resubscribe to the DB watch stream.
+    // Wave 1 watchGenreSongs already reacts to excludedFoldersTable in SQL.
     _updateStream();
-    if (_excludedFolders.isEmpty) {
-      unawaited(_loadExcludedFolders());
-    }
-  }
-
-  Future<void> _loadExcludedFolders() async {
-    try {
-      List<String> fetched = const [];
-      if (getIt.isRegistered<FolderUseCases>()) {
-        final res = await getIt<FolderUseCases>().getExcludedFolders();
-        fetched = res.fold((_) => const <String>[], (r) => r);
-      } else if (getIt.isRegistered<IMusicRepository>()) {
-        final res = await getIt<IMusicRepository>().getExcludedFolderPaths();
-        fetched = res.fold((_) => const <String>[], (r) => r);
-      }
-      if (!mounted || listEquals(fetched, _excludedFolders)) return;
-      setState(() {
-        _excludedFolders = List<String>.unmodifiable(fetched);
-        _updateStream();
-      });
-    } catch (e, st) {
-      ErrorLogger.log('Failed to load excluded folders for GenreDetailScreen',
-          error: e, stackTrace: st, category: 'GenreDetail');
-    }
   }
 
   @override
@@ -89,13 +58,7 @@ class _GenreDetailScreenState extends State<GenreDetailScreen> {
         oldWidget.getGenresUseCase != widget.getGenresUseCase ||
         excludedChanged) {
       _useCase = widget.getGenresUseCase ?? getIt<GetGenresUseCase>();
-      if (excludedChanged) {
-        _excludedFolders = List<String>.unmodifiable(widget.excludedFolders);
-      }
       setState(_updateStream);
-      if (excludedChanged && _excludedFolders.isEmpty) {
-        unawaited(_loadExcludedFolders());
-      }
     }
   }
 
@@ -115,7 +78,7 @@ class _GenreDetailScreenState extends State<GenreDetailScreen> {
 
   void _updateStream() {
     final base = _useCase.watchGenreSongs(widget.genreItem.name).distinct();
-    final excluded = _excludedFolders;
+    final excluded = widget.excludedFolders;
     if (excluded.isEmpty) {
       _songsStream = base;
     } else {
@@ -145,6 +108,8 @@ class _GenreDetailScreenState extends State<GenreDetailScreen> {
               children: [
                 Text(
                   '${context.l10n.genres} > ${genreItem.name}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: AppFontSize.caption,
                     color: p.textTertiary,
@@ -153,12 +118,14 @@ class _GenreDetailScreenState extends State<GenreDetailScreen> {
                 ),
                 Text(
                   genreItem.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(fontWeight: FontWeight.w700),
                 ),
               ],
             ),
             onRefresh: () async {
-              if (mounted) setState(() {});
+              if (mounted) setState(_updateStream);
             },
             hero: Column(
               mainAxisSize: MainAxisSize.min,

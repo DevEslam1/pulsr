@@ -44,10 +44,16 @@ class _SuggestionsCard extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: Material(
         type: MaterialType.transparency,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            for (var i = 0; i < suggestions.length; i++) ...[
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight:
+                (MediaQuery.sizeOf(context).height * 0.42).clamp(160.0, 320.0),
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (var i = 0; i < suggestions.length; i++) ...[
               if (i > 0) Divider(color: p.hairline, height: 1),
               Semantics(
                 button: true,
@@ -105,7 +111,9 @@ class _SuggestionsCard extends StatelessWidget {
                 ),
               ),
             ],
-          ],
+            ],
+            ),
+          ),
         ),
       ),
     );
@@ -513,7 +521,7 @@ class _SavedSearchChip extends StatelessWidget {
                       borderRadius: AppRadii.circular(6),
                     ),
                     child: Text(
-                      decoded.filter,
+                      _localizedFilterLabel(context, decoded.filter),
                       style: TextStyle(
                         color: palette.accent,
                         fontSize: AppFontSize.caption,

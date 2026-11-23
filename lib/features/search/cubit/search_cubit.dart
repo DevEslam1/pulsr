@@ -6,10 +6,12 @@ import 'package:flutter/foundation.dart';
 import 'package:injectable/injectable.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/bloc/base_cubit.dart';
+import '../../../core/di/injection.dart';
 import '../../../core/errors/failures.dart';
 import '../../../core/utils/error_logger.dart';
 import '../../../core/utils/search_algorithm_utils.dart';
 import '../../../data/db/app_database.dart';
+import '../../../domain/repositories/music_repository_interface.dart';
 import '../../../domain/usecases/folder_usecases.dart';
 import '../../../domain/usecases/search_music_usecase.dart';
 import 'search_state.dart';
@@ -20,20 +22,36 @@ import '../../../core/errors/app_error.dart';
 class SearchCubit extends PulsrCubit<SearchState> {
   final SearchMusicUseCase _searchUseCase;
   final FolderUseCases _folderUseCases;
+  final IMusicRepository? _musicRepository;
   StreamSubscription? _searchSub;
+  StreamSubscription? _excludedSub;
   Timer? _debounceTimer;
   final Mutex _historyMutex = Mutex();
+
+  IMusicRepository? get _repo {
+    if (_musicRepository != null) return _musicRepository;
+    try {
+      return getIt.isRegistered<IMusicRepository>()
+          ? getIt<IMusicRepository>()
+          : null;
+    } catch (_) {
+      return null;
+    }
+  }
 
   SearchCubit({
     required SearchMusicUseCase searchUseCase,
     required FolderUseCases folderUseCases,
+    IMusicRepository? musicRepository,
   })  : _searchUseCase = searchUseCase,
         _folderUseCases = folderUseCases,
+        _musicRepository = musicRepository,
         super(const SearchState()) {
     historyReady = _loadHistoryAsync();
     _loadFilter();
     savedSearchesReady = _loadSavedSearches();
     searchPlayedSongsReady = _loadSearchPlayedSongs();
+    _watchExcludedFoldersForPlayed();
   }
 
   late final Future<void> historyReady;
@@ -85,6 +103,16 @@ class SearchCubit extends PulsrCubit<SearchState> {
   final ValueNotifier<List<SongsTableData>> searchPlayedSongs =
       ValueNotifier<List<SongsTableData>>(const []);
   late final Future<void> searchPlayedSongsReady;
+
+  /// Direct repository artist/album search matches, kept outside freezed state
+  /// so results are not capped at the 500-song FTS window.
+  final ValueNotifier<List<ArtistsTableData>> artistResults =
+      ValueNotifier<List<ArtistsTableData>>(const []);
+  final ValueNotifier<List<AlbumsTableData>> albumResults =
+      ValueNotifier<List<AlbumsTableData>>(const []);
+
+  final List<int> _searchPlayedIds = <int>[];
+  final Map<int, SongsTableData> _playedSongCache = <int, SongsTableData>{};
 
   /// True while the latest query has not been executed yet (debounce window).
   /// The UI uses this to keep the skeleton up instead of flashing "no results".
@@ -178,32 +206,137 @@ class SearchCubit extends PulsrCubit<SearchState> {
     }
   }
 
+  void _watchExcludedFoldersForPlayed() {
+    final repo = _repo;
+    if (repo == null) return;
+    try {
+      _excludedSub = autoSub(repo.watchExcludedFolders(), (_) {
+        invalidateExcludedFoldersCache();
+        unawaited(reconcileSearchPlayedSongs());
+        if (state.query.trim().isNotEmpty) {
+          _executeSearch(state.query);
+        }
+      });
+    } catch (_) {
+      // Optional in unit tests whose mock repository leaves watchExcludedFolders unstubbed.
+    }
+  }
+
+  static String _normDirPath(String path) =>
+      path.replaceAll('\\', '/').toLowerCase().trim();
+
+  static bool _isSongInExcludedFolders(
+    SongsTableData song,
+    List<String> excludedFolders,
+  ) {
+    if (excludedFolders.isEmpty) return false;
+    final normSong = _normDirPath(song.path);
+    for (final raw in excludedFolders) {
+      var folder = _normDirPath(raw);
+      if (folder.isEmpty) continue;
+      if (!folder.endsWith('/')) folder = '$folder/';
+      if (normSong.startsWith(folder)) return true;
+    }
+    return false;
+  }
+
   Future<void> _loadSearchPlayedSongs() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final list =
           prefs.getStringList(_searchPlayedSongsKey) ?? const <String>[];
-      final loaded = <SongsTableData>[];
+      _searchPlayedIds.clear();
+      var hadLegacyEntries = false;
       for (final item in list) {
+        final parsedId = int.tryParse(item.trim());
+        if (parsedId != null) {
+          if (!_searchPlayedIds.contains(parsedId)) {
+            _searchPlayedIds.add(parsedId);
+          }
+          continue;
+        }
         try {
           final decoded = jsonDecode(item);
           if (decoded is Map<String, dynamic>) {
-            loaded.add(SongsTableData.fromJson(decoded));
+            final song = SongsTableData.fromJson(decoded);
+            if (!_searchPlayedIds.contains(song.id)) {
+              _searchPlayedIds.add(song.id);
+            }
+            _playedSongCache[song.id] = song;
+            hadLegacyEntries = true;
           }
         } catch (_) {}
       }
-      if (!isClosed) searchPlayedSongs.value = List.unmodifiable(loaded);
+      if (hadLegacyEntries && !isClosed) {
+        unawaited(_persistSearchPlayedIds());
+      }
+      await reconcileSearchPlayedSongs();
     } catch (e, st) {
       ErrorLogger.log('Failed to load search played songs',
           error: e, stackTrace: st, category: 'SearchCubit');
     }
   }
 
-  Future<void> _persistSearchPlayedSongs(List<SongsTableData> list) async {
+  Future<void> reconcileSearchPlayedSongs() async {
+    if (isClosed) return;
+    if (_searchPlayedIds.isEmpty) {
+      if (searchPlayedSongs.value.isNotEmpty) {
+        searchPlayedSongs.value = const [];
+      }
+      return;
+    }
+    final excluded = await _excludedFolders();
+    if (isClosed) return;
+
+    final repo = _repo;
+    if (repo != null) {
+      try {
+        final res = await repo.getSongsByIds(List<int>.from(_searchPlayedIds));
+        if (isClosed) return;
+        res.fold((_) {}, (rows) {
+          final byId = <int, SongsTableData>{
+            for (final r in rows) r.id: r,
+          };
+          var prunedDeleted = false;
+          _searchPlayedIds.removeWhere((id) {
+            final row = byId[id];
+            if (row == null || row.isMissing) {
+              // Keep negative online sentinel IDs only if cached in memory;
+              // drop missing or deleted local DB rows.
+              if (id < 0 && _playedSongCache.containsKey(id)) {
+                return false;
+              }
+              _playedSongCache.remove(id);
+              prunedDeleted = true;
+              return true;
+            }
+            _playedSongCache[id] = row;
+            return false;
+          });
+          if (prunedDeleted) {
+            unawaited(_persistSearchPlayedIds());
+          }
+        });
+      } catch (_) {}
+    }
+
+    if (isClosed) return;
+    final visible = <SongsTableData>[
+      for (final id in _searchPlayedIds)
+        if (_playedSongCache[id] != null &&
+            !_playedSongCache[id]!.isMissing &&
+            !_isSongInExcludedFolders(_playedSongCache[id]!, excluded))
+          _playedSongCache[id]!,
+    ];
+    searchPlayedSongs.value = List.unmodifiable(visible);
+  }
+
+  Future<void> _persistSearchPlayedIds() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final strings = list.map((s) => jsonEncode(s.toJson())).toList();
-      await prefs.setStringList(_searchPlayedSongsKey, strings);
+      final idStrings =
+          _searchPlayedIds.map((id) => id.toString()).toList(growable: false);
+      await prefs.setStringList(_searchPlayedSongsKey, idStrings);
     } catch (e, st) {
       ErrorLogger.log('Failed to persist search played songs',
           error: e, stackTrace: st, category: 'SearchCubit');
@@ -267,6 +400,7 @@ class SearchCubit extends PulsrCubit<SearchState> {
   /// the RefreshIndicator spinner reflects real work.
   Future<void> refresh() async {
     invalidateExcludedFoldersCache();
+    await reconcileSearchPlayedSongs();
     if (state.query.trim().isEmpty) return;
     unawaited(_executeSearch(state.query));
     try {
@@ -282,6 +416,8 @@ class SearchCubit extends PulsrCubit<SearchState> {
     _generation++;
     _cancelSearch();
     _resetResultWindow();
+    if (artistResults.value.isNotEmpty) artistResults.value = const [];
+    if (albumResults.value.isNotEmpty) albumResults.value = const [];
     safeEmit(
         state.copyWith(query: '', results: [], isLoading: false, error: null));
   }
@@ -349,28 +485,39 @@ class SearchCubit extends PulsrCubit<SearchState> {
   Future<void> recordPlayedSong(SongsTableData song) async {
     await searchPlayedSongsReady;
     if (isClosed) return;
+    _searchPlayedIds.remove(song.id);
+    _searchPlayedIds.insert(0, song.id);
+    if (_searchPlayedIds.length > searchPlayedSongsMax) {
+      _searchPlayedIds.removeRange(
+          searchPlayedSongsMax, _searchPlayedIds.length);
+    }
+    _playedSongCache[song.id] = song;
     final current = searchPlayedSongs.value;
     final updated = [
       song,
       ...current.where((s) => s.id != song.id),
     ].take(searchPlayedSongsMax).toList();
     searchPlayedSongs.value = List.unmodifiable(updated);
-    await _persistSearchPlayedSongs(updated);
+    await _persistSearchPlayedIds();
   }
 
   Future<void> removeSearchPlayedSong(int songId) async {
     await searchPlayedSongsReady;
     if (isClosed) return;
+    _searchPlayedIds.remove(songId);
+    _playedSongCache.remove(songId);
     final updated = searchPlayedSongs.value
         .where((s) => s.id != songId)
         .toList(growable: false);
     searchPlayedSongs.value = List.unmodifiable(updated);
-    await _persistSearchPlayedSongs(updated);
+    await _persistSearchPlayedIds();
   }
 
   Future<void> clearSearchPlayedSongs() async {
     await searchPlayedSongsReady;
     if (isClosed) return;
+    _searchPlayedIds.clear();
+    _playedSongCache.clear();
     searchPlayedSongs.value = const [];
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -529,6 +676,8 @@ class SearchCubit extends PulsrCubit<SearchState> {
 
     final trimmed = query.trim();
     if (trimmed.isEmpty) {
+      if (artistResults.value.isNotEmpty) artistResults.value = const [];
+      if (albumResults.value.isNotEmpty) albumResults.value = const [];
       safeEmit(state.copyWith(results: [], isLoading: false, error: null));
       return;
     }
@@ -538,6 +687,7 @@ class SearchCubit extends PulsrCubit<SearchState> {
         : trimmed;
 
     safeEmit(state.copyWith(isLoading: true, error: null));
+    unawaited(_searchDirectEntities(normalize(boundedQuery), generation));
 
     try {
       final excluded = await _excludedFolders();
@@ -562,18 +712,12 @@ class SearchCubit extends PulsrCubit<SearchState> {
 
               if (pool.isEmpty && boundedQuery.length >= 2) {
                 try {
-                  final prefixRes = await _searchUseCase
-                      .searchSongs(boundedQuery.substring(0, 2),
-                          excludedFolders: excluded, limit: _searchLimit)
-                      .first
-                      .timeout(const Duration(seconds: 2));
-                  // BUG FIX: re-check against the *emission*, not just the
-                  // generation, so a slow fallback can't overwrite a newer
-                  // emission of the same live stream.
+                  pool = await _fallbackFuzzyPool(
+                    boundedQuery,
+                    q,
+                    excluded: excluded,
+                  );
                   if (stale()) return;
-                  final candidates =
-                      prefixRes.fold((l) => <SongsTableData>[], (r) => r);
-                  pool = candidates.take(_searchLimit).toList();
                   filtered = await _filterWithFuzzy(pool, q, filter);
                 } catch (e, st) {
                   ErrorLogger.log('Fuzzy fallback search failed',
@@ -600,6 +744,138 @@ class SearchCubit extends PulsrCubit<SearchState> {
     }
   }
 
+  static List<String> _fuzzyAnchorsFor(String normalizedQuery) {
+    final tokens = normalizedQuery
+        .split(RegExp(r'\s+'))
+        .where((t) => t.length >= 2)
+        .toList();
+    final anchors = <String>[];
+    void addAnchor(String s) {
+      if (s.length >= 2 && !anchors.contains(s) && anchors.length < 4) {
+        anchors.add(s);
+      }
+    }
+
+    for (final token in tokens) {
+      addAnchor(token.substring(0, 2));
+      if (token.length >= 3) {
+        addAnchor(token.substring(1, 3));
+        addAnchor(token.substring(token.length - 2));
+      }
+      if (anchors.length >= 4) break;
+    }
+    return anchors;
+  }
+
+  Future<List<SongsTableData>> _fallbackFuzzyPool(
+    String boundedQuery,
+    String normalizedQ, {
+    required List<String> excluded,
+  }) async {
+    final repo = _repo;
+    if (repo != null) {
+      try {
+        final libRes = await repo
+            .getAllSongs(excludedFolders: excluded, limit: 2000)
+            .timeout(const Duration(seconds: 3));
+        final libSongs = libRes.fold((_) => <SongsTableData>[], (r) => r);
+        if (libSongs.isNotEmpty) {
+          return libSongs;
+        }
+      } catch (_) {}
+    }
+
+    final anchors = _fuzzyAnchorsFor(normalizedQ);
+    if (anchors.isEmpty || (anchors.length == 1 && anchors.first == normalizedQ)) {
+      return const [];
+    }
+    final merged = <int, SongsTableData>{};
+    await Future.wait(anchors.map((anchor) async {
+      try {
+        final res = await _searchUseCase
+            .searchSongs(anchor, excludedFolders: excluded, limit: _searchLimit)
+            .first
+            .timeout(const Duration(seconds: 2));
+        res.fold((_) {}, (list) {
+          for (final song in list) {
+            merged.putIfAbsent(song.id, () => song);
+          }
+        });
+      } catch (_) {}
+    }));
+    return merged.values.take(_searchLimit).toList();
+  }
+
+  Future<void> _searchDirectEntities(String q, int generation) async {
+    final repo = _repo;
+    if (repo == null || q.isEmpty) {
+      if (!_isStale(generation)) {
+        if (artistResults.value.isNotEmpty) artistResults.value = const [];
+        if (albumResults.value.isNotEmpty) albumResults.value = const [];
+      }
+      return;
+    }
+    try {
+      final results = await Future.wait([
+        repo.getArtists(),
+        repo.getAlbums(),
+      ]);
+      if (_isStale(generation)) return;
+
+      final artists = (results[0] as Result<List<ArtistsTableData>>)
+          .fold((_) => const <ArtistsTableData>[], (r) => r);
+      final albums = (results[1] as Result<List<AlbumsTableData>>)
+          .fold((_) => const <AlbumsTableData>[], (r) => r);
+
+      int matchRank(String primary, [String secondary = '']) {
+        final p = normalize(primary);
+        if (p == q) return 0;
+        if (p.startsWith(q)) return 1;
+        if (p.contains(q)) return 2;
+        if (secondary.isNotEmpty && normalize(secondary).contains(q)) return 3;
+        if (q.length >= 3) {
+          final maxDist = q.length <= 4 ? 1 : 2;
+          for (final word in p.split(RegExp(r'\s+'))) {
+            if (word.isEmpty) continue;
+            if ((word.length - q.length).abs() <= maxDist &&
+                SearchAlgorithmUtils.levenshtein(word, q) <= maxDist) {
+              return 4;
+            }
+          }
+        }
+        return -1;
+      }
+
+      final scoredArtists = <(int, ArtistsTableData)>[];
+      for (final a in artists) {
+        final r = matchRank(a.name);
+        if (r >= 0) scoredArtists.add((r, a));
+      }
+      scoredArtists.sort((a, b) {
+        final c = a.$1.compareTo(b.$1);
+        return c != 0 ? c : a.$2.name.compareTo(b.$2.name);
+      });
+
+      final scoredAlbums = <(int, AlbumsTableData)>[];
+      for (final al in albums) {
+        final r = matchRank(al.title, al.artist);
+        if (r >= 0) scoredAlbums.add((r, al));
+      }
+      scoredAlbums.sort((a, b) {
+        final c = a.$1.compareTo(b.$1);
+        return c != 0 ? c : a.$2.title.compareTo(b.$2.title);
+      });
+
+      if (_isStale(generation)) return;
+      artistResults.value = List.unmodifiable(
+        scoredArtists.take(20).map((e) => e.$2),
+      );
+      albumResults.value = List.unmodifiable(
+        scoredAlbums.take(20).map((e) => e.$2),
+      );
+    } catch (_) {}
+  }
+
   void _failSearch(int generation, Object error, StackTrace stackTrace) {
     if (_isStale(generation)) return;
     addError(error, stackTrace);
@@ -611,20 +887,54 @@ class SearchCubit extends PulsrCubit<SearchState> {
   /// [SearchAlgorithmUtils] so it can be tested without a Cubit.
   static String normalize(String s) => SearchAlgorithmUtils.normalize(s);
 
+  static const Set<String> _extraLosslessCodecs = {
+    'flac',
+    'wav',
+    'wave',
+    'alac',
+    'aiff',
+    'aif',
+    'aifc',
+    'dsd',
+    'dsf',
+    'dff',
+    'ape',
+    'wv',
+    'tta',
+    'tak',
+    'mlp',
+    'pcm',
+  };
+
+  static bool _isExtraLossless(SongsTableData song) {
+    final codec = (song.codec ?? '').trim().toLowerCase();
+    if (codec.isNotEmpty) {
+      return _extraLosslessCodecs.contains(codec) || codec.startsWith('pcm');
+    }
+    final path = song.path.toLowerCase();
+    final dot = path.lastIndexOf('.');
+    if (dot == -1 || dot == path.length - 1) return false;
+    return _extraLosslessCodecs.contains(path.substring(dot + 1));
+  }
+
   Future<List<SongsTableData>> _filterWithFuzzy(
       List<SongsTableData> songs, String rawQ, String filter) {
     // Levenshtein ranking is CPU-bound; keep small result sets inline and
     // move the large ones off the UI isolate. `SongsTableData` and the query
     // arguments are plain values, so the closure is sendable — capture the
     // limit locally so the closure does not reference `this`.
+    final effectiveSongs = filter == 'Lossless'
+        ? songs.where(_isExtraLossless).toList()
+        : songs;
+    final effectiveFilter = filter == 'Lossless' ? 'All' : filter;
     final limit = _resultLimit;
-    if (songs.length < 250) {
+    if (effectiveSongs.length < 250) {
       return Future.value(SearchAlgorithmUtils.filterWithFuzzy(
-          songs, rawQ, filter,
+          effectiveSongs, rawQ, effectiveFilter,
           maxResults: limit));
     }
     return Isolate.run(() => SearchAlgorithmUtils.filterWithFuzzy(
-        songs, rawQ, filter,
+        effectiveSongs, rawQ, effectiveFilter,
         maxResults: limit));
   }
 
@@ -661,11 +971,16 @@ class SearchCubit extends PulsrCubit<SearchState> {
   Future<void> close() async {
     _debounceTimer?.cancel();
     _searchSub?.cancel();
+    _excludedSub?.cancel();
     await super.close();
     savedSearches.value = const [];
     savedSearches.dispose();
     searchPlayedSongs.value = const [];
     searchPlayedSongs.dispose();
+    artistResults.value = const [];
+    artistResults.dispose();
+    albumResults.value = const [];
+    albumResults.dispose();
     hasMoreResults.dispose();
   }
 }

@@ -72,7 +72,7 @@ class StudioToolsRail extends StatelessWidget {
           icon: Icons.calendar_month_rounded,
           label: context.l10n.decades,
           color: p.accent,
-          onTap: () => context.push('/year'),
+          onTap: () => context.push('/library?tab=years'),
         ),
         if (showYtm)
           (

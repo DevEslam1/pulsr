@@ -14,6 +14,7 @@ import '../../../../core/widgets/song_tile.dart';
 import '../../../../data/db/app_database.dart';
 import '../../../../domain/usecases/folder_usecases.dart';
 import '../../../player/cubit/player_cubit.dart';
+import '../../../sheets/song_options_sheet.dart';
 import '../../cubit/library_cubit.dart';
 import '../../cubit/library_state.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
@@ -568,6 +569,8 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
                                 .read<PlayerCubit>()
                                 .playSong(childSongs[i], queue: childSongs);
                           },
+                          onMorePressed: () =>
+                              SongOptionsSheet.show(context, song: childSongs[i]),
                         ),
                       ),
 

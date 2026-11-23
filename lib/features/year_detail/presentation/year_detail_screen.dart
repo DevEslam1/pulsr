@@ -1,12 +1,10 @@
 // lib/features/year_detail/presentation/year_detail_screen.dart
-import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/theme/aura_theme.dart';
-import '../../../core/utils/error_logger.dart';
 import '../../../core/responsive/detail_scaffold.dart';
 import '../../../core/widgets/async_state_builder.dart';
 import '../../../core/widgets/pulsr_empty_state.dart';
@@ -16,8 +14,6 @@ import '../../../core/widgets/shimmer_skeleton.dart';
 import '../../../core/widgets/song_tile.dart';
 import '../../../data/db/app_database.dart';
 import '../../../domain/models/year_item.dart';
-import '../../../domain/repositories/music_repository_interface.dart';
-import '../../../domain/usecases/folder_usecases.dart';
 import '../../../domain/usecases/get_years_usecase.dart';
 import '../../player/cubit/player_cubit.dart';
 import '../../sheets/song_options_sheet.dart';
@@ -43,41 +39,14 @@ class YearDetailScreen extends StatefulWidget {
 
 class _YearDetailScreenState extends State<YearDetailScreen> {
   late GetYearsUseCase _useCase;
-  late List<String> _excludedFolders;
   late Stream<Result<List<SongsTableData>>> _songsStream;
 
   @override
   void initState() {
     super.initState();
     _useCase = widget.getYearsUseCase ?? getIt<GetYearsUseCase>();
-    _excludedFolders = List<String>.unmodifiable(widget.excludedFolders);
-    // Recreated only on retry, prop change, or exclusion change so rebuilds do
-    // not resubscribe to the DB watch stream.
+    // Wave 1 watchYearSongs already reacts to excludedFoldersTable in SQL.
     _updateStream();
-    if (_excludedFolders.isEmpty) {
-      unawaited(_loadExcludedFolders());
-    }
-  }
-
-  Future<void> _loadExcludedFolders() async {
-    try {
-      List<String> fetched = const [];
-      if (getIt.isRegistered<FolderUseCases>()) {
-        final res = await getIt<FolderUseCases>().getExcludedFolders();
-        fetched = res.fold((_) => const <String>[], (r) => r);
-      } else if (getIt.isRegistered<IMusicRepository>()) {
-        final res = await getIt<IMusicRepository>().getExcludedFolderPaths();
-        fetched = res.fold((_) => const <String>[], (r) => r);
-      }
-      if (!mounted || listEquals(fetched, _excludedFolders)) return;
-      setState(() {
-        _excludedFolders = List<String>.unmodifiable(fetched);
-        _updateStream();
-      });
-    } catch (e, st) {
-      ErrorLogger.log('Failed to load excluded folders for YearDetailScreen',
-          error: e, stackTrace: st, category: 'YearDetail');
-    }
   }
 
   @override
@@ -89,13 +58,7 @@ class _YearDetailScreenState extends State<YearDetailScreen> {
         oldWidget.getYearsUseCase != widget.getYearsUseCase ||
         excludedChanged) {
       _useCase = widget.getYearsUseCase ?? getIt<GetYearsUseCase>();
-      if (excludedChanged) {
-        _excludedFolders = List<String>.unmodifiable(widget.excludedFolders);
-      }
       setState(_updateStream);
-      if (excludedChanged && _excludedFolders.isEmpty) {
-        unawaited(_loadExcludedFolders());
-      }
     }
   }
 
@@ -115,7 +78,7 @@ class _YearDetailScreenState extends State<YearDetailScreen> {
 
   void _updateStream() {
     final base = _useCase.watchYearSongs(widget.yearItem.year).distinct();
-    final excluded = _excludedFolders;
+    final excluded = widget.excludedFolders;
     if (excluded.isEmpty) {
       _songsStream = base;
     } else {
@@ -141,7 +104,7 @@ class _YearDetailScreenState extends State<YearDetailScreen> {
           return DetailScaffold(
             titleText: '${yearItem.year}',
             onRefresh: () async {
-              if (mounted) setState(() {});
+              if (mounted) setState(_updateStream);
             },
             hero: Column(
               mainAxisSize: MainAxisSize.min,

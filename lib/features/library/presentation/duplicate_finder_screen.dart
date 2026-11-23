@@ -75,7 +75,11 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
         }
         final res = await getIt<IMusicRepository>()
             .getAllSongs(excludedFolders: excluded);
-        songs = res.fold((_) => const <SongsTableData>[], (list) => list);
+        if (res.isLeft()) {
+          if (mounted) setState(() => _scanFailed = true);
+          return;
+        }
+        songs = res.getOrElse((_) => const <SongsTableData>[]);
       }
       // CUE chapter rows share the container's path/duration/fileSize, so the
       // checksum pass would hash one file per chapter and report every chapter
@@ -122,10 +126,31 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
       return;
     }
     setState(() => _isFetchingArtwork = true);
-    final count =
-        await getIt<MissingArtworkService>().fetchAndPersistMissingArtwork();
+    int count = 0;
+    try {
+      count =
+          await getIt<MissingArtworkService>().fetchAndPersistMissingArtwork();
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Missing artwork fetch failed',
+        error: e,
+        stackTrace: st,
+        category: 'DuplicateFinder',
+      );
+      if (mounted) {
+        PulsrToast.show(
+          context,
+          message: l10n.browseFailedToFetch,
+          isError: true,
+        );
+      }
+      return;
+    } finally {
+      if (mounted) {
+        setState(() => _isFetchingArtwork = false);
+      }
+    }
     if (!mounted) return;
-    setState(() => _isFetchingArtwork = false);
     PulsrToast.show(
       context,
       message: count == 0

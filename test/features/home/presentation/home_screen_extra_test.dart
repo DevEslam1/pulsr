@@ -57,7 +57,12 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     _messenger.setMockMethodCallHandler(
       const MethodChannel('flutter.baseflow.com/permissions/methods'),
-      (call) async => true,
+      (call) async {
+        if (call.method == 'checkPermissionStatus') {
+          return 1; // PermissionStatus.granted
+        }
+        return true;
+      },
     );
 
     ytm = _YtmService();
@@ -197,7 +202,7 @@ void main() {
     expect(find.text(l10n.themeStudio), findsWidgets);
   });
 
-  testWidgets('the notification banner Open Settings clears the denied flag',
+  testWidgets('the notification banner Open Settings clears the denied flag when granted on resume',
       (tester) async {
     SharedPreferences.setMockInitialValues(
         {'notification_permission_denied': true});
@@ -205,6 +210,12 @@ void main() {
 
     expect(find.text('Playback stops when screen is off?'), findsOneWidget);
     await tester.tap(find.text('Open Settings'));
+    await tester.pump();
+    // Flag remains true until the user actually resumes with permission granted.
+    final prefsBeforeResume = await SharedPreferences.getInstance();
+    expect(prefsBeforeResume.getBool('notification_permission_denied'), isTrue);
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     await tester.pumpAndSettle();
 
     expect(find.text('Playback stops when screen is off?'), findsNothing);

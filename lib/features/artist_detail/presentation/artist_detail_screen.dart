@@ -52,6 +52,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
   // on every rebuild and reset the StreamBuilder's snapshot.
   late Stream<Result<List<AlbumsTableData>>> _albumsStream;
   late Stream<Result<List<SongsTableData>>> _songsStream;
+  Stream<Result<List<ArtistsTableData>>>? _artistsStream;
 
   @override
   void initState() {
@@ -65,8 +66,18 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
   }
 
   void _rebuildStreams() {
+    _updateArtistsStream();
     _updateAlbumsStream();
     _updateSongsStream();
+  }
+
+  void _updateArtistsStream() {
+    try {
+      _artistsStream = _useCase.watchArtists().distinct();
+    } catch (_) {
+      // Unstubbed in isolated widget tests; falls back to widget.artist.
+      _artistsStream = null;
+    }
   }
 
   void _updateAlbumsStream() {
@@ -156,22 +167,45 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
   Widget build(BuildContext context) {
     final p = context.palette;
     final isTablet = Adaptive.isTablet(context);
-    final artist = widget.artist;
 
-    return StreamBuilder<Result<List<SongsTableData>>>(
-      stream: _songsStream,
-      builder: (context, songsSnapshot) {
-        final currentSongs = songsSnapshot.data?.fold(
-              (_) => const <SongsTableData>[],
-              (songs) => songs,
+    return StreamBuilder<Result<List<ArtistsTableData>>>(
+      stream: _artistsStream,
+      builder: (context, artistSnap) {
+        final liveArtists = artistSnap.data?.fold(
+              (_) => const <ArtistsTableData>[],
+              (artists) => artists,
             ) ??
-            const <SongsTableData>[];
+            const <ArtistsTableData>[];
+        var artist = widget.artist;
+        for (final candidate in liveArtists) {
+          if (candidate.id == widget.artist.id) {
+            artist = candidate;
+            break;
+          }
+        }
 
-        return DetailScaffold(
-          titleText: artist.name,
-          onRefresh: () async {
-            if (mounted) setState(() {});
-          },
+        return StreamBuilder<Result<List<SongsTableData>>>(
+          stream: _songsStream,
+          builder: (context, songsSnapshot) {
+            final hasSongs = songsSnapshot.hasData &&
+                (songsSnapshot.data?.isRight() ?? false);
+            final currentSongs = songsSnapshot.data?.fold(
+                  (_) => const <SongsTableData>[],
+                  (songs) => songs,
+                ) ??
+                const <SongsTableData>[];
+            final trackCount = hasSongs ? currentSongs.length : artist.songCount;
+
+            return DetailScaffold(
+              titleText: artist.name,
+              onRefresh: () async {
+                if (mounted) {
+                  setState(() {
+                    _bioFuture = _bioService.getArtistInfo(artist.name);
+                    _rebuildStreams();
+                  });
+                }
+              },
           hero: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
@@ -231,7 +265,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
             const SizedBox(height: AppSpacing.xxs),
             Center(
               child: Text(
-                context.l10n.tracksCount(artist.songCount),
+                context.l10n.tracksCount(trackCount),
                 style: TextStyle(
                     color: p.textSecondary, fontSize: AppFontSize.bodySmall),
               ),
@@ -451,6 +485,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
                                       tag: 'album_${album.id}',
                                       child: CachedArtwork(
                                           id: album.id,
+                                          remoteUrl: album.artworkUri,
                                           type: ArtworkType.ALBUM,
                                           size: 120,
                                           borderRadius: 16),
@@ -542,6 +577,8 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
           ),
         ],
       ),
+            );
+          },
         );
       },
     );

@@ -65,6 +65,8 @@ MockLibraryCubit stubLibraryCubit(
   when(() => cubit.stream)
       .thenAnswer((_) => stream ?? const Stream<LibraryState>.empty());
   when(() => cubit.hasMoreSongs).thenReturn(hasMoreSongs);
+  when(() => cubit.totalSongCount).thenReturn(ValueNotifier<int?>(null));
+  when(() => cubit.isYtmLoggedIn).thenReturn(false);
   when(() => cubit.init()).thenAnswer((_) async {});
   when(() => cubit.loadMoreSongs()).thenAnswer((_) {});
   when(() => cubit.toggleViewMode()).thenAnswer((_) {});
@@ -72,6 +74,9 @@ MockLibraryCubit stubLibraryCubit(
   when(() => cubit.clearError()).thenAnswer((_) {});
   when(() => cubit.toggleSongSelection(any())).thenAnswer((_) {});
   when(() => cubit.toggleFavorite(any())).thenAnswer((_) async {});
+  when(() => cubit.setSongsFavorite(any(), any())).thenAnswer((_) async {});
+  when(() => cubit.importYtmPlaylistAsFavorites(any()))
+      .thenAnswer((_) async => 0);
   when(() => cubit.selectAllSongs()).thenAnswer((_) async {});
   when(() => cubit.selectSongs(any())).thenAnswer((_) {});
   when(() => cubit.loadFolders()).thenAnswer((_) async {});

@@ -1,6 +1,7 @@
 // lib/features/library/presentation/library_screen.dart
 import 'dart:async';
 import 'package:material_ui/material_ui.dart';
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -13,12 +14,10 @@ import 'package:pulsr/core/constants/app_typography.dart';
 import 'package:pulsr/core/responsive/pulsr_layout_metrics.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/config/app_config.dart';
-import '../../../core/di/injection.dart';
 import '../../../core/motion/pulsr_motion.dart';
 import '../../../core/responsive/adaptive_grid.dart';
 import '../../../core/router/safe_navigation.dart';
 import '../../../core/services/sound_feedback_service.dart';
-import '../../../core/services/ytm_account_service.dart';
 import '../../../core/services/ytm_service.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
@@ -262,8 +261,24 @@ class _LibraryScreenState extends State<LibraryScreen>
   }
 
   /// Select-all is scoped to what the current tab is actually showing. The
-  /// Songs tab may select the whole library (bounded); Favorites and Downloaded
-  /// must only select rows from their own filtered list.
+  /// Songs tab selects the library (bounded); Favorites and Downloaded
+  /// select rows from their own filtered lists; collection tabs do nothing.
+  bool get _canSelectAllOnActiveTab {
+    final tab = _activeTab;
+    return tab == null ||
+        tab == LibraryTabItem.songs ||
+        tab == LibraryTabItem.downloaded ||
+        tab == LibraryTabItem.favorites;
+  }
+
+  ValueListenable<int?>? _safeTotalSongNotifier(LibraryCubit cubit) {
+    try {
+      return cubit.totalSongCount;
+    } catch (_) {
+      return null;
+    }
+  }
+
   void _selectAllInCurrentTab(LibraryState state, LibraryCubit cubit) {
     switch (_activeTab) {
       case LibraryTabItem.favorites:
@@ -282,7 +297,7 @@ class _LibraryScreenState extends State<LibraryScreen>
       case LibraryTabItem.folders:
       case LibraryTabItem.genres:
       case LibraryTabItem.years:
-        cubit.selectSongs(state.songs.map((s) => s.id));
+        return;
     }
   }
 
@@ -755,15 +770,16 @@ class _LibraryScreenState extends State<LibraryScreen>
                     ),
                   ),
                   actions: [
-                    IconButton(
-                      constraints: const BoxConstraints(
-                        minWidth: AppSpacing.minTouchTarget,
-                        minHeight: AppSpacing.minTouchTarget,
+                    if (_canSelectAllOnActiveTab)
+                      IconButton(
+                        constraints: const BoxConstraints(
+                          minWidth: AppSpacing.minTouchTarget,
+                          minHeight: AppSpacing.minTouchTarget,
+                        ),
+                        icon: const Icon(Icons.select_all_rounded),
+                        tooltip: context.l10n.selectAllAction,
+                        onPressed: () => _selectAllInCurrentTab(state, cubit),
                       ),
-                      icon: const Icon(Icons.select_all_rounded),
-                      tooltip: context.l10n.selectAllAction,
-                      onPressed: () => _selectAllInCurrentTab(state, cubit),
-                    ),
                     FilledButton.tonalIcon(
                       style: FilledButton.styleFrom(
                         backgroundColor: p.accent.withValues(alpha: 0.18),
@@ -814,16 +830,30 @@ class _LibraryScreenState extends State<LibraryScreen>
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Flexible(
-                            child: Text(
-                              '${context.l10n.songsCount(state.songs.length)} · '
-                              '${context.l10n.albumsCount(state.albums.length)}',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: p.textSecondary,
-                                fontSize: AppFontSize.caption,
-                                fontWeight: FontWeight.w500,
-                              ),
+                            child: Builder(
+                              builder: (context) {
+                                final totalNotifier =
+                                    _safeTotalSongNotifier(cubit);
+                                Widget buildCounts(int songsCount) => Text(
+                                      '${context.l10n.songsCount(songsCount)} · '
+                                      '${context.l10n.albumsCount(state.albums.length)}',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: p.textSecondary,
+                                        fontSize: AppFontSize.caption,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    );
+                                if (totalNotifier == null) {
+                                  return buildCounts(state.songs.length);
+                                }
+                                return ValueListenableBuilder<int?>(
+                                  valueListenable: totalNotifier,
+                                  builder: (context, total, _) =>
+                                      buildCounts(total ?? state.songs.length),
+                                );
+                              },
                             ),
                           ),
                           if (losslessCount > 0) ...[
@@ -1621,18 +1651,20 @@ class _LibraryScreenState extends State<LibraryScreen>
                         _showManageTabsSheet(context, state);
                       },
                     ),
-                    const SizedBox(width: AppSpacing.xs),
-                    _buildSortAndViewActionChip(
-                      sheetContext,
-                      key: const ValueKey('library_sheet_select_all'),
-                      icon: Icons.select_all_rounded,
-                      label: sheetContext.l10n.selectAllAction,
-                      p: p,
-                      onTap: () {
-                        Navigator.of(sheetContext).pop();
-                        _selectAllInCurrentTab(state, cubit);
-                      },
-                    ),
+                    if (_canSelectAllOnActiveTab) ...[
+                      const SizedBox(width: AppSpacing.xs),
+                      _buildSortAndViewActionChip(
+                        sheetContext,
+                        key: const ValueKey('library_sheet_select_all'),
+                        icon: Icons.select_all_rounded,
+                        label: sheetContext.l10n.selectAllAction,
+                        p: p,
+                        onTap: () {
+                          Navigator.of(sheetContext).pop();
+                          _selectAllInCurrentTab(state, cubit);
+                        },
+                      ),
+                    ],
                     const SizedBox(width: AppSpacing.xs),
                     _buildSortAndViewActionChip(
                       sheetContext,

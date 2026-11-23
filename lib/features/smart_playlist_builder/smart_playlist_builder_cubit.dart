@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:injectable/injectable.dart';
 import '../../core/bloc/base_cubit.dart';
 import '../../core/utils/error_logger.dart';
+import '../../core/utils/l10n_holder.dart';
 import '../../data/db/app_database.dart';
 import '../../domain/models/smart_playlist_criteria.dart';
 import '../../domain/repositories/smart_playlist_engine_interface.dart';
@@ -243,7 +244,9 @@ class SmartPlaylistBuilderCubit extends PulsrCubit<SmartPlaylistBuilderState> {
       ErrorLogger.log('Failed to save smart playlist',
           error: e, stackTrace: st, category: 'SmartPlaylist');
       return _finishSave(
-          false, 'Could not save the playlist. Please try again.');
+          false,
+          L10nHolder.current?.saveFailed ??
+              'Could not save the playlist. Please try again.');
     }
   }
 

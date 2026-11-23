@@ -105,7 +105,7 @@ void main() {
     );
   }
 
-  testWidgets('renders artist name and track count in the header',
+  testWidgets('renders artist name and reactive track count in the header',
       (tester) async {
     await tester.pumpWidget(build(
       albums: Stream.value(const Right([])),
@@ -114,7 +114,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Test Artist'), findsWidgets);
-    expect(find.text('3 tracks'), findsOneWidget);
+    expect(find.text('0 tracks'), findsOneWidget);
   });
 
   testWidgets('renders every top track as a SongTile', (tester) async {
@@ -233,15 +233,15 @@ void main() {
     await first.close();
   });
 
-  testWidgets('reports the track count from the artist row', (tester) async {
+  testWidgets('reports reactive track count from the emitted songs list',
+      (tester) async {
     await tester.pumpWidget(build(
       albums: Stream.value(const Right([])),
       songs: Stream.value(Right([_song(1, 'Only')])),
     ));
     await tester.pumpAndSettle();
 
-    // The header count comes from ArtistsTableData.songCount, not the list.
-    expect(find.text('3 tracks'), findsOneWidget);
+    expect(find.text('1 track'), findsOneWidget);
   });
 
   testWidgets('tapping a top track routes playback through PlayerCubit',

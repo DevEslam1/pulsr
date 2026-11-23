@@ -71,6 +71,7 @@ class PlaylistsScreen extends StatefulWidget {
 class _PlaylistsScreenState extends State<PlaylistsScreen> {
   SourceScope _scope = SourceScope.local;
   PlaylistsTableData? _selectedPlaylist;
+  OnlinePlaylistDetailArgs? _selectedOnlineArgs;
   List<PlaylistSuggestion> _suggestions = const [];
   bool _isCreatingPlaylist = false;
   final Set<String> _creatingSuggestions = {};
@@ -555,10 +556,15 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
     );
     if (url != null && url.isNotEmpty && context.mounted) {
       cubit.fetchOnlinePlaylistByUrl(url);
-      context.push(
-        '/online-playlist?id=${Uri.encodeComponent(url)}',
-        extra: OnlinePlaylistDetailArgs(playlistId: url),
-      );
+      final args = OnlinePlaylistDetailArgs(playlistId: url);
+      if (context.isTwoPanePlaylist && _scope == SourceScope.online) {
+        setState(() => _selectedOnlineArgs = args);
+      } else {
+        context.push(
+          '/online-playlist?id=${Uri.encodeComponent(url)}',
+          extra: args,
+        );
+      }
     }
   }
 
@@ -578,7 +584,21 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
     final getSongsUseCase = getIt<GetSongsUseCase>();
     final playerCubit = context.read<PlayerCubit>();
 
-    return BlocBuilder<PlaylistCubit, PlaylistState>(
+    return BlocConsumer<PlaylistCubit, PlaylistState>(
+      listenWhen: (previous, current) =>
+          current.errorMessage != null &&
+          current.errorMessage != previous.errorMessage &&
+          current.playlists.isNotEmpty,
+      listener: (context, state) {
+        final message = state.errorMessage;
+        if (message == null) return;
+        PulsrToast.show(
+          context,
+          message: resolveUiErrorMessage(context, message),
+          isError: true,
+        );
+        cubit.clearError();
+      },
       builder: (context, state) {
         final smartPlaylists = state.playlists.where((x) => x.isSmart).toList();
         final userPlaylists = state.playlists.where((x) => !x.isSmart).toList();
@@ -715,33 +735,36 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                         color: p.hairline,
                       ),
                     Expanded(
-                      child: resolvedSelection != null
-                          ? PlaylistDetailScreen(
-                              key: ValueKey('playlist_${resolvedSelection.id}'),
-                              playlist: resolvedSelection,
-                              isEmbedded: true,
-                            )
-                          : Center(
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Icons.queue_music_rounded,
-                                    size: 64,
-                                    color: p.textTertiary,
+                      child: _scope == SourceScope.online
+                          ? _buildTwoPaneOnlineDetail(context, p, cubit)
+                          : (resolvedSelection != null
+                              ? PlaylistDetailScreen(
+                                  key: ValueKey(
+                                      'playlist_${resolvedSelection.id}'),
+                                  playlist: resolvedSelection,
+                                  isEmbedded: true,
+                                )
+                              : Center(
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.queue_music_rounded,
+                                        size: 64,
+                                        color: p.textTertiary,
+                                      ),
+                                      const SizedBox(height: AppSpacing.md),
+                                      Text(
+                                        context.l10n.selectPlaylistHint,
+                                        style: TextStyle(
+                                          color: p.textSecondary,
+                                          fontSize: AppFontSize.bodyLarge,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                  const SizedBox(height: AppSpacing.md),
-                                  Text(
-                                    context.l10n.selectPlaylistHint,
-                                    style: TextStyle(
-                                      color: p.textSecondary,
-                                      fontSize: AppFontSize.bodyLarge,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
+                                )),
                     ),
                   ],
                 )
@@ -753,6 +776,80 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                 ),
         );
       },
+    );
+  }
+
+  Widget _buildTwoPaneOnlineDetail(
+    BuildContext context,
+    PulsrPalette p,
+    PlaylistCubit cubit,
+  ) {
+    final ytmOnline = () {
+      try {
+        return cubit.ytmOnline;
+      } catch (_) {
+        return null;
+      }
+    }();
+    final online = ytmOnline?.value ?? const YtmOnlineState();
+    var selected = _selectedOnlineArgs;
+    if (selected == null) {
+      if (online.likedTracks.isNotEmpty) {
+        selected = OnlinePlaylistDetailArgs(
+          playlistId: 'VLLM',
+          title: context.l10n.likedMusic,
+          subtitle: 'YouTube Music',
+          initialTracks: online.likedTracks,
+          kind: OnlineLibraryKind.liked,
+        );
+      } else if (online.accountPlaylists.isNotEmpty) {
+        final pl = online.accountPlaylists.first;
+        selected = OnlinePlaylistDetailArgs(
+          playlistId: pl.playlistId,
+          title: pl.title,
+          subtitle: pl.subtitle,
+          artworkUrl: pl.artworkUrl,
+          kind: OnlineLibraryKind.account,
+        );
+      } else if (online.customPlaylists.isNotEmpty) {
+        final pl = online.customPlaylists.first;
+        selected = OnlinePlaylistDetailArgs(
+          playlistId: pl.id,
+          title: pl.title,
+          subtitle: pl.uploader,
+          artworkUrl: pl.tracks.firstOrNull?.artworkUrl,
+          initialTracks: pl.tracks,
+          kind: OnlineLibraryKind.custom,
+        );
+      }
+    }
+    if (selected == null) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.cloud_queue_rounded,
+              size: 64,
+              color: p.textTertiary,
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Text(
+              context.l10n.selectPlaylistHint,
+              style: TextStyle(
+                color: p.textSecondary,
+                fontSize: AppFontSize.bodyLarge,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    return OnlinePlaylistDetailScreen(
+      key: ValueKey('online_${selected.playlistId}'),
+      args: selected,
+      isEmbedded: true,
     );
   }
 
@@ -806,23 +903,23 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
               },
             ),
           ),
-          if (_suggestions.isNotEmpty || smartPlaylists.isNotEmpty) ...[
-            PulsrSectionHeader(
-              title: _suggestions.isNotEmpty
-                  ? context.l10n.suggestedForYou
-                  : context.l10n.smartPlaylists,
-              padding: EdgeInsetsDirectional.only(
-                start: Adaptive.pagePadding(context),
-                end: Adaptive.pagePadding(context),
-                top: AppSpacing.sectionGap,
-                bottom: AppSpacing.s10,
-              ),
-              actionLabel: context.l10n.createSmartPlaylist,
-              onAction: () async {
-                PulsrHaptics.selectionClick();
-                await context.push('/smart-playlist-builder');
-              },
+          PulsrSectionHeader(
+            title: _suggestions.isNotEmpty
+                ? context.l10n.suggestedForYou
+                : context.l10n.smartPlaylists,
+            padding: EdgeInsetsDirectional.only(
+              start: Adaptive.pagePadding(context),
+              end: Adaptive.pagePadding(context),
+              top: AppSpacing.sectionGap,
+              bottom: AppSpacing.s10,
             ),
+            actionLabel: context.l10n.createSmartPlaylist,
+            onAction: () async {
+              PulsrHaptics.selectionClick();
+              await context.push('/smart-playlist-builder');
+            },
+          ),
+          if (_suggestions.isNotEmpty || smartPlaylists.isNotEmpty) ...[
             SizedBox(
               height: 152,
               child: ListView.separated(
@@ -1051,6 +1148,9 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                       playerCubit: playerCubit,
                       onAddPlaylist: () =>
                           _showAddOnlinePlaylistDialog(context, cubit),
+                      onOpenOnlinePlaylist: isTabletLandscape
+                          ? (args) => setState(() => _selectedOnlineArgs = args)
+                          : null,
                     ),
             ),
           ),
@@ -1068,12 +1168,27 @@ class _OnlinePlaylistsContent extends StatelessWidget {
   final PlaylistCubit cubit;
   final PlayerCubit playerCubit;
   final VoidCallback onAddPlaylist;
+  final void Function(OnlinePlaylistDetailArgs args)? onOpenOnlinePlaylist;
 
   const _OnlinePlaylistsContent({
     required this.cubit,
     required this.playerCubit,
     required this.onAddPlaylist,
+    this.onOpenOnlinePlaylist,
   });
+
+  void _openOnline(
+    BuildContext context,
+    OnlinePlaylistDetailArgs args, {
+    required String route,
+    Object? pushExtra,
+  }) {
+    if (onOpenOnlinePlaylist != null) {
+      onOpenOnlinePlaylist!(args);
+    } else {
+      context.push(route, extra: pushExtra ?? args);
+    }
+  }
 
   Future<void> _downloadAccountPlaylist(
     BuildContext context,
@@ -1408,16 +1523,21 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                       onFetch: () => cubit.fetchLikedSongsPlaylist(),
                       onDownload: () =>
                           _downloadLikedSongs(context, online.likedTracks),
-                      onPlay: () => context.push(
-                        '/online-playlist?id=VLLM&title=${Uri.encodeComponent(context.l10n.likedMusic)}&kind=${OnlineLibraryKind.liked}',
-                        extra: OnlinePlaylistDetailArgs(
+                      onPlay: () {
+                        final args = OnlinePlaylistDetailArgs(
                           playlistId: 'VLLM',
                           title: context.l10n.likedMusic,
                           subtitle: 'YouTube Music',
                           initialTracks: online.likedTracks,
                           kind: OnlineLibraryKind.liked,
-                        ),
-                      ),
+                        );
+                        _openOnline(
+                          context,
+                          args,
+                          route:
+                              '/online-playlist?id=VLLM&title=${Uri.encodeComponent(context.l10n.likedMusic)}&kind=${OnlineLibraryKind.liked}',
+                        );
+                      },
                     ),
                   ),
                   PulsrSectionHeader(
@@ -1559,9 +1679,18 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                           final pl = online.accountPlaylists[i];
                           return _AccountPlaylistCard(
                             playlist: pl,
-                            onTap: () => context.push(
-                              '/online-playlist?id=${Uri.encodeComponent(pl.playlistId)}&title=${Uri.encodeComponent(pl.title)}&kind=${OnlineLibraryKind.account}',
-                              extra: pl,
+                            onTap: () => _openOnline(
+                              context,
+                              OnlinePlaylistDetailArgs(
+                                playlistId: pl.playlistId,
+                                title: pl.title,
+                                subtitle: pl.subtitle,
+                                artworkUrl: pl.artworkUrl,
+                                kind: OnlineLibraryKind.account,
+                              ),
+                              route:
+                                  '/online-playlist?id=${Uri.encodeComponent(pl.playlistId)}&title=${Uri.encodeComponent(pl.title)}&kind=${OnlineLibraryKind.account}',
+                              pushExtra: pl,
                             ),
                             onDownload: () =>
                                 _downloadAccountPlaylist(context, pl),
@@ -1646,9 +1775,19 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                           final pl = online.customPlaylists[i];
                           return _OnlinePlaylistCard(
                             entry: pl,
-                            onTap: () => context.push(
-                              '/online-playlist?id=${Uri.encodeComponent(pl.id)}&title=${Uri.encodeComponent(pl.title)}&kind=${OnlineLibraryKind.custom}',
-                              extra: pl,
+                            onTap: () => _openOnline(
+                              context,
+                              OnlinePlaylistDetailArgs(
+                                playlistId: pl.id,
+                                title: pl.title,
+                                subtitle: pl.uploader,
+                                artworkUrl: pl.tracks.firstOrNull?.artworkUrl,
+                                initialTracks: pl.tracks,
+                                kind: OnlineLibraryKind.custom,
+                              ),
+                              route:
+                                  '/online-playlist?id=${Uri.encodeComponent(pl.id)}&title=${Uri.encodeComponent(pl.title)}&kind=${OnlineLibraryKind.custom}',
+                              pushExtra: pl,
                             ),
                             onDownload: () =>
                                 _downloadCustomPlaylist(context, pl),

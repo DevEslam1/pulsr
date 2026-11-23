@@ -4,36 +4,71 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../../../core/bloc/base_cubit.dart';
+import '../../../core/errors/app_error.dart';
 import '../../../core/network/connectivity_guard.dart';
 import '../../../core/services/ytm_account_service.dart';
 import '../../../core/services/ytm_service.dart';
 import '../../../core/utils/error_logger.dart';
 import '../../../domain/models/ytm_track.dart';
 
+enum HomeCategoryStatus { initial, loading, loaded, empty, offline, error }
+
+class HomeCategoryState {
+  const HomeCategoryState({
+    this.status = HomeCategoryStatus.initial,
+    this.tracks = const [],
+    this.error,
+  });
+
+  final HomeCategoryStatus status;
+  final List<YtmTrack> tracks;
+  final AppError? error;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is HomeCategoryState &&
+          runtimeType == other.runtimeType &&
+          status == other.status &&
+          listEquals(tracks, other.tracks) &&
+          error == other.error;
+
+  @override
+  int get hashCode =>
+      Object.hash(status, Object.hashAll(tracks), error);
+}
+
 /// Minimal state: [loginEpoch] bumps whenever the account login state flips so
 /// the screen can reset its selected category, [refreshEpoch] bumps when a
-/// category cache is refreshed or retried, and [isLoggedIn] mirrors the
-/// account service.
+/// category cache is refreshed or retried, [isLoggedIn] mirrors the account
+/// service, and [categories] tracks typed async state per category.
 class HomeState {
   const HomeState({
     this.loginEpoch = 0,
     this.refreshEpoch = 0,
     this.isLoggedIn = false,
+    this.categories = const {},
   });
 
   final int loginEpoch;
   final int refreshEpoch;
   final bool isLoggedIn;
+  final Map<String, HomeCategoryState> categories;
+
+  HomeCategoryState categoryState(String category) =>
+      categories[category] ?? const HomeCategoryState();
 
   HomeState copyWith({
     int? loginEpoch,
     int? refreshEpoch,
     bool? isLoggedIn,
+    Map<String, HomeCategoryState>? categories,
   }) =>
       HomeState(
         loginEpoch: loginEpoch ?? this.loginEpoch,
         refreshEpoch: refreshEpoch ?? this.refreshEpoch,
         isLoggedIn: isLoggedIn ?? this.isLoggedIn,
+        categories: categories ?? this.categories,
       );
 
   @override
@@ -43,10 +78,18 @@ class HomeState {
           runtimeType == other.runtimeType &&
           loginEpoch == other.loginEpoch &&
           refreshEpoch == other.refreshEpoch &&
-          isLoggedIn == other.isLoggedIn;
+          isLoggedIn == other.isLoggedIn &&
+          mapEquals(categories, other.categories);
 
   @override
-  int get hashCode => Object.hash(loginEpoch, refreshEpoch, isLoggedIn);
+  int get hashCode => Object.hash(
+        loginEpoch,
+        refreshEpoch,
+        isLoggedIn,
+        Object.hashAllUnordered(
+          categories.entries.map((e) => Object.hash(e.key, e.value)),
+        ),
+      );
 }
 
 /// Owns the Home online-category data fetching and its TTL cache so the UI no
@@ -123,8 +166,25 @@ class HomeCubit extends PulsrCubit<HomeState> {
     safeEmit(state.copyWith(
       loginEpoch: state.loginEpoch + 1,
       isLoggedIn: isLoggedIn,
+      categories: const {},
     ));
   }
+
+  void _setCategoryState(String category, HomeCategoryState categoryState) {
+    if (isClosed) return;
+    final current = state.categories[category];
+    if (current == categoryState) return;
+    final next = Map<String, HomeCategoryState>.of(state.categories);
+    next[category] = categoryState;
+    safeEmit(state.copyWith(categories: Map.unmodifiable(next)));
+  }
+
+  HomeCategoryState categoryState(String category) =>
+      state.categoryState(category);
+
+  /// Starts loading [category] if not already loaded or cached within TTL.
+  Future<List<YtmTrack>> loadCategory(String category) =>
+      categoryFuture(category);
 
   static const int _maxCachedCategories = 20;
 
@@ -150,6 +210,10 @@ class HomeCubit extends PulsrCubit<HomeState> {
     _categoryFetchTimestamps[category] = _monotonicClock.elapsedMilliseconds;
     final fetchToken = (_categoryTokens[category] ?? 0) + 1;
     _categoryTokens[category] = fetchToken;
+    _setCategoryState(
+      category,
+      const HomeCategoryState(status: HomeCategoryStatus.loading),
+    );
 
     late final Future<List<YtmTrack>> future;
     future = () async {
@@ -161,6 +225,12 @@ class HomeCubit extends PulsrCubit<HomeState> {
           if (identical(_categoryFutures[category], future)) {
             _categoryFutures.remove(category);
             _categoryFetchTimestamps.remove(category);
+          }
+          if ((_categoryTokens[category] ?? 0) == fetchToken) {
+            _setCategoryState(
+              category,
+              const HomeCategoryState(status: HomeCategoryStatus.offline),
+            );
           }
           return <YtmTrack>[];
         }
@@ -223,12 +293,32 @@ class HomeCubit extends PulsrCubit<HomeState> {
           _categoryFetchTimestamps[category] =
               _monotonicClock.elapsedMilliseconds;
         }
+        if ((_categoryTokens[category] ?? 0) == fetchToken) {
+          _setCategoryState(
+            category,
+            result.isEmpty
+                ? const HomeCategoryState(status: HomeCategoryStatus.empty)
+                : HomeCategoryState(
+                    status: HomeCategoryStatus.loaded,
+                    tracks: List<YtmTrack>.unmodifiable(result),
+                  ),
+          );
+        }
         return result;
       } catch (e, st) {
         // C-05: Only remove if the cached future is still this in-flight instance
         if (identical(_categoryFutures[category], future)) {
           _categoryFutures.remove(category);
           _categoryFetchTimestamps.remove(category);
+        }
+        if ((_categoryTokens[category] ?? 0) == fetchToken) {
+          _setCategoryState(
+            category,
+            HomeCategoryState(
+              status: HomeCategoryStatus.error,
+              error: uiError(e.toString()),
+            ),
+          );
         }
         // FIX-H05: Return empty list and log error instead of unhandled rethrow in widget FutureBuilder
         ErrorLogger.log('Failed to fetch home category $category',
@@ -303,7 +393,12 @@ class HomeCubit extends PulsrCubit<HomeState> {
     _categoryFutures.remove(category);
     _categoryFetchTimestamps.remove(category);
     if (!isClosed) {
-      safeEmit(state.copyWith(refreshEpoch: state.refreshEpoch + 1));
+      final next = Map<String, HomeCategoryState>.of(state.categories);
+      next[category] = const HomeCategoryState(status: HomeCategoryStatus.loading);
+      safeEmit(state.copyWith(
+        refreshEpoch: state.refreshEpoch + 1,
+        categories: Map.unmodifiable(next),
+      ));
     }
   }
 

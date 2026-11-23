@@ -515,10 +515,37 @@ void main() {
       await cubit.close();
     });
 
-    test('truncates oversized lyrics', () async {
+    test('preserves long lyrics on ID3v2/FLAC/Vorbis containers', () async {
+      String? writtenLyrics;
+      handler = (call) async {
+        if (call.method == 'writeTags') {
+          writtenLyrics = (call.arguments as Map)['lyrics'] as String?;
+          return true;
+        }
+        return <String, dynamic>{};
+      };
+      final cubit = single();
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+      final longLyrics = 'x' * 9000;
+      cubit.updateLyrics(longLyrics);
+      await cubit.saveTags();
+      expect(cubit.state.status, TagEditorStatus.success);
+      expect(cubit.state.errorMessage, isNull);
+      expect(writtenLyrics?.length, 9000);
+      await cubit.close();
+    });
+
+    test('truncates oversized lyrics only on small-limit containers like WAV',
+        () async {
       handler = (call) async =>
           call.method == 'readTags' ? <String, dynamic>{} : true;
-      final cubit = single();
+      final cubit = single(
+        s: createTestSong(
+          id: 9,
+          title: 'Wave',
+          path: '/music/Wave.wav',
+        ),
+      );
       await Future<void>.delayed(const Duration(milliseconds: 10));
       cubit.updateLyrics('x' * 9000);
       await cubit.saveTags();

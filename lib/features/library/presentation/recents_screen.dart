@@ -162,7 +162,7 @@ class _RecentsScreenState extends State<RecentsScreen> {
                   controller: _searchController,
                   autofocus: true,
                   debounceDuration: Duration.zero,
-                  hintText: '${l10n.search}${l10n.browseRecentSongs}...',
+                  hintText: '${l10n.search} ${l10n.browseRecentSongs}...',
                   // BUG-09: debounce keystrokes so the list isn't rebuilt on every character.
                   onChanged: (val) {
                     _searchDebounce?.cancel();
