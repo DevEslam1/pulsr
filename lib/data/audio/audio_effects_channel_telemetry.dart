@@ -573,7 +573,7 @@ mixin _AudioEffectsChannelTelemetryMixin {
   /// Sends a silent buffer through the DSP pipeline to warm up complex filters (e.g. convolver)
   /// before unmuting, preventing audible pops/clicks.
   Future<bool> sendWarmupBuffer({int durationMs = 100}) async {
-    if (!_isAndroid) return true;
+    if (!_isAndroid) return false;
     try {
       final res = await AudioEffectsChannel._channel.invokeMethod<bool>('sendWarmupBuffer',
           {'durationMs': durationMs}).timeout(const Duration(seconds: 2));

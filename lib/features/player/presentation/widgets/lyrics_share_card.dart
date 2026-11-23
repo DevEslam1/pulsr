@@ -8,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
+import 'package:pulsr/core/performance/gpu_budget.dart';
 import 'package:pulsr/core/theme/aura_theme.dart';
 import 'package:pulsr/core/utils/l10n_extensions.dart';
 import 'package:pulsr/core/utils/error_logger.dart';
@@ -146,7 +147,9 @@ class LyricsShareCardRenderer {
       // Soft glow orb behind lyrics
       final glowPaint = Paint()
         ..color = accentColor.withValues(alpha: 0.18)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 180);
+        ..maskFilter = GpuBudget.isGpuSaverActive
+            ? null
+            : const MaskFilter.blur(BlurStyle.normal, 180);
       canvas.drawCircle(
         const Offset(cardWidth / 2, cardHeight * 0.45),
         360,

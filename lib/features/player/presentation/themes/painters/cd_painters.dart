@@ -243,6 +243,7 @@ class _CdJewelCasePainter extends CustomPainter {
   final bool isDark;
   final bool customGlow;
   final PlayerSurfacePalette surface;
+  final bool isRtl;
 
   _CdJewelCasePainter({
     required this.spineWidth,
@@ -255,10 +256,16 @@ class _CdJewelCasePainter extends CustomPainter {
     required this.isDark,
     required this.customGlow,
     required this.surface,
+    this.isRtl = false,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
+    if (isRtl) {
+      canvas.save();
+      canvas.translate(size.width, 0);
+      canvas.scale(-1, 1);
+    }
     final caseRect = Rect.fromLTWH(0, 0, size.width, size.height);
     final radius = Radius.circular(caseRadius);
     final caseRRect = RRect.fromRectAndRadius(caseRect.deflate(0.5), radius);
@@ -495,6 +502,7 @@ class _CdJewelCasePainter extends CustomPainter {
         ..strokeWidth = 0.8
         ..color = AppColors.specularAt(isDark ? 0.10 : 0.38),
     );
+    if (isRtl) canvas.restore();
   }
 
   @override
@@ -508,7 +516,8 @@ class _CdJewelCasePainter extends CustomPainter {
       oldDelegate.isPlaying != isPlaying ||
       oldDelegate.isDark != isDark ||
       oldDelegate.customGlow != customGlow ||
-      oldDelegate.surface != surface;
+      oldDelegate.surface != surface ||
+      oldDelegate.isRtl != isRtl;
 }
 
 /// Paints the optical pickup sled: the rail along the tray lip, the lens head
@@ -525,6 +534,7 @@ class _CdPickupSledPainter extends CustomPainter {
   final Offset discCenter;
   final double discRadius;
   final PlayerSurfacePalette surface;
+  final bool isRtl;
 
   _CdPickupSledPainter({
     required this.railLeft,
@@ -536,10 +546,16 @@ class _CdPickupSledPainter extends CustomPainter {
     required this.discCenter,
     required this.discRadius,
     required this.surface,
+    this.isRtl = false,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
+    if (isRtl) {
+      canvas.save();
+      canvas.translate(size.width, 0);
+      canvas.scale(-1, 1);
+    }
     final engaged = engage.clamp(0.0, 1.0);
 
     // 1. Rail: a machined groove with an end stop at either side.
@@ -585,7 +601,9 @@ class _CdPickupSledPainter extends CustomPainter {
           3.2,
           Paint()
             ..color = activeColor.withValues(alpha: 0.58 * engaged)
-            ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
+            ..maskFilter = GpuBudget.isGpuSaverActive
+                ? null
+                : const MaskFilter.blur(BlurStyle.normal, 3),
         );
       }
     }
@@ -629,7 +647,7 @@ class _CdPickupSledPainter extends CustomPainter {
       2.5,
       Paint()..color = activeColor.withValues(alpha: 0.30 + (0.70 * engaged)),
     );
-    if (engaged > 0) {
+    if (engaged > 0 && !GpuBudget.isGpuSaverActive) {
       canvas.drawCircle(
         objective,
         4.8,
@@ -638,6 +656,7 @@ class _CdPickupSledPainter extends CustomPainter {
           ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
       );
     }
+    if (isRtl) canvas.restore();
   }
 
   @override
@@ -650,7 +669,8 @@ class _CdPickupSledPainter extends CustomPainter {
       oldDelegate.activeColor != activeColor ||
       oldDelegate.discCenter != discCenter ||
       oldDelegate.discRadius != discRadius ||
-      oldDelegate.surface != surface;
+      oldDelegate.surface != surface ||
+      oldDelegate.isRtl != isRtl;
 }
 
 /// Static transparent acrylic lid reflection + animated play/pause gloss sweep
@@ -661,16 +681,23 @@ class _CdLidGlossPainter extends CustomPainter {
   final double caseRadius;
   final double spineWidth;
   final PlayerSurfacePalette surface;
+  final bool isRtl;
 
   _CdLidGlossPainter({
     required this.gloss,
     required this.caseRadius,
     required this.spineWidth,
     required this.surface,
+    this.isRtl = false,
   }) : super(repaint: gloss);
 
   @override
   void paint(Canvas canvas, Size size) {
+    if (isRtl) {
+      canvas.save();
+      canvas.translate(size.width, 0);
+      canvas.scale(-1, 1);
+    }
     final caseRRect = RRect.fromRectAndRadius(
       Rect.fromLTWH(0, 0, size.width, size.height).deflate(0.8),
       Radius.circular(caseRadius),
@@ -726,6 +753,7 @@ class _CdLidGlossPainter extends CustomPainter {
     }
 
     canvas.restore();
+    if (isRtl) canvas.restore();
   }
 
   @override
@@ -733,5 +761,6 @@ class _CdLidGlossPainter extends CustomPainter {
       oldDelegate.gloss != gloss ||
       oldDelegate.caseRadius != caseRadius ||
       oldDelegate.spineWidth != spineWidth ||
-      oldDelegate.surface != surface;
+      oldDelegate.surface != surface ||
+      oldDelegate.isRtl != isRtl;
 }

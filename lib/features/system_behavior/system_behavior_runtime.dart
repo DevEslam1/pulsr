@@ -27,6 +27,11 @@ import 'system_behavior_settings.dart';
 /// subscription that mirrors `stopWhenTaskRemoved` to the native plugin. The
 /// settings object itself is owned by the caller.
 class SystemBehaviorRuntime {
+  static SystemBehaviorSettings? _activeSettings;
+
+  /// The live [SystemBehaviorSettings] attached by the active runtime, if any.
+  static SystemBehaviorSettings? get activeSettings => _activeSettings;
+
   SystemBehaviorRuntime._({
     required SystemBehaviorService service,
     required MethodChannel channel,
@@ -76,9 +81,11 @@ class SystemBehaviorRuntime {
     required AudioHandler handler,
     double Function()? readVolume,
     Future<void> Function(double volume)? writeVolume,
+    UsbExclusiveService? usbExclusive,
     MethodChannel? channel,
     bool subscribeInterruptions = false,
   }) async {
+    final UsbExclusiveService usb = usbExclusive ?? UsbExclusiveService();
     final AudioHandlerVolumeControls? volume =
         readVolume == null || writeVolume == null
             ? null
@@ -94,7 +101,7 @@ class SystemBehaviorRuntime {
       volumeReader: volume == null ? null : () => port.currentVolume ?? 0,
       isPlaying: () => port.isPlaying,
       resumePlayback: port.play,
-      usbRelease: (bool enabled) => UsbExclusiveService().setExclusive(enabled),
+      usbRelease: (bool enabled) => _coordinateUsbFocusTransfer(usb, enabled),
       channel: channel ?? defaultChannel,
       subscribeInterruptions: subscribeInterruptions,
     );
@@ -103,6 +110,29 @@ class SystemBehaviorRuntime {
     // produces exactly one pause (fade or immediate, as the settings decide).
     runtime._attachToHandler(handler);
     return runtime;
+  }
+
+  /// Coordinates USB DAC release/reacquire with `UsbExclusivePlugin.kt`.
+  ///
+  /// When releasing (`enabled == false`), only drops the USB claim if an
+  /// exclusive or streaming session is actually active; otherwise returns
+  /// `false` so focus gain will not hijack an un-claimed DAC later. When
+  /// re-acquiring (`enabled == true`), calls `setExclusive(true)` so Wave 1
+  /// `UsbExclusivePlugin` restarts any suspended PCM/DSD stream or restores
+  /// the exclusive interface claim.
+  static Future<bool> _coordinateUsbFocusTransfer(
+    UsbExclusiveService usb,
+    bool enabled,
+  ) async {
+    if (!enabled) {
+      final UsbExclusiveStatus status = await usb.getStatus();
+      if (!status.attached ||
+          (!status.exclusiveActive && !status.streamingActive)) {
+        return false;
+      }
+      return usb.setExclusive(false);
+    }
+    return usb.setExclusive(true);
   }
 
   /// Bridges [handler]'s interruption path to this runtime's service.
@@ -183,6 +213,7 @@ class SystemBehaviorRuntime {
     settings.addListener(runtime._settingsListener!);
     channel.setMethodCallHandler(runtime._onPlatformCall);
     unawaited(runtime._pushTaskPolicy());
+    _activeSettings = settings;
     await service.start(subscribeInterruptions: subscribeInterruptions);
     return runtime;
   }
@@ -201,6 +232,9 @@ class SystemBehaviorRuntime {
   void dispose() {
     if (_disposed) return;
     _disposed = true;
+    if (identical(_activeSettings, _settings)) {
+      _activeSettings = null;
+    }
     _attachedHandler?.attachSystemBehaviorHooks(null);
     _attachedHandler = null;
     final VoidCallback? listener = _settingsListener;

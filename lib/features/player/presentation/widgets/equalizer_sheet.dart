@@ -10,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/prefs_keys.dart';
 import '../../../../core/constants/app_radii.dart';
 import '../../../../core/motion/pulsr_motion.dart';
+import '../../../../core/performance/gpu_budget.dart';
 import '../../../../core/responsive/pulsr_layout_metrics.dart';
 import '../../../../core/services/coach_mark_service.dart';
 import '../../../../core/errors/error_message_resolver.dart';
@@ -151,10 +152,10 @@ class _EqualizerSheetState extends State<EqualizerSheet>
   String _selectedCategory = 'All';
   String _searchQuery = '';
   bool _isLoadingProfiles = true;
-  bool _isAbComparing = false;
+  bool _fallbackAbComparing = false;
   Timer? _crossfeedAuditionTimer;
   bool? _crossfeedPreAuditionEnabled;
-  ComparisonSlot _activeComparisonSlot = ComparisonSlot.slotA;
+  ComparisonSlot _fallbackComparisonSlot = ComparisonSlot.slotA;
   bool? _isStudioModeOverride;
   Timer? _preampDebounce;
   double? _preampPreview;
@@ -167,6 +168,26 @@ class _EqualizerSheetState extends State<EqualizerSheet>
   final Set<int> _soloedBands = <int>{};
   int? _activeDraggedBandIndex;
   bool _autoPreampEnabled = false;
+
+  bool get _effectiveIsAbComparing {
+    try {
+      final manager = _cachedEqualizerManager;
+      if (manager != null) return manager.isAbComparisonActive;
+    } catch (_) {
+      // Fallback when a mock EqualizerManager leaves isAbComparisonActive unstubbed.
+    }
+    return _fallbackAbComparing;
+  }
+
+  ComparisonSlot get _effectiveComparisonSlot {
+    try {
+      final manager = _cachedEqualizerManager;
+      if (manager != null) return manager.activeComparisonSlot;
+    } catch (_) {
+      // Fallback when a mock EqualizerManager leaves activeComparisonSlot unstubbed.
+    }
+    return _fallbackComparisonSlot;
+  }
 
   EqualizerManager? _cachedEqualizerManager;
 
@@ -186,10 +207,10 @@ class _EqualizerSheetState extends State<EqualizerSheet>
     }
     _tabController = TabController(length: 4, vsync: this);
     try {
-      _activeComparisonSlot =
+      _fallbackComparisonSlot =
           _cachedEqualizerManager?.activeComparisonSlot ?? ComparisonSlot.slotA;
     } catch (e, st) {
-      _activeComparisonSlot = ComparisonSlot.slotA;
+      _fallbackComparisonSlot = ComparisonSlot.slotA;
       ErrorLogger.log('Failed to read active EQ comparison slot',
           error: e, stackTrace: st, category: 'EqualizerSheet');
     }
@@ -207,8 +228,8 @@ class _EqualizerSheetState extends State<EqualizerSheet>
     // Leaving the sheet mid-comparison would otherwise strand the manager's
     // A/B latch: the next sheet open would snap its "original" to the flat
     // preview instead of the user's real curve.
-    if (_isAbComparing) {
-      _isAbComparing = false;
+    if (_effectiveIsAbComparing) {
+      _fallbackAbComparing = false;
       final manager = _cachedEqualizerManager;
       if (manager != null) {
         unawaited(manager.endAbComparison());

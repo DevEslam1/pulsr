@@ -166,6 +166,8 @@ class FadeOutController {
   FadeRamp? _ramp;
   int _step = 0;
   double? _savedVolume;
+  int _generation = 0;
+  Future<void>? _activeStep;
 
   /// Whether a ramp is currently running.
   bool get isRunning => _ramp != null;
@@ -198,6 +200,8 @@ class FadeOutController {
     final double? saved = _savedVolume;
     if (saved == null) return;
     _savedVolume = null;
+    final Future<void>? inFlight = _activeStep;
+    if (inFlight != null) await inFlight;
     await _setVolume(saved);
   }
 
@@ -211,6 +215,7 @@ class FadeOutController {
 
   /// Cancels the timer and drops the running ramp, keeping the saved level.
   void cancelTimer() {
+    _generation += 1;
     _timer?.cancel();
     _timer = null;
     _ramp = null;
@@ -223,6 +228,7 @@ class FadeOutController {
       timer.cancel();
       return;
     }
+    final int gen = _generation;
     _step += 1;
     final double volume = ramp.volumeAtStep(_step);
     final bool done = _step >= ramp.steps;
@@ -232,14 +238,30 @@ class FadeOutController {
       _ramp = null;
       _step = 0;
     }
-    unawaited(_applyStep(volume, pauseWhenDone: done));
+    final Future<void>? previous = _activeStep;
+    late final Future<void> current;
+    final Future<void> stepFuture = previous == null
+        ? _applyStep(volume, pauseWhenDone: done, generation: gen)
+        : previous.then(
+            (_) => _applyStep(volume, pauseWhenDone: done, generation: gen),
+          );
+    current = stepFuture.catchError((Object _, StackTrace __) {}).whenComplete(
+      () {
+        if (identical(_activeStep, current)) _activeStep = null;
+      },
+    );
+    _activeStep = current;
+    unawaited(current);
   }
 
   Future<void> _applyStep(
     double volume, {
     required bool pauseWhenDone,
+    required int generation,
   }) async {
+    if (generation != _generation) return;
     await _setVolume(volume);
+    if (generation != _generation) return;
     if (pauseWhenDone) await _pause();
   }
 }
@@ -404,20 +426,10 @@ class SystemBehaviorService with WidgetsBindingObserver {
               );
     _fade.cancelTimer();
     await _fade.restore();
-    if (decision != InterruptionDecision.resume) return false;
     if (_usbReleasedForFocusLoss) {
-      _usbReleasedForFocusLoss = false;
-      try {
-        await _usbRelease(true);
-      } catch (e, st) {
-        ErrorLogger.log(
-          'Re-claiming the exclusive USB stream after focus loss failed',
-          error: e,
-          stackTrace: st,
-          category: 'SystemBehavior',
-        );
-      }
+      await _reclaimUsb();
     }
+    if (decision != InterruptionDecision.resume) return false;
     await _resume();
     return true;
   }
@@ -548,7 +560,7 @@ class SystemBehaviorService with WidgetsBindingObserver {
       case AppLifecycleState.paused:
         unawaited(handleAppBackgrounded());
       case AppLifecycleState.detached:
-        unawaited(handleTaskRemoved());
+        break;
     }
   }
 
@@ -612,9 +624,10 @@ class SystemBehaviorService with WidgetsBindingObserver {
         await _pause();
         return;
       case SystemAction.pauseAndReleaseUsb:
-        _usbReleasedForFocusLoss = true;
         await _fade.cancel(restoreVolume: true);
-        await _releaseUsb();
+        if (await _releaseUsb()) {
+          _usbReleasedForFocusLoss = true;
+        }
         await _pause();
         return;
       case SystemAction.fadeOutPause:
@@ -697,12 +710,28 @@ class SystemBehaviorService with WidgetsBindingObserver {
     }
   }
 
-  Future<void> _releaseUsb() async {
+  Future<bool> _releaseUsb() async {
     try {
       await _usbRelease(false);
+      return true;
     } catch (e, st) {
       ErrorLogger.log(
         'Releasing the exclusive USB claim failed',
+        error: e,
+        stackTrace: st,
+        category: 'SystemBehavior',
+      );
+      return false;
+    }
+  }
+
+  Future<void> _reclaimUsb() async {
+    _usbReleasedForFocusLoss = false;
+    try {
+      await _usbRelease(true);
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Re-claiming the exclusive USB stream after focus loss failed',
         error: e,
         stackTrace: st,
         category: 'SystemBehavior',

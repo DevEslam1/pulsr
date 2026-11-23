@@ -261,7 +261,30 @@ void main() {
     ]);
     await pump(tester, player);
 
-    expect(find.byIcon(Icons.graphic_eq_rounded), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.widgetWithText(ListTile, 'Alpha'),
+        matching: find.byWidgetPredicate(
+          (w) =>
+              w is Icon &&
+              w.icon == Icons.graphic_eq_rounded &&
+              w.size == 20.0,
+        ),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.widgetWithText(ListTile, 'Online'),
+        matching: find.byWidgetPredicate(
+          (w) =>
+              w is Icon &&
+              w.icon == Icons.graphic_eq_rounded &&
+              w.size == 20.0,
+        ),
+      ),
+      findsNothing,
+    );
     expect(find.byIcon(Icons.cloud_rounded), findsOneWidget);
   });
 

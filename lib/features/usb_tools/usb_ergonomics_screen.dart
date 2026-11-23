@@ -109,55 +109,57 @@ class _UsbErgonomicsScreenState extends State<UsbErgonomicsScreen> {
     );
   }
 
-  Future<void> _save() async {
+  Future<void> _runBusy(Future<void> Function() action) async {
     if (_busy) return;
     setState(() => _busy = true);
-    final ok = await _service.saveQuirk(_draft);
-    if (!mounted) return;
-    setState(() => _busy = false);
-    _snack(
-      ok ? UsbErgonomicsStrings.saved : UsbErgonomicsStrings.saveFailed,
-      isError: !ok,
-    );
-  }
-
-  Future<void> _delete() async {
-    if (_busy) return;
-    setState(() => _busy = true);
-    final ok = await _service.deleteQuirk();
-    if (!mounted) return;
-    setState(() {
-      _busy = false;
-      _draftKey = null;
-      _syncDraft();
-    });
-    _snack(
-      ok ? UsbErgonomicsStrings.deleted : UsbErgonomicsStrings.deleteFailed,
-      isError: !ok,
-    );
-  }
-
-  Future<void> _probe() async {
-    if (_busy) return;
-    setState(() => _busy = true);
-    final mbps = await _service.probeBusSpeed();
-    if (!mounted) return;
-    setState(() => _busy = false);
-    if (mbps == null) {
-      _snack(UsbErgonomicsStrings.busSpeedUnavailable, isError: true);
+    try {
+      await action();
+    } finally {
+      if (mounted) {
+        setState(() => _busy = false);
+      } else {
+        _busy = false;
+      }
     }
   }
 
-  Future<void> _resetAlt() async {
-    if (_busy) return;
-    setState(() => _busy = true);
-    final ok = await _service.resetAltSetting();
-    if (!mounted) return;
-    setState(() => _busy = false);
-    if (!ok) {
-      _snack(UsbErgonomicsStrings.resetAltFailed, isError: true);
-    }
-  }
+  Future<void> _save() => _runBusy(() async {
+        final ok = await _service.saveQuirk(_draft);
+        if (!mounted) return;
+        _snack(
+          ok ? UsbErgonomicsStrings.saved : UsbErgonomicsStrings.saveFailed,
+          isError: !ok,
+        );
+      });
+
+  Future<void> _delete() => _runBusy(() async {
+        final ok = await _service.deleteQuirk();
+        if (!mounted) return;
+        setState(() {
+          _draftKey = null;
+          _syncDraft();
+        });
+        _snack(
+          ok ? UsbErgonomicsStrings.deleted : UsbErgonomicsStrings.deleteFailed,
+          isError: !ok,
+        );
+      });
+
+  Future<void> _probe() => _runBusy(() async {
+        final mbps = await _service.probeBusSpeed();
+        if (!mounted) return;
+        if (mbps == null) {
+          _snack(UsbErgonomicsStrings.busSpeedUnavailable, isError: true);
+        }
+      });
+
+  Future<void> _resetAlt() => _runBusy(() async {
+        final ok = await _service.resetAltSetting();
+        if (!mounted) return;
+        if (!ok) {
+          _snack(UsbErgonomicsStrings.resetAltFailed, isError: true);
+        }
+      });
 
   Future<void> _copyJson() async {
     await Clipboard.setData(ClipboardData(text: _draftJson));

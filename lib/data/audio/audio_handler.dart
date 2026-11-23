@@ -505,7 +505,8 @@ class PulsrAudioHandler extends BaseAudioHandler
         // preparation acknowledgement only means we cannot confirm the native
         // queue drained; it must not be reported as the profile failing to
         // apply. Log it and still give the settle window.
-        if (!await AudioEffectsChannel().awaitControlUpdates()) {
+        if (PlatformCapabilities.isAndroid &&
+            !await AudioEffectsChannel().awaitControlUpdates()) {
           ErrorLogger.log(
             'DSP profile preparation did not acknowledge completion; '
             'releasing the transition anyway',
@@ -756,6 +757,11 @@ class PulsrAudioHandler extends BaseAudioHandler
   // re-entering its unplayable-track auto-skip path.
   static const String outputModeNoticePrefix = '__pulsr_output_mode__:';
   static const String failureCascadeHaltPrefix = '__pulsr_cascade_halt__:';
+  static const String autoSkippedNoticePrefix = '__pulsr_auto_skipped__:';
+
+  /// Declares that [PulsrAudioHandler] is the single owner of consecutive-error
+  /// auto-skip recovery so UI cubits do not double-skip on error streams.
+  bool get ownsAutoSkipOnError => true;
   String? _lastOutputModeNotice;
   /// Last temporary-suspension reason logged. A suspension and its resume
   /// repeat the same reason, so this keeps the informational line to one per

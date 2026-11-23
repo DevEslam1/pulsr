@@ -32,6 +32,7 @@ class _ArbitraryEqSheetState extends State<ArbitraryEqSheet> {
 
   late final TextEditingController _textController;
   late bool _linearPhase;
+  bool? _lastCanonicalLinearPhase;
   _GraphicEqValidationError? _validationError;
 
   static const Map<String, String> _presets = {
@@ -54,7 +55,36 @@ class _ArbitraryEqSheetState extends State<ArbitraryEqSheet> {
       text: current.isNotEmpty ? current : _presets.values.first,
     );
     _textController.addListener(_onTextChanged);
-    _linearPhase = cubit.isArbitraryEqLinearPhase;
+    _linearPhase = cubit.state.arbitraryEqLinearPhase ||
+        cubit.isArbitraryEqLinearPhase;
+    _lastCanonicalLinearPhase = cubit.state.arbitraryEqLinearPhase;
+  }
+
+  bool _confirmSucceeded(PlayerState before, PlayerState after) {
+    final newError =
+        after.errorMessage != null && after.errorMessage != before.errorMessage;
+    return !newError;
+  }
+
+  Future<bool> _applySpec(
+    BuildContext context, {
+    required bool enabled,
+    required String eqString,
+    required bool linearPhase,
+  }) async {
+    final cubit = context.read<PlayerCubit>();
+    final prevState = cubit.state;
+    await cubit.setArbitraryEqEnabled(
+      enabled,
+      eqString: eqString,
+      linearPhase: linearPhase,
+    );
+    if (!mounted) return false;
+    final after = cubit.state;
+    if (!_confirmSucceeded(prevState, after)) {
+      return false;
+    }
+    return true;
   }
 
   void _onTextChanged() {
@@ -179,15 +209,20 @@ class _ArbitraryEqSheetState extends State<ArbitraryEqSheet> {
     return true;
   }
 
-  void _apply(BuildContext context) {
+  Future<void> _apply(BuildContext context) async {
     if (!_validateBeforeEnable()) return;
     final text = _textController.text.trim();
-    context
-        .read<PlayerCubit>()
-        .setArbitraryEqEnabled(true, eqString: text, linearPhase: _linearPhase);
+    final l10n = context.l10n;
+    final confirmed = await _applySpec(
+      context,
+      enabled: true,
+      eqString: text,
+      linearPhase: _linearPhase,
+    );
+    if (!confirmed || !context.mounted) return;
     PulsrToast.show(
       context,
-      message: context.l10n.appliedGraphicEq,
+      message: l10n.appliedGraphicEq,
       icon: Icons.check_circle_rounded,
     );
   }
@@ -199,8 +234,13 @@ class _ArbitraryEqSheetState extends State<ArbitraryEqSheet> {
     return BlocBuilder<PlayerCubit, PlayerState>(
       buildWhen: (prev, curr) =>
           prev.isArbitraryEqEnabled != curr.isArbitraryEqEnabled ||
-          prev.arbitraryEqString != curr.arbitraryEqString,
+          prev.arbitraryEqString != curr.arbitraryEqString ||
+          prev.arbitraryEqLinearPhase != curr.arbitraryEqLinearPhase,
       builder: (context, state) {
+        if (_lastCanonicalLinearPhase != state.arbitraryEqLinearPhase) {
+          _lastCanonicalLinearPhase = state.arbitraryEqLinearPhase;
+          _linearPhase = state.arbitraryEqLinearPhase;
+        }
         final cubit = context.read<PlayerCubit>();
         final parsed = _parseGraphicEq(_textController.text);
 
@@ -307,13 +347,22 @@ class _ArbitraryEqSheetState extends State<ArbitraryEqSheet> {
                       Switch.adaptive(
                         value: _linearPhase,
                         activeThumbColor: p.primary,
-                        onChanged: (val) {
-                          setState(() => _linearPhase = val);
-                          cubit.setArbitraryEqEnabled(
-                            state.isArbitraryEqEnabled,
+                        onChanged: (val) async {
+                          final prevState = cubit.state;
+                          final ok = await _applySpec(
+                            context,
+                            enabled: prevState.isArbitraryEqEnabled,
                             eqString: _textController.text.trim(),
                             linearPhase: val,
                           );
+                          if (!ok || !mounted) return;
+                          final after = cubit.state;
+                          final didEmitChange = !identical(after, prevState);
+                          setState(() {
+                            _linearPhase = didEmitChange
+                                ? after.arbitraryEqLinearPhase
+                                : val;
+                          });
                         },
                       ),
                     ],
@@ -473,12 +522,17 @@ class _ArbitraryEqSheetState extends State<ArbitraryEqSheet> {
                   return Padding(
                     padding: const EdgeInsets.only(bottom: AppSpacing.xs),
                     child: InkWell(
-                      onTap: () {
+                      onTap: () async {
+                        final ok = await _applySpec(
+                          context,
+                          enabled: true,
+                          eqString: entry.value,
+                          linearPhase: _linearPhase,
+                        );
+                        if (!ok || !mounted) return;
                         setState(() {
                           _textController.text = entry.value;
                         });
-                        cubit.setArbitraryEqEnabled(true,
-                            eqString: entry.value, linearPhase: _linearPhase);
                       },
                       borderRadius: AppRadii.r14All,
                       child: Container(

@@ -15,6 +15,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:mutex/mutex.dart';
 
 import '../../core/utils/error_logger.dart';
 import '../../data/services/usb_exclusive_service.dart';
@@ -255,6 +256,7 @@ class UsbErgonomicsService extends ChangeNotifier {
   ErgonomicsState _state = ErgonomicsState.empty;
   String? _appliedSignature;
   bool _started = false;
+  final Mutex _opMutex = Mutex();
   bool _disposed = false;
 
   /// Current snapshot; never null.
@@ -308,24 +310,25 @@ class UsbErgonomicsService extends ChangeNotifier {
   /// device that is not the one currently attached only persists the entry (so
   /// the list refreshes); it must not replace [ErgonomicsState.quirk] or reach
   /// the native side, which would apply another DAC's settings to this one.
-  Future<bool> saveQuirk(UsbQuirkProfile profile) async {
-    final stored = await _store.put(profile);
-    if (!stored) {
-      _emit(_state.copyWith(lastError: UsbErgonomicsStrings.saveFailed));
-      return false;
-    }
-    if (!_profileAppliesToAttachedDevice(profile)) {
-      // Persisted only: the attached device's resolution stays as it was.
-      _emit(_state.copyWith(lastError: null));
-      return true;
-    }
-    // Drop the signature so the very same profile is re-applied after an edit
-    // that only touched the label or was made while detached.
-    _appliedSignature = null;
-    _emit(_state.copyWith(quirk: profile, lastError: null));
-    if (_state.attached) await _applyActive();
-    return true;
-  }
+  Future<bool> saveQuirk(UsbQuirkProfile profile) =>
+      _opMutex.protect(() async {
+        final stored = await _store.put(profile);
+        if (!stored) {
+          _emit(_state.copyWith(lastError: UsbErgonomicsStrings.saveFailed));
+          return false;
+        }
+        if (!_profileAppliesToAttachedDevice(profile)) {
+          // Persisted only: the attached device's resolution stays as it was.
+          _emit(_state.copyWith(lastError: null));
+          return true;
+        }
+        // Drop the signature so the very same profile is re-applied after an edit
+        // that only touched the label or was made while detached.
+        _appliedSignature = null;
+        _emit(_state.copyWith(quirk: profile, lastError: null));
+        if (_state.attached) await _applyActive();
+        return true;
+      });
 
   /// Whether [profile] is the stored entry for the DAC attached right now.
   bool _profileAppliesToAttachedDevice(UsbQuirkProfile profile) {
@@ -337,24 +340,24 @@ class UsbErgonomicsService extends ChangeNotifier {
   }
 
   /// Removes the stored entry for the attached device and applies the fallback.
-  Future<bool> deleteQuirk() async {
-    final vid = _state.deviceVid;
-    final pid = _state.devicePid;
-    if (vid == null || pid == null) {
-      _emit(_state.copyWith(lastError: UsbErgonomicsStrings.noDeviceId));
-      return false;
-    }
-    final removed = await _store.remove(vid, pid);
-    if (!removed) {
-      _emit(_state.copyWith(lastError: UsbErgonomicsStrings.deleteFailed));
-      return false;
-    }
-    final fallback = _store.profileForDevice(vid, pid);
-    _appliedSignature = null;
-    _emit(_state.copyWith(quirk: fallback, lastError: null));
-    if (_state.attached) await _applyActive();
-    return true;
-  }
+  Future<bool> deleteQuirk() => _opMutex.protect(() async {
+        final vid = _state.deviceVid;
+        final pid = _state.devicePid;
+        if (vid == null || pid == null) {
+          _emit(_state.copyWith(lastError: UsbErgonomicsStrings.noDeviceId));
+          return false;
+        }
+        final removed = await _store.remove(vid, pid);
+        if (!removed) {
+          _emit(_state.copyWith(lastError: UsbErgonomicsStrings.deleteFailed));
+          return false;
+        }
+        final fallback = _store.profileForDevice(vid, pid);
+        _appliedSignature = null;
+        _emit(_state.copyWith(quirk: fallback, lastError: null));
+        if (_state.attached) await _applyActive();
+        return true;
+      });
 
   /// Measures the bus speed of the attached device.
   ///
@@ -393,7 +396,11 @@ class UsbErgonomicsService extends ChangeNotifier {
   /// Returns true only when the plugin reported success.
   Future<bool> resetAltSetting() async {
     if (!_state.attached) return false;
-    final result = await _invoke(resetAltMethod);
+    final result = await _invoke(resetAltMethod, <String, Object?>{
+      'vid': _state.deviceVid,
+      'pid': _state.devicePid,
+      'deviceId': _state.deviceId,
+    });
     final ok = result is Map && result['ok'] == true;
     if (!ok && _state.lastError == null) {
       final detail = result is Map ? result['detail'] : null;
@@ -422,49 +429,65 @@ class UsbErgonomicsService extends ChangeNotifier {
 
   // ---- internals ----
 
-  Future<void> _onStatus(UsbExclusiveStatus status) async {
-    if (_disposed) return;
-    final vid = status.vendorId;
-    final pid = status.productId;
-    final quirk = _store.profileForDevice(vid, pid);
-    final label = status.deviceName ??
-        (vid != null && pid != null
-            ? UsbQuirkProfile.deviceKey(vid, pid)
-            : UsbErgonomicsStrings.unknownDevice);
-    if (!status.attached) {
-      _appliedSignature = null;
-      _emit(_state.copyWith(
-        attached: false,
-        deviceLabel: label,
-        deviceVid: vid,
-        devicePid: pid,
-        deviceId: null,
-        quirk: quirk,
-        busSpeedMbps: null,
-        hid: HidStatus.none,
-        lastError: null,
-      ));
-      return;
-    }
-    _emit(_state.copyWith(
-      attached: true,
-      deviceLabel: label,
-      deviceVid: vid,
-      devicePid: pid,
-      deviceId: status.deviceId,
-      quirk: quirk,
-    ));
-    await _applyActive(force: false);
-  }
+  Future<void> _onStatus(UsbExclusiveStatus status) =>
+      _opMutex.protect(() async {
+        if (_disposed) return;
+        final vid = status.vendorId;
+        final pid = status.productId;
+        final quirk = _store.profileForDevice(vid, pid);
+        final label = status.deviceName ??
+            (vid != null && pid != null
+                ? UsbQuirkProfile.deviceKey(vid, pid)
+                : UsbErgonomicsStrings.unknownDevice);
+        if (!status.attached) {
+          _appliedSignature = null;
+          _emit(_state.copyWith(
+            attached: false,
+            deviceLabel: label,
+            deviceVid: vid,
+            devicePid: pid,
+            deviceId: null,
+            quirk: quirk,
+            busSpeedMbps: null,
+            hid: HidStatus.none,
+            lastError: null,
+          ));
+          return;
+        }
+        final deviceChanged = _state.deviceVid != vid ||
+            _state.devicePid != pid ||
+            _state.deviceId != status.deviceId;
+        if (deviceChanged) {
+          _appliedSignature = null;
+        }
+        _emit(_state.copyWith(
+          attached: true,
+          deviceLabel: label,
+          deviceVid: vid,
+          devicePid: pid,
+          deviceId: status.deviceId,
+          quirk: quirk,
+          busSpeedMbps: deviceChanged ? null : _state.busSpeedMbps,
+          hid: deviceChanged ? HidStatus.none : _state.hid,
+          lastError: deviceChanged ? null : _state.lastError,
+        ));
+        await _applyActive(force: false);
+      });
 
   /// Pushes the resolved profile when it differs from what was last applied.
   Future<void> _applyActive({bool force = true}) async {
     final vid = _state.deviceVid;
     final pid = _state.devicePid;
+    final deviceId = _state.deviceId;
     final quirk = _state.quirk;
-    final signature = _signature(vid, pid, quirk);
+    final signature = _signature(vid, pid, deviceId, quirk);
     if (!force && signature == _appliedSignature) return;
-    final applied = await _pushQuirk(vid: vid, pid: pid, quirk: quirk);
+    final applied = await _pushQuirk(
+      vid: vid,
+      pid: pid,
+      deviceId: deviceId,
+      quirk: quirk,
+    );
     if (applied) {
       _appliedSignature = signature;
       await refreshHidStatus();
@@ -474,6 +497,7 @@ class UsbErgonomicsService extends ChangeNotifier {
   Future<bool> _pushQuirk({
     required int? vid,
     required int? pid,
+    required int? deviceId,
     required UsbQuirkProfile? quirk,
   }) async {
     final profile = quirk ?? UsbQuirkProfile.defaults;
@@ -481,6 +505,7 @@ class UsbErgonomicsService extends ChangeNotifier {
       ...profile.toJson(),
       'vid': vid ?? profile.vid,
       'pid': pid ?? profile.pid,
+      'deviceId': deviceId,
     };
     // The exclusive plugin owns the direct audio path; it validates the same
     // document again and applies only the safe transport quirks. A missing
@@ -510,7 +535,7 @@ class UsbErgonomicsService extends ChangeNotifier {
     return result == true;
   }
 
-  String _signature(int? vid, int? pid, UsbQuirkProfile? quirk) {
+  String _signature(int? vid, int? pid, int? deviceId, UsbQuirkProfile? quirk) {
     final q = quirk;
     final fields = q == null
         ? const <Object?>['none']
@@ -527,8 +552,10 @@ class UsbErgonomicsService extends ChangeNotifier {
             q.uac1ReassertAfterAlt,
             q.disableUac2ClockSwitch,
           ];
-    return <String>['${vid ?? -1}:${pid ?? -1}', ...fields.map((f) => '$f')]
-        .join('|');
+    return <String>[
+      '${vid ?? -1}:${pid ?? -1}:${deviceId ?? -1}',
+      ...fields.map((f) => '$f'),
+    ].join('|');
   }
 
   Future<Object?> _invoke(

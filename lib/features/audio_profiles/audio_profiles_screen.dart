@@ -14,12 +14,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/constants/app_radii.dart';
 import '../../core/constants/app_spacing.dart';
 import '../../core/constants/app_typography.dart';
+import '../../core/di/injection.dart';
 import '../../core/errors/app_error.dart';
 import '../../core/theme/aura_theme.dart';
 import '../../core/utils/error_logger.dart';
 import '../../core/widgets/pulsr_dialog.dart';
 import '../../core/widgets/pulsr_empty_state.dart';
 import '../../core/widgets/pulsr_progress.dart';
+import '../settings/cubit/settings_cubit.dart';
 import 'audio_profile.dart';
 import 'audio_profile_service.dart';
 import 'audio_profile_strings.dart';
@@ -79,9 +81,11 @@ class _AudioProfilesScreenState extends State<AudioProfilesScreen> {
     }
     try {
       final service = widget.service ??
-          (_localService ??= AudioProfileService(
-            prefs: await SharedPreferences.getInstance(),
-          ));
+          (_localService ??= getIt.isRegistered<AudioProfileService>()
+              ? getIt<AudioProfileService>()
+              : AudioProfileService(
+                  prefs: await SharedPreferences.getInstance(),
+                ));
       final profiles = await service.list();
       final defaultId = service.defaultProfileId;
       if (!mounted) return;
@@ -156,7 +160,7 @@ class _AudioProfilesScreenState extends State<AudioProfilesScreen> {
       );
       return;
     }
-    final device = widget.deviceLabel?.call();
+    final device = _resolvedDeviceLabel();
     await _runAction(
       () async {
         await _effectiveService.captureCurrent(trimmed, deviceName: device);
@@ -164,6 +168,17 @@ class _AudioProfilesScreenState extends State<AudioProfilesScreen> {
       },
       failureMessage: AudioProfileStrings.captureFailed,
     );
+  }
+
+  String? _resolvedDeviceLabel() {
+    final explicit = widget.deviceLabel?.call();
+    if (explicit != null && explicit.trim().isNotEmpty) return explicit;
+    if (getIt.isRegistered<SettingsCubit>()) {
+      final name =
+          getIt<SettingsCubit>().state.currentOutputDevice?.deviceName;
+      if (name != null && name.trim().isNotEmpty) return name;
+    }
+    return null;
   }
 
   Future<void> _apply(AudioProfile profile) async {
@@ -374,7 +389,7 @@ class _AudioProfilesScreenState extends State<AudioProfilesScreen> {
         child: Column(
           children: <Widget>[
             _Header(
-              deviceLabel: widget.deviceLabel,
+              deviceLabel: _resolvedDeviceLabel,
               busy: _busy,
               onCapture: _captureCurrent,
               onImport: _import,

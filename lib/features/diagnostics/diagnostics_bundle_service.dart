@@ -359,7 +359,7 @@ class DiagnosticsBundleService {
   }
 
   List<Map<String, Object?>> _dspStages() {
-    bool enabled(String key) => _prefs.getBool(key) ?? false;
+    bool enabled(String key) => _boolValue(key) ?? false;
     String detail(String key, String fallback) => _stringValue(key) ?? fallback;
     String intDetail(String key, String fallback) =>
         _intValue(key)?.toString() ?? fallback;
@@ -449,7 +449,9 @@ class DiagnosticsBundleService {
       <String, Object?>{
         'stage': 'live_prog',
         'enabled': enabled(PrefsKeys.liveProgEnabled),
-        'detail': detail(PrefsKeys.liveProgCode, 'none'),
+        'detail': (_stringValue(PrefsKeys.liveProgCode)?.isNotEmpty ?? false)
+            ? '[REDACTED]'
+            : 'none',
       },
       <String, Object?>{
         'stage': 'stereo_balance',
@@ -462,6 +464,12 @@ class DiagnosticsBundleService {
         'detail': enabled(PrefsKeys.monoMix) ? 'on' : 'off',
       },
     ];
+  }
+
+  /// Reads a preference only when it is stored as a bool.
+  bool? _boolValue(String key) {
+    final value = _prefs.get(key);
+    return value is bool ? value : null;
   }
 
   /// Reads a preference only when it is stored as a string.
@@ -545,6 +553,9 @@ class DiagnosticsBundleService {
   }
 
   Object? _redactValue(String key, Object? value) {
+    if (key == PrefsKeys.liveProgCode && value is String && value.isNotEmpty) {
+      return '[REDACTED]';
+    }
     if (value is String) {
       return _sensitiveKey.hasMatch(key) ? '[REDACTED]' : redactText(value);
     }

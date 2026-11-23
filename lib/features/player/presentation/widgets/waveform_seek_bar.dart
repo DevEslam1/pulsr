@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/motion/pulsr_motion.dart';
+import '../../../../core/performance/gpu_budget.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../core/utils/l10n_extensions.dart';
@@ -152,11 +153,17 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
 
   /// Maps a local X coordinate to a global 0..1 ratio through the visible
   /// window, so zoomed scrubbing is accurate.
-  double _ratioForDx(double dx, double trackWidth, int totalCount) {
+  double _ratioForDx(
+    double dx,
+    double trackWidth,
+    int totalCount, {
+    bool isRtl = false,
+  }) {
     if (trackWidth <= 0 || totalCount <= 0) return 0.0;
     final window = _visibleWindow(totalCount);
     if (window.visibleCount <= 0) return 0.0;
-    final double ratioInWindow = (dx / trackWidth).clamp(0.0, 1.0);
+    final double effectiveDx = isRtl ? trackWidth - dx : dx;
+    final double ratioInWindow = (effectiveDx / trackWidth).clamp(0.0, 1.0);
     final double globalRatio =
         (window.startIndex + ratioInWindow * window.visibleCount) / totalCount;
     return globalRatio.clamp(0.0, 1.0);
@@ -228,6 +235,8 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                   LayoutBuilder(
                     builder: (context, constraints) {
                       final trackWidth = constraints.maxWidth;
+                      final isRtl =
+                          Directionality.of(context) == TextDirection.rtl;
                       return GestureDetector(
                         behavior: HitTestBehavior.opaque,
                         onDoubleTap: () {
@@ -315,7 +324,7 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                             PulsrHaptics.selectionClick();
                             _dragFrozenWindow = _visibleWindow(totalCount);
                             final ratio = _ratioForDx(details.localPosition.dx,
-                                trackWidth, totalCount);
+                                trackWidth, totalCount, isRtl: isRtl);
                             final seekVal =
                                 (ratio * maxDuration).clamp(0.0, maxDuration);
                             _dragStartValue = seekVal;
@@ -329,7 +338,7 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                           if (!widget.enabled) return;
                           if (trackWidth > 0 && maxDuration > 0) {
                             final ratio = _ratioForDx(details.localPosition.dx,
-                                trackWidth, totalCount);
+                                trackWidth, totalCount, isRtl: isRtl);
                             final seekVal =
                                 (ratio * maxDuration).clamp(0.0, maxDuration);
                             if (_lastHapticCheckMs != null) {
@@ -385,7 +394,7 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                           if (trackWidth > 0 && maxDuration > 0) {
                             PulsrHaptics.selectionClick();
                             final ratio = _ratioForDx(details.localPosition.dx,
-                                trackWidth, totalCount);
+                                trackWidth, totalCount, isRtl: isRtl);
                             final seekMs = ratio * maxDuration;
                             widget
                                 .onSeek(Duration(milliseconds: seekMs.round()));
@@ -421,6 +430,7 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                                       style: widget.style,
                                       amplitudeScale:
                                           _dragValue != null ? 1.35 : 1.0,
+                                      isRtl: isRtl,
                                     ),
                                   ),
                                 ),
@@ -602,6 +612,7 @@ class _WaveformPainter extends CustomPainter {
   final int visibleCount;
   final WaveformVisualizerStyle style;
   final double amplitudeScale;
+  final bool isRtl;
 
   _WaveformPainter({
     required this.samples,
@@ -618,6 +629,7 @@ class _WaveformPainter extends CustomPainter {
     this.visibleCount = 0,
     this.style = WaveformVisualizerStyle.mirroredBars,
     this.amplitudeScale = 1.0,
+    this.isRtl = false,
   });
 
   @override
@@ -643,6 +655,12 @@ class _WaveformPainter extends CustomPainter {
     final int visible = endIndex - startIndex;
     final visibleSamples = samples.sublist(startIndex, endIndex);
     if (visibleSamples.length < 2 || visible < 2) return;
+
+    if (isRtl) {
+      canvas.save();
+      canvas.translate(size.width, 0);
+      canvas.scale(-1, 1);
+    }
 
     // AUDIT-FIX (P0-5a): Downsample dense windows to width ~/ 3 bars and derive
     // spacing/barWidth from the drawn count so n*barWidth + (n-1)*spacing ==
@@ -757,7 +775,9 @@ class _WaveformPainter extends CustomPainter {
           }
           final glowPaint = Paint()
             ..color = paint.color.withValues(alpha: 0.4)
-            ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.0)
+            ..maskFilter = GpuBudget.isGpuSaverActive
+                ? null
+                : const MaskFilter.blur(BlurStyle.normal, 3.0)
             ..strokeWidth = 3.5
             ..style = PaintingStyle.stroke;
           canvas.drawPath(linePath, glowPaint);
@@ -889,6 +909,7 @@ class _WaveformPainter extends CustomPainter {
         canvas.drawRect(fadeRect, fadePaint);
       }
     }
+    if (isRtl) canvas.restore();
   }
 
   @override
@@ -906,6 +927,7 @@ class _WaveformPainter extends CustomPainter {
         oldDelegate.visibleCount != visibleCount ||
         oldDelegate.style != style ||
         oldDelegate.amplitudeScale != amplitudeScale ||
+        oldDelegate.isRtl != isRtl ||
         !listEquals(oldDelegate.samples, samples);
   }
 }

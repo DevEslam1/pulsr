@@ -1,9 +1,15 @@
 // lib/features/player/presentation/widgets/visualizer/milkdrop_renderer.dart
 import 'dart:math' as math;
 import 'dart:ui' as ui;
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:material_ui/material_ui.dart';
 import '../../../../../core/performance/gpu_budget.dart';
 import '../../../../../domain/models/milkdrop_preset.dart';
+
+/// Shared monotonic stopwatch so [MilkdropGpuPainter] and [MilkdropCanvasPainter]
+/// never experience wall-clock jumps or 3600s modulo resets when no external
+/// clock sample is provided.
+final Stopwatch _fallbackMonotonicClock = Stopwatch()..start();
 
 /// Dedicated MilkDrop visualizer renderer.
 /// Renders via GPU fragment shader (`shaders/milkdrop.frag`) when available and
@@ -16,8 +22,8 @@ class MilkdropRenderer extends StatelessWidget {
   final MilkdropPreset preset;
   final bool forceCanvasFallback;
   final bool transparentBackground;
-
   final int generation;
+  final double? elapsedSeconds;
 
   const MilkdropRenderer({
     super.key,
@@ -28,6 +34,7 @@ class MilkdropRenderer extends StatelessWidget {
     this.forceCanvasFallback = false,
     this.transparentBackground = false,
     this.generation = 0,
+    this.elapsedSeconds,
   });
 
   bool get isFallback =>
@@ -50,6 +57,7 @@ class MilkdropRenderer extends StatelessWidget {
                     preset: preset,
                     transparentBackground: transparentBackground,
                     generation: generation,
+                    elapsedSeconds: elapsedSeconds,
                   )
                 : MilkdropCanvasPainter(
                     data: data,
@@ -57,6 +65,7 @@ class MilkdropRenderer extends StatelessWidget {
                     preset: preset,
                     transparentBackground: transparentBackground,
                     generation: generation,
+                    elapsedSeconds: elapsedSeconds,
                   ),
           ),
         );
@@ -70,6 +79,13 @@ double _sanitizeScalar(double value, double fallback, double min, double max) {
   return value.clamp(min, max);
 }
 
+double _resolveMonotonicSeconds(double? elapsedSeconds) {
+  if (elapsedSeconds != null && elapsedSeconds.isFinite && elapsedSeconds >= 0) {
+    return elapsedSeconds;
+  }
+  return _fallbackMonotonicClock.elapsedMicroseconds / 1000000.0;
+}
+
 /// GPU shader painter for MilkDrop effects using `shaders/milkdrop.frag`.
 class MilkdropGpuPainter extends CustomPainter {
   final ui.FragmentShader shader;
@@ -78,6 +94,7 @@ class MilkdropGpuPainter extends CustomPainter {
   final MilkdropPreset preset;
   final bool transparentBackground;
   final int generation;
+  final double? elapsedSeconds;
 
   MilkdropGpuPainter({
     required this.shader,
@@ -86,6 +103,7 @@ class MilkdropGpuPainter extends CustomPainter {
     required this.preset,
     this.transparentBackground = false,
     this.generation = 0,
+    this.elapsedSeconds,
   });
 
   double _avg(int a, int b) {
@@ -104,7 +122,7 @@ class MilkdropGpuPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     if (size.isEmpty) return;
-    final t = (DateTime.now().millisecondsSinceEpoch % 3600000) / 1000.0;
+    final t = _resolveMonotonicSeconds(elapsedSeconds);
     shader.setFloat(0, size.width);
     shader.setFloat(1, size.height);
     shader.setFloat(2, t);
@@ -126,7 +144,14 @@ class MilkdropGpuPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant MilkdropGpuPainter oldDelegate) => true;
+  bool shouldRepaint(covariant MilkdropGpuPainter oldDelegate) =>
+      oldDelegate.shader != shader ||
+      oldDelegate.elapsedSeconds != elapsedSeconds ||
+      oldDelegate.generation != generation ||
+      oldDelegate.color != color ||
+      oldDelegate.preset != preset ||
+      oldDelegate.transparentBackground != transparentBackground ||
+      !listEquals(oldDelegate.data, data);
 }
 
 /// Parameter-driven Canvas fallback approximation for MilkDrop presets.
@@ -136,6 +161,7 @@ class MilkdropCanvasPainter extends CustomPainter {
   final MilkdropPreset preset;
   final bool transparentBackground;
   final int generation;
+  final double? elapsedSeconds;
 
   MilkdropCanvasPainter({
     required this.data,
@@ -143,6 +169,7 @@ class MilkdropCanvasPainter extends CustomPainter {
     required this.preset,
     this.transparentBackground = false,
     this.generation = 0,
+    this.elapsedSeconds,
   });
 
   double _avg(int a, int b) {
@@ -161,7 +188,7 @@ class MilkdropCanvasPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     if (size.isEmpty) return;
-    final t = (DateTime.now().millisecondsSinceEpoch % 3600000) / 1000.0;
+    final t = _resolveMonotonicSeconds(elapsedSeconds);
     final bass = _avg(0, 6);
     final mid = _avg(8, 18);
     final treb = _avg(22, 32);
@@ -277,5 +304,11 @@ class MilkdropCanvasPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant MilkdropCanvasPainter oldDelegate) => true;
+  bool shouldRepaint(covariant MilkdropCanvasPainter oldDelegate) =>
+      oldDelegate.elapsedSeconds != elapsedSeconds ||
+      oldDelegate.generation != generation ||
+      oldDelegate.color != color ||
+      oldDelegate.preset != preset ||
+      oldDelegate.transparentBackground != transparentBackground ||
+      !listEquals(oldDelegate.data, data);
 }

@@ -7,6 +7,7 @@ import '../../../../core/constants/app_radii.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/motion/pulsr_motion.dart';
+import '../../../../core/performance/gpu_budget.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../data/audio/headphone_target_curve.dart';
@@ -146,6 +147,9 @@ class _EqCurveVisualizerState extends State<EqCurveVisualizer> {
     final shouldAnimate =
         _activeDraggingBand == null && PulsrMotion.shouldAnimate(context);
     final surfacePalette = context.playerSurfacePalette;
+    final safeHeight = widget.height.isFinite
+        ? math.max(24.0, widget.height)
+        : 24.0;
     final curveDuration =
         shouldAnimate ? context.motionMs(260) : Duration.zero;
 
@@ -162,7 +166,7 @@ class _EqCurveVisualizerState extends State<EqCurveVisualizer> {
             _prevGains = widget.gains;
           },
           builder: (context, animatedGains, _) => CustomPaint(
-            size: Size(double.infinity, widget.height),
+            size: Size(double.infinity, safeHeight),
             painter: _CatmullRomEqPainter(
               gains: animatedGains,
               color: widget.activeColor,
@@ -172,7 +176,7 @@ class _EqCurveVisualizerState extends State<EqCurveVisualizer> {
               targetCurve: _selectedTargetCurve,
               maxGain: widget.maxGain,
               showGrid: widget.showGrid,
-              showLabels: widget.showLabels && widget.height >= 70,
+              showLabels: widget.showLabels && safeHeight >= 70,
               selectedBandIndex:
                   _activeDraggingBand ?? widget.selectedBandIndex,
             ),
@@ -210,7 +214,7 @@ class _EqCurveVisualizerState extends State<EqCurveVisualizer> {
     // because the host layouts give this widget a fixed height (52–72 px), and
     // kept outside the GestureDetector so its taps cannot be read as a band
     // drag or delayed by the double-tap recogniser.
-    if (widget.showTargetCurveSelector && widget.height >= 48) {
+    if (widget.showTargetCurveSelector && safeHeight >= 48) {
       visualizer = Stack(
         children: [
           visualizer,
@@ -220,7 +224,7 @@ class _EqCurveVisualizerState extends State<EqCurveVisualizer> {
             child: _TargetCurvePicker(
               selected: _selectedTargetCurve,
               color: widget.activeColor,
-              maxHeight: widget.height,
+              maxHeight: safeHeight,
               onSelected: _handleTargetCurveSelected,
             ),
           ),
@@ -242,6 +246,7 @@ class _EqCurveVisualizerState extends State<EqCurveVisualizer> {
     final renderBox = context.findRenderObject() as RenderBox?;
     if (renderBox == null) return;
     final size = renderBox.size;
+    if (size.width <= 0 || size.height <= 0) return;
     final stepX = widget.gains.length > 1
         ? size.width / (widget.gains.length - 1)
         : size.width;
@@ -283,6 +288,7 @@ class _EqCurveVisualizerState extends State<EqCurveVisualizer> {
     final renderBox = context.findRenderObject() as RenderBox?;
     if (renderBox == null) return;
     final size = renderBox.size;
+    if (size.width <= 0 || size.height <= 0) return;
     final stepX = widget.gains.length > 1
         ? size.width / (widget.gains.length - 1)
         : size.width;
@@ -327,14 +333,16 @@ class _EqCurveVisualizerState extends State<EqCurveVisualizer> {
   void _handlePanUpdate(Offset localPos) {
     if (_activeDraggingBand == null) return;
     final renderBox = context.findRenderObject() as RenderBox?;
-    if (renderBox == null) return;
+    if (renderBox == null || renderBox.size.height <= 0) return;
     _updateGainForPosition(
         _activeDraggingBand!, localPos.dy, renderBox.size.height);
   }
 
   void _updateGainForPosition(int bandIndex, double yPos, double totalHeight) {
+    if (!totalHeight.isFinite || totalHeight <= 0) return;
     final midY = totalHeight / 2;
     final effectiveSpan = (totalHeight / 2) * 0.9;
+    if (effectiveSpan <= 0) return;
     // Invert Y: top is +maxGain, bottom is -maxGain
     final rawGain = ((midY - yPos) / effectiveSpan) * widget.maxGain;
     final clampedGain = rawGain.clamp(-widget.maxGain, widget.maxGain);
@@ -440,13 +448,17 @@ class _CatmullRomEqPainter extends CustomPainter {
   static final Path _curvePath = Path();
   static final Path _fillPath = Path();
 
+  static const MaskFilter _glowBlurFilter =
+      MaskFilter.blur(BlurStyle.normal, 3.0);
+  static const MaskFilter _outerGlowBlurFilter =
+      MaskFilter.blur(BlurStyle.normal, 5.0);
+
   static final Paint _fillPaint = Paint();
   static final Paint _glowPaint = Paint()
     ..strokeWidth = 3.6
     ..style = PaintingStyle.stroke
     ..strokeCap = StrokeCap.round
-    ..strokeJoin = StrokeJoin.round
-    ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.0);
+    ..strokeJoin = StrokeJoin.round;
   static final Paint _strokePaint = Paint()
     ..strokeWidth = 2.4
     ..style = PaintingStyle.stroke
@@ -463,8 +475,7 @@ class _CatmullRomEqPainter extends CustomPainter {
   static final Paint _cursorPaint = Paint()
     ..strokeWidth = 1.2
     ..style = PaintingStyle.stroke;
-  static final Paint _outerGlowPaint = Paint()
-    ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5.0);
+  static final Paint _outerGlowPaint = Paint();
   static final Paint _specularPaint = Paint()..style = PaintingStyle.fill;
   static final Paint _zeroPaint = Paint()..style = PaintingStyle.fill;
 
@@ -548,7 +559,15 @@ class _CatmullRomEqPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (gains.isEmpty) return;
+    if (gains.isEmpty ||
+        !size.width.isFinite ||
+        !size.height.isFinite ||
+        size.width < 4.0 ||
+        size.height < 4.0 ||
+        !maxGain.isFinite ||
+        maxGain <= 0) {
+      return;
+    }
 
     final midY = size.height / 2;
     final stepX =
@@ -621,7 +640,9 @@ class _CatmullRomEqPainter extends CustomPainter {
     canvas.drawPath(fillPath, fillPaint);
 
     // 6. Draw Curve Glow & Stroke
-    final glowPaint = _glowPaint..color = color.withValues(alpha: 0.45);
+    final glowPaint = _glowPaint
+      ..color = color.withValues(alpha: 0.45)
+      ..maskFilter = GpuBudget.isGpuSaverActive ? null : _glowBlurFilter;
     canvas.drawPath(curvePath, glowPaint);
 
     final strokePaint = _strokePaint..color = color;
@@ -828,7 +849,9 @@ class _CatmullRomEqPainter extends CustomPainter {
 
         // Highlighted node outer soft glow
         final outerGlowPaint = _outerGlowPaint
-          ..color = color.withValues(alpha: 0.22);
+          ..color = color.withValues(alpha: 0.22)
+          ..maskFilter =
+              GpuBudget.isGpuSaverActive ? null : _outerGlowBlurFilter;
         canvas.drawCircle(pt, 14.0, outerGlowPaint);
 
         canvas.drawCircle(pt, 9.0, haloPaint);

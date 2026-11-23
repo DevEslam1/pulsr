@@ -20,7 +20,7 @@ import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_typography.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/services/abx_report_export.dart';
-import '../../../core/services/hires_audio_service.dart';
+import '../../../data/services/hires_audio_service.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/error_logger.dart';
 import '../../../core/utils/l10n_extensions.dart';

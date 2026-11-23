@@ -11,6 +11,9 @@ import '../../domain/models/dsp_battery_estimate.dart';
 import '../../domain/models/dsp_debug_report.dart';
 import '../../domain/models/dsp_telemetry.dart';
 import '../../core/telemetry/dsp_reliability_tracker.dart';
+import 'platform_audio_capabilities.dart';
+
+export 'platform_audio_capabilities.dart';
 
 part 'audio_effects_channel_remaster_ext.dart';
 part 'audio_effects_channel_telemetry.dart';
@@ -57,7 +60,7 @@ class SystemMusicVolumeReading {
 
 class AudioEffectsChannel with _AudioEffectsChannelTelemetryMixin {
   Future<bool> awaitControlUpdates() async {
-    if (!PlatformCapabilities.isAndroid) return true;
+    if (!PlatformCapabilities.isAndroid) return false;
     // Documented as a bool result: a timeout or platform error must report
     // `false` rather than throw a raw TimeoutException/PlatformException at
     // callers that only check the return value.
@@ -228,6 +231,15 @@ class AudioEffectsChannel with _AudioEffectsChannelTelemetryMixin {
   bool get isFloatOutputSupported => _isFloatOutputSupported;
   bool get isHardwareOffloadSupported => _isHardwareOffloadSupported;
   bool get isPcmDspAttached => _isPcmDspAttached;
+
+  /// Explicit tri-state capability matrix (`supported`, `unsupported`,
+  /// `requiresPermission`) for the active host platform.
+  PlatformAudioCapabilities get platformCapabilities =>
+      PlatformAudioCapabilities.detect(
+        isAndroid: _isAndroid,
+        floatOutputSupported: _isFloatOutputSupported,
+        hardwareOffloadSupported: _isHardwareOffloadSupported,
+      );
 
   Future<bool> isVolumeBoostSupportedLive() async {
     if (!_isAndroid) return false;
@@ -747,7 +759,7 @@ class AudioEffectsChannel with _AudioEffectsChannelTelemetryMixin {
   /// Callers use the return value to decide whether the legacy mirror write is
   /// still needed as a fallback (single-application guarantee, 13-01).
   Future<bool> setEqBands(List<double> frequencies) async {
-    if (!_isAndroid) return true;
+    if (!_isAndroid) return false;
     if (frequencies.any((f) => !f.isFinite || f <= 0)) return false;
     try {
       await _channel.invokeMethod('setEqBands',
@@ -766,7 +778,7 @@ class AudioEffectsChannel with _AudioEffectsChannelTelemetryMixin {
 
   /// Live-updates a single band's gain (dB) without rebuilding the effect.
   Future<bool> setEqBandGain(int index, double gainDb) async {
-    if (!_isAndroid) return true;
+    if (!_isAndroid) return false;
     if (!gainDb.isFinite) return false;
     try {
       await _channel.invokeMethod('setEqBandGain', {
@@ -787,7 +799,7 @@ class AudioEffectsChannel with _AudioEffectsChannelTelemetryMixin {
 
   /// Sets all band gains (dB) at once. Length should match the band count.
   Future<bool> setEqBandGains(List<double> gains) async {
-    if (!_isAndroid) return true;
+    if (!_isAndroid) return false;
     if (gains.any((g) => !g.isFinite)) return false;
     try {
       await _channel.invokeMethod('setEqBandGains', {'gains': gains}).timeout(
@@ -830,7 +842,7 @@ class AudioEffectsChannel with _AudioEffectsChannelTelemetryMixin {
     int type = 0,
     bool enabled = true,
   }) async {
-    if (!_isAndroid) return true;
+    if (!_isAndroid) return false;
     if (!freq.isFinite || !gainDb.isFinite || !q.isFinite) return false;
     try {
       await _channel.invokeMethod('setNativeEqBand', {
@@ -863,7 +875,7 @@ class AudioEffectsChannel with _AudioEffectsChannelTelemetryMixin {
     List<double>? qs,
     List<int>? types,
   }) async {
-    if (!_isAndroid) return true;
+    if (!_isAndroid) return false;
     if (frequencies.any((f) => !f.isFinite || f <= 0) ||
         gains.any((g) => !g.isFinite) ||
         (qs != null && qs.any((q) => !q.isFinite || q <= 0))) {
@@ -894,7 +906,7 @@ class AudioEffectsChannel with _AudioEffectsChannelTelemetryMixin {
   }
 
   Future<bool> setNativeEqBandCount(int count) async {
-    if (!_isAndroid) return true;
+    if (!_isAndroid) return false;
     try {
       await _channel.invokeMethod('setNativeEqBandCount',
           {'count': count}).timeout(const Duration(seconds: 3));

@@ -675,11 +675,15 @@ class _KaraokeSyncedLrcListState extends State<_KaraokeSyncedLrcList> {
           0.0,
           _scrollController.position.maxScrollExtent,
         );
-        _scrollController.animateTo(
-          target,
-          duration: context.motionMs(320),
-          curve: context.motionCurve(Curves.easeOutCubic),
-        );
+        if (!PulsrMotion.shouldAnimate(context)) {
+          _scrollController.jumpTo(target);
+        } else {
+          _scrollController.animateTo(
+            target,
+            duration: context.motionMs(320),
+            curve: context.motionCurve(Curves.easeOutCubic),
+          );
+        }
       }
     });
   }

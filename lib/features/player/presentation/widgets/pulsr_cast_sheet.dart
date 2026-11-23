@@ -245,11 +245,25 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
     PulsrHaptics.selectionClick();
     setState(() => _busy = true);
     try {
-      if (route.selected || _session.connected) {
+      if (route.selected) {
         await _service.disconnect();
       } else {
+        if (_session.connected) {
+          await _service.disconnect();
+        }
         await _service.connect(route.id);
       }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _disconnect() async {
+    if (_busy) return;
+    PulsrHaptics.selectionClick();
+    setState(() => _busy = true);
+    try {
+      await _service.disconnect();
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -548,7 +562,7 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
                           ),
                         ),
                         TextButton.icon(
-                          onPressed: _busy ? null : () => _service.disconnect(),
+                          onPressed: _busy ? null : _disconnect,
                           icon:
                               const Icon(Icons.stop_circle_outlined, size: 18),
                           label: Text(l10n.disconnect),

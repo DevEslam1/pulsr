@@ -55,10 +55,12 @@ mixin PlayerQueueOps on PulsrCubit<PlayerState> {
 
   Future<void> restoreQueue(
       List<SongsTableData> previousQueue, int previousIndex,
-      {Duration? initialPosition}) {
+      {Duration? initialPosition,
+      Map<int, QueueTier>? previousTrackTiers}) {
     invalidateMediaItemResolution();
     return queueController.restoreQueue(previousQueue, previousIndex,
-        initialPosition: initialPosition);
+        initialPosition: initialPosition,
+        previousTrackTiers: previousTrackTiers);
   }
 
   /// Reorders the queue using **post-removal** `newIndex` semantics (`0..queue.length - 1`),

@@ -663,6 +663,7 @@ class _MilkdropLiveCanvasState extends State<_MilkdropLiveCanvas>
               forceCanvasFallback: forceCanvas || isGpuSaver,
               transparentBackground: false,
               generation: _snapshotGeneration,
+              elapsedSeconds: _phaseClock.elapsedMicroseconds / 1000000.0,
             );
           },
         );

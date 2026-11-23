@@ -327,7 +327,9 @@ class _VerticalEqSliderState extends State<_VerticalEqSlider> {
     if (!widget.isEnabled && _isDragging) {
       _isDragging = false;
       _dragGain = null;
-      widget.onDragEnd?.call();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) widget.onDragEnd?.call();
+      });
       return;
     }
     // H-06: Preserve _dragGain while actively dragging so parent rebuilds
@@ -648,7 +650,9 @@ class _VerticalSliderPainter extends CustomPainter {
     // Thumb Outer Shadow
     final shadowPaint = Paint()
       ..color = AppColors.scrimAt(0.25)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.0);
+      ..maskFilter = GpuBudget.isGpuSaverActive
+          ? null
+          : const MaskFilter.blur(BlurStyle.normal, 2.0);
     canvas.drawCircle(
         Offset(centerX, thumbY + 1), isDragging ? 9.0 : 8.0, shadowPaint);
 

@@ -250,7 +250,7 @@ extension _EqQuickSoundView on _EqualizerSheetState {
           child: Center(
             child: Semantics(
               button: true,
-              toggled: _isAbComparing,
+              toggled: _effectiveIsAbComparing,
               label: context.l10n.abFlat,
               child: _buildAbCompareToggle(
                 cubit: cubit,

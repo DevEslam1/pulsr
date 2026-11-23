@@ -592,6 +592,7 @@ class _CassetteBodyState extends State<_CassetteBody> {
                 leftTapeRadius: leftTapeRadius,
                 rightTapeRadius: rightTapeRadius,
                 surface: surface,
+                isRtl: Directionality.of(context) == TextDirection.rtl,
               ),
             ),
           ),
@@ -1301,17 +1302,24 @@ class _MagneticTapePathPainter extends CustomPainter {
   final double leftTapeRadius;
   final double rightTapeRadius;
   final PlayerSurfacePalette surface;
+  final bool isRtl;
 
   _MagneticTapePathPainter({
     required this.leftTapeRadius,
     required this.rightTapeRadius,
     required this.surface,
+    this.isRtl = false,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
     final w = size.width;
     final h = size.height;
+    if (isRtl) {
+      canvas.save();
+      canvas.translate(w, 0);
+      canvas.scale(-1, 1);
+    }
 
     final leftCenter = Offset(73.0, h / 2);
     final rightCenter = Offset(w - 73.0, h / 2);
@@ -1391,11 +1399,13 @@ class _MagneticTapePathPainter extends CustomPainter {
 
     canvas.drawPath(tapePath, tapePaint);
     canvas.drawPath(tapePath, sheenPaint);
+    if (isRtl) canvas.restore();
   }
 
   @override
   bool shouldRepaint(covariant _MagneticTapePathPainter oldDelegate) =>
       oldDelegate.leftTapeRadius != leftTapeRadius ||
       oldDelegate.rightTapeRadius != rightTapeRadius ||
-      oldDelegate.surface != surface;
+      oldDelegate.surface != surface ||
+      oldDelegate.isRtl != isRtl;
 }

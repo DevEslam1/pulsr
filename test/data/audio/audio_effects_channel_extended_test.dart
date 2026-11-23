@@ -425,10 +425,10 @@ void main() {
     final effects = AudioEffectsChannel();
     await effects.init();
     expect(calls, isEmpty);
-    expect(await effects.awaitControlUpdates(), isTrue);
+    expect(await effects.awaitControlUpdates(), isFalse);
     expect(await effects.setVolumeBoost(100), isFalse);
     expect(await effects.isDvcSupported(), isFalse);
-    expect(await effects.setEqBands([1.0]), isTrue);
+    expect(await effects.setEqBands([1.0]), isFalse);
     expect(await effects.getTelemetry(), const DspTelemetry.zero());
     expect(await effects.getWeeklyDose(), 0.0);
     expect(await effects.getPipelineLatencyFrames(), 0);
@@ -450,7 +450,7 @@ void main() {
     expect(await effects.loadArbitraryEq(eqString: 'x'), isFalse);
     expect(await effects.loadLiveProgCode('x'), 'Unsupported platform');
     expect(await effects.loadImpulseResponse(const [1.0]), isFalse);
-    expect(await effects.sendWarmupBuffer(), isTrue);
+    expect(await effects.sendWarmupBuffer(), isFalse);
     expect(await effects.decodeDsd(Uint8List(4), Uint8List(4)), isNull);
     expect(await effects.getDspDebugStatus(), isNull);
     expect(await effects.getDspDebugReport(), isNull);

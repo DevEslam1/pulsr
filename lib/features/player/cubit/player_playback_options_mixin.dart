@@ -70,6 +70,9 @@ mixin PlayerPlaybackOptions on PulsrCubit<PlayerState> {
   Future<void> adjustVolume(double delta) =>
       playbackOptionsController.adjustVolume(delta);
 
+  Future<void> stepVolume(int direction) =>
+      playbackOptionsController.stepVolume(direction);
+
   /// A-06: Toggle output mute (restores pre-mute volume on unmute).
   Future<void> toggleMute() => playbackOptionsController.toggleMute();
 

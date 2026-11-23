@@ -1386,7 +1386,8 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
         await _failCurrentPlayback(fatal: false);
         return;
       }
-      final nextIdx = _getNextIndex();
+      final nextIdx =
+          _activePlayer.loopMode == LoopMode.one ? null : _getNextIndex();
       if (nextIdx != null && nextIdx != targetIndex) {
         await playSongAt(nextIdx, initialPosition: initialPosition);
       } else {
@@ -1756,8 +1757,15 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
       return;
     }
     _consecutiveFailures++;
-    if (_consecutiveFailures >= 3 || _consecutiveFailures >= _songs.length) {
-      if (!_errorSubject.isClosed) {
+    final nextIdx =
+        _activePlayer.loopMode == LoopMode.one ? null : _getNextIndex();
+    final hasNextTarget = nextIdx != null && nextIdx != _currentIndex;
+    if (_consecutiveFailures >= 3 ||
+        _consecutiveFailures >= _songs.length ||
+        !hasNextTarget) {
+      if (!_errorSubject.isClosed &&
+          (_consecutiveFailures >= 3 ||
+              (_songs.length > 1 && _consecutiveFailures >= _songs.length))) {
         _errorSubject.add(
           '${PulsrAudioHandler.failureCascadeHaltPrefix}'
           'Playback failed for consecutive tracks. Stopping.',
@@ -1765,6 +1773,12 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
       }
       await halt();
     } else {
+      if (!_errorSubject.isClosed && currentSong != null) {
+        _errorSubject.add(
+          '${PulsrAudioHandler.autoSkippedNoticePrefix}'
+          'Skipped ${currentSong!.title} (unplayable)',
+        );
+      }
       await skipToNext();
     }
   }

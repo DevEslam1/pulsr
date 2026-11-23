@@ -74,11 +74,15 @@ class _NowPlayingQueueViewState extends State<NowPlayingQueueView> {
         0.0,
         _scrollController.position.maxScrollExtent,
       );
-      _scrollController.animateTo(
-        targetOffset,
-        duration: context.motionMs(260),
-        curve: context.motionCurve(Curves.easeOutCubic),
-      );
+      if (!PulsrMotion.shouldAnimate(context)) {
+        _scrollController.jumpTo(targetOffset);
+      } else {
+        _scrollController.animateTo(
+          targetOffset,
+          duration: context.motionMs(260),
+          curve: context.motionCurve(Curves.easeOutCubic),
+        );
+      }
     });
   }
 

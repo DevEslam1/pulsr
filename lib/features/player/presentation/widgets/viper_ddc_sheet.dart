@@ -447,14 +447,20 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
                       Switch.adaptive(
                         value: state.isViperDdcEnabled,
                         activeThumbColor: p.primary,
-                        onChanged: (val) {
+                        onChanged: (val) async {
+                          final prevState = cubit.state;
+                          await cubit.setViperDdcEnabled(val);
+                          if (!mounted) return;
+                          final after = cubit.state;
+                          final failed = after.errorMessage != null &&
+                              after.errorMessage != prevState.errorMessage;
+                          if (failed) return;
                           // User took explicit ownership of DDC enabled state;
                           // cancel any sheet-owned A/B restore on dispose.
                           _ddcDisabledBySheetBypass = false;
                           if (_abBypassed) {
                             setState(() => _abBypassed = false);
                           }
-                          cubit.setViperDdcEnabled(val);
                         },
                       ),
                     ],
@@ -689,32 +695,43 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
                             const SizedBox(width: AppSpacing.sm),
                             Expanded(
                               child: OutlinedButton.icon(
-                                onPressed: () {
+                                onPressed: () async {
+                                  final messenger =
+                                      ScaffoldMessenger.maybeOf(context);
+                                  final bypassedMsg =
+                                      context.l10n.viperAbBypassed(
+                                    (-avgGain).toStringAsFixed(1),
+                                  );
+                                  final activeMsg = context.l10n.viperAbActive;
+                                  final prevState = cubit.state;
                                   final nowBypassed = !_abBypassed;
-                                  setState(() => _abBypassed = nowBypassed);
+                                  final didDisableByBypass =
+                                      nowBypassed && prevState.isViperDdcEnabled;
                                   if (nowBypassed) {
-                                    _ddcDisabledBySheetBypass =
-                                        state.isViperDdcEnabled;
-                                    if (state.isViperDdcEnabled) {
-                                      cubit.setViperDdcEnabled(false);
+                                    if (prevState.isViperDdcEnabled) {
+                                      await cubit.setViperDdcEnabled(false);
                                     }
                                   } else {
-                                    final shouldReenable =
-                                        _ddcDisabledBySheetBypass;
-                                    _ddcDisabledBySheetBypass = false;
-                                    if (shouldReenable) {
-                                      cubit.setViperDdcEnabled(true);
+                                    if (_ddcDisabledBySheetBypass) {
+                                      await cubit.setViperDdcEnabled(true);
                                     }
                                   }
-                                  ScaffoldMessenger.of(context).showSnackBar(
+                                  if (!mounted) return;
+                                  final after = cubit.state;
+                                  final failed = after.errorMessage != null &&
+                                      after.errorMessage !=
+                                          prevState.errorMessage;
+                                  if (failed) return;
+                                  setState(() {
+                                    _abBypassed = nowBypassed;
+                                    _ddcDisabledBySheetBypass =
+                                        nowBypassed ? didDisableByBypass : false;
+                                  });
+                                  messenger?.showSnackBar(
                                     SnackBar(
                                       duration: const Duration(seconds: 1),
                                       content: Text(
-                                        nowBypassed
-                                            ? context.l10n.viperAbBypassed(
-                                                (-avgGain).toStringAsFixed(1),
-                                              )
-                                            : context.l10n.viperAbActive,
+                                        nowBypassed ? bypassedMsg : activeMsg,
                                       ),
                                     ),
                                   );

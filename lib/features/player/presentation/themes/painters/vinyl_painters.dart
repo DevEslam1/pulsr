@@ -379,7 +379,7 @@ class _PlatterStrobePainter extends CustomPainter {
     );
 
     // Quartz-lock lamp ambient halo when playing
-    if (isPlaying) {
+    if (isPlaying && !GpuBudget.isGpuSaverActive) {
       final haloPaint = Paint()
         ..color = activeColor.withValues(alpha: 0.35)
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
@@ -407,7 +407,7 @@ class _PlatterStrobePainter extends CustomPainter {
           dotRadius = 0.9 + (0.5 * intensity);
 
           // Subtle dot bloom under direct illumination
-          if (intensity > 0.4) {
+          if (intensity > 0.4 && !GpuBudget.isGpuSaverActive) {
             final bloomPaint = Paint()
               ..color = activeColor.withValues(alpha: 0.5 * intensity)
               ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2);
@@ -437,6 +437,7 @@ class _TonearmPainter extends CustomPainter {
   final double armLength;
   final double liftProgress;
   final PlayerSurfacePalette surface;
+  final bool isRtl;
 
   static const double _gimbalRadius = 22.0;
   static const double _screwCircleRadius = 16.0;
@@ -451,10 +452,17 @@ class _TonearmPainter extends CustomPainter {
     required this.armLength,
     this.liftProgress = 1.0,
     required this.surface,
+    this.isRtl = false,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
+    if (isRtl) {
+      canvas.save();
+      canvas.translate(size.width, 0);
+      canvas.scale(-1, 1);
+    }
+
     // 1. Arm Rest / Cradle at fixed position
     final restBase = pivot + const Offset(-6, 44);
     _drawArmRest(canvas, restBase);
@@ -486,6 +494,7 @@ class _TonearmPainter extends CustomPainter {
     _drawPivotCap(canvas);
 
     canvas.restore();
+    if (isRtl) canvas.restore();
   }
 
   void _drawGimbalBase(Canvas canvas) {
@@ -576,7 +585,9 @@ class _TonearmPainter extends CustomPainter {
       ..color = AppColors.scrimLight
       ..style = PaintingStyle.stroke
       ..strokeWidth = 4.5
-      ..maskFilter = MaskFilter.blur(BlurStyle.normal, blurSigma);
+      ..maskFilter = GpuBudget.isGpuSaverActive
+          ? null
+          : MaskFilter.blur(BlurStyle.normal, blurSigma);
 
     canvas.save();
     canvas.translate(offset.dx, offset.dy);
@@ -643,7 +654,7 @@ class _TonearmPainter extends CustomPainter {
     canvas.drawRRect(stylusHousingRect, stylusHousingPaint);
 
     // Subtle warm stylus contact glow when tonearm is dropped onto groove
-    if (liftProgress > 0.8) {
+    if (liftProgress > 0.8 && !GpuBudget.isGpuSaverActive) {
       final glowAlpha = ((liftProgress - 0.8) / 0.2).clamp(0.0, 1.0) * 0.45;
       final stylusGlowPaint = Paint()
         ..color = activeColor.withValues(alpha: glowAlpha)
@@ -732,6 +743,7 @@ class _TonearmPainter extends CustomPainter {
         oldDelegate.armLength != armLength ||
         oldDelegate.pivot != pivot ||
         oldDelegate.liftProgress != liftProgress ||
-        oldDelegate.surface != surface;
+        oldDelegate.surface != surface ||
+        oldDelegate.isRtl != isRtl;
   }
 }

@@ -50,6 +50,7 @@ extension EqualizerPresetOps on EqualizerManager {
     // NaN survives clamp() and `(NaN * 1000).round()` throws UnsupportedError.
     final clamped = value.isFinite ? value.clamp(0.0, 1.0).toDouble() : 0.0;
     currentPreset = currentPreset.copyWith(bassBoost: clamped);
+    comparisonSlots[activeComparisonSlot] = currentPreset;
     final milliBels = (clamped * 1000).round();
     if (PlatformCapabilities.isAndroid) {
       final applied = await _effectsChannel.setBassBoost(milliBels);

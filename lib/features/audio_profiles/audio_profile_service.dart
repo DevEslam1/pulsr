@@ -678,11 +678,16 @@ class AudioProfileService {
   /// the rollback path; production code only calls it from [apply].
   @visibleForTesting
   Future<bool> writeKeyValue(String key, Object? value) async {
-    if (value is bool) return _prefs.setBool(key, value);
-    if (value is int) return _prefs.setInt(key, value);
-    if (value is double) return _prefs.setDouble(key, value);
-    if (value is String) return _prefs.setString(key, value);
-    if (value is List<String>) return _prefs.setStringList(key, value);
+    final verdict = AudioProfileKeys.validate(key, value);
+    if (!verdict.valid) return false;
+    final normalized = verdict.normalized;
+    if (normalized is bool) return _prefs.setBool(key, normalized);
+    if (normalized is int) return _prefs.setInt(key, normalized);
+    if (normalized is double) return _prefs.setDouble(key, normalized);
+    if (normalized is String) return _prefs.setString(key, normalized);
+    if (normalized is List<String>) {
+      return _prefs.setStringList(key, normalized);
+    }
     return false;
   }
 
