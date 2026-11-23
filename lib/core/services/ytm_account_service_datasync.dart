@@ -123,10 +123,7 @@ extension YtmAccountDatasync on YtmAccountService {
   }
 
   /// Version stamp for WEB client requests.
-  String get _webClientVersion {
-    final v = _clientVersion;
-    return v.startsWith('1.') ? '2.${v.substring(2)}' : v;
-  }
+  String get _webClientVersion => _versionResolver.webClientVersion;
 
   /// Key names (never values) of the response context, for diagnosing a
   /// missing datasyncId without logging anything account-bound.

@@ -307,7 +307,8 @@ void main() {
           YtmClientVersionResolver.fallbackClientVersion);
     });
 
-    test('a body with no recognizable fields still records the fetch time',
+    test(
+        'a body with no recognizable fields does not record fetch time',
         () async {
       SharedPreferences.setMockInitialValues({});
       final resolver = YtmClientVersionResolver();
@@ -317,7 +318,7 @@ void main() {
       );
 
       final prefs = await SharedPreferences.getInstance();
-      expect(prefs.getInt(_fetchTsKey), isNotNull);
+      expect(prefs.getInt(_fetchTsKey), isNull);
       expect(prefs.getString(_versionKey), isNull);
     });
   });

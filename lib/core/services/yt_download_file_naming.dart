@@ -73,14 +73,9 @@ class YtDownloadFileNaming {
       base = '${base}_track';
     }
 
-    // 3. Limit UTF-8 byte length to 180 bytes (BUG-015)
-    var encoded = utf8.encode(base);
-    if (encoded.length > 180) {
-      while (encoded.length > 180 && base.isNotEmpty) {
-        base = base.substring(0, base.length - 1);
-        encoded = utf8.encode(base);
-      }
-    }
+    // 3. Limit UTF-8 byte length to 180 bytes (BUG-015) without splitting
+    // UTF-16 surrogate pairs, combining marks, or ZWJ emoji clusters.
+    base = _truncateUtf8GraphemeSafe(base, 180);
     // F11: strip trailing dots/spaces — not a valid file-name tail on every
     // target, and the shape a traversal attempt takes once separators are gone.
     base = base.replaceAll(RegExp(r'[. ]+$'), '').trim();
@@ -124,11 +119,60 @@ class YtDownloadFileNaming {
     if (at(0, const [0x49, 0x44, 0x33])) {
       return (ext: 'mp3', mime: 'audio/mpeg');
     }
-    // MPEG audio frame sync: eleven set bits.
-    if (header.length >= 2 && header[0] == 0xFF && (header[1] & 0xE0) == 0xE0) {
+    // ADTS AAC frame sync: 12-bit syncword (0xFFF) with MPEG layer == 00.
+    if (header.length >= 2 &&
+        header[0] == 0xFF &&
+        (header[1] & 0xF6) == 0xF0) {
+      return (ext: 'aac', mime: 'audio/aac');
+    }
+    // MPEG audio frame sync: eleven set bits with layer != 00.
+    if (header.length >= 2 &&
+        header[0] == 0xFF &&
+        (header[1] & 0xE0) == 0xE0 &&
+        (header[1] & 0x06) != 0x00) {
       return (ext: 'mp3', mime: 'audio/mpeg');
     }
     return null;
+  }
+
+  static bool _isExtendingCodePoint(int cp) =>
+      (cp >= 0x0300 && cp <= 0x036F) || // Combining diacritical marks
+      (cp >= 0xFE00 && cp <= 0xFE0F) || // Variation selectors
+      (cp >= 0x1F3FB && cp <= 0x1F3FF) || // Fitzpatrick skin tone modifiers
+      cp == 0x200D; // Zero-width joiner
+
+  static String _truncateUtf8GraphemeSafe(String input, int maxBytes) {
+    if (utf8.encode(input).length <= maxBytes) return input;
+    final runes = input.runes.toList();
+    // Group code points into grapheme clusters so trimming never cuts inside a
+    // surrogate pair, combining sequence, or ZWJ emoji sequence.
+    final clusters = <String>[];
+    for (var i = 0; i < runes.length;) {
+      var end = i + 1;
+      while (end < runes.length) {
+        final next = runes[end];
+        if (next == 0x200D && end + 1 < runes.length) {
+          end += 2; // Consume ZWJ and the joined code point.
+          continue;
+        }
+        if (_isExtendingCodePoint(next)) {
+          end++;
+          continue;
+        }
+        break;
+      }
+      clusters.add(String.fromCharCodes(runes.sublist(i, end)));
+      i = end;
+    }
+    final buf = StringBuffer();
+    var usedBytes = 0;
+    for (final cluster in clusters) {
+      final clusterBytes = utf8.encode(cluster).length;
+      if (usedBytes + clusterBytes > maxBytes) break;
+      buf.write(cluster);
+      usedBytes += clusterBytes;
+    }
+    return buf.toString();
   }
 
   static Future<({String ext, String mime})?> sniffContainer(File file) async {

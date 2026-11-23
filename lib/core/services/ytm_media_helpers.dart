@@ -19,7 +19,9 @@ class YtmMediaHelpers {
       final w = (item['width'] as num?)?.toInt() ?? 0;
       final h = (item['height'] as num?)?.toInt() ?? 0;
       final pixels = w * h;
-      if (best == null || pixels > maxPixels) {
+      if (best == null ||
+          pixels > maxPixels ||
+          (pixels == 0 && maxPixels == 0)) {
         maxPixels = pixels;
         best = url;
       }
@@ -35,6 +37,33 @@ class YtmMediaHelpers {
       if (run is! Map) continue;
       final text = (run['text'] as String?)?.trim();
       if (text == null || text.isEmpty) continue;
+      final nav = run['navigationEndpoint'];
+      if (nav is Map) {
+        final pageType =
+            (((nav['browseEndpoint'] as Map?)?['browseEndpointContextSupportedConfigs']
+                    as Map?)?['browseEndpointContextMusicConfig']
+                as Map?)?['pageType'] as String?;
+        if (pageType == 'MUSIC_PAGE_TYPE_ARTIST' ||
+            pageType == 'MUSIC_PAGE_TYPE_USER_CHANNEL') {
+          return text;
+        }
+      }
+    }
+    for (final run in runs) {
+      if (run is! Map) continue;
+      final text = (run['text'] as String?)?.trim();
+      if (text == null || text.isEmpty) continue;
+      final nav = run['navigationEndpoint'];
+      if (nav is Map) {
+        final pageType =
+            (((nav['browseEndpoint'] as Map?)?['browseEndpointContextSupportedConfigs']
+                    as Map?)?['browseEndpointContextMusicConfig']
+                as Map?)?['pageType'] as String?;
+        if (pageType == 'MUSIC_PAGE_TYPE_ALBUM' ||
+            pageType == 'MUSIC_PAGE_TYPE_PLAYLIST') {
+          continue;
+        }
+      }
       if (const {'•', '·', '-', '–', '—', '|'}.contains(text)) continue;
       final lower = text.toLowerCase();
       if (const {

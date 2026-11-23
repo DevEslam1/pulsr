@@ -23,6 +23,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 
+import '../utils/ytm_rate_limiter.dart';
+
 /// A pending device-authorization request. The user enters [userCode] at
 /// [verificationUrl] on another device while the app polls for the token.
 class OAuthDeviceCode {
@@ -97,10 +99,17 @@ class YtmOAuthService {
     iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
   );
 
-  http.Client _client = http.Client();
+  http.Client? _client;
+  http.Client get _httpClient => _client ??= http.Client();
+  final AsyncMutex _storageMutex = AsyncMutex();
 
   @visibleForTesting
-  set debugHttpClient(http.Client client) => _client = client;
+  set debugHttpClient(http.Client client) {
+    if (!identical(_client, client)) {
+      _client?.close();
+    }
+    _client = client;
+  }
 
   @visibleForTesting
   int get debugAuthGeneration => _authGeneration;
@@ -118,7 +127,7 @@ class YtmOAuthService {
   int _authGeneration = 0;
 
   /// True only when the last failed refresh proved the session dead
-  /// (invalid_grant/invalid_client), not when the network was unavailable.
+  /// (terminal OAuth error), not when the network was unavailable.
   /// Account code uses this to avoid logging the user out on an offline blip.
   bool _lastRefreshTerminal = false;
   bool get lastRefreshFailedTerminally => _lastRefreshTerminal;
@@ -130,7 +139,8 @@ class YtmOAuthService {
   String? get accessToken => _accessToken;
 
   void dispose() {
-    _client.close();
+    _client?.close();
+    _client = null;
   }
 
   Future<void> init() {
@@ -141,15 +151,22 @@ class YtmOAuthService {
   }
 
   Future<void> _loadTokens() async {
+    final generation = _authGeneration;
     try {
       final access = await _storage.read(key: _keyAccess);
       final refresh = await _storage.read(key: _keyRefresh);
       final expiryRaw = await _storage.read(key: _keyExpiry);
+      if (generation != _authGeneration) {
+        _initialized = true;
+        return;
+      }
       _accessToken = access;
       _refreshToken = refresh;
       final epoch = int.tryParse(expiryRaw ?? '');
       if (epoch != null && epoch > 0) {
         _expiresAt = DateTime.fromMillisecondsSinceEpoch(epoch);
+      } else {
+        _expiresAt = null;
       }
       _initialized = true;
     } catch (e) {
@@ -158,22 +175,22 @@ class YtmOAuthService {
     }
   }
 
-  /// Refreshes the access token when it is missing or within 2 minutes of
-  /// expiry. Returns true when a usable token is present afterwards.
+  /// Refreshes the access token when it is missing, its expiry is unknown, or
+  /// it is within 2 minutes of expiry. Returns true when a usable token is
+  /// present afterwards.
   Future<bool> ensureFresh() async {
     await init();
     if (_accessToken == null || _accessToken!.isEmpty) return false;
     final exp = _expiresAt;
-    // Unknown expiry: assume valid and let the server reject if not.
-    if (exp == null) return true;
-    if (exp.difference(DateTime.now()) > const Duration(minutes: 2)) {
+    if (exp != null && exp.difference(DateTime.now()) > const Duration(minutes: 2)) {
       return true;
     }
-    // The token is (nearly) expired and cannot be refreshed: treat as signed
-    // out instead of reporting a usable session that will 401 on every call.
+    // The token is (nearly) expired or has unknown expiry and cannot be
+    // refreshed: treat as signed out instead of reporting a usable session
+    // that will 401 on every call.
     if (_refreshToken == null || _refreshToken!.isEmpty) {
       _lastRefreshTerminal = true;
-      await _clearTokens();
+      await _clearTokens(expectedGeneration: _authGeneration);
       return false;
     }
     return refresh();
@@ -181,7 +198,7 @@ class YtmOAuthService {
 
   /// Requests a device + user code. [scope] defaults to the YouTube scope.
   Future<OAuthDeviceCode> requestDeviceCode() async {
-    final res = await _client
+    final res = await _httpClient
         .post(
           _deviceCodeEndpoint,
           headers: const {'Content-Type': 'application/json'},
@@ -228,13 +245,9 @@ class YtmOAuthService {
   }) async {
     final generation = _authGeneration;
     var interval = code.intervalSeconds.clamp(1, 60);
-    var pollCount = 0;
-    const maxPolls = 60;
-    final deadline = DateTime.now().add(const Duration(minutes: 15));
-    while (!code.isExpired &&
-        pollCount < maxPolls &&
-        DateTime.now().isBefore(deadline)) {
-      pollCount++;
+    final deadline = code.requestedAt
+        .add(Duration(seconds: code.expiresInSeconds.clamp(1, 1800)));
+    while (!code.isExpired && DateTime.now().isBefore(deadline)) {
       if ((isCancelled?.call() ?? false) || generation != _authGeneration) {
         return false;
       }
@@ -246,7 +259,7 @@ class YtmOAuthService {
 
       final http.Response res;
       try {
-        res = await _client
+        res = await _httpClient
             .post(
               _tokenEndpoint,
               headers: const {'Content-Type': 'application/json'},
@@ -262,7 +275,9 @@ class YtmOAuthService {
         // A transient blip during a long device grant must not abort the whole
         // flow: keep polling until the code expires or the user cancels.
         debugPrint('[YtmOAuth] device poll transport error: $e');
-        if (isCancelled?.call() ?? false) return false;
+        if ((isCancelled?.call() ?? false) || generation != _authGeneration) {
+          return false;
+        }
         continue;
       }
       final json = _decode(res.body);
@@ -284,7 +299,7 @@ class YtmOAuthService {
       if (error == null) continue;
       if (error == 'authorization_pending') continue;
       if (error == 'slow_down') {
-        interval += 5;
+        interval = (interval + 5).clamp(1, 60);
         continue;
       }
       if (_isTerminalOAuthError(error)) {
@@ -299,9 +314,16 @@ class YtmOAuthService {
   /// share a single in-flight request so overlapping refreshes cannot race the
   /// rotating refresh token.
   Future<bool> refresh() {
-    return _refreshInFlight ??= _refreshOnce().whenComplete(() {
-      _refreshInFlight = null;
+    final existing = _refreshInFlight;
+    if (existing != null) return existing;
+    late final Future<bool> future;
+    future = _refreshOnce().whenComplete(() {
+      if (identical(_refreshInFlight, future)) {
+        _refreshInFlight = null;
+      }
     });
+    _refreshInFlight = future;
+    return future;
   }
 
   Future<bool> _refreshOnce() async {
@@ -313,7 +335,7 @@ class YtmOAuthService {
       return false;
     }
     try {
-      final res = await _client
+      final res = await _httpClient
           .post(
             _tokenEndpoint,
             headers: const {'Content-Type': 'application/json'},
@@ -337,12 +359,15 @@ class YtmOAuthService {
         );
         return generation == _authGeneration;
       }
-      // A revoked/consumed refresh token is terminal: clear the dead session so
-      // the UI stops claiming the account is connected.
+      // A revoked/consumed refresh token or invalid client/request is
+      // terminal: clear the dead session so the UI stops claiming it works.
       final error = json?['error'] as String?;
-      if (error == 'invalid_grant' || error == 'invalid_client') {
+      if (error != null &&
+          (_isTerminalOAuthError(error) || error == 'unauthorized_client')) {
         _lastRefreshTerminal = true;
-        if (generation == _authGeneration) await _clearTokens();
+        if (generation == _authGeneration) {
+          await _clearTokens(expectedGeneration: generation);
+        }
       }
       return false;
     } catch (e) {
@@ -356,10 +381,11 @@ class YtmOAuthService {
   Future<void> signOut() async {
     // Invalidate any in-flight persist/refresh before clearing memory/storage.
     _authGeneration++;
+    _refreshInFlight = null;
     final tokenToRevoke = _refreshToken ?? _accessToken;
     if (tokenToRevoke != null && tokenToRevoke.isNotEmpty) {
       try {
-        await _client
+        await _httpClient
             .post(
               Uri.parse('https://oauth2.googleapis.com/revoke'),
               headers: const {
@@ -375,15 +401,22 @@ class YtmOAuthService {
     await _clearTokens();
   }
 
-  Future<void> _clearTokens() async {
-    _accessToken = null;
-    _refreshToken = null;
-    _expiresAt = null;
-    try {
-      await _storage.delete(key: _keyAccess);
-      await _storage.delete(key: _keyRefresh);
-      await _storage.delete(key: _keyExpiry);
-    } catch (_) {}
+  Future<void> _clearTokens({int? expectedGeneration}) async {
+    if (expectedGeneration == null || expectedGeneration == _authGeneration) {
+      _accessToken = null;
+      _refreshToken = null;
+      _expiresAt = null;
+    }
+    await _storageMutex.run(() async {
+      if (expectedGeneration != null && expectedGeneration != _authGeneration) {
+        return;
+      }
+      try {
+        await _storage.delete(key: _keyAccess);
+        await _storage.delete(key: _keyRefresh);
+        await _storage.delete(key: _keyExpiry);
+      } catch (_) {}
+    });
   }
 
   Future<void> _persistTokens({
@@ -393,28 +426,30 @@ class YtmOAuthService {
     int? expectedGeneration,
   }) async {
     final generation = expectedGeneration ?? _authGeneration;
-    // A sign-out raced this refresh: drop the result instead of writing it.
-    if (generation != _authGeneration) return;
-    _accessToken = accessToken;
-    if (refreshToken != null && refreshToken.isNotEmpty) {
-      _refreshToken = refreshToken;
-    }
-    final ttl = expiresInSeconds ?? 3600;
-    _expiresAt = DateTime.now().add(Duration(seconds: ttl));
-    try {
-      await _storage.write(key: _keyAccess, value: accessToken);
+    await _storageMutex.run(() async {
+      // A sign-out raced this refresh: drop the result instead of writing it.
       if (generation != _authGeneration) return;
-      if (_refreshToken != null) {
-        await _storage.write(key: _keyRefresh, value: _refreshToken!);
+      _accessToken = accessToken;
+      if (refreshToken != null && refreshToken.isNotEmpty) {
+        _refreshToken = refreshToken;
       }
-      if (generation != _authGeneration) return;
-      await _storage.write(
-        key: _keyExpiry,
-        value: _expiresAt!.millisecondsSinceEpoch.toString(),
-      );
-    } catch (e) {
-      debugPrint('[YtmOAuth] Failed to persist tokens: $e');
-    }
+      final ttl = expiresInSeconds ?? 3600;
+      _expiresAt = DateTime.now().add(Duration(seconds: ttl));
+      try {
+        await _storage.write(key: _keyAccess, value: accessToken);
+        if (generation != _authGeneration) return;
+        if (_refreshToken != null) {
+          await _storage.write(key: _keyRefresh, value: _refreshToken!);
+        }
+        if (generation != _authGeneration) return;
+        await _storage.write(
+          key: _keyExpiry,
+          value: _expiresAt!.millisecondsSinceEpoch.toString(),
+        );
+      } catch (e) {
+        debugPrint('[YtmOAuth] Failed to persist tokens: $e');
+      }
+    });
   }
 
   Map<String, dynamic>? _decode(String body) {

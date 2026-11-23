@@ -74,12 +74,14 @@ class YtmUrlCacheEntry {
   /// Returns reconstituted [YtmStream] if cached, or constructs a minimal valid one.
   YtmStream toStream({String quality = 'high'}) {
     if (stream != null) return stream!;
+    final baseQuality = quality.split(':').first.trim().toLowerCase();
     return YtmStream(
       videoId: videoId,
       url: url,
       mimeType: url.contains('mime=audio%2Fwebm') ? 'audio/webm' : 'audio/mp4',
       container: url.contains('mime=audio%2Fwebm') ? 'webm' : 'm4a',
-      bitrateKbps: quality == 'high' ? 256 : (quality == 'medium' ? 128 : 64),
+      bitrateKbps:
+          baseQuality == 'high' ? 256 : (baseQuality == 'medium' ? 128 : 64),
       duration: Duration.zero,
       title: L10nHolder.current?.ytmFallbackTrackTitle ?? 'YouTube Track',
       artist: L10nHolder.current?.browseYouTubeMusic ?? 'YouTube Music',
@@ -110,6 +112,7 @@ class YtmUrlCache {
 
   final LinkedHashMap<String, YtmUrlCacheEntry> _cache =
       LinkedHashMap<String, YtmUrlCacheEntry>();
+  int _mutationGeneration = 0;
 
   static const String _diskFileName = 'ytm_url_cache_v1.json';
   static const MethodChannel _networkChannel =
@@ -143,6 +146,7 @@ class YtmUrlCache {
 
   File? _diskFile;
   bool _restored = false;
+  Future<void>? _restoreFuture;
   Timer? _persistTimer;
 
   @factoryMethod
@@ -172,14 +176,22 @@ class YtmUrlCache {
   /// previous run: replaying its old stamp would skip the one probe that can
   /// tell whether the signature still works from here. Any `verifiedAt` an
   /// on-disk file happens to carry is therefore ignored, not restored.
-  Future<void> restore() async {
-    if (_restored) return;
-    _restored = true;
+  Future<void> restore() {
+    if (_restored) return Future.value();
+    return _restoreFuture ??= _restoreImpl().whenComplete(() {
+      _restoreFuture = null;
+    });
+  }
+
+  Future<void> _restoreImpl() async {
     try {
       final dir = await getApplicationSupportDirectory();
       final file = File('${dir.path}/$_diskFileName');
       _diskFile = file;
-      if (!await file.exists()) return;
+      if (!await file.exists()) {
+        _restored = true;
+        return;
+      }
 
       // Signed googlevideo URLs are bound to the egress that minted them. A
       // restart on a different interface means the persisted body is dead.
@@ -212,6 +224,7 @@ class YtmUrlCache {
           ErrorLogger.log('Best-effort YtmUrlCache operation failed',
               error: e, stackTrace: st, category: 'YtmUrlCache');
         }
+        _restored = true;
         return;
       }
       if (currentIdentity != null) {
@@ -226,13 +239,29 @@ class YtmUrlCache {
       final size = await file.length();
       if (size > _maxRestoreBytes) {
         debugPrint(
-            '[YtmUrlCache] Ignoring oversized restore file ($size bytes)');
+            '[YtmUrlCache] Ignoring and deleting oversized restore file ($size bytes)');
+        unawaited(file.delete().catchError((_) => file));
+        _restored = true;
         return;
       }
       final raw = await file.readAsString();
-      if (raw.trim().isEmpty) return;
-      final decoded = jsonDecode(raw);
-      if (decoded is! List) return;
+      if (raw.trim().isEmpty) {
+        _restored = true;
+        return;
+      }
+      final dynamic decoded;
+      try {
+        decoded = jsonDecode(raw);
+      } catch (e) {
+        debugPrint('[YtmUrlCache] Deleting corrupt cache file: $e');
+        unawaited(file.delete().catchError((_) => file));
+        _restored = true;
+        return;
+      }
+      if (decoded is! List) {
+        _restored = true;
+        return;
+      }
       final now = _clock.now();
       for (final item in decoded) {
         if (item is! Map) continue;
@@ -246,6 +275,8 @@ class YtmUrlCache {
         if (videoId == null || url == null || expiryMs == null) continue;
         final expiresAt = DateTime.fromMillisecondsSinceEpoch(expiryMs);
         if (expiresAt.difference(now) < _restoreMinTtl) continue;
+        // Never clobber a fresher in-memory entry inserted while awaiting I/O.
+        if (_cache.containsKey(_buildKey(videoId, quality))) continue;
         final userAgent = item['userAgent']?.toString();
         // Rebuild the rich stream from persisted metadata when present, so a
         // restored entry isn't served with Duration.zero and a guessed
@@ -282,6 +313,7 @@ class YtmUrlCache {
             stream: rebuilt,
             carryVerified: false);
       }
+      _restored = true;
       debugPrint(
           '[YtmUrlCache] Restored ${_cache.length} cached stream URL(s)');
     } catch (e) {
@@ -499,18 +531,31 @@ class YtmUrlCache {
     // richer fields are carried forward.
     final previous = _cache[key];
     final sameUrl = previous != null && previous.url == url;
-    final effectiveStream = stream ??
-        (sameUrl
-            ? previous.stream
-            : (previous?.stream != null
-                ? previous!.stream!.copyWith(
-                    url: url,
-                    userAgent: userAgent ?? previous.userAgent,
-                    cookies: cookies ?? previous.cookies,
-                  )
-                : null));
-    final effectiveUserAgent = userAgent ?? previous?.userAgent;
-    final effectiveCookies = cookies ?? previous?.cookies;
+    final effectiveUserAgent = userAgent ?? (sameUrl ? previous.userAgent : null);
+    final effectiveCookies = cookies ?? (sameUrl ? previous.cookies : null);
+    YtmStream? effectiveStream;
+    if (stream != null) {
+      effectiveStream = stream;
+    } else if (sameUrl) {
+      effectiveStream = previous.stream;
+    } else if (previous?.stream != null) {
+      final ps = previous!.stream!;
+      effectiveStream = YtmStream(
+        videoId: ps.videoId,
+        url: url,
+        mimeType: ps.mimeType,
+        container: ps.container,
+        bitrateKbps: ps.bitrateKbps,
+        duration: ps.duration,
+        title: ps.title,
+        artist: ps.artist,
+        artworkUrl: ps.artworkUrl,
+        userAgent: effectiveUserAgent,
+        cookies: effectiveCookies,
+        loudnessDb: ps.loudnessDb,
+        expiresAt: ps.expiresAt,
+      );
+    }
 
     // A verification describes one URL, so it survives only a re-store of that
     // same URL. A different URL carries a different signature and starts
@@ -539,6 +584,7 @@ class YtmUrlCache {
       _cache.remove(_cache.keys.first);
     }
 
+    _mutationGeneration++;
     _cache[key] = entry;
     _schedulePersist();
   }
@@ -632,13 +678,24 @@ class YtmUrlCache {
         _cache.remove(k);
       }
     }
+    _mutationGeneration++;
     _schedulePersist();
   }
 
-  /// Clears entire in-memory URL cache.
+  /// Clears entire in-memory URL cache and flushes persisted cache.
   void clear() {
+    final clearGen = ++_mutationGeneration;
     _cache.clear();
-    _schedulePersist();
+    _persistTimer?.cancel();
+    _persistTimer = null;
+    final file = _diskFile;
+    if (file != null) {
+      Future<void>.microtask(() async {
+        if (_mutationGeneration == clearGen && _cache.isEmpty) {
+          await _persistNow(file);
+        }
+      });
+    }
   }
 
   /// Current number of entries in the cache.

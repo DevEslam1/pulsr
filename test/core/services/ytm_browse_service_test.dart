@@ -25,6 +25,8 @@ void main() {
 
   setUp(() {
     ytm = MockYtmService();
+    when(() => ytm.browseMusicSection(any(), limit: any(named: 'limit')))
+        .thenAnswer((_) async => const []);
     browse = YtmBrowseService(ytm);
   });
 

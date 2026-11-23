@@ -252,8 +252,9 @@ void main() {
       expect(stream!.bitrateKbps, 192);
     });
 
-    test('authenticated ciphered formats hand off to the native tier',
-        () async {
+    test(
+        'authenticated ciphered formats fall through to guest clients when allowed '
+        'and hand off when guestClientsEnabled is false', () async {
       final service = await loggedIn(dataSyncId: 'dsid||');
       requests.clear();
       handler = (request) async {
@@ -270,13 +271,18 @@ void main() {
         ]);
       };
 
-      // Dart cannot decipher signatureCipher; returning null lets YtmService
-      // run the native extractor instead of handing back a 403 URL.
-      final stream = await service.resolvePlayerStream('dQw4w9WgXcQ');
-      expect(stream, isNull);
+      final guestFallback = await service.resolvePlayerStream('dQw4w9WgXcQ');
+      expect(guestFallback?.url, contains('https://x/guest'));
+      expect(requests.map(_clientName), containsAll(['WEB_REMIX', 'ANDROID_VR']));
+
+      requests.clear();
+      final handoffOnly = await service.resolvePlayerStream(
+        'dQw4w9WgXcQ',
+        guestClientsEnabled: false,
+      );
+      expect(handoffOnly, isNull);
       expect(requests.map(_clientName), contains('WEB_REMIX'));
-      expect(requests.map(_clientName), isNot(contains('ANDROID_VR')),
-          reason: 'a session-auth ciphered answer hands off immediately');
+      expect(requests.map(_clientName), isNot(contains('ANDROID_VR')));
     });
   });
 

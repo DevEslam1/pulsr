@@ -95,6 +95,10 @@ class FolderUseCases {
     final List<FolderSongEntry> entries =
         entriesResult.fold((l) => [], (r) => r);
     final List<String> excludedPaths = excludedResult.fold((l) => [], (r) => r);
+    final normalizedExcluded = excludedPaths
+        .map(_normalizeFolderPath)
+        .where((s) => s.isNotEmpty)
+        .toList(growable: false);
     final Map<String, int> folderSongCounts = {};
     final Map<String, FolderSongEntry> folderRepresentative = {};
 
@@ -116,7 +120,11 @@ class FolderUseCases {
               .where((s) => s.isNotEmpty)
               .lastOrNull ??
           path;
-      final isExcluded = excludedPaths.contains(path);
+      final normPath = _normalizeFolderPath(path);
+      final isExcluded = normalizedExcluded.any((ex) =>
+          ex == normPath ||
+          (ex == '/' && normPath.startsWith('/')) ||
+          normPath.startsWith('$ex/'));
       final rep = folderRepresentative[path];
       items.add(
         FolderItem(
@@ -134,6 +142,14 @@ class FolderUseCases {
 
     items.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
     return Right(items);
+  }
+
+  static String _normalizeFolderPath(String raw) {
+    var normalized = raw.replaceAll('\\', '/').trim();
+    if (normalized.length > 1) {
+      normalized = normalized.replaceAll(RegExp(r'/+$'), '');
+    }
+    return normalized.toLowerCase();
   }
 
   Stream<Result<List<SongsTableData>>> watchFolderSongs(String folderPath) {

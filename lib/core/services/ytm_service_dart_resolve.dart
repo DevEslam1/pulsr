@@ -124,6 +124,8 @@ extension YtmServiceDartResolve on YtmService {
           'X-Goog-Visitor-Id': guestVisitorData,
       };
 
+      await YtmRateLimiter.shared
+          .acquirePermit(maxWait: const Duration(seconds: 10));
       final response = await _httpClient
           .post(
             Uri.parse(
@@ -134,12 +136,21 @@ extension YtmServiceDartResolve on YtmService {
           // FIX-C06: 12s timeout per client in _resolveStreamDart
           .timeout(const Duration(seconds: 12));
 
+      if (response.statusCode == 429) {
+        YtmRateLimiter.shared.onRateLimited();
+      }
       if (response.statusCode != 200) {
         throw YtmException('YTM_HTTP_${response.statusCode}',
             'Dart client ${client.name} answered HTTP ${response.statusCode}');
       }
+      YtmRateLimiter.shared.onSuccess();
 
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map<String, dynamic>) {
+        throw YtmException('YTM_BAD_RESPONSE',
+            'Dart client ${client.name} returned non-object JSON');
+      }
+      final data = decoded;
       final playability = data['playabilityStatus'] as Map<String, dynamic>?;
       final status = playability?['status'] as String? ?? '';
       if (status == 'LOGIN_REQUIRED' ||
@@ -207,8 +218,11 @@ extension YtmServiceDartResolve on YtmService {
             .whereType<Map<String, dynamic>>()
             .toList();
         for (final f in formats) {
+          final mime = f['mimeType'] as String? ?? '';
           final streamUrl = f['url'] as String?;
-          if (streamUrl != null && streamUrl.isNotEmpty) {
+          if (mime.startsWith('audio/') &&
+              streamUrl != null &&
+              streamUrl.isNotEmpty) {
             audioFormats.add((format: f, url: streamUrl));
           }
         }

@@ -32,6 +32,7 @@ class YtDownloadForegroundController {
   /// Brings the native download notification up for a queued job.
   void start(String videoId, String title) {
     _lastPublishMs.remove(videoId);
+    _stopRequested = false;
     _startsInFlight++;
     if (_phase != _ForegroundPhase.running) {
       _phase = _ForegroundPhase.starting;
@@ -77,7 +78,11 @@ class YtDownloadForegroundController {
     final last = _lastPublishMs[videoId] ?? 0;
     final isTerminal = fraction >= 1.0;
     if (!isTerminal && now - last < _publishMinIntervalMs) return;
-    _lastPublishMs[videoId] = now;
+    if (isTerminal) {
+      _lastPublishMs.remove(videoId);
+    } else {
+      _lastPublishMs[videoId] = now;
+    }
     _channel.invokeMethod('updateDownloadProgress', {
       'videoId': videoId,
       'title': title,
@@ -85,19 +90,16 @@ class YtDownloadForegroundController {
     }).catchError((_) => null);
   }
 
-  /// Removes a job from the native notification without pretending the file
-  /// finished. A failed transfer used to stay in the service's map at its last
-  /// percentage for as long as another download kept the service alive.
+  /// Removes a canceled/failed job from the native notification without
+  /// pretending the file finished (progress 100).
   void release(String videoId) {
     _lastPublishMs.remove(videoId);
     if (_phase != _ForegroundPhase.running &&
         _phase != _ForegroundPhase.starting) {
       return;
     }
-    _channel.invokeMethod('updateDownloadProgress', {
+    _channel.invokeMethod('releaseDownloadJob', {
       'videoId': videoId,
-      'title': '',
-      'progress': 100,
     }).catchError((_) => null);
   }
 

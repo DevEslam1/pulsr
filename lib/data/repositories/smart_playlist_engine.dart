@@ -102,6 +102,7 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
   SimpleSelectStatement<$SongsTableTable, SongsTableData> _buildQuery(
     SmartCriteria criteria, {
     Set<int>? allowedIds,
+    bool applyLimit = true,
   }) {
     final query = _db.select(_db.songsTable)
       ..where((t) =>
@@ -158,44 +159,86 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
     if (criteria.sortBy != null) {
       final mode =
           criteria.sortAscending ? OrderingMode.asc : OrderingMode.desc;
-      // 'rating' is prefs-backed: SQL keeps a stable base order and the
-      // Dart post-step re-sorts. Anything unknown falls back to title.
+      // 'rating' and 'bpm' are prefs-backed: SQL keeps a stable base order
+      // and the Dart post-step re-sorts. Unknown keys fall back to title.
       switch (criteria.sortBy) {
+        case 'artist':
+          query.orderBy([
+            (t) => OrderingTerm(
+                expression: t.artist.collate(Collate.noCase), mode: mode),
+            (t) => OrderingTerm(
+                expression: t.title.collate(Collate.noCase), mode: mode),
+            (t) => OrderingTerm.asc(t.id),
+          ]);
+          break;
+        case 'album':
+          query.orderBy([
+            (t) => OrderingTerm(
+                expression: t.album.collate(Collate.noCase), mode: mode),
+            (t) => OrderingTerm(expression: t.discNumber, mode: OrderingMode.asc),
+            (t) => OrderingTerm(expression: t.trackNumber, mode: OrderingMode.asc),
+            (t) => OrderingTerm(
+                expression: t.title.collate(Collate.noCase), mode: mode),
+            (t) => OrderingTerm.asc(t.id),
+          ]);
+          break;
         case 'rating':
-          query.orderBy([(t) => OrderingTerm(expression: t.title)]);
+        case 'bpm':
+          query.orderBy([
+            (t) => OrderingTerm(expression: t.title.collate(Collate.noCase)),
+            (t) => OrderingTerm.asc(t.id),
+          ]);
           break;
         case 'dateAdded':
-          query.orderBy(
-              [(t) => OrderingTerm(expression: t.dateAdded, mode: mode)]);
+          query.orderBy([
+            (t) => OrderingTerm(expression: t.dateAdded, mode: mode),
+            (t) => OrderingTerm.asc(t.id),
+          ]);
           break;
         case 'playCount':
-          query.orderBy(
-              [(t) => OrderingTerm(expression: t.playCount, mode: mode)]);
+          query.orderBy([
+            (t) => OrderingTerm(expression: t.playCount, mode: mode),
+            (t) => OrderingTerm.asc(t.id),
+          ]);
           break;
         case 'lastPlayed':
-          query.orderBy(
-              [(t) => OrderingTerm(expression: t.lastPlayed, mode: mode)]);
+          query.orderBy([
+            (t) => OrderingTerm(expression: t.lastPlayed, mode: mode),
+            (t) => OrderingTerm.asc(t.id),
+          ]);
           break;
         case 'durationMs':
-          query.orderBy(
-              [(t) => OrderingTerm(expression: t.durationMs, mode: mode)]);
+          query.orderBy([
+            (t) => OrderingTerm(expression: t.durationMs, mode: mode),
+            (t) => OrderingTerm.asc(t.id),
+          ]);
           break;
         case 'year':
-          query.orderBy([(t) => OrderingTerm(expression: t.year, mode: mode)]);
+          query.orderBy([
+            (t) => OrderingTerm(expression: t.year, mode: mode),
+            (t) => OrderingTerm.asc(t.id),
+          ]);
           break;
         case 'title':
         default:
-          query.orderBy([(t) => OrderingTerm(expression: t.title, mode: mode)]);
+          query.orderBy([
+            (t) => OrderingTerm(
+                expression: t.title.collate(Collate.noCase), mode: mode),
+            (t) => OrderingTerm.asc(t.id),
+          ]);
           break;
       }
     }
 
-    // When rating rules exist (or rating sort is requested) the limit is
-    // applied in Dart AFTER the prefs-backed filter/sort; a SQL limit first
-    // would truncate candidates before ratings are even considered.
-    final needsDartPost =
-        criteria.rules.any(_isDartPostRule) || criteria.sortBy == 'rating';
-    if (!needsDartPost && criteria.limit != null && criteria.limit! > 0) {
+    // When prefs-backed rules or sorts exist, the limit is applied in Dart
+    // AFTER filtering/sorting so SQL doesn't drop candidates prematurely.
+    final needsDartPost = criteria.rules.any(_isDartPostRule) ||
+        criteria.sortBy == 'rating' ||
+        criteria.sortBy == 'bpm';
+    if (applyLimit &&
+        !needsDartPost &&
+        criteria.limit != null &&
+        criteria.limit! > 0) {
       query.limit(criteria.limit!);
     }
 
@@ -606,13 +649,13 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
       if (narrowedIds != null && narrowedIds.isEmpty) {
         return const <SongsTableData>[];
       }
-      final base = await _buildQuery(
+      final base = await _querySongsForIds(criteria, narrowedIds);
+      return _postProcess(
+        base,
         criteria,
-        allowedIds: (narrowedIds != null && narrowedIds.length <= 900)
-            ? narrowedIds
-            : null,
-      ).get();
-      return _postProcess(base, criteria, dartRules);
+        dartRules,
+        forceDartSort: narrowedIds != null && narrowedIds.length > 900,
+      );
     }
     // matchAny: union of SQL matches and prefs-backed matches.
     final sqlRules = criteria.rules.where((r) => !_isDartPostRule(r)).toList();
@@ -623,18 +666,74 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
     final List<SongsTableData> all;
     if (narrowedIds != null && narrowedIds.isEmpty) {
       all = const <SongsTableData>[];
-    } else if (narrowedIds != null && narrowedIds.length <= 900) {
-      all = await _buildQuery(
-        _allLocal(criteria),
-        allowedIds: narrowedIds,
-      ).get();
     } else {
-      all = await _buildQuery(_allLocal(criteria)).get();
+      all = await _querySongsForIds(_allLocal(criteria), narrowedIds);
     }
     final baseIds = base.map((s) => s.id).toSet();
     final merged = List<SongsTableData>.from(base)
       ..addAll(all.where((s) => !baseIds.contains(s.id)));
     return _postProcessAny(merged, baseIds, criteria, dartRules);
+  }
+
+  static List<Set<int>> _chunkIds(Set<int> ids, {int chunkSize = 900}) {
+    final list = ids.toList(growable: false);
+    final chunks = <Set<int>>[];
+    for (var i = 0; i < list.length; i += chunkSize) {
+      final end = i + chunkSize < list.length ? i + chunkSize : list.length;
+      chunks.add(list.sublist(i, end).toSet());
+    }
+    return chunks;
+  }
+
+  Future<List<SongsTableData>> _querySongsForIds(
+    SmartCriteria criteria,
+    Set<int>? narrowedIds,
+  ) async {
+    if (narrowedIds == null) {
+      return _buildQuery(criteria).get();
+    }
+    if (narrowedIds.isEmpty) return const [];
+    if (narrowedIds.length <= 900) {
+      return _buildQuery(criteria, allowedIds: narrowedIds).get();
+    }
+    final seen = <int>{};
+    final combined = <SongsTableData>[];
+    for (final chunk in _chunkIds(narrowedIds)) {
+      final rows =
+          await _buildQuery(criteria, allowedIds: chunk, applyLimit: false)
+              .get();
+      for (final row in rows) {
+        if (seen.add(row.id)) combined.add(row);
+      }
+    }
+    return combined;
+  }
+
+  Stream<List<SongsTableData>> _watchSongsForIds(
+    SmartCriteria criteria,
+    Set<int>? narrowedIds,
+  ) {
+    if (narrowedIds == null) {
+      return _buildQuery(criteria).watch();
+    }
+    if (narrowedIds.isEmpty) return Stream.value(const <SongsTableData>[]);
+    if (narrowedIds.length <= 900) {
+      return _buildQuery(criteria, allowedIds: narrowedIds).watch();
+    }
+    final chunks = _chunkIds(narrowedIds);
+    return CombineLatestStream.list<List<SongsTableData>>([
+      for (final chunk in chunks)
+        _buildQuery(criteria, allowedIds: chunk, applyLimit: false).watch(),
+    ]).map((chunkLists) {
+      final seen = <int>{};
+      final combined = <SongsTableData>[];
+      for (final chunk in chunkLists) {
+        for (final row in chunk) {
+          if (seen.add(row.id)) combined.add(row);
+        }
+      }
+      return combined;
+    });
   }
 
   @override
@@ -653,23 +752,17 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
       }
       final stream =
           queryStream.debounceTime(const Duration(milliseconds: 500));
-      if (criteria.sortBy == 'rating') {
+      if (criteria.sortBy == 'rating' || criteria.sortBy == 'bpm') {
         return stream.map((list) => _postProcess(list, criteria, const []));
       }
       return stream;
     }
     if (criteria.matchAll) {
+      var multiChunk = false;
       Stream<List<SongsTableData>> buildMatchAllStream() {
         final narrowedIds = _narrowIdsForDartRules(dartRules, matchAll: true);
-        if (narrowedIds != null && narrowedIds.isEmpty) {
-          return Stream.value(const <SongsTableData>[]);
-        }
-        return _buildQuery(
-          criteria,
-          allowedIds: (narrowedIds != null && narrowedIds.length <= 900)
-              ? narrowedIds
-              : null,
-        ).watch();
+        multiChunk = narrowedIds != null && narrowedIds.length > 900;
+        return _watchSongsForIds(criteria, narrowedIds);
       }
 
       final Stream<List<SongsTableData>> queryStream = trigger != null
@@ -677,7 +770,12 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
           : buildMatchAllStream();
       return queryStream
           .debounceTime(const Duration(milliseconds: 500))
-          .map((list) => _postProcess(list, criteria, dartRules));
+          .map((list) => _postProcess(
+                list,
+                criteria,
+                dartRules,
+                forceDartSort: multiChunk,
+              ));
     }
     final sqlRules = criteria.rules.where((r) => !_isDartPostRule(r)).toList();
     final baseStream = sqlRules.isEmpty
@@ -685,16 +783,7 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
         : _buildQuery(_withoutDartRules(criteria)).watch();
     Stream<List<SongsTableData>> buildAllStream() {
       final narrowedIds = _narrowIdsForDartRules(dartRules, matchAll: false);
-      if (narrowedIds != null && narrowedIds.isEmpty) {
-        return Stream.value(const <SongsTableData>[]);
-      }
-      if (narrowedIds != null && narrowedIds.length <= 900) {
-        return _buildQuery(
-          _allLocal(criteria),
-          allowedIds: narrowedIds,
-        ).watch();
-      }
-      return _buildQuery(_allLocal(criteria)).watch();
+      return _watchSongsForIds(_allLocal(criteria), narrowedIds);
     }
 
     final Stream<List<SongsTableData>> allStream = trigger != null
@@ -723,12 +812,13 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
     final hasBpmRule =
         criteria.rules.any((r) => r.field == SmartRuleField.bpm);
     final hasRatingSort = criteria.sortBy == 'rating';
+    final hasBpmSort = criteria.sortBy == 'bpm';
 
     final triggers = <Stream<void>>[];
     if ((hasRatingRule || hasRatingSort) && _ratingStore != null) {
       triggers.add(_ratingStore!.changes);
     }
-    if (hasBpmRule && _bpmOverrideStore != null) {
+    if ((hasBpmRule || hasBpmSort) && _bpmOverrideStore != null) {
       triggers.add(_bpmOverrideStore!.changes);
     }
     if (triggers.isEmpty) return null;
@@ -838,8 +928,9 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
   List<SongsTableData> _postProcess(
     List<SongsTableData> songs,
     SmartCriteria criteria,
-    List<SmartRule> dartRules,
-  ) {
+    List<SmartRule> dartRules, {
+    bool forceDartSort = false,
+  }) {
     var list = songs;
     final ratingStore = _ratingStore;
     final bpmStore = _bpmOverrideStore;
@@ -857,11 +948,14 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
               )))
           .toList();
     }
-    if (criteria.sortBy == 'rating') {
-      list = _sortByRatingSnapshot(
+    if (criteria.sortBy == 'rating' ||
+        criteria.sortBy == 'bpm' ||
+        (forceDartSort && criteria.sortBy != null)) {
+      list = _sortSongsWithSnapshot(
         list,
-        ascending: criteria.sortAscending,
-        ratingSnapshot: ratingSnapshot,
+        criteria,
+        ratingSnapshot,
+        bpmSnapshot: bpmSnapshot,
       );
     }
     if (criteria.limit != null && criteria.limit! > 0) {
@@ -896,10 +990,15 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
                 )))
         .toList();
     // The union appends Dart-side matches after the SQL half, so every sort
-    // key needs a final Dart pass: 'rating' because it is prefs-backed, the
-    // rest because the SQL order no longer covers the whole union.
+    // key needs a final Dart pass: 'rating'/'bpm' because they are prefs-backed,
+    // the rest because the SQL order no longer covers the whole union.
     if (criteria.sortBy != null) {
-      list = _sortSongsWithSnapshot(list, criteria, ratingSnapshot);
+      list = _sortSongsWithSnapshot(
+        list,
+        criteria,
+        ratingSnapshot,
+        bpmSnapshot: bpmSnapshot,
+      );
     }
     if (criteria.limit != null && criteria.limit! > 0) {
       list = list.take(criteria.limit!).toList();
@@ -1042,7 +1141,34 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
     sorted.sort((a, b) {
       final cmp = ratingFor(a).compareTo(ratingFor(b));
       if (cmp != 0) return ascending ? cmp : -cmp;
-      return a.title.toLowerCase().compareTo(b.title.toLowerCase());
+      final titleCmp = a.title.toLowerCase().compareTo(b.title.toLowerCase());
+      return titleCmp != 0 ? titleCmp : a.id.compareTo(b.id);
+    });
+    return sorted;
+  }
+
+  List<SongsTableData> _sortByBpmSnapshot(
+    List<SongsTableData> songs, {
+    bool ascending = true,
+    Map<String, double> bpmSnapshot = const {},
+  }) {
+    double? bpmFor(SongsTableData s) =>
+        bpmSnapshot[PulsrAudioHandler.trackKeyFor(s)];
+
+    final sorted = List<SongsTableData>.from(songs);
+    sorted.sort((a, b) {
+      final ba = bpmFor(a);
+      final bb = bpmFor(b);
+      if (ba == null && bb == null) {
+        final titleCmp = a.title.toLowerCase().compareTo(b.title.toLowerCase());
+        return titleCmp != 0 ? titleCmp : a.id.compareTo(b.id);
+      }
+      if (ba == null) return 1;
+      if (bb == null) return -1;
+      final cmp = ba.compareTo(bb);
+      if (cmp != 0) return ascending ? cmp : -cmp;
+      final titleCmp = a.title.toLowerCase().compareTo(b.title.toLowerCase());
+      return titleCmp != 0 ? titleCmp : a.id.compareTo(b.id);
     });
     return sorted;
   }
@@ -1050,8 +1176,9 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
   List<SongsTableData> _sortSongsWithSnapshot(
     List<SongsTableData> songs,
     SmartCriteria criteria,
-    Map<String, int> ratingSnapshot,
-  ) {
+    Map<String, int> ratingSnapshot, {
+    Map<String, double> bpmSnapshot = const {},
+  }) {
     final sortBy = criteria.sortBy;
     if (sortBy == null) return songs;
     if (sortBy == 'rating') {
@@ -1061,17 +1188,26 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
         ratingSnapshot: ratingSnapshot,
       );
     }
-    return _sortSongs(songs, criteria, null);
+    if (sortBy == 'bpm') {
+      return _sortByBpmSnapshot(
+        songs,
+        ascending: criteria.sortAscending,
+        bpmSnapshot: bpmSnapshot,
+      );
+    }
+    return _sortSongs(songs, criteria, null, null);
   }
 
   /// Applies [criteria.sortBy]/[criteria.sortAscending] in Dart, used where
-  /// the SQL ordering cannot cover the whole candidate set (matchAny unions)
-  /// or the key is prefs-backed (rating). Unknown keys fall back to title.
+  /// the SQL ordering cannot cover the whole candidate set (matchAny/chunked
+  /// unions) or the key is prefs-backed (rating/bpm). Unknown keys fall back to
+  /// case-insensitive title.
   List<SongsTableData> _sortSongs(
     List<SongsTableData> songs,
     SmartCriteria criteria,
-    SongRatingStore? ratingStore,
-  ) {
+    SongRatingStore? ratingStore, [
+    BpmOverrideStore? bpmStore,
+  ]) {
     final sortBy = criteria.sortBy;
     if (sortBy == null) return songs;
     if (sortBy == 'rating') {
@@ -1081,8 +1217,24 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
         ratingSnapshot: ratingStore?.snapshotRatings() ?? const {},
       );
     }
+    if (sortBy == 'bpm') {
+      return _sortByBpmSnapshot(
+        songs,
+        ascending: criteria.sortAscending,
+        bpmSnapshot: bpmStore?.snapshot() ?? const {},
+      );
+    }
     final ascending = criteria.sortAscending;
     int compare(SongsTableData a, SongsTableData b) => switch (sortBy) {
+          'artist' => a.artist.toLowerCase().compareTo(b.artist.toLowerCase()),
+          'album' => () {
+              final alb = a.album.toLowerCase().compareTo(b.album.toLowerCase());
+              if (alb != 0) return ascending ? alb : -alb;
+              final disc =
+                  (a.discNumber ?? 0).compareTo(b.discNumber ?? 0);
+              if (disc != 0) return disc;
+              return (a.trackNumber ?? 0).compareTo(b.trackNumber ?? 0);
+            }(),
           'dateAdded' => (a.dateAdded ?? 0).compareTo(b.dateAdded ?? 0),
           'playCount' => a.playCount.compareTo(b.playCount),
           'lastPlayed' => (a.lastPlayed ?? 0).compareTo(b.lastPlayed ?? 0),
@@ -1092,9 +1244,16 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
         };
     final sorted = List<SongsTableData>.from(songs);
     sorted.sort((a, b) {
-      final cmp = compare(a, b);
-      if (cmp != 0) return ascending ? cmp : -cmp;
-      return a.title.toLowerCase().compareTo(b.title.toLowerCase());
+      if (sortBy == 'album') {
+        final cmp = compare(a, b);
+        if (cmp != 0) return cmp;
+      } else {
+        final cmp = compare(a, b);
+        if (cmp != 0) return ascending ? cmp : -cmp;
+      }
+      final titleCmp = a.title.toLowerCase().compareTo(b.title.toLowerCase());
+      final orientedTitle = ascending ? titleCmp : -titleCmp;
+      return orientedTitle != 0 ? orientedTitle : a.id.compareTo(b.id);
     });
     return sorted;
   }

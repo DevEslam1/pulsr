@@ -29,6 +29,9 @@ class YtDownloadProgress {
 }
 
 class _QueuedDownload {
+  static int _nextRunId = 0;
+
+  final int runId = ++_nextRunId;
   final SongsTableData song;
   final void Function(YtDownloadProgress)? onProgress;
   final Completer<Result<int>> completer;
@@ -43,6 +46,16 @@ class _QueuedDownload {
     required this.onProgress,
     required this.completer,
     this.quality,
+  });
+}
+
+class _TransferOutcome {
+  final int? verifiedHttpBytes;
+  final bool hasVerifiedHttpLength;
+
+  const _TransferOutcome({
+    this.verifiedHttpBytes,
+    this.hasVerifiedHttpLength = false,
   });
 }
 
@@ -66,7 +79,9 @@ bool _partsWorthKeeping(Object e) {
     final m = e.message.toLowerCase();
     return !m.contains('mismatch') &&
         !m.contains('incomplete') &&
-        !m.contains('missing');
+        !m.contains('missing') &&
+        !m.contains('416') &&
+        !m.contains('resume range');
   }
   return true;
 }

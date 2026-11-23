@@ -6,11 +6,13 @@
 part of 'download_repository_impl.dart';
 
 extension DownloadRepositoryExecution on DownloadRepositoryImpl {
-  Future<void> _executeTask(DownloadTask task) async {
+  Future<void> _executeTask(DownloadTask task, int runToken) async {
     final videoId = task.videoId;
     final completer = Completer<void>();
     _activeCompleters[videoId] = completer;
     _updateTask(task.copyWith(status: DownloadStatus.downloading));
+
+    bool isCurrentRun() => _activeRunTokens[videoId] == runToken;
 
     try {
       // No upfront resolve: YtDownloadService.download() resolves internally
@@ -42,7 +44,10 @@ extension DownloadRepositoryExecution on DownloadRepositoryImpl {
       Either<AppFailure, int>? result;
       // One initial attempt + up to 2 transient retries with backoff.
       for (var attempt = 0; attempt < 3; attempt++) {
-        if (_pausedVideoIds.contains(videoId) || !_tasks.containsKey(videoId)) {
+        if (!isCurrentRun() ||
+            _pausedVideoIds.contains(videoId) ||
+            _deletingVideoIds.contains(videoId) ||
+            !_tasks.containsKey(videoId)) {
           break;
         }
         if (attempt > 0) {
@@ -50,7 +55,9 @@ extension DownloadRepositoryExecution on DownloadRepositoryImpl {
           final backoffMs = (2000 << (attempt - 1)) +
               DownloadRepositoryImpl._random.nextInt(400);
           await Future.delayed(Duration(milliseconds: backoffMs));
-          if (_pausedVideoIds.contains(videoId) ||
+          if (!isCurrentRun() ||
+              _pausedVideoIds.contains(videoId) ||
+              _deletingVideoIds.contains(videoId) ||
               !_tasks.containsKey(videoId)) {
             break;
           }
@@ -73,7 +80,11 @@ extension DownloadRepositoryExecution on DownloadRepositoryImpl {
           songRow,
           bypassInternalQueue: true,
           onProgress: (p) {
-            if (_pausedVideoIds.contains(videoId)) return;
+            if (!isCurrentRun() ||
+                _pausedVideoIds.contains(videoId) ||
+                _deletingVideoIds.contains(videoId)) {
+              return;
+            }
             // A deleted task must not be resurrected by a late progress tick.
             final progressTask = _tasks[videoId];
             if (progressTask == null) return;
@@ -125,12 +136,9 @@ extension DownloadRepositoryExecution on DownloadRepositoryImpl {
       // A successful result means tagging/saving/indexing already completed in
       // the service, regardless of what the user did in the meantime.
       final completedId = result.getRight().toNullable();
+      if (!isCurrentRun()) return;
 
       if (_pausedVideoIds.contains(videoId) && completedId == null) {
-        _activeVideoIds.remove(videoId);
-        _activeCompleters.remove(videoId);
-        if (!completer.isCompleted) completer.complete();
-        _processQueue();
         return;
       }
       if (completedId != null && _pausedVideoIds.contains(videoId)) {
@@ -146,7 +154,7 @@ extension DownloadRepositoryExecution on DownloadRepositoryImpl {
       // service still finished the save+index (delete landed mid-tagging), the
       // library row and file it just produced must be removed too, otherwise
       // they linger untracked until a full scan.
-      if (!_tasks.containsKey(videoId)) {
+      if (!_tasks.containsKey(videoId) || _deletingVideoIds.contains(videoId)) {
         if (completedId != null) {
           try {
             await _libraryMaintenance.removeDownloadedArtifacts(
@@ -159,10 +167,6 @@ extension DownloadRepositoryExecution on DownloadRepositoryImpl {
                 error: e, stackTrace: st, category: 'Download');
           }
         }
-        _activeVideoIds.remove(videoId);
-        _activeCompleters.remove(videoId);
-        if (!completer.isCompleted) completer.complete();
-        _processQueue();
         return;
       }
 
@@ -171,6 +175,7 @@ extension DownloadRepositoryExecution on DownloadRepositoryImpl {
       // resurrecting a task the user had already removed.
       await result.fold(
         (failure) async {
+          if (!isCurrentRun() || _deletingVideoIds.contains(videoId)) return;
           // Classify via YtmErrorClassifier for localized message, but repository keeps raw for UI to map
           final current = _tasks[videoId];
           if (current == null) return;
@@ -278,6 +283,7 @@ extension DownloadRepositoryExecution on DownloadRepositoryImpl {
           }
 
           // Re-read after the async DB read: a delete may have landed meanwhile.
+          if (!isCurrentRun() || _deletingVideoIds.contains(videoId)) return;
           final latest = _tasks[videoId];
           if (latest == null) return;
           _updateTask(latest.copyWith(
@@ -309,7 +315,9 @@ extension DownloadRepositoryExecution on DownloadRepositoryImpl {
         },
       );
     } catch (e) {
-      if (_tasks.containsKey(videoId)) {
+      if (isCurrentRun() &&
+          _tasks.containsKey(videoId) &&
+          !_deletingVideoIds.contains(videoId)) {
         final current = _tasks[videoId] ?? task;
         _updateTask(current.copyWith(
           status: DownloadStatus.failed,
@@ -320,10 +328,10 @@ extension DownloadRepositoryExecution on DownloadRepositoryImpl {
         _ytDownloadService.releaseForeground(videoId);
       }
     } finally {
-      _pausingVideoIds.remove(videoId);
-      _activeVideoIds.remove(videoId);
-      _activeCompleters.remove(videoId);
-      if (!completer.isCompleted) completer.complete();
+      _releaseExecutionSlot(videoId, runToken, completer);
+      if (!_tasks.containsKey(videoId) && !_activeVideoIds.contains(videoId)) {
+        unawaited(_ytDownloadService.deleteArtifactsFor(videoId));
+      }
       _processQueue();
     }
   }

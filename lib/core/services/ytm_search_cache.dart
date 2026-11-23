@@ -5,6 +5,7 @@ import 'package:injectable/injectable.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../domain/models/ytm_track.dart';
 import '../utils/error_logger.dart';
+import '../utils/ytm_rate_limiter.dart' show AsyncMutex;
 
 /// Last successful results for a query, so an offline search is not a dead end.
 ///
@@ -19,83 +20,92 @@ class YtmSearchCache {
   static const int maxResultsPerEntry = 40;
   static const Duration ttl = Duration(days: 14);
 
+  final AsyncMutex _mutex = AsyncMutex();
+
   static String normalize(String query) => query.trim().toLowerCase();
 
-  Future<List<YtmTrack>> read(String query, {DateTime? now}) async {
-    final key = normalize(query);
-    if (key.isEmpty) return const [];
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final entries = _decode(prefs.getString(prefsKey));
-      final at = now ?? DateTime.now();
-      for (final entry in entries) {
-        if (entry.query != key) continue;
-        if (at.difference(entry.savedAt) > ttl) return const [];
-        return List<YtmTrack>.unmodifiable(entry.results);
-      }
-    } catch (e, st) {
-      ErrorLogger.log('Failed to read the YTM search cache',
-          error: e, stackTrace: st, category: 'YtmSearchCache');
-    }
-    return const [];
-  }
+  Future<List<YtmTrack>> read(String query, {DateTime? now}) =>
+      _mutex.run(() async {
+        final key = normalize(query);
+        if (key.isEmpty) return const [];
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          final entries = _decode(prefs.getString(prefsKey));
+          final at = now ?? DateTime.now();
+          for (final entry in entries) {
+            if (entry.query != key) continue;
+            if (at.difference(entry.savedAt) > ttl) return const [];
+            return List<YtmTrack>.unmodifiable(entry.results);
+          }
+        } catch (e, st) {
+          ErrorLogger.log('Failed to read the YTM search cache',
+              error: e, stackTrace: st, category: 'YtmSearchCache');
+        }
+        return const [];
+      });
 
   Future<void> write(
     String query,
     List<YtmTrack> results, {
     DateTime? now,
-  }) async {
-    final key = normalize(query);
-    if (key.isEmpty || results.isEmpty) return;
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final entries = _decode(prefs.getString(prefsKey))
-        ..removeWhere((entry) => entry.query == key);
-      entries.insert(
-        0,
-        _CacheEntry(
-          query: key,
-          savedAt: now ?? DateTime.now(),
-          results: List<YtmTrack>.unmodifiable(
-            results
-                .where((track) => track.videoId.isNotEmpty)
-                .take(maxResultsPerEntry),
-          ),
-        ),
-      );
-      if (entries.length > maxEntries) {
-        entries.removeRange(maxEntries, entries.length);
-      }
-      await prefs.setString(
-        prefsKey,
-        jsonEncode([
-          for (final entry in entries)
-            {
-              'q': entry.query,
-              'at': entry.savedAt.toIso8601String(),
-              'results': [for (final track in entry.results) track.toJson()],
-            },
-        ]),
-      );
-    } catch (e, st) {
-      ErrorLogger.log('Failed to write the YTM search cache',
-          error: e, stackTrace: st, category: 'YtmSearchCache');
-    }
-  }
+  }) =>
+      _mutex.run(() async {
+        final key = normalize(query);
+        if (key.isEmpty || results.isEmpty) return;
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          final entries = _decode(prefs.getString(prefsKey))
+            ..removeWhere((entry) => entry.query == key);
+          entries.insert(
+            0,
+            _CacheEntry(
+              query: key,
+              savedAt: now ?? DateTime.now(),
+              results: List<YtmTrack>.unmodifiable(
+                results
+                    .where((track) => track.videoId.isNotEmpty)
+                    .take(maxResultsPerEntry),
+              ),
+            ),
+          );
+          if (entries.length > maxEntries) {
+            entries.removeRange(maxEntries, entries.length);
+          }
+          await prefs.setString(
+            prefsKey,
+            jsonEncode([
+              for (final entry in entries)
+                {
+                  'q': entry.query,
+                  'at': entry.savedAt.toIso8601String(),
+                  'results': [for (final track in entry.results) track.toJson()],
+                },
+            ]),
+          );
+        } catch (e, st) {
+          ErrorLogger.log('Failed to write the YTM search cache',
+              error: e, stackTrace: st, category: 'YtmSearchCache');
+        }
+      });
 
-  Future<void> clear() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(prefsKey);
-    } catch (e, st) {
-      ErrorLogger.log('Failed to clear the YTM search cache',
-          error: e, stackTrace: st, category: 'YtmSearchCache');
-    }
-  }
+  Future<void> clear() => _mutex.run(() async {
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.remove(prefsKey);
+        } catch (e, st) {
+          ErrorLogger.log('Failed to clear the YTM search cache',
+              error: e, stackTrace: st, category: 'YtmSearchCache');
+        }
+      });
 
   static List<_CacheEntry> _decode(String? raw) {
     if (raw == null || raw.isEmpty) return [];
-    final decoded = jsonDecode(raw);
+    final dynamic decoded;
+    try {
+      decoded = jsonDecode(raw);
+    } catch (_) {
+      return [];
+    }
     if (decoded is! List) return [];
     final entries = <_CacheEntry>[];
     for (final item in decoded) {

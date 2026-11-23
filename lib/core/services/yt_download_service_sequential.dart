@@ -6,7 +6,7 @@
 part of 'yt_download_service.dart';
 
 extension YtDownloadServiceSequential on YtDownloadService {
-  Future<void> _downloadSequential(
+  Future<_TransferOutcome> _downloadSequential(
     Uri uri,
     File dest,
     _QueuedDownload task,
@@ -71,8 +71,9 @@ extension YtDownloadServiceSequential on YtDownloadService {
       resumeOffset = 0;
     }
 
-    final request = await _http.openUrl('GET', uri);
-    _trackRequest(task.song.remoteId, request);
+    final request =
+        await _http.openUrl('GET', uri).timeout(YtDownloadService._stallTimeout);
+    _trackRequest(task.runId, request);
     try {
       if (resumeOffset > 0) {
         YtDownloadTransferPolicy.applyHeaders(request, userAgent,
@@ -89,13 +90,13 @@ extension YtDownloadServiceSequential on YtDownloadService {
         final retryAfter = response.headers.value(HttpHeaders.retryAfterHeader);
         final retrySec = int.tryParse(retryAfter ?? '');
         // Drain body before throwing so connection reused
-        await response.drain<void>();
+        await YtDownloadHttpSupport.drainSmall(response);
         throw YtmException('YTM_429',
             'HTTP 429 Too Many Requests${retrySec != null ? ' Retry-After: $retrySec' : ''}');
       }
       if (response.statusCode == HttpStatus.forbidden ||
           response.statusCode == HttpStatus.unauthorized) {
-        await response.drain<void>();
+        await YtDownloadHttpSupport.drainSmall(response);
         throw YtmException('YTM_STREAM_EXPIRED',
             'HTTP ${response.statusCode} on stream request');
       }
@@ -105,7 +106,7 @@ extension YtDownloadServiceSequential on YtDownloadService {
       // five times could never succeed; drop the partial and start clean.
       if (resumeOffset > 0 &&
           response.statusCode == HttpStatus.requestedRangeNotSatisfiable) {
-        await response.drain<void>();
+        await YtDownloadHttpSupport.drainSmall(response);
         try {
           await partFile.delete();
         } catch (_) {
@@ -129,12 +130,17 @@ extension YtDownloadServiceSequential on YtDownloadService {
       }
 
       // Resume correctness: if we sent Range, server MUST reply 206. A 200 means it ignored Range
-      // → appending would corrupt file. Discard stale part and restart.
+      // → appending would corrupt file. Abort body and discard stale part + stamp.
       if (resumeOffset > 0) {
         if (response.statusCode == HttpStatus.ok) {
-          await response.drain<void>();
+          await YtDownloadHttpSupport.abortBody(response);
           try {
             await partFile.delete();
+          } catch (_) {
+            // Best-effort: failure intentionally ignored on this non-critical path.
+          }
+          try {
+            if (await stampFile.exists()) await stampFile.delete();
           } catch (_) {
             // Best-effort: failure intentionally ignored on this non-critical path.
           }
@@ -152,13 +158,13 @@ extension YtDownloadServiceSequential on YtDownloadService {
               retryCount: retryCount + 1); // FIX-A01
         }
         if (response.statusCode != HttpStatus.partialContent) {
-          await response.drain<void>();
+          await YtDownloadHttpSupport.drainSmall(response);
           throw DownloadFailure('HTTP ${response.statusCode} on resume');
         }
       } else {
         if (response.statusCode != HttpStatus.ok &&
             response.statusCode != HttpStatus.partialContent) {
-          await response.drain<void>();
+          await YtDownloadHttpSupport.drainSmall(response);
           throw DownloadFailure('HTTP ${response.statusCode} on stream request');
         }
       }
@@ -193,8 +199,7 @@ extension YtDownloadServiceSequential on YtDownloadService {
         // to hold the transfer open indefinitely with the progress bar frozen.
         await for (final chunk
             in response.timeout(YtDownloadService._stallTimeout)) {
-          if (task.isCanceled ||
-              _canceledVideoIds.contains(task.song.remoteId)) {
+          if (task.isCanceled) {
             throw const DownloadFailure('Download canceled');
           }
           await _assertTransferPolicy();
@@ -245,7 +250,7 @@ extension YtDownloadServiceSequential on YtDownloadService {
         }
       }
 
-      if (task.isCanceled || _canceledVideoIds.contains(task.song.remoteId)) {
+      if (task.isCanceled) {
         // Keep .part for resume if partially downloaded; don't delete on cancel (pause semantics)
         throw const DownloadFailure('Download canceled');
       }
@@ -305,8 +310,13 @@ extension YtDownloadServiceSequential on YtDownloadService {
           // Best-effort: failure intentionally ignored on this non-critical path.
         }
       }
+      return _TransferOutcome(
+        verifiedHttpBytes: expectedFinalSize,
+        hasVerifiedHttpLength:
+            expectedFinalSize != null && expectedFinalSize > 0,
+      );
     } finally {
-      _untrackRequest(task.song.remoteId, request);
+      _untrackRequest(task.runId, request);
     }
   }
 }

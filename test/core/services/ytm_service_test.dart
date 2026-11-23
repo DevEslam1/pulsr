@@ -552,15 +552,14 @@ void main() {
     });
 
     test('a bot challenge opens the service gate and the shared breaker', () {
-      // Two ledgers exist for two purposes — an escalating egress gate for the
-      // resolve chain, and per-signal policy/metrics — but they must agree on
-      // the one verdict they both represent, or one of them will happily retry
-      // a route the other has just declared blocked.
       final service = YtmService();
       service.debugClearBotCooldown();
       service.recordFailure('dQw4w9WgXcQ', const YtmException('BOT_CHALLENGE'));
 
       expect(service.isBotCoolingDown, isTrue);
+      expect(service.breaker.shouldAllow(YtmBlockSignal.botChallenge), isTrue);
+      service.recordFailure('dQw4w9WgXcQ', const YtmException('BOT_CHALLENGE'));
+      service.recordFailure('dQw4w9WgXcQ', const YtmException('BOT_CHALLENGE'));
       expect(service.breaker.shouldAllow(YtmBlockSignal.botChallenge), isFalse);
 
       service.debugClearBotCooldown();

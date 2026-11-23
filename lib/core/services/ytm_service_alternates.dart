@@ -46,6 +46,7 @@ extension YtmServiceAlternates on YtmService {
             cachedAltId,
             quality: quality,
             preferM4a: preferM4a,
+            allowAlternateFallback: false,
           );
           if (stream.url.trim().isNotEmpty &&
               _durationMatches(expectedDuration, stream.duration)) {
@@ -86,11 +87,11 @@ extension YtmServiceAlternates on YtmService {
     var resolveAttempts = 0;
 
     for (final q in queryList) {
-      if (outOfBudget()) break;
+      if (outOfBudget() || isBotCoolingDown) break;
       try {
         final tracks = await searchWithFallback(q, limit: 4);
         for (final cand in tracks) {
-          if (outOfBudget() || resolveAttempts >= 4) break;
+          if (outOfBudget() || isBotCoolingDown || resolveAttempts >= 4) break;
           final candId = cand.videoId;
           if (candId.isEmpty || testedIds.contains(candId)) continue;
           testedIds.add(candId);
@@ -123,6 +124,7 @@ extension YtmServiceAlternates on YtmService {
               candId,
               quality: quality,
               preferM4a: preferM4a,
+              allowAlternateFallback: false,
             );
             if (stream.url.trim().isNotEmpty) {
               if (!_isSameRecording(

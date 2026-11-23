@@ -118,28 +118,32 @@ class YtmCookieCodec {
       final name = nameValue.substring(0, eqIdx).trim();
       final value = nameValue.substring(eqIdx + 1).trim();
 
-      bool shouldDelete = false;
+      bool? maxAgeDeletes;
+      bool expiresDeletes = false;
       for (int i = 1; i < segments.length; i++) {
         final attr = segments[i].trim().toLowerCase();
         if (attr.startsWith('max-age=')) {
-          final maxAge = int.tryParse(attr.substring(8)) ?? 0;
-          if (maxAge <= 0) shouldDelete = true;
+          final maxAge = int.tryParse(attr.substring(8).trim());
+          if (maxAge != null) {
+            maxAgeDeletes = maxAge <= 0;
+          }
         }
         if (attr.startsWith('expires=')) {
           try {
             final expires =
                 HttpDate.parse(segments[i].trim().substring(8).trim());
             if (expires.isBefore(DateTime.now())) {
-              shouldDelete = true;
+              expiresDeletes = true;
             }
           } catch (_) {
             final fallbackExp = DateTime.tryParse(attr.substring(8));
             if (fallbackExp != null && fallbackExp.isBefore(DateTime.now())) {
-              shouldDelete = true;
+              expiresDeletes = true;
             }
           }
         }
       }
+      final shouldDelete = maxAgeDeletes ?? expiresDeletes;
 
       if (shouldDelete) {
         map.remove(name);

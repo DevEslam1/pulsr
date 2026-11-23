@@ -48,6 +48,13 @@ enum SessionValidationResult {
 class YtmAccountService {
   String? _cachedLikedSongsBrowseId;
   bool _isFetchingLikedSongs = false;
+  Future<List<YtmTrack>>? _likedSongsInFlight;
+  int _sessionGeneration = 0;
+  bool _disposed = false;
+  Future<void>? _initFuture;
+
+  YtmService? get _ytmService =>
+      getIt.isRegistered<YtmService>() ? getIt<YtmService>() : null;
 
   /// Session cookies are full Google auth credentials — stored in
   /// Keystore/Keychain-backed secure storage, never as plaintext prefs. (BUG-023)
@@ -88,12 +95,18 @@ class YtmAccountService {
   YtmAccountService(this._versionResolver);
 
   /// Shared persistent HTTP client for the Dart Innertube chain (login-state
-  http.Client _innertubeClient = http.Client();
+  http.Client? _innertubeClient;
+  http.Client get _http => _innertubeClient ??= http.Client();
 
   /// Swaps in a scripted client so tests can drive the Tier-1 player chain's
   /// timing without touching the network.
   @visibleForTesting
-  set debugInnertubeClient(http.Client client) => _innertubeClient = client;
+  set debugInnertubeClient(http.Client client) {
+    if (!identical(_innertubeClient, client)) {
+      _innertubeClient?.close();
+    }
+    _innertubeClient = client;
+  }
 
   String? _cookies;
   String? _accountName;
@@ -190,11 +203,19 @@ class YtmAccountService {
   String get _clientVersion => _versionResolver.clientVersion;
   String get _apiKey => _versionResolver.apiKey;
 
-  Future<void> init() async {
-    if (_isInitialized) return;
+  Future<void> init() {
+    if (_isInitialized) return Future.value();
+    return _initFuture ??= _initImpl().whenComplete(() {
+      _initFuture = null;
+    });
+  }
+
+  Future<void> _initImpl() async {
+    final initGen = _sessionGeneration;
     try {
       await _versionResolver.init();
       final rawNative = await getNativeCookiesFromDomains();
+      if (_disposed || initGen != _sessionGeneration) return;
       // The native store answers for several domains at once, so the same
       // `SAPISID` can appear twice with different values. Un-deduplicated, the
       // header carries both while buildAuthorizationHeader hashes only the first
@@ -207,19 +228,24 @@ class YtmAccountService {
         _cookies = nativeCookies;
         await _persistCookies(nativeCookies);
       } else {
-        _cookies = await _readStoredCookies();
+        final stored = await _readStoredCookies();
+        if (_disposed || initGen != _sessionGeneration) return;
+        _cookies = stored;
       }
       final prefs = await SharedPreferences.getInstance();
+      if (_disposed || initGen != _sessionGeneration) return;
       _accountName = prefs.getString(_accountNamePrefKey);
       _accountAvatar = prefs.getString(_accountAvatarPrefKey);
       _dataSyncId ??= prefs.getString(_dataSyncIdPrefKey);
 
       if (_cookies != null && _cookies!.isNotEmpty) {
-        final ytmService = getIt<YtmService>();
-        unawaited(ytmService.syncCookies(_cookies!));
-        final dsid = _dataSyncId;
-        if (dsid != null && dsid.isNotEmpty) {
-          unawaited(ytmService.setDataSyncId(dsid));
+        final ytmService = _ytmService;
+        if (ytmService != null) {
+          unawaited(ytmService.syncCookies(_cookies!));
+          final dsid = _dataSyncId;
+          if (dsid != null && dsid.isNotEmpty) {
+            unawaited(ytmService.setDataSyncId(dsid));
+          }
         }
 
         // Validate session asynchronously off the startup critical path so init() does
@@ -230,29 +256,46 @@ class YtmAccountService {
             final ok = await validateSession();
             // A login/sign-out completed while the old jar was being checked:
             // never apply the stale verdict to the new session.
-            if (_cookies != cookiesUnderValidation) return;
+            if (_disposed ||
+                initGen != _sessionGeneration ||
+                _cookies != cookiesUnderValidation) {
+              return;
+            }
             if (!ok) {
               await _deleteStoredCookies(); // dead session: wipe, don't poison WebView
               _cookies = null;
+              _accountName = null;
+              _accountAvatar = null;
               _clearAccountScopedCaches();
-              loginState.value = isLoggedIn;
               try {
-                await ytmService.clearNativeSession();
-                await ytmService.syncCookies('');
-              } catch (e, st) {
-                ErrorLogger.log(
-                  'Failed clearing native YTM session after invalid boot check',
-                  error: e,
-                  stackTrace: st,
-                  category: 'YTM_ACCOUNT',
-                );
+                final p = await SharedPreferences.getInstance();
+                await p.remove(_accountNamePrefKey);
+                await p.remove(_accountAvatarPrefKey);
+                await p.remove(_dataSyncIdPrefKey);
+              } catch (_) {}
+              loginState.value = isLoggedIn;
+              final service = _ytmService;
+              if (service != null) {
+                try {
+                  await service.clearNativeSession();
+                  await service.syncCookies('');
+                } catch (e, st) {
+                  ErrorLogger.log(
+                    'Failed clearing native YTM session after invalid boot check',
+                    error: e,
+                    stackTrace: st,
+                    category: 'YTM_ACCOUNT',
+                  );
+                }
               }
             } else {
               final freshDsid = _dataSyncId;
               if (freshDsid != null && freshDsid.isNotEmpty) {
-                await ytmService.setDataSyncId(freshDsid);
+                await _ytmService?.setDataSyncId(freshDsid);
               }
-              await _persistCookies(_cookies!);
+              if (_cookies != null && _cookies!.isNotEmpty) {
+                await _persistCookies(_cookies!);
+              }
             }
           } catch (e) {
             debugPrint('[YTM_ACCOUNT] Background session validation error: $e');
@@ -268,16 +311,29 @@ class YtmAccountService {
         try {
           final oauth = YtmOAuthService.shared;
           await oauth.init();
+          if (_disposed || initGen != _sessionGeneration) return;
           if (oauth.isSignedIn) {
             _oauthAccessToken = oauth.accessToken;
             _accountName ??= 'Google TV';
-            unawaited(oauth.ensureFresh());
+            unawaited(() async {
+              try {
+                final refreshed = await oauth.ensureFresh();
+                if (_disposed || initGen != _sessionGeneration) return;
+                if (refreshed) {
+                  _oauthAccessToken = oauth.accessToken;
+                } else if (oauth.lastRefreshFailedTerminally ||
+                    !oauth.isSignedIn) {
+                  await logout();
+                }
+              } catch (_) {}
+            }());
           }
         } catch (e) {
           debugPrint('[YTM_ACCOUNT] OAuth session restore failed: $e');
         }
       }
 
+      if (_disposed || initGen != _sessionGeneration) return;
       _isInitialized = true;
       loginState.value = isLoggedIn;
 
@@ -285,7 +341,9 @@ class YtmAccountService {
       // transiently blocked, or the harvest response lacked it). Bootstrap it in
       // the background so signed-in resolves can mint an account-bound poToken
       // instead of endlessly falling through to the guest chain.
-      if (isLoggedIn && (_dataSyncId == null || _dataSyncId!.isEmpty)) {
+      if (isLoggedIn &&
+          !isOAuthSession &&
+          (_dataSyncId == null || _dataSyncId!.isEmpty)) {
         unawaited(ensureDataSyncId());
       }
     } catch (e, st) {
@@ -298,16 +356,35 @@ class YtmAccountService {
   Future<SessionValidationResult> validateSessionDetailed() async {
     if (!isLoggedIn) return SessionValidationResult.invalid;
     try {
-      final res = await _postWithRetry(
-        Uri.parse('$_innertubeBrowseUrl&key=$_apiKey'),
-        headers: _buildHeaders(),
-        body: jsonEncode({
-          'context': _buildClientContext('WEB_REMIX'),
-          'browseId': 'FEmusic_home',
-        }),
-        baseTimeoutSeconds: 5,
-        maxAttempts: 1,
-      );
+      final res = isOAuthSession
+          ? await _postWithRetry(
+              Uri.parse('$_innertubeBrowseUrl&key=$_apiKey'),
+              headers: _buildHeaders(),
+              body: jsonEncode({
+                'context': _buildClientContext('WEB_REMIX'),
+                'browseId': 'FEmusic_library_playlists',
+              }),
+              baseTimeoutSeconds: 5,
+              maxAttempts: 1,
+            )
+          : await _postWithRetry(
+              Uri.parse(
+                  'https://www.youtube.com/youtubei/v1/account/account_menu?prettyPrint=false&key=$_apiKey'),
+              headers: _buildHeaders(origin: 'https://www.youtube.com')
+                ..['x-youtube-client-name'] = '1'
+                ..['x-youtube-client-version'] =
+                    _versionResolver.webClientVersion,
+              body: jsonEncode({
+                'context': {
+                  'client': {
+                    'clientName': 'WEB',
+                    'clientVersion': _versionResolver.webClientVersion,
+                  },
+                },
+              }),
+              baseTimeoutSeconds: 5,
+              maxAttempts: 1,
+            );
       // A 401 is Innertube rejecting the credential itself, which is as
       // definitive as a logged-out body; answering `unknown` for it kept a dead
       // session installed so every later request failed with no way back to the
@@ -335,7 +412,22 @@ class YtmAccountService {
         return SessionValidationResult.invalid; // definitive
       }
       _harvestSessionState(json);
-      return SessionValidationResult.valid;
+      final hasIdentity = _extractDataSyncId(json) != null ||
+          _findShelfNode(json, 'activeAccountHeaderRenderer') != null;
+      if (hasIdentity) {
+        return SessionValidationResult.valid;
+      }
+      if (isOAuthSession &&
+          (json.containsKey('contents') || json.containsKey('header'))) {
+        return SessionValidationResult.valid;
+      }
+      // Ambiguous browse stub (e.g. test fixtures with `contents` only) stays
+      // unknown so non-auth payloads never forge `.valid`, while responses
+      // without identity or browse contents (logged-out menu) are invalid.
+      if (json.containsKey('contents')) {
+        return SessionValidationResult.unknown;
+      }
+      return SessionValidationResult.invalid;
     } on YtmException catch (e) {
       return e.isAuth
           ? SessionValidationResult.invalid
@@ -458,22 +550,27 @@ class YtmAccountService {
           '[YTM_ACCOUNT] Refusing to save a cookie jar with no session cookies');
       return false;
     }
+    final gen = ++_sessionGeneration;
     _oauthAccessToken = null;
     _accountAvatar = null;
     _clearAccountScopedCaches();
     _cookies = jar;
     await _persistCookies(jar);
+    if (_disposed || gen != _sessionGeneration) return false;
 
     // Sync to native CookieManager and invalidate stale poTokens
-    final ytmService = getIt<YtmService>();
-    await ytmService.syncCookies(jar);
-    await ytmService.invalidatePoToken();
+    final ytmService = _ytmService;
+    if (ytmService != null) {
+      await ytmService.syncCookies(jar);
+      await ytmService.invalidatePoToken();
+    }
 
     // ACCOUNT_CHOOSER / LOGIN_INFO hold opaque base64 blobs, not human names.
     // Use a stable honest label; real account metadata is harvested later.
     const name = 'YouTube Music Account';
     _accountName = name;
     final prefs = await SharedPreferences.getInstance();
+    if (_disposed || gen != _sessionGeneration) return false;
     await prefs.setString(_accountNamePrefKey, name);
     await prefs.remove(_accountAvatarPrefKey);
     await prefs.remove(_dataSyncIdPrefKey);
@@ -489,6 +586,7 @@ class YtmAccountService {
       } catch (e) {
         debugPrint('[YTM_ACCOUNT] Session warming failed (non-fatal): $e');
       }
+      if (_disposed || gen != _sessionGeneration) return;
       // If _warmSession didn't harvest a dataSyncId (e.g. home browse returned
       // an unexpected shape), do an explicit lightweight bootstrap fetch.
       if (_dataSyncId == null || _dataSyncId!.isEmpty) {
@@ -509,15 +607,18 @@ class YtmAccountService {
 
   /// Adopts a freshly-completed Google TV OAuth device-flow session and
   Future<void> adoptOAuthSession() async {
+    final gen = ++_sessionGeneration;
     final oauth = YtmOAuthService.shared;
     await oauth.init();
     if (!await oauth.ensureFresh()) return;
+    if (_disposed || gen != _sessionGeneration) return;
     _cookies = null;
     _clearAccountScopedCaches();
     _oauthAccessToken = oauth.accessToken;
     _accountName = 'Google TV';
     _accountAvatar = null;
     final prefs = await SharedPreferences.getInstance();
+    if (_disposed || gen != _sessionGeneration) return;
     await prefs.setString(_accountNamePrefKey, _accountName!);
     await prefs.remove(_accountAvatarPrefKey);
     await prefs.remove(_dataSyncIdPrefKey);
@@ -525,6 +626,7 @@ class YtmAccountService {
     // Warm session state (visitorData) off the critical path.
     unawaited(() async {
       try {
+        if (_disposed || gen != _sessionGeneration) return;
         await _warmSession();
       } catch (_) {
         // Best-effort: failure intentionally ignored on this non-critical path.
@@ -533,6 +635,7 @@ class YtmAccountService {
   }
 
   Future<void> logout() async {
+    _sessionGeneration++;
     _cookies = null;
     _oauthAccessToken = null;
     _accountName = null;
@@ -561,13 +664,15 @@ class YtmAccountService {
       // Best-effort: failure intentionally ignored on this non-critical path.
     }
     try {
-      final ytmService = getIt<YtmService>();
-      // Marks the native store signed out, expires the tracked cookie names in
-      // CookieManager, and drops the account-bound poToken + dataSyncId. Plain
-      // `syncCookies('')` does none of the last three.
-      await ytmService.clearNativeSession();
-      await ytmService.syncCookies('');
-      await ytmService.invalidatePoToken();
+      final ytmService = _ytmService;
+      if (ytmService != null) {
+        // Marks the native store signed out, expires the tracked cookie names in
+        // CookieManager, and drops the account-bound poToken + dataSyncId. Plain
+        // `syncCookies('')` does none of the last three.
+        await ytmService.clearNativeSession();
+        await ytmService.syncCookies('');
+        await ytmService.invalidatePoToken();
+      }
     } catch (_) {
       // Best-effort: failure intentionally ignored on this non-critical path.
     }
@@ -639,7 +744,7 @@ class YtmAccountService {
         if (_isUnauthenticatedResponse(json)) {
           debugPrint(
               '[YTM_ACCOUNT] Warmed session returned unauthenticated — keeping session, notifying expiry check');
-          getIt<YtmService>().notifyAuthExpired();
+          _ytmService?.notifyAuthExpired();
           return;
         }
         try {
@@ -671,8 +776,29 @@ class YtmAccountService {
     unawaited(_persistCookies(merged));
     // Keep the native cookie store (used by the extractor) in sync with the
     // refreshed jar so the two layers never drift apart.
+    final ytm = _ytmService;
+    if (ytm != null) {
+      unawaited(ytm.syncCookies(merged));
+    }
+  }
+
+  /// Hydrates cookie jar from native CookieManager only when no OAuth session
+  /// or in-memory cookie jar is active, so background/native cookies never
+  /// overwrite an OAuth session or rotated session cookies.
+  Future<void> _maybeHydrateNativeCookies() async {
+    if (isOAuthSession || (_cookies != null && _cookies!.isNotEmpty)) return;
     try {
-      unawaited(getIt<YtmService>().syncCookies(merged));
+      final rawNative = await getNativeCookiesFromDomains();
+      final nativeCookies =
+          rawNative == null ? null : scopeCookiesForYouTube(rawNative);
+      if (nativeCookies != null &&
+          nativeCookies.isNotEmpty &&
+          looksLikeSignedInCookies(nativeCookies) &&
+          !isOAuthSession &&
+          (_cookies == null || _cookies!.isEmpty)) {
+        _cookies = nativeCookies;
+        unawaited(_persistCookies(nativeCookies));
+      }
     } catch (_) {
       // Best-effort: failure intentionally ignored on this non-critical path.
     }
@@ -728,6 +854,17 @@ class YtmAccountService {
   /// Re-derives the credential-bearing headers from the live cookie jar just
   Map<String, String>? _resignHeaders(Map<String, String>? headers) {
     if (headers == null) return null;
+    if (!isLoggedIn) {
+      if (!headers.containsKey('Cookie') &&
+          !headers.containsKey('Authorization') &&
+          !headers.containsKey('x-goog-authuser')) {
+        return headers;
+      }
+      return Map<String, String>.from(headers)
+        ..remove('Cookie')
+        ..remove('Authorization')
+        ..remove('x-goog-authuser');
+    }
     // OAuth sessions re-read the (possibly just refreshed) bearer so a retry
     // after a 401 never replays the stale token.
     if (isOAuthSession) {
@@ -926,28 +1063,32 @@ class YtmAccountService {
         // Best-effort: failure intentionally ignored on this non-critical path.
       }
     }
+    var oauthRetriedAfter401 = false;
     for (var attempt = 0; attempt < maxAttempts; attempt++) {
       try {
         await YtmRateLimiter.shared
             .acquirePermit(maxWait: const Duration(seconds: 10));
         final timeout = Duration(seconds: baseTimeoutSeconds + attempt * 5);
-        final res = await _innertubeClient
+        final res = await _http
             .post(uri, headers: _resignHeaders(headers), body: body)
             .timeout(timeout);
-        // A 401 on an OAuth session is an expired bearer: refresh and retry.
+        // A 401 on an OAuth session is an expired bearer: refresh and retry
+        // once even when maxAttempts == 1 (e.g. validation calls).
         if (res.statusCode == 401 &&
             isOAuthSession &&
-            attempt < maxAttempts - 1) {
+            !oauthRetriedAfter401) {
+          oauthRetriedAfter401 = true;
           final refreshed = await YtmOAuthService.shared.refresh();
           if (refreshed) {
             _oauthAccessToken = YtmOAuthService.shared.accessToken;
+            attempt--;
             continue;
           }
           if (YtmOAuthService.shared.lastRefreshFailedTerminally) {
             // Refresh rejected by the server: the bearer is dead. Invalidate
             // the session so the UI stops claiming it is connected.
             await logout();
-            return res;
+            throw const YtmException('YTM_AUTH', 'Session expired');
           }
           // Transient refresh failure (offline/timeout): keep the session and
           // report a retryable offline error instead of signing the user out.
@@ -1072,7 +1213,7 @@ class YtmAccountService {
               await logout();
               throw const YtmException('YTM_AUTH', 'Session expired');
             }
-            getIt<YtmService>().notifyAuthExpired();
+            _ytmService?.notifyAuthExpired();
             continue;
           }
 
@@ -1161,27 +1302,31 @@ class YtmAccountService {
   }
 
   /// Fetches private Liked Music playlist (VLLM, FEmusic_liked_videos, LM).
-  Future<List<YtmTrack>> fetchLikedSongs({int maxTracks = 200}) async {
+  Future<List<YtmTrack>> fetchLikedSongs({int maxTracks = 200}) {
     if (!isLoggedIn) {
-      throw const YtmException('YTM_AUTH', 'Not signed in to YouTube Music');
+      return Future.error(
+        const YtmException('YTM_AUTH', 'Not signed in to YouTube Music'),
+      );
     }
-    if (_isFetchingLikedSongs) {
-      debugPrint('[YTM_ACCOUNT] Re-entrant fetchLikedSongs call aborted');
-      return [];
+    final existing = _likedSongsInFlight;
+    if (existing != null) {
+      return existing.then((tracks) => tracks.take(maxTracks).toList());
     }
     _isFetchingLikedSongs = true;
-
-    try {
-      // Refresh cookies from native CookieManager if needed
-      final rawNative = await getNativeCookiesFromDomains();
-      final nativeCookies =
-          rawNative == null ? null : scopeCookiesForYouTube(rawNative);
-      if (nativeCookies != null &&
-          nativeCookies.isNotEmpty &&
-          looksLikeSignedInCookies(nativeCookies)) {
-        _cookies = nativeCookies;
-        unawaited(_persistCookies(nativeCookies));
+    late final Future<List<YtmTrack>> future;
+    future = _fetchLikedSongsImpl(maxTracks: maxTracks).whenComplete(() {
+      if (identical(_likedSongsInFlight, future)) {
+        _likedSongsInFlight = null;
+        _isFetchingLikedSongs = false;
       }
+    });
+    _likedSongsInFlight = future;
+    return future;
+  }
+
+  Future<List<YtmTrack>> _fetchLikedSongsImpl({int maxTracks = 200}) async {
+    try {
+      await _maybeHydrateNativeCookies();
 
       final headers = _buildHeaders();
       final orderedBrowseIds = {
@@ -1429,9 +1574,10 @@ class YtmAccountService {
         try {
           debugPrint(
               '[YTM_ACCOUNT] Attempting Native Kotlin Innertube fallback for liked songs...');
-          final ytmService = getIt<YtmService>();
-          final nativeTracks =
-              await ytmService.getPlaylistTracks('VLLM', limit: maxTracks);
+          final ytmService = _ytmService;
+          final nativeTracks = ytmService == null
+              ? const <YtmTrack>[]
+              : await ytmService.getPlaylistTracks('VLLM', limit: maxTracks);
           if (nativeTracks.isNotEmpty) {
             debugPrint(
                 '[YTM_ACCOUNT] Native Kotlin fallback returned ${nativeTracks.length} liked songs');
@@ -1443,8 +1589,8 @@ class YtmAccountService {
       }
 
       return [];
-    } finally {
-      _isFetchingLikedSongs = false;
+    } catch (e) {
+      rethrow;
     }
   }
 
@@ -1483,20 +1629,7 @@ class YtmAccountService {
       );
     }
 
-    // Refresh cookies from native CookieManager if needed
-    try {
-      final rawNative = await getNativeCookiesFromDomains();
-      final nativeCookies =
-          rawNative == null ? null : scopeCookiesForYouTube(rawNative);
-      if (nativeCookies != null &&
-          nativeCookies.isNotEmpty &&
-          looksLikeSignedInCookies(nativeCookies)) {
-        _cookies = nativeCookies;
-        unawaited(_persistCookies(nativeCookies));
-      }
-    } catch (_) {
-      // Best-effort: failure intentionally ignored on this non-critical path.
-    }
+    await _maybeHydrateNativeCookies();
 
     final headers = _buildHeaders();
     final cleanRawId =
@@ -1921,15 +2054,7 @@ class YtmAccountService {
   Future<List<YtmTrack>> fetchHomeRecommendations({int maxTracks = 50}) async {
     if (!isLoggedIn) return [];
 
-    final rawNative = await getNativeCookiesFromDomains();
-    final nativeCookies =
-        rawNative == null ? null : scopeCookiesForYouTube(rawNative);
-    if (nativeCookies != null &&
-        nativeCookies.isNotEmpty &&
-        looksLikeSignedInCookies(nativeCookies)) {
-      _cookies = nativeCookies;
-      unawaited(_persistCookies(nativeCookies));
-    }
+    await _maybeHydrateNativeCookies();
 
     final headers = _buildHeaders();
 
@@ -2133,8 +2258,10 @@ class YtmAccountService {
 
   /// Resolves an audio stream using multi-client priority fallback:
   Future<String?> _mintPlayerPoToken(String videoId) async {
+    final ytm = _ytmService;
+    if (ytm == null) return null;
     try {
-      return await getIt<YtmService>()
+      return await ytm
           .getPlayerPoToken(videoId)
           .timeout(const Duration(seconds: 4));
     } catch (e, st) {
@@ -2195,10 +2322,10 @@ class YtmAccountService {
     // Warm the native BotGuard attestation once so both the account-bound and
     // guest minting below have a live generator instead of a cold WebView.
     final tokenReady = () async {
+      final ytm = _ytmService;
+      if (ytm == null) return;
       try {
-        await getIt<YtmService>()
-            .ensurePoTokenReady()
-            .timeout(const Duration(seconds: 2));
+        await ytm.ensurePoTokenReady().timeout(const Duration(seconds: 2));
       } catch (_) {
         // Best-effort: failure intentionally ignored on this non-critical path.
       }
@@ -2234,8 +2361,10 @@ class YtmAccountService {
     final guestState = !guestClientsEnabled
         ? Future<void>.value()
         : () async {
+            final ytm = _ytmService;
+            if (ytm == null) return;
             try {
-              final poState = await getIt<YtmService>()
+              final poState = await ytm
                   .getPoTokenState()
                   .timeout(const Duration(seconds: 2));
               guestPoToken = poState?['streamingPoToken'] as String?;
@@ -2267,12 +2396,15 @@ class YtmAccountService {
             'running Tier-1 as a guest pass (no session cookies).');
         useSessionAuth = false;
       } else {
-        accountMint = () async {
-          final account = await getIt<YtmService>()
-              .getAccountPoToken(dsid)
-              .timeout(const Duration(seconds: 2));
-          return account;
-        }();
+        final ytm = _ytmService;
+        if (ytm != null) {
+          accountMint = () async {
+            final account = await ytm
+                .getAccountPoToken(dsid)
+                .timeout(const Duration(seconds: 2));
+            return account;
+          }();
+        }
       }
     }
     if (!useSessionAuth) {
@@ -2643,7 +2775,7 @@ class YtmAccountService {
             debugPrint(
                 '[YTM_ACCOUNT] Client $client returned status $status but no direct audio formats (adaptiveFormats: ${adaptive.length} total, ciphered: $hasCipheredAudio)');
             if (hasCipheredAudio) {
-              if (acceptsSessionAuth) {
+              if (acceptsSessionAuth && !guestClientsEnabled) {
                 debugPrint(
                     '[YTM_ACCOUNT] WEB_REMIX formats require native decipher; handing off to native tier');
                 return null;
@@ -2837,7 +2969,7 @@ class YtmAccountService {
       }).catchError((e) {
         debugPrint('[YTM_ACCOUNT] Failed to persist dataSyncId: $e');
       }));
-      getIt<YtmService>().setDataSyncId(dsid);
+      _ytmService?.setDataSyncId(dsid);
     }
     final rc = json['responseContext'];
     if (rc is Map<String, dynamic>) {
@@ -2892,7 +3024,7 @@ class YtmAccountService {
 
   /// Public, throttled trigger for [_bootstrapDataSyncId].
   Future<void> ensureDataSyncId() async {
-    if (!isLoggedIn) return;
+    if (!isLoggedIn || isOAuthSession) return;
     final existing = _dataSyncId;
     if (existing != null && existing.isNotEmpty) return;
     if (_dataSyncBootstrapInFlight) return;
@@ -2912,10 +3044,12 @@ class YtmAccountService {
 
   @disposeMethod
   void dispose() {
+    _disposed = true;
     _sessionHarvestDebounce?.cancel();
     loginState.dispose();
     try {
-      _innertubeClient.close();
+      _innertubeClient?.close();
+      _innertubeClient = null;
     } catch (_) {
       // Best-effort: failure intentionally ignored on this non-critical path.
     }
