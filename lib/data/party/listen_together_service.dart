@@ -88,12 +88,29 @@ class ListenTogetherService {
 
   // Drift correction state
   int _lastHandledSeq = -1;
+  String? _activePartyTrackVideoId;
+  int? _activePartyMatchedSongId;
 
   @visibleForTesting
   int get lastHandledSeq => _lastHandledSeq;
 
   @visibleForTesting
   set debugLastHandledSeq(int val) => _lastHandledSeq = val;
+
+  @visibleForTesting
+  String? get activePartyTrackVideoId => _activePartyTrackVideoId;
+
+  @visibleForTesting
+  int? get activePartyMatchedSongId => _activePartyMatchedSongId;
+
+  @visibleForTesting
+  void setMatchedLocalTrackForTesting({
+    required String partyVideoId,
+    required int localSongId,
+  }) {
+    _activePartyTrackVideoId = partyVideoId;
+    _activePartyMatchedSongId = localSongId;
+  }
 
   /// Local monotonic time before which reconciliation must stay quiet, so a
   /// track load or a seek is not immediately re-corrected by the next tick.
@@ -133,16 +150,45 @@ class ListenTogetherService {
     _bindPlayerCubitEvents();
   }
 
+  /// Normalizes a candidate party server URL, converting `ws://` -> `http://`
+  /// and `wss://` -> `https://` and defaulting bare hosts to `https://`.
+  static String normalizeServerUrl(String raw) {
+    var url = raw.trim();
+    while (url.endsWith('/')) {
+      url = url.substring(0, url.length - 1);
+    }
+    if (url.isEmpty) return '';
+    final lower = url.toLowerCase();
+    if (lower.startsWith('wss://')) {
+      return 'https://${url.substring(6)}';
+    }
+    if (lower.startsWith('ws://')) {
+      return 'http://${url.substring(5)}';
+    }
+    if (lower.startsWith('http://') || lower.startsWith('https://')) {
+      return url;
+    }
+    if (lower.contains('://')) {
+      return url;
+    }
+    return 'https://$url';
+  }
+
   /// Validates a candidate server URL against [RemoteTargetPolicy].
   ///
   /// Rejects insecure `http://` targets unless they target an explicit local or
   /// LAN address (such as localhost or private RFC-1918 space for local dev).
   static bool isValidServerUrl(String raw) {
-    final uri = Uri.tryParse(raw.trim());
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) return false;
+    final normalized = normalizeServerUrl(trimmed);
+    final uri = Uri.tryParse(normalized);
     if (uri == null || uri.host.isEmpty) return false;
+    final scheme = uri.scheme.toLowerCase();
+    if (scheme != 'http' && scheme != 'https') return false;
     final isLocal = RemoteTargetPolicy.isUnsafeHost(uri.host);
     final verdict = RemoteTargetPolicy.classify(
-      raw.trim(),
+      normalized,
       requireHttps: !isLocal,
       allowedHostSuffixes: isLocal ? {uri.host} : const {},
     );
@@ -154,7 +200,7 @@ class ListenTogetherService {
     final prefs = await SharedPreferences.getInstance();
     final custom = prefs.getString(prefCustomServerKey)?.trim();
     if (custom != null && custom.isNotEmpty) {
-      final normalized = _normalizeUrl(custom);
+      final normalized = normalizeServerUrl(custom);
       if (isValidServerUrl(normalized)) {
         return normalized;
       }
@@ -167,23 +213,12 @@ class ListenTogetherService {
     if (url == null || url.trim().isEmpty) {
       await prefs.remove(prefCustomServerKey);
     } else {
-      final normalized = _normalizeUrl(url.trim());
+      final normalized = normalizeServerUrl(url.trim());
       if (!isValidServerUrl(normalized)) {
         throw ArgumentError('The party server address is not allowed.');
       }
       await prefs.setString(prefCustomServerKey, normalized);
     }
-  }
-
-  String _normalizeUrl(String raw) {
-    var url = raw.trim();
-    while (url.endsWith('/')) {
-      url = url.substring(0, url.length - 1);
-    }
-    if (!url.startsWith('http://') && !url.startsWith('https://')) {
-      url = 'https://$url';
-    }
-    return url;
   }
 
   String _resolveWsBase(String httpBase) {
@@ -286,10 +321,16 @@ class ListenTogetherService {
     final identity = await _buildIdentity(nickname);
 
     final url = Uri.parse('$serverBase/api/parties/$cleanedCode/join');
+    final headers = <String, String>{'Content-Type': 'application/json'};
+    if (_activeCode == cleanedCode &&
+        _activeToken != null &&
+        _activeToken!.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $_activeToken';
+    }
     final resp = await _httpClient
         .post(
           url,
-          headers: {'Content-Type': 'application/json'},
+          headers: headers,
           body: jsonEncode(identity.toJson()),
         )
         .timeout(const Duration(seconds: 12));
@@ -324,6 +365,8 @@ class ListenTogetherService {
     _reconnectScheduled = false;
     _reconnectAttempts = 0;
     _lastHandledSeq = -1;
+    _activePartyTrackVideoId = null;
+    _activePartyMatchedSongId = null;
     _clock.reset();
     clockSynced.value = false;
     roundTripMs.value = 0;
@@ -519,11 +562,18 @@ class ListenTogetherService {
 
   void _sendPing() {
     final clientMs = _clock.nowMs();
+    _clock.registerPing(clientMs);
     _sendFrame({
       'type': 'ping',
       'clientMs': clientMs,
     });
   }
+
+  @visibleForTesting
+  void sendPingForTesting() => _sendPing();
+
+  @visibleForTesting
+  void handleWebSocketMessageForTesting(String raw) => _onWebSocketMessage(raw);
 
   void _sendFrame(Map<String, dynamic> frame) {
     if (_channel == null) return;
@@ -677,8 +727,9 @@ class ListenTogetherService {
           : lastPosition;
       final seeked = (state.position - expectedPosition).abs() >
           const Duration(seconds: 2);
-      final changed =
-          songKey != lastSongKey || state.isPlaying != lastPlaying || seeked;
+      final trackChanged = songKey != lastSongKey;
+      final playingChanged = state.isPlaying != lastPlaying;
+      final changed = trackChanged || playingChanged || seeked;
       final heartbeatDue = lastAt == null ||
           now.difference(lastAt!) >= const Duration(milliseconds: 1000);
       if (!changed && !(state.isPlaying && heartbeatDue)) return;
@@ -686,41 +737,87 @@ class ListenTogetherService {
       lastPosition = state.position;
       lastSongKey = songKey;
       lastPlaying = state.isPlaying;
-      unawaited(_broadcastHostPlayback(
-          state.currentSong, state.isPlaying, state.position));
+      unawaited(_syncHostPlayback(
+        song: state.currentSong,
+        isPlaying: state.isPlaying,
+        position: state.position,
+        trackChanged: trackChanged,
+        playingChanged: playingChanged,
+        seeked: seeked,
+      ));
     });
   }
 
-  Future<void> _broadcastHostPlayback(
-      SongsTableData? song, bool isPlaying, Duration position) async {
+  Future<void> _syncHostPlayback({
+    required SongsTableData? song,
+    required bool isPlaying,
+    required Duration position,
+    required bool trackChanged,
+    required bool playingChanged,
+    required bool seeked,
+  }) async {
     if (!inParty) return;
 
     await _resolveOutputLatencyMs();
-    final serverNow =
-        _clock.serverNowMs() ?? DateTime.now().millisecondsSinceEpoch;
-    final track = song != null
-        ? PartyTrack(
-            videoId: song.remoteId ?? song.id.toString(),
-            title: song.title,
-            artist: song.artist,
-            thumbnailUrl: song.remoteArtworkUrl ?? song.artworkUri,
-            durationMs: song.durationMs,
-          )
-        : null;
+    final audiblePosMs = PartySyncController.audibleAnchorPositionMs(
+      hostRenderPositionMs: position.inMilliseconds,
+      hostOutputLatencyMs: _outputLatencyMs,
+    );
 
+    if (trackChanged) {
+      if (song == null) {
+        _sendFrame({
+          'type': 'control',
+          'action': 'pause',
+          'positionMs': 0,
+        });
+        return;
+      }
+      final track = PartyTrack(
+        videoId: song.remoteId ?? song.id.toString(),
+        title: song.title,
+        artist: song.artist,
+        thumbnailUrl: song.remoteArtworkUrl ?? song.artworkUri,
+        durationMs: song.durationMs,
+      );
+      _sendFrame({
+        'type': 'control',
+        'action': 'setTrack',
+        'track': track.toJson(),
+        'isPlaying': isPlaying,
+        // Publish AUDIBLE time, not the position this device rendered: followers
+        // align to whatever this value says, so the host's own speaker delay has to
+        // be part of the timeline rather than a private offset everyone inherits.
+        'positionMs': audiblePosMs,
+      });
+      return;
+    }
+
+    if (playingChanged) {
+      _sendFrame({
+        'type': 'control',
+        'action': isPlaying ? 'play' : 'pause',
+        'positionMs': audiblePosMs,
+      });
+      return;
+    }
+
+    if (seeked) {
+      _sendFrame({
+        'type': 'control',
+        'action': 'seek',
+        'positionMs': audiblePosMs,
+      });
+      return;
+    }
+
+    // Periodic heartbeat when track and transport state have not changed:
+    // emit lightweight report frame so server does not reset AnchorMs (+350ms)
+    // or spam activity messages every second.
     _sendFrame({
-      'type': 'control',
-      'action': 'setTrack',
-      'track': track?.toJson(),
-      'isPlaying': isPlaying,
-      // Publish AUDIBLE time, not the position this device rendered: followers
-      // align to whatever this value says, so the host's own speaker delay has to
-      // be part of the timeline rather than a private offset everyone inherits.
-      'positionMs': PartySyncController.audibleAnchorPositionMs(
-        hostRenderPositionMs: position.inMilliseconds,
-        hostOutputLatencyMs: _outputLatencyMs,
-      ),
-      'anchorMs': serverNow,
+      'type': 'report',
+      'positionMs': audiblePosMs,
+      'playing': isPlaying,
     });
   }
 
@@ -835,7 +932,13 @@ class ListenTogetherService {
 
       // 1. Reconcile Track: verify current track matches target videoId
       final currentSong = playerState.currentSong;
-      final currentVideoId = currentSong?.remoteId ?? currentSong?.id.toString();
+      final isMatchedLocalSong = currentSong != null &&
+          _activePartyTrackVideoId == targetTrack.videoId &&
+          _activePartyMatchedSongId != null &&
+          currentSong.id == _activePartyMatchedSongId;
+      final currentVideoId = isMatchedLocalSong
+          ? targetTrack.videoId
+          : (currentSong?.remoteId ?? currentSong?.id.toString());
 
       if (forceTrackReconciliation || currentVideoId != targetTrack.videoId) {
         if (currentVideoId != targetTrack.videoId) {
@@ -920,6 +1023,9 @@ class ListenTogetherService {
       artworkUrl: track.thumbnailUrl,
     ).toSongData();
 
+    _activePartyTrackVideoId = track.videoId;
+    _activePartyMatchedSongId = match.id;
+
     final targetPos = effectivePartyPositionMs(playback) ?? playback.positionMs;
 
     await playerCubit.playSong(
@@ -956,6 +1062,31 @@ class ListenTogetherService {
     _sendFrame({'type': 'control', 'action': 'previous'});
   }
 
+  void sendKick(String memberId) {
+    _sendFrame({
+      'type': 'control',
+      'action': 'kick',
+      'memberId': memberId,
+    });
+  }
+
+  void sendSetHostOnlyControl(bool enabled) {
+    _sendFrame({
+      'type': 'control',
+      'action': 'setHostOnlyControl',
+      'enabled': enabled,
+    });
+  }
+
+  void sendQueueRemove(String videoId) {
+    _sendFrame({
+      'type': 'control',
+      'action': 'queueRemove',
+      'videoId': videoId,
+    });
+  }
+
+  @disposeMethod
   void dispose() {
     _reconnectTimer?.cancel();
     _reconnectTimer = null;

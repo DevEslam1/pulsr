@@ -136,8 +136,8 @@ class StreamUrlVerifier {
 
   /// Whether [url] is a YouTube media CDN endpoint worth probing.
   ///
-  /// Only the CDN answers the question this class asks. Anything else returns
-  /// [StreamUrlProbe.ok] untouched.
+  /// Only verified YouTube/Google CDN domains answer the question this class
+  /// asks. Anything else returns [StreamUrlProbe.ok] untouched.
   static bool isProbeable(String url) {
     final uri = Uri.tryParse(url);
     if (uri == null) return false;
@@ -146,7 +146,14 @@ class StreamUrlVerifier {
       return true;
     }
     if (host.endsWith('.c.youtube.com')) return true;
-    return uri.path.contains('/videoplayback');
+    if ((host == 'youtube.com' ||
+            host.endsWith('.youtube.com') ||
+            host == 'youtube-nocookie.com' ||
+            host.endsWith('.youtube-nocookie.com')) &&
+        uri.path.contains('/videoplayback')) {
+      return true;
+    }
+    return false;
   }
 
   /// Maps an HTTP status to a verdict. Exposed for tests: the mapping is the
@@ -195,7 +202,7 @@ class StreamUrlVerifier {
       if (referer != null && referer.isNotEmpty) {
         request.headers.set(HttpHeaders.refererHeader, referer);
       }
-      if (cookie != null && cookie.isNotEmpty) {
+      if (cookie != null && cookie.isNotEmpty && isProbeable(url)) {
         request.headers.set(HttpHeaders.cookieHeader, cookie);
       }
       final response = await request.close().timeout(timeout);

@@ -40,7 +40,6 @@ class LyricsTranslationService {
   static final Map<String, _CachedTranslation> _memoryCache = {};
   static Future<void> _diskIndexChain = Future<void>.value();
   static final RegExp _markerRegex = RegExp(r'\uE000[^\uE001]*\uE001');
-  static String _lastDetectedSource = '';
 
   final http.Client _client;
   final bool _ownsClient;
@@ -216,11 +215,18 @@ class LyricsTranslationService {
       String detectedSource = 'auto';
 
       for (final batch in batches) {
-        var answer =
-            await _requestRomanizationBatch(batch, fallbackTargetLanguage);
+        var answer = await _requestRomanizationBatch(
+          batch,
+          fallbackTargetLanguage,
+          onDetectedSource: (src) {
+            if (src.isNotEmpty && detectedSource == 'auto') {
+              detectedSource = src;
+            }
+          },
+        );
         if (answer == null) {
           // Allow InputTools fallback on batch 1 using detected source or script detection
-          var lang = detectedSource != 'auto' ? detectedSource : _lastDetectedSource;
+          var lang = detectedSource != 'auto' ? detectedSource : '';
           if (lang.isEmpty || lang == 'auto') {
             lang = _detectScriptLanguage(batch.texts);
           }
@@ -401,8 +407,9 @@ class LyricsTranslationService {
 
   Future<_BatchAnswer?> _requestRomanizationBatch(
     _Batch batch,
-    String targetLang,
-  ) async {
+    String targetLang, {
+    void Function(String source)? onDetectedSource,
+  }) async {
     try {
       final uri = Uri.parse(_translateEndpoint);
       final response = await _client.post(
@@ -443,7 +450,7 @@ class LyricsTranslationService {
       final String source =
           (data.length > 2 && data[2] != null) ? data[2].toString() : '';
       if (source.isNotEmpty) {
-        _lastDetectedSource = source;
+        onDetectedSource?.call(source);
       }
 
       final parts =
@@ -559,14 +566,36 @@ class LyricsTranslationService {
   static bool _hasNonLatinLetters(List<String> texts) {
     for (final text in texts) {
       for (final rune in text.runes) {
-        // Runes outside Basic Latin and Latin Extended (0x0000 - 0x024F)
-        if (rune > 0x024F && rune < 0x2000) return true;
-        if (rune >= 0x3000) return true; // CJK, Hangul, Hiragana, etc.
-        if (rune >= 0x0600 && rune <= 0x06FF) return true; // Arabic
-        if (rune >= 0x0400 && rune <= 0x04FF) return true; // Cyrillic
-        if (rune >= 0x0900 && rune <= 0x097F) return true; // Devanagari
+        if (_isNonLatinScriptRune(rune)) return true;
       }
     }
+    return false;
+  }
+
+  static bool _isNonLatinScriptRune(int rune) {
+    // Greek, Cyrillic, Armenian, Hebrew, Arabic, Syriac, Thaana, NKo, Indic,
+    // Thai, Lao, Tibetan, Myanmar, Georgian, Hangul Jamo, Ethiopic, Khmer, etc.
+    if (rune >= 0x0370 && rune <= 0x18AF) return true;
+    // Greek Extended
+    if (rune >= 0x1F00 && rune <= 0x1FFF) return true;
+    // Hiragana, Katakana, Bopomofo, Hangul Compatibility Jamo, Kanbun, etc.
+    // (excludes CJK Symbols and Punctuation 0x3000-0x303F)
+    if (rune >= 0x3040 && rune <= 0x31FF) return true;
+    // CJK Unified Ideographs Extension A & CJK Unified Ideographs
+    if (rune >= 0x3400 && rune <= 0x9FFF) return true;
+    // Yi & Hangul Syllables
+    if (rune >= 0xA000 && rune <= 0xD7AF) return true;
+    // CJK Compatibility Ideographs
+    if (rune >= 0xF900 && rune <= 0xFAFF) return true;
+    // Arabic Presentation Forms A & B
+    if ((rune >= 0xFB50 && rune <= 0xFDFF) ||
+        (rune >= 0xFE70 && rune <= 0xFEFF)) {
+      return true;
+    }
+    // Halfwidth Katakana
+    if (rune >= 0xFF66 && rune <= 0xFF9D) return true;
+    // CJK Unified Ideographs Extensions B-I (excludes Emoji/Symbol blocks 0x1F000-0x1FFFF)
+    if (rune >= 0x20000 && rune <= 0x2FA1F) return true;
     return false;
   }
 

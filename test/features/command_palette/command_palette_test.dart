@@ -185,6 +185,51 @@ void main() {
       expect(popped, isTrue);
     });
 
+    testWidgets('BUG-P2-29: Escape dismisses command palette even when search results are empty',
+        (tester) async {
+      bool popped = false;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: appLocalizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          theme: ThemeData.dark().copyWith(
+            extensions: [AuraTheme.defaultDark],
+          ),
+          home: BlocProvider<PlayerCubit>.value(
+            value: mockCubit,
+            child: Builder(
+              builder: (context) {
+                return ElevatedButton(
+                  onPressed: () async {
+                    await CommandPaletteSheet.show(context);
+                    popped = true;
+                  },
+                  child: const Text('Open'),
+                );
+              },
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Open'));
+      await tester.pumpAndSettle();
+      expect(find.byType(CommandPaletteSheet), findsOneWidget);
+
+      await tester.enterText(
+          find.byType(PulsrSearchField), 'no_matching_command_xyz_999');
+      await tester.pumpAndSettle();
+      expect(find.byIcon(Icons.search_off_rounded), findsOneWidget);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(CommandPaletteSheet), findsNothing);
+      expect(popped, isTrue);
+    });
+
     test('CommandPaletteItem matches keywords correctly', () {
       final item = CommandPaletteItem(
         id: 'test',

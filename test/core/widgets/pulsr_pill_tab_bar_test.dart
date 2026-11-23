@@ -142,7 +142,7 @@ void main() {
     );
     final indicatorDecoration = indicator.decoration as BoxDecoration;
     expect(indicatorDecoration.color, palette.accent);
-    expect(indicatorDecoration.borderRadius, AppRadii.r20All);
+    expect(indicatorDecoration.borderRadius, AppRadii.r16All);
 
     int selected = 0;
     await tester.pumpWidget(

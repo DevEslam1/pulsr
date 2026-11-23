@@ -222,15 +222,15 @@ class _RemoteSourcesScreenState extends State<RemoteSourcesScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: Text(RemoteSourcesStrings.deleteConfirmTitle(source.displayName)),
-        content: const Text(RemoteSourcesStrings.deleteBody),
+        content: Text(RemoteSourcesStrings.deleteBody),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text(RemoteSourcesStrings.cancel),
+            child: Text(RemoteSourcesStrings.cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text(RemoteSourcesStrings.deleteSource),
+            child: Text(RemoteSourcesStrings.deleteSource),
           ),
         ],
       ),
@@ -394,16 +394,16 @@ class _RemoteSourcesScreenState extends State<RemoteSourcesScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text(RemoteSourcesStrings.clearCache),
-        content: const Text(RemoteSourcesStrings.cacheBody),
+        title: Text(RemoteSourcesStrings.clearCache),
+        content: Text(RemoteSourcesStrings.cacheBody),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text(RemoteSourcesStrings.cancel),
+            child: Text(RemoteSourcesStrings.cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text(RemoteSourcesStrings.clearCache),
+            child: Text(RemoteSourcesStrings.clearCache),
           ),
         ],
       ),
@@ -423,7 +423,7 @@ class _RemoteSourcesScreenState extends State<RemoteSourcesScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(RemoteSourcesStrings.title),
+        title: Text(RemoteSourcesStrings.title),
         actions: [
           IconButton(
             tooltip: RemoteSourcesStrings.addSourceTooltip,
@@ -586,11 +586,11 @@ class _SourceCard extends StatelessWidget {
                 // A discovered server has no hand-editable fields: its name,
                 // address and control path all come from the description.
                 if (!source.kind.isDiscovered)
-                  const PopupMenuItem<_SourceAction>(
+                  PopupMenuItem<_SourceAction>(
                     value: _SourceAction.edit,
                     child: Text(RemoteSourcesStrings.editSource),
                   ),
-                const PopupMenuItem<_SourceAction>(
+                PopupMenuItem<_SourceAction>(
                   value: _SourceAction.delete,
                   child: Text(RemoteSourcesStrings.deleteSource),
                 ),
@@ -656,7 +656,7 @@ class _CacheCard extends StatelessWidget {
         contentPadding:
             const EdgeInsetsDirectional.fromSTEB(16, 8, 8, 8),
         leading: Icon(Icons.sd_storage_outlined, color: palette.textSecondary),
-        title: const Text(RemoteSourcesStrings.cacheTitle),
+        title: Text(RemoteSourcesStrings.cacheTitle),
         subtitle: Text(
           busy || size == null
               ? RemoteSourcesStrings.calculating
@@ -707,7 +707,7 @@ class _EmptyState extends StatelessWidget {
           FilledButton.tonalIcon(
             onPressed: onAdd,
             icon: const Icon(Icons.add),
-            label: const Text(RemoteSourcesStrings.addSource),
+            label: Text(RemoteSourcesStrings.addSource),
           ),
         ],
       ),
@@ -728,7 +728,7 @@ class _UpnpCard extends StatelessWidget {
         contentPadding:
             const EdgeInsetsDirectional.fromSTEB(16, 8, 8, 8),
         leading: Icon(Icons.lan_outlined, color: palette.accent),
-        title: const Text(RemoteSourcesStrings.upnpTitle),
+        title: Text(RemoteSourcesStrings.upnpTitle),
         subtitle: Text(
           RemoteSourcesStrings.upnpIntro,
           style: Theme.of(context)

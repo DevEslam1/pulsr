@@ -122,4 +122,117 @@ void main() {
       handle.dispose();
     }
   });
+
+  testWidgets(
+      'BUG-P1-9 vertical EQ slider ignores tap and drag when Bit-Perfect DSP lock is active and responds when enabled',
+      (tester) async {
+    EqualizerSheet.debugForceAndroidSurface = true;
+    addTearDown(() => EqualizerSheet.debugForceAndroidSurface = null);
+
+    final prevFatal = WidgetController.hitTestWarningShouldBeFatal;
+    WidgetController.hitTestWarningShouldBeFatal = true;
+    addTearDown(() => WidgetController.hitTestWarningShouldBeFatal = prevFatal);
+
+    tester.view.physicalSize = const Size(420, 1400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final lockedCubit = stubPlayerCubit(
+      state: PlayerState(
+        dsp: DspSlice(
+          isEqEnabled: true,
+          eqPreset: EqPreset(
+            name: 'Custom',
+            gains: List<double>.filled(10, 0.0),
+          ),
+        ),
+      ),
+    );
+    when(() => lockedCubit.setBandGain(any(), any())).thenAnswer((_) async {});
+    when(() => lockedCubit.setEqualizerEnabled(any())).thenAnswer((_) async {});
+
+    await tester.pumpWidget(sheetHost(
+      playerCubit: lockedCubit,
+      settingsCubit: stubSettingsCubit(
+        state: const SettingsState(
+          experienceMode: ExperienceMode.professional,
+          bitPerfectOutput: true,
+          bypassDspOnBitPerfect: true,
+        ),
+      ),
+      child: const EqualizerSheet(),
+    ));
+    await tester.pump();
+
+    final band0Finder = find.byKey(const ValueKey('eq_band_0'));
+    expect(band0Finder, findsOneWidget);
+    await tester.ensureVisible(band0Finder);
+    await tester.pump();
+
+    final lockedDetector = tester.widget<GestureDetector>(
+      find.descendant(
+        of: band0Finder,
+        matching: find.byType(GestureDetector),
+      ),
+    );
+    expect(lockedDetector.onTapUp, isNull);
+    expect(lockedDetector.onVerticalDragStart, isNull);
+
+    await tester.tap(band0Finder);
+    await tester.pump();
+    await tester.drag(band0Finder, const Offset(0, -40));
+    await tester.pump();
+
+    verifyNever(() => lockedCubit.setEqualizerEnabled(any()));
+    verifyNever(() => lockedCubit.setBandGain(any(), any()));
+
+    // Positive control: when Bit-Perfect lock is off and EQ is enabled,
+    // the exact same drag on eq_band_0 updates Band 0 gain.
+    final enabledCubit = stubPlayerCubit(
+      state: PlayerState(
+        dsp: DspSlice(
+          isEqEnabled: true,
+          eqPreset: EqPreset(
+            name: 'Custom',
+            gains: List<double>.filled(10, 0.0),
+          ),
+        ),
+      ),
+    );
+    when(() => enabledCubit.setBandGain(any(), any())).thenAnswer((_) async {});
+    when(() => enabledCubit.setEqualizerEnabled(any()))
+        .thenAnswer((_) async {});
+
+    await tester.pumpWidget(sheetHost(
+      playerCubit: enabledCubit,
+      settingsCubit: stubSettingsCubit(
+        state: const SettingsState(
+          experienceMode: ExperienceMode.professional,
+          bitPerfectOutput: false,
+          bypassDspOnBitPerfect: true,
+        ),
+      ),
+      child: const EqualizerSheet(),
+    ));
+    await tester.pump();
+
+    await tester.ensureVisible(band0Finder);
+    await tester.pump();
+
+    final enabledDetector = tester.widget<GestureDetector>(
+      find.descendant(
+        of: band0Finder,
+        matching: find.byType(GestureDetector),
+      ),
+    );
+    expect(enabledDetector.onTapUp, isNotNull);
+    expect(enabledDetector.onVerticalDragStart, isNotNull);
+
+    await tester.drag(band0Finder, const Offset(0, -40));
+    await tester.pump(const Duration(milliseconds: 400));
+
+    verify(() => enabledCubit.setBandGain(0, any()))
+        .called(greaterThanOrEqualTo(1));
+  });
 }

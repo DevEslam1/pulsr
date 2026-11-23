@@ -92,17 +92,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     super.dispose();
   }
 
-  String _startListeningLabel(BuildContext context) {
-    final code = Localizations.maybeLocaleOf(context)?.languageCode ?? 'en';
-    switch (code) {
-      case 'ar':
-        return 'ابدأ الاستماع';
-      case 'es':
-        return 'Empezar a escuchar';
-      default:
-        return 'Start Listening';
-    }
-  }
+  String _startListeningLabel(BuildContext context) =>
+      context.l10n.onboardingStartListening;
 
   Widget _animateIfEnabled(
     BuildContext context,

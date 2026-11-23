@@ -1,4 +1,5 @@
 import 'dart:collection';
+import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -16,6 +17,7 @@ import '../../core/errors/app_error.dart';
 
 class TagEditorCubit extends PulsrCubit<TagEditorState> {
   static const String batchCheckpointKey = 'batch_tag_checkpoint';
+  static const String batchCheckpointPayloadKey = 'batch_tag_checkpoint_payload';
   static const MethodChannel _channel = MethodChannel(PulsrChannels.tagEditor);
   final MediaScannerService _scannerService;
   final MetadataSearchService _metadataSearchService;
@@ -67,7 +69,7 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
     }
     _lastHistoryField = field;
     _lastHistoryPushAt = now;
-    _history.addLast(_TagEditorDiff.fromState(state));
+    _history.addLast(_TagEditorDiff.fromCubit(this));
     while (_history.length > _historyMax) {
       _history.removeFirst();
     }
@@ -88,8 +90,120 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
     if (isClosed || _history.isEmpty) return false;
     final prevDiff = _history.removeLast();
     _resetHistoryCoalescing();
+    _userEditedFields
+      ..clear()
+      ..addAll(prevDiff.userEditedFields);
+    _batchArtistEdited = prevDiff.batchArtistEdited;
+    _batchAlbumEdited = prevDiff.batchAlbumEdited;
+    _batchGenreEdited = prevDiff.batchGenreEdited;
+    _batchYearEdited = prevDiff.batchYearEdited;
+    _batchTrackEdited = prevDiff.batchTrackEdited;
+    _batchDiscEdited = prevDiff.batchDiscEdited;
+    _batchCommentEdited = prevDiff.batchCommentEdited;
     safeEmit(prevDiff.applyTo(state));
     return true;
+  }
+
+  Map<String, dynamic> _buildBatchCheckpointPayload(List<String> pendingPaths) {
+    return <String, dynamic>{
+      'paths': pendingPaths,
+      'artist': state.artist,
+      'album': state.album,
+      'genre': state.genre,
+      'year': state.year,
+      'trackNumber': state.trackNumber,
+      'discNumber': state.discNumber,
+      'comment': state.comment,
+      'newArtworkPath': state.newArtworkPath,
+      'removeArtwork': state.removeArtwork,
+      'batchArtistEdited': _batchArtistEdited,
+      'batchAlbumEdited': _batchAlbumEdited,
+      'batchGenreEdited': _batchGenreEdited,
+      'batchYearEdited': _batchYearEdited,
+      'batchTrackEdited': _batchTrackEdited,
+      'batchDiscEdited': _batchDiscEdited,
+      'batchCommentEdited': _batchCommentEdited,
+      'userEditedFields': _userEditedFields.toList(),
+    };
+  }
+
+  Future<void> _writeBatchCheckpoint(
+    SharedPreferences prefs,
+    List<String> pendingPaths,
+  ) async {
+    await prefs.setStringList(batchCheckpointKey, pendingPaths);
+    await prefs.setString(
+      batchCheckpointPayloadKey,
+      jsonEncode(_buildBatchCheckpointPayload(pendingPaths)),
+    );
+  }
+
+  static Future<void> clearBatchCheckpoint(SharedPreferences prefs) async {
+    await prefs.remove(batchCheckpointKey);
+    await prefs.remove(batchCheckpointPayloadKey);
+  }
+
+  /// Restores batch edit state from [prefs] before retrying an interrupted
+  /// batch save.
+  Future<void> restoreBatchCheckpoint(SharedPreferences prefs) async {
+    if (isClosed) return;
+    final rawJson = prefs.getString(batchCheckpointPayloadKey);
+    if (rawJson == null || rawJson.isEmpty) return;
+    try {
+      final decoded = jsonDecode(rawJson);
+      if (decoded is! Map) return;
+      final map = Map<String, dynamic>.from(decoded);
+      _batchArtistEdited = map['batchArtistEdited'] == true;
+      _batchAlbumEdited = map['batchAlbumEdited'] == true;
+      _batchGenreEdited = map['batchGenreEdited'] == true;
+      _batchYearEdited = map['batchYearEdited'] == true;
+      _batchTrackEdited = map['batchTrackEdited'] == true;
+      _batchDiscEdited = map['batchDiscEdited'] == true;
+      _batchCommentEdited = map['batchCommentEdited'] == true;
+
+      final restoredFields = (map['userEditedFields'] as List?)
+              ?.whereType<String>()
+              .toSet() ??
+          <String>{};
+      if (_batchArtistEdited) restoredFields.add('artist');
+      if (_batchAlbumEdited) restoredFields.add('album');
+      if (_batchGenreEdited) restoredFields.add('genre');
+      if (_batchYearEdited) restoredFields.add('year');
+      if (_batchTrackEdited) restoredFields.add('trackNumber');
+      if (_batchDiscEdited) restoredFields.add('discNumber');
+      if (_batchCommentEdited) restoredFields.add('comment');
+      final artPath = map['newArtworkPath'] as String?;
+      final remArt = map['removeArtwork'] == true;
+      if (artPath != null || remArt) restoredFields.add('artwork');
+      _userEditedFields
+        ..clear()
+        ..addAll(restoredFields);
+
+      safeEmit(state.copyWith(
+        artist: _batchArtistEdited
+            ? (map['artist'] as String? ?? '')
+            : state.artist,
+        album:
+            _batchAlbumEdited ? (map['album'] as String? ?? '') : state.album,
+        genre:
+            _batchGenreEdited ? (map['genre'] as String? ?? '') : state.genre,
+        year: _batchYearEdited ? (map['year'] as String? ?? '') : state.year,
+        trackNumber: _batchTrackEdited
+            ? (map['trackNumber'] as String? ?? '')
+            : state.trackNumber,
+        discNumber: _batchDiscEdited
+            ? (map['discNumber'] as String? ?? '')
+            : state.discNumber,
+        comment: _batchCommentEdited
+            ? (map['comment'] as String? ?? '')
+            : state.comment,
+        newArtworkPath: artPath ?? state.newArtworkPath,
+        removeArtwork: remArt ? true : state.removeArtwork,
+      ));
+    } catch (e, st) {
+      ErrorLogger.log('Failed to restore batch tag checkpoint',
+          error: e, stackTrace: st, category: 'TagEditor');
+    }
   }
 
   TagEditorCubit({
@@ -547,6 +661,21 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
         return;
       }
     }
+    final discTrimmed = state.discNumber.trim();
+    if (discTrimmed.isNotEmpty) {
+      final parts = discTrimmed.split('/');
+      final discNum = int.tryParse(parts.first.trim());
+      final totalValid = parts.length == 1 ||
+          (parts.length == 2 &&
+              (int.tryParse(parts[1].trim()) ?? 0) >= (discNum ?? 1));
+      if (discNum == null || discNum <= 0 || discNum > 999 || !totalValid) {
+        safeEmit(state.copyWith(
+          status: TagEditorStatus.failure,
+          error: uiError('Disc number must be a positive number.'),
+        ));
+        return;
+      }
+    }
 
     safeEmit(state.copyWith(
         status: TagEditorStatus.saving,
@@ -563,7 +692,7 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
         try {
           prefs = await SharedPreferences.getInstance();
           pendingPaths = state.batchSongs.map((s) => s.path).toList();
-          await prefs.setStringList(batchCheckpointKey, pendingPaths);
+          await _writeBatchCheckpoint(prefs, pendingPaths);
         } catch (_) {}
 
         var lastEmitTime = DateTime.now();
@@ -631,7 +760,7 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
             // always clears it.
             if (prefs != null && taggedSongs.length % 10 == 0) {
               try {
-                await prefs.setStringList(batchCheckpointKey, pendingPaths);
+                await _writeBatchCheckpoint(prefs, pendingPaths);
               } catch (e, st) {
                 ErrorLogger.log('Failed to update batch checkpoint',
                     error: e, stackTrace: st, category: 'TagEditor');
@@ -647,11 +776,11 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
         if (prefs != null) {
           try {
             if (failedFiles.isEmpty) {
-              await prefs.remove(batchCheckpointKey);
+              await clearBatchCheckpoint(prefs);
             } else {
               // Keep the paths that still need tagging so the next editor open
               // can offer to retry the remainder instead of just informing.
-              await prefs.setStringList(batchCheckpointKey, pendingPaths);
+              await _writeBatchCheckpoint(prefs, pendingPaths);
             }
           } catch (_) {}
         }
@@ -879,20 +1008,36 @@ class _TagEditorDiff {
   final String? newArtworkPath;
   final bool removeArtwork;
   final Uint8List? artworkBytes;
+  final Set<String> userEditedFields;
+  final bool batchArtistEdited;
+  final bool batchAlbumEdited;
+  final bool batchGenreEdited;
+  final bool batchYearEdited;
+  final bool batchTrackEdited;
+  final bool batchDiscEdited;
+  final bool batchCommentEdited;
 
-  _TagEditorDiff.fromState(TagEditorState s)
-      : title = s.title,
-        artist = s.artist,
-        album = s.album,
-        genre = s.genre,
-        year = s.year,
-        trackNumber = s.trackNumber,
-        discNumber = s.discNumber,
-        comment = s.comment,
-        lyrics = s.lyrics,
-        newArtworkPath = s.newArtworkPath,
-        removeArtwork = s.removeArtwork,
-        artworkBytes = s.artworkBytes;
+  _TagEditorDiff.fromCubit(TagEditorCubit c)
+      : title = c.state.title,
+        artist = c.state.artist,
+        album = c.state.album,
+        genre = c.state.genre,
+        year = c.state.year,
+        trackNumber = c.state.trackNumber,
+        discNumber = c.state.discNumber,
+        comment = c.state.comment,
+        lyrics = c.state.lyrics,
+        newArtworkPath = c.state.newArtworkPath,
+        removeArtwork = c.state.removeArtwork,
+        artworkBytes = c.state.artworkBytes,
+        userEditedFields = Set<String>.from(c._userEditedFields),
+        batchArtistEdited = c._batchArtistEdited,
+        batchAlbumEdited = c._batchAlbumEdited,
+        batchGenreEdited = c._batchGenreEdited,
+        batchYearEdited = c._batchYearEdited,
+        batchTrackEdited = c._batchTrackEdited,
+        batchDiscEdited = c._batchDiscEdited,
+        batchCommentEdited = c._batchCommentEdited;
 
   TagEditorState applyTo(TagEditorState s) => s.copyWith(
         title: title,
@@ -905,8 +1050,10 @@ class _TagEditorDiff {
         comment: comment,
         lyrics: lyrics,
         newArtworkPath: newArtworkPath,
+        clearNewArtworkPath: newArtworkPath == null,
         removeArtwork: removeArtwork,
         artworkBytes: artworkBytes,
+        clearArtworkBytes: artworkBytes == null,
       );
 }
 

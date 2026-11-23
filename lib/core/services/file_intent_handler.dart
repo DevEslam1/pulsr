@@ -680,4 +680,9 @@ class FileIntentHandler {
       lastPositionMs: 0,
     );
   }
+
+  @disposeMethod
+  void dispose() {
+    _channel.setMethodCallHandler(null);
+  }
 }

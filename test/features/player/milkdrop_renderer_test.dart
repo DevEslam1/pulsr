@@ -1,4 +1,5 @@
 // test/features/player/milkdrop_renderer_test.dart
+import 'dart:ui' as ui;
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/domain/models/milkdrop_preset.dart';
@@ -66,6 +67,32 @@ void main() {
         preset: testPreset,
       );
       expect(painter.shouldRepaint(painter), isTrue);
+    });
+
+    test(
+        'BUG-P1-8 MilkdropCanvasPainter clamps zero/NaN warp and non-finite inputs safely',
+        () {
+      const dangerousPreset = MilkdropPreset(
+        name: 'Hazardous',
+        decay: double.nan,
+        waveR: double.infinity,
+        waveG: double.negativeInfinity,
+        waveB: double.nan,
+        rot: double.infinity,
+        zoom: double.nan,
+        warp: 0.0,
+      );
+      final painter = MilkdropCanvasPainter(
+        data: const [double.nan, double.infinity, -1.0, 0.5],
+        color: Colors.purple,
+        preset: dangerousPreset,
+      );
+      final recorder = ui.PictureRecorder();
+      final canvas = Canvas(recorder);
+      expect(
+        () => painter.paint(canvas, const Size(300, 300)),
+        returnsNormally,
+      );
     });
   });
 }

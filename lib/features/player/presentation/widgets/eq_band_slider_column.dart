@@ -324,6 +324,12 @@ class _VerticalEqSliderState extends State<_VerticalEqSlider> {
   @override
   void didUpdateWidget(covariant _VerticalEqSlider oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (!widget.isEnabled && _isDragging) {
+      _isDragging = false;
+      _dragGain = null;
+      widget.onDragEnd?.call();
+      return;
+    }
     // H-06: Preserve _dragGain while actively dragging so parent rebuilds
     // cannot stomp on the in-flight gesture with stale props.
     if (!_isDragging) {
@@ -410,42 +416,54 @@ class _VerticalEqSliderState extends State<_VerticalEqSlider> {
                 return GestureDetector(
                   behavior: HitTestBehavior.opaque,
                   // Tap-to-set on release so starting a drag never jumps the band.
-                  onTapUp: (details) {
-                    _handlePointer(details.localPosition.dy, height,
-                        notifyParent: true);
-                  },
+                  onTapUp: widget.isEnabled
+                      ? (details) {
+                          _handlePointer(details.localPosition.dy, height,
+                              notifyParent: true);
+                        }
+                      : null,
                   // Double-tap-to-zero (0.0 dB) reset with confirmation haptics.
-                  onDoubleTap: () {
-                    PulsrHaptics.confirm();
-                    widget.onChanged(0.0);
-                    setState(() => _dragGain = 0.0);
-                  },
-                  onVerticalDragStart: (details) {
-                    setState(() => _isDragging = true);
-                    widget.onDragStart?.call();
-                    _handlePointer(details.localPosition.dy, height,
-                        notifyParent: true);
-                  },
-                  onVerticalDragUpdate: (details) {
-                    _handlePointer(details.localPosition.dy, height,
-                        notifyParent: true);
-                  },
-                  onVerticalDragEnd: (_) {
-                    final finalGain = _dragGain ?? widget.value;
-                    widget.onChanged(finalGain);
-                    widget.onDragEnd?.call();
-                    setState(() {
-                      _isDragging = false;
-                      _dragGain = null;
-                    });
-                  },
-                  onVerticalDragCancel: () {
-                    widget.onDragEnd?.call();
-                    setState(() {
-                      _isDragging = false;
-                      _dragGain = null;
-                    });
-                  },
+                  onDoubleTap: widget.isEnabled
+                      ? () {
+                          PulsrHaptics.confirm();
+                          widget.onChanged(0.0);
+                          setState(() => _dragGain = 0.0);
+                        }
+                      : null,
+                  onVerticalDragStart: widget.isEnabled
+                      ? (details) {
+                          setState(() => _isDragging = true);
+                          widget.onDragStart?.call();
+                          _handlePointer(details.localPosition.dy, height,
+                              notifyParent: true);
+                        }
+                      : null,
+                  onVerticalDragUpdate: widget.isEnabled
+                      ? (details) {
+                          _handlePointer(details.localPosition.dy, height,
+                              notifyParent: true);
+                        }
+                      : null,
+                  onVerticalDragEnd: widget.isEnabled
+                      ? (_) {
+                          final finalGain = _dragGain ?? widget.value;
+                          widget.onChanged(finalGain);
+                          widget.onDragEnd?.call();
+                          setState(() {
+                            _isDragging = false;
+                            _dragGain = null;
+                          });
+                        }
+                      : null,
+                  onVerticalDragCancel: widget.isEnabled
+                      ? () {
+                          widget.onDragEnd?.call();
+                          setState(() {
+                            _isDragging = false;
+                            _dragGain = null;
+                          });
+                        }
+                      : null,
                   child: Stack(
                     clipBehavior: Clip.none,
                     children: [

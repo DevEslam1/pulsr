@@ -2,6 +2,7 @@
 // ignore_for_file: experimental_member_use
 import 'dart:async';
 import 'dart:io';
+import 'dart:isolate';
 import 'dart:math' as math;
 import 'dart:typed_data';
 
@@ -257,28 +258,32 @@ class DsdDecoderHelper {
         'limit (${(fileSize / (1024 * 1024)).toStringAsFixed(1)} MB)',
       );
     }
-    final bytes = await file.readAsBytes();
     final ext = song.path.split('.').last.toLowerCase();
+    final parsed = await Isolate.run(() {
+      final rawBytes = File(song.path).readAsBytesSync();
+      if (ext == 'dsf') {
+        final dsf = parseDsfBytes(rawBytes);
+        return (
+          dsdL: dsf.dsdL,
+          dsdR: dsf.dsdR,
+          dsdRate: dsf.dsdRate,
+          bitOrder: dsf.msbFirst ? 1 : 0,
+        );
+      } else {
+        final dff = parseDffBytes(rawBytes);
+        return (
+          dsdL: dff.dsdL,
+          dsdR: dff.dsdR,
+          dsdRate: dff.dsdRate,
+          bitOrder: 1, // MSB first (Philips DFF)
+        );
+      }
+    });
 
-    final Uint8List dsdL;
-    final Uint8List dsdR;
-    final int dsdRate;
-    final int bitOrder;
-
-    if (ext == 'dsf') {
-      final parsed = parseDsfBytes(bytes);
-      dsdL = parsed.dsdL;
-      dsdR = parsed.dsdR;
-      dsdRate = parsed.dsdRate;
-      // DSF declares its bit order in the fmt chunk (1 = LSB first, 8 = MSB).
-      bitOrder = parsed.msbFirst ? 1 : 0;
-    } else {
-      final parsed = parseDffBytes(bytes);
-      dsdL = parsed.dsdL;
-      dsdR = parsed.dsdR;
-      dsdRate = parsed.dsdRate;
-      bitOrder = 1; // MSB first (Philips DFF)
-    }
+    final Uint8List dsdL = parsed.dsdL;
+    final Uint8List dsdR = parsed.dsdR;
+    final int dsdRate = parsed.dsdRate;
+    final int bitOrder = parsed.bitOrder;
 
     final int dopSampleRate = DopEncoder.dopPcmSampleRate(dsdRate);
 
@@ -301,42 +306,44 @@ class DsdDecoderHelper {
                 dopCapabilities.supportsRate(dsdRate)));
 
     if (canFallbackToDop) {
-      // DoP framing (DSD over PCM v1.1): pack 16-bit DSD chunks with alternating 0x05/0xFA markers
-      var left = dsdL;
-      var right = dsdR;
-      if (left.length != right.length) {
-        final minLen = math.min(left.length, right.length);
-        left = Uint8List.sublistView(left, 0, minLen);
-        right = Uint8List.sublistView(right, 0, minLen);
-      }
-      if (left.length.isOdd) {
-        // 0x69 is DSD digital silence; a 0x00 pad is a DC/noise byte.
-        left = Uint8List.fromList([...left, 0x69]);
-        right = Uint8List.fromList([...right, 0x69]);
-      }
-      // DoP wants the oldest DSD bit in the MSB. DSF is LSB-first, so pass
-      // reverseBits: bitOrder == 0 so native C++ DopFramer reverses bits inline
-      // in a single pass without intermediate buffer copies.
-      final bool reverseBits = bitOrder == 0;
-      final use32Bit = dopContainerBits == 32;
-      final dopBytes = use32Bit
-          ? DopEncoder.encodeToDopPcm32(
-              dsdLeft: left,
-              dsdRight: right,
-              reverseBits: reverseBits,
-            )
-          : DopEncoder.encodeToDopPcm24(
-              dsdLeft: left,
-              dsdRight: right,
-              reverseBits: reverseBits,
-            );
+      final wavBytes = await Isolate.run(() {
+        // DoP framing (DSD over PCM v1.1): pack 16-bit DSD chunks with alternating 0x05/0xFA markers
+        var left = dsdL;
+        var right = dsdR;
+        if (left.length != right.length) {
+          final minLen = math.min(left.length, right.length);
+          left = Uint8List.sublistView(left, 0, minLen);
+          right = Uint8List.sublistView(right, 0, minLen);
+        }
+        if (left.length.isOdd) {
+          // 0x69 is DSD digital silence; a 0x00 pad is a DC/noise byte.
+          left = Uint8List.fromList([...left, 0x69]);
+          right = Uint8List.fromList([...right, 0x69]);
+        }
+        // DoP wants the oldest DSD bit in the MSB. DSF is LSB-first, so pass
+        // reverseBits: bitOrder == 0 so native C++ DopFramer reverses bits inline
+        // in a single pass without intermediate buffer copies.
+        final bool reverseBits = bitOrder == 0;
+        final use32Bit = dopContainerBits == 32;
+        final dopBytes = use32Bit
+            ? DopEncoder.encodeToDopPcm32(
+                dsdLeft: left,
+                dsdRight: right,
+                reverseBits: reverseBits,
+              )
+            : DopEncoder.encodeToDopPcm24(
+                dsdLeft: left,
+                dsdRight: right,
+                reverseBits: reverseBits,
+              );
 
-      final wavBytes = buildDopWavContainer(
-        dopPcmBytes: dopBytes,
-        sampleRate: dopSampleRate,
-        channels: 2,
-        bitsPerSample: use32Bit ? 32 : 24,
-      );
+        return buildDopWavContainer(
+          dopPcmBytes: dopBytes,
+          sampleRate: dopSampleRate,
+          channels: 2,
+          bitsPerSample: use32Bit ? 32 : 24,
+        );
+      });
 
       if (updateGlobalState) {
         dsdDopActive = true;
@@ -387,10 +394,12 @@ class DsdDecoderHelper {
       );
     }
 
-    final wavBytes = buildWavContainer(
-      pcmFloatSamples: pcmFloats,
-      sampleRate: targetSampleRate,
-      channels: 2,
+    final wavBytes = await Isolate.run(
+      () => buildWavContainer(
+        pcmFloatSamples: pcmFloats,
+        sampleRate: targetSampleRate,
+        channels: 2,
+      ),
     );
 
     if (updateGlobalState) {
@@ -448,14 +457,10 @@ class DsdDecoderHelper {
       pos += chunkSize;
     }
 
-    if (dataOffset == -1 || dataOffset + dataSize > bytes.length) {
-      dataOffset = pos + 12;
-      dataSize = bytes.length - dataOffset;
-    }
-
-    if (dataSize <= 0 || dataOffset >= bytes.length) {
+    if (dataOffset < 0 || dataOffset >= bytes.length || dataSize <= 0) {
       throw const FormatException('DSF file contains no audio data');
     }
+    dataSize = math.min(dataSize, bytes.length - dataOffset);
     if (channels != 1 && channels != 2) {
       throw DsdUnsupportedException(
           'DSF with $channels channels is not supported (mono/stereo only)');
@@ -616,8 +621,10 @@ class DsdDecoderHelper {
     int bitsPerSample = 24,
   }) {
     final int bytesPerSample = bitsPerSample ~/ 8;
-    final int numFrames = pcmFloatSamples.length ~/ channels;
-    final int byteCount = numFrames * channels * bytesPerSample;
+    final int safeChannels = channels > 0 ? channels : 2;
+    final int numFrames = pcmFloatSamples.length ~/ safeChannels;
+    final int sampleLimit = numFrames * safeChannels;
+    final int byteCount = sampleLimit * bytesPerSample;
     final ByteData byteData = ByteData(44 + byteCount);
 
     // RIFF header
@@ -654,7 +661,7 @@ class DsdDecoderHelper {
     byteData.setUint32(40, byteCount, Endian.little);
 
     int offset = 44;
-    for (int i = 0; i < pcmFloatSamples.length; i++) {
+    for (int i = 0; i < sampleLimit; i++) {
       // NaN/Inf from the native decoder would make .round() throw
       // UnsupportedError and kill the whole load; write silence instead.
       final double raw = pcmFloatSamples[i];

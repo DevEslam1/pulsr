@@ -1,7 +1,6 @@
 // lib/services/canvas/canvas_repository.dart
 import 'dart:async';
 import 'package:http/http.dart' as http;
-import 'package:mutex/mutex.dart';
 import '../../core/utils/error_logger.dart';
 import '../../data/db/app_database.dart';
 import 'apple_music_canvas.dart';
@@ -34,13 +33,32 @@ class CanvasRepository {
   final AppleMusicCanvas _apple;
   final TidalCanvas _tidal;
 
-  final Mutex _lock = Mutex();
+  final Map<String, Future<CanvasArtwork?>> _inFlight = {};
 
   CanvasCache get cache => _cache;
 
+  Future<CanvasArtwork?> _coalesce(
+    String key,
+    Future<CanvasArtwork?> Function() loader,
+  ) {
+    final existing = _inFlight[key];
+    if (existing != null) return existing;
+    late final Future<CanvasArtwork?> future;
+    future = loader().whenComplete(() {
+      if (identical(_inFlight[key], future)) {
+        _inFlight.remove(key);
+      }
+    });
+    _inFlight[key] = future;
+    return future;
+  }
+
   /// Returns already-resolved canvas from memory immediately without network.
   CanvasArtwork? cached(SongsTableData song) {
-    final key = _cacheKey(song.title, song.artist, song.album);
+    final cleanTitle = cleanNoise(song.title);
+    final cleanArtist = song.artist.trim();
+    if (cleanTitle.isEmpty || cleanArtist.isEmpty) return null;
+    final key = _cacheKey(cleanTitle, cleanArtist, song.album);
     return _cache.getFromMemory(key);
   }
 
@@ -71,7 +89,7 @@ class CanvasRepository {
 
     final key = _cacheKey(cleanTitle, cleanArtist, album);
 
-    return _lock.protect(() async {
+    return _coalesce('$key|$downloadToDisk', () async {
       // 1. Check in-memory cache (including negative caching)
       if (_cache.hasInMemory(key)) {
         final mem = _cache.getFromMemory(key);
@@ -162,7 +180,7 @@ class CanvasRepository {
 
     final key = 'album|$cleanAlbum|$cleanArtist';
 
-    return _lock.protect(() async {
+    return _coalesce('$key|$downloadToDisk', () async {
       if (_cache.hasInMemory(key)) {
         final mem = _cache.getFromMemory(key);
         if (mem != null && downloadToDisk && mem.localFilePath == null) {
@@ -185,7 +203,10 @@ class CanvasRepository {
             candidate.matches(cleanAlbum, cleanArtist, cleanAlbum)) {
           hit = candidate;
         }
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('Community album canvas search failed',
+            error: e, stackTrace: st, category: 'CanvasRepository');
+      }
 
       // Source 2: Apple Music
       if (hit == null) {
@@ -195,7 +216,10 @@ class CanvasRepository {
               candidate.matches(cleanAlbum, cleanArtist, cleanAlbum)) {
             hit = candidate;
           }
-        } catch (_) {}
+        } catch (e, st) {
+          ErrorLogger.log('Apple Music album canvas search failed',
+              error: e, stackTrace: st, category: 'CanvasRepository');
+        }
       }
 
       // Source 3: Tidal
@@ -206,7 +230,10 @@ class CanvasRepository {
               candidate.matches(cleanAlbum, cleanArtist, cleanAlbum)) {
             hit = candidate;
           }
-        } catch (_) {}
+        } catch (e, st) {
+          ErrorLogger.log('Tidal album canvas search failed',
+              error: e, stackTrace: st, category: 'CanvasRepository');
+        }
       }
 
       if (hit != null && downloadToDisk) {
@@ -215,7 +242,10 @@ class CanvasRepository {
           if (localPath != null) {
             hit = hit.copyWith(localFilePath: localPath);
           }
-        } catch (_) {}
+        } catch (e, st) {
+          ErrorLogger.log('Album canvas video download to disk failed',
+              error: e, stackTrace: st, category: 'CanvasRepository');
+        }
       }
 
       _cache.putInMemory(key, hit);

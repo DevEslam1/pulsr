@@ -42,12 +42,14 @@ class DspDiagnosticReport {
   final double totalLatencyMs;
   final bool allStagesHealthy;
   final List<String> warnings;
+  final bool isSyntheticSelfCheck;
 
   const DspDiagnosticReport({
     required this.stages,
     required this.totalLatencyMs,
     required this.allStagesHealthy,
     required this.warnings,
+    this.isSyntheticSelfCheck = false,
   });
 
   Map<String, dynamic> toMap() => {
@@ -55,6 +57,7 @@ class DspDiagnosticReport {
         'totalLatencyMs': totalLatencyMs,
         'allStagesHealthy': allStagesHealthy,
         'warnings': warnings,
+        'isSyntheticSelfCheck': isSyntheticSelfCheck,
       };
 
   @override
@@ -264,6 +267,7 @@ class DspChainValidator {
       totalLatencyMs: totalLatency,
       allStagesHealthy: allHealthy,
       warnings: allWarnings,
+      isSyntheticSelfCheck: true,
     );
   }
 }

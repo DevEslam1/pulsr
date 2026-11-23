@@ -22,7 +22,7 @@ class SleepTimerSheet extends StatelessWidget {
   static Future<void> show(BuildContext context) {
     return PulsrSheetHelper.showPulsrSheet<void>(
       context: context,
-      wrapWithContainer: true,
+      wrapWithContainer: false,
       builder: (_) => const SleepTimerSheet(),
     );
   }
@@ -34,6 +34,12 @@ class SleepTimerSheet extends StatelessWidget {
     final screenHeight = MediaQuery.sizeOf(context).height;
 
     return BlocBuilder<PlayerCubit, PlayerState>(
+      buildWhen: (prev, curr) =>
+          prev.sleepTimerRemaining?.inSeconds !=
+              curr.sleepTimerRemaining?.inSeconds ||
+          prev.sleepTimerRemainingTracks != curr.sleepTimerRemainingTracks ||
+          prev.sleepTimerMode != curr.sleepTimerMode ||
+          prev.isEndOfQueueSleepTimer != curr.isEndOfQueueSleepTimer,
       builder: (context, state) {
         final sleepTimerRemaining = state.sleepTimerRemaining;
         final cubit = context.read<PlayerCubit>();

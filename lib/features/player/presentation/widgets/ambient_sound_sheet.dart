@@ -35,9 +35,14 @@ class AmbientSoundSheet extends StatelessWidget {
       builder: (context, _) {
         return PulsrBottomSheetContainer(
           title: Row(
-            mainAxisSize: MainAxisSize.min,
             children: [
-              Text(l10n.ambientSounds),
+              Flexible(
+                child: Text(
+                  l10n.ambientSounds,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
               if (service.isEnabled) ...[
                 const SizedBox(width: AppSpacing.xs),
                 AmbientStatusBadge(

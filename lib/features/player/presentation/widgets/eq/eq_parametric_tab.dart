@@ -81,7 +81,7 @@ extension _EqParametricTab on _EqualizerSheetState {
 
           // Active AutoEq Profile Banner
           if (state.selectedHeadphoneProfile != null) ...[
-            _buildActiveAutoEqBanner(context, cubit, state, p),
+            _buildActiveAutoEqBanner(context, cubit, state, p, dspBlocked),
             const SizedBox(height: AppSpacing.sm),
           ],
 
@@ -300,7 +300,7 @@ extension _EqParametricTab on _EqualizerSheetState {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        'DSP Tools',
+                        context.l10n.dspTools,
                         style: TextStyle(
                           fontSize: AppFontSize.caption,
                           fontWeight: FontWeight.w700,
@@ -321,7 +321,7 @@ extension _EqParametricTab on _EqualizerSheetState {
                           child: Text(
                             '$activeCount',
                             style: TextStyle(
-                              fontSize: AppFontSize.tiny,
+                              fontSize: AppFontSize.caption,
                               fontWeight: FontWeight.w900,
                               color: AppColors.textOnAccent(p.accent),
                             ),
@@ -648,8 +648,13 @@ extension _EqParametricTab on _EqualizerSheetState {
     );
   }
 
-  Widget _buildActiveAutoEqBanner(BuildContext context, PlayerCubit cubit,
-      PlayerState state, PulsrPalette p) {
+  Widget _buildActiveAutoEqBanner(
+    BuildContext context,
+    PlayerCubit cubit,
+    PlayerState state,
+    PulsrPalette p,
+    String? dspBlocked,
+  ) {
     final profile = state.selectedHeadphoneProfile!;
     return Container(
       padding: const EdgeInsets.symmetric(
@@ -676,7 +681,7 @@ extension _EqParametricTab on _EqualizerSheetState {
                   ),
                 ),
                 Text(
-                  '${profile.brand} â€¢ '
+                  '${profile.brand} • '
                   '${context.l10n.preampLabel}: ${profile.preampGain.toStringAsFixed(1)} dB',
                   style: TextStyle(
                       fontSize: AppFontSize.caption, color: p.textTertiary),
@@ -685,7 +690,7 @@ extension _EqParametricTab on _EqualizerSheetState {
             ),
           ),
           TextButton(
-            onPressed: () => cubit.resetToFlat(),
+            onPressed: dspBlocked != null ? null : () => cubit.resetToFlat(),
             style: TextButton.styleFrom(
               padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
             ),

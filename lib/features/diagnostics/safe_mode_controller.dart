@@ -185,7 +185,7 @@ class SafeModeController {
       reason: _truncateReason(reason),
     );
     if (!saved) {
-      throw const SafeModeError(
+      throw SafeModeError(
         code: 'safe-mode-record-failed',
         userMessage: DiagnosticsStrings.safeModePersistFailed,
       );
@@ -221,7 +221,7 @@ class SafeModeController {
       failuresKey(key),
     ]);
     if (!removed) {
-      throw const SafeModeError(
+      throw SafeModeError(
         code: 'safe-mode-record-success-failed',
         userMessage: DiagnosticsStrings.safeModePersistFailed,
       );
@@ -257,7 +257,7 @@ class SafeModeController {
       // able to undo the fallback.
       final captured = await _captureSnapshotIfNeeded(key);
       if (!captured) {
-        throw const SafeModeError(
+        throw SafeModeError(
           code: 'safe-mode-snapshot-failed',
           userMessage: DiagnosticsStrings.safeModePersistFailed,
         );
@@ -274,7 +274,7 @@ class SafeModeController {
           ) &&
           saved;
       if (!saved) {
-        throw const SafeModeError(
+        throw SafeModeError(
           code: 'safe-mode-write-rejected',
           userMessage: DiagnosticsStrings.safeModePersistFailed,
         );
@@ -324,7 +324,7 @@ class SafeModeController {
         ]) &&
         removed;
     if (!removed) {
-      throw const SafeModeError(
+      throw SafeModeError(
         code: 'safe-mode-reset-failed',
         userMessage: DiagnosticsStrings.safeModePersistFailed,
       );

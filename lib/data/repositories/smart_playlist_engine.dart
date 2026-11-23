@@ -227,7 +227,9 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
   bool _needsDartTextRule(SmartRule rule) {
     if (!_isTextRule(rule.field)) return false;
     if (rule.operator != SmartOperator.equals &&
-        rule.operator != SmartOperator.contains) {
+        rule.operator != SmartOperator.contains &&
+        rule.operator != SmartOperator.notContains &&
+        rule.operator != SmartOperator.startsWith) {
       return false;
     }
     return !_isAscii(rule.value);
@@ -269,34 +271,46 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
 
       case SmartRuleField.artist:
         if (valStr.isEmpty) return null;
+        final escaped = _likeEscape(valStr.toLowerCase());
         switch (rule.operator) {
           case SmartOperator.equals:
             return t.artist.lower().equals(valStr.toLowerCase());
+          case SmartOperator.notContains:
+            return t.artist.lower().like('%$escaped%', escapeChar: r'\').not();
+          case SmartOperator.startsWith:
+            return t.artist.lower().like('$escaped%', escapeChar: r'\');
           case SmartOperator.contains:
           default:
-            final escaped = _likeEscape(valStr.toLowerCase());
             return t.artist.lower().like('%$escaped%', escapeChar: r'\');
         }
 
       case SmartRuleField.album:
         if (valStr.isEmpty) return null;
+        final escaped = _likeEscape(valStr.toLowerCase());
         switch (rule.operator) {
           case SmartOperator.equals:
             return t.album.lower().equals(valStr.toLowerCase());
+          case SmartOperator.notContains:
+            return t.album.lower().like('%$escaped%', escapeChar: r'\').not();
+          case SmartOperator.startsWith:
+            return t.album.lower().like('$escaped%', escapeChar: r'\');
           case SmartOperator.contains:
           default:
-            final escaped = _likeEscape(valStr.toLowerCase());
             return t.album.lower().like('%$escaped%', escapeChar: r'\');
         }
 
       case SmartRuleField.title:
         if (valStr.isEmpty) return null;
+        final escaped = _likeEscape(valStr.toLowerCase());
         switch (rule.operator) {
           case SmartOperator.equals:
             return t.title.lower().equals(valStr.toLowerCase());
+          case SmartOperator.notContains:
+            return t.title.lower().like('%$escaped%', escapeChar: r'\').not();
+          case SmartOperator.startsWith:
+            return t.title.lower().like('$escaped%', escapeChar: r'\');
           case SmartOperator.contains:
           default:
-            final escaped = _likeEscape(valStr.toLowerCase());
             return t.title.lower().like('%$escaped%', escapeChar: r'\');
         }
 
@@ -341,13 +355,19 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
 
       case SmartRuleField.genre:
         if (valStr.isEmpty) return null;
+        final escaped = _likeEscape(valStr.toLowerCase());
         switch (rule.operator) {
           case SmartOperator.equals:
             return t.genre.isNotNull() &
                 t.genre.lower().equals(valStr.toLowerCase());
+          case SmartOperator.notContains:
+            return t.genre.isNull() |
+                t.genre.lower().like('%$escaped%', escapeChar: r'\').not();
+          case SmartOperator.startsWith:
+            return t.genre.isNotNull() &
+                t.genre.lower().like('$escaped%', escapeChar: r'\');
           case SmartOperator.contains:
           default:
-            final escaped = _likeEscape(valStr.toLowerCase());
             return t.genre.isNotNull() &
                 t.genre.lower().like('%$escaped%', escapeChar: r'\');
         }
@@ -639,14 +659,22 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
       return stream;
     }
     if (criteria.matchAll) {
-      Stream<List<SongsTableData>> queryStream = _buildQuery(criteria).watch();
-      if (trigger != null) {
-        queryStream = Rx.combineLatest2(
-          queryStream,
-          trigger,
-          (list, _) => list,
-        );
+      Stream<List<SongsTableData>> buildMatchAllStream() {
+        final narrowedIds = _narrowIdsForDartRules(dartRules, matchAll: true);
+        if (narrowedIds != null && narrowedIds.isEmpty) {
+          return Stream.value(const <SongsTableData>[]);
+        }
+        return _buildQuery(
+          criteria,
+          allowedIds: (narrowedIds != null && narrowedIds.length <= 900)
+              ? narrowedIds
+              : null,
+        ).watch();
       }
+
+      final Stream<List<SongsTableData>> queryStream = trigger != null
+          ? trigger.switchMap((_) => buildMatchAllStream())
+          : buildMatchAllStream();
       return queryStream
           .debounceTime(const Duration(milliseconds: 500))
           .map((list) => _postProcess(list, criteria, dartRules));
@@ -655,8 +683,24 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
     final baseStream = sqlRules.isEmpty
         ? Stream.value(<SongsTableData>[])
         : _buildQuery(_withoutDartRules(criteria)).watch();
-    final allStream = _buildQuery(_allLocal(criteria)).watch();
-    Stream<(List<SongsTableData>, Set<int>)> combinedStream =
+    Stream<List<SongsTableData>> buildAllStream() {
+      final narrowedIds = _narrowIdsForDartRules(dartRules, matchAll: false);
+      if (narrowedIds != null && narrowedIds.isEmpty) {
+        return Stream.value(const <SongsTableData>[]);
+      }
+      if (narrowedIds != null && narrowedIds.length <= 900) {
+        return _buildQuery(
+          _allLocal(criteria),
+          allowedIds: narrowedIds,
+        ).watch();
+      }
+      return _buildQuery(_allLocal(criteria)).watch();
+    }
+
+    final Stream<List<SongsTableData>> allStream = trigger != null
+        ? trigger.switchMap((_) => buildAllStream())
+        : buildAllStream();
+    final Stream<(List<SongsTableData>, Set<int>)> combinedStream =
         Rx.combineLatest2(
       baseStream,
       allStream,
@@ -667,14 +711,6 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
         return (merged, baseIds);
       },
     );
-
-    if (trigger != null) {
-      combinedStream = Rx.combineLatest2(
-        combinedStream,
-        trigger,
-        (parts, _) => parts,
-      );
-    }
 
     return combinedStream
         .debounceTime(const Duration(milliseconds: 500))
@@ -806,11 +842,10 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
   ) {
     var list = songs;
     final ratingStore = _ratingStore;
-    final audioHandler = _audioHandler;
+    final bpmStore = _bpmOverrideStore;
     final ratingSnapshot =
         ratingStore?.snapshotRatings() ?? const <String, int>{};
-    final bpmSnapshot =
-        audioHandler?.bpmOverrideStore.snapshot() ?? const <String, double>{};
+    final bpmSnapshot = bpmStore?.snapshot() ?? const <String, double>{};
 
     if (dartRules.isNotEmpty) {
       list = list
@@ -845,11 +880,10 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
     List<SmartRule> dartRules,
   ) {
     final ratingStore = _ratingStore;
-    final audioHandler = _audioHandler;
+    final bpmStore = _bpmOverrideStore;
     final ratingSnapshot =
         ratingStore?.snapshotRatings() ?? const <String, int>{};
-    final bpmSnapshot =
-        audioHandler?.bpmOverrideStore.snapshot() ?? const <String, double>{};
+    final bpmSnapshot = bpmStore?.snapshot() ?? const <String, double>{};
 
     var list = merged
         .where((s) =>
@@ -941,18 +975,25 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
   bool _matchesText(String value, SmartRule rule) {
     final target = SearchAlgorithmUtils.normalize(rule.value);
     final haystack = SearchAlgorithmUtils.normalize(value);
-    return rule.operator == SmartOperator.equals
-        ? haystack == target
-        : haystack.contains(target);
+    final lowerTarget = rule.value.trim().toLowerCase();
+    final lowerHaystack = value.toLowerCase();
+    return switch (rule.operator) {
+      SmartOperator.equals =>
+        haystack == target || lowerHaystack == lowerTarget,
+      SmartOperator.notContains =>
+        !haystack.contains(target) && !lowerHaystack.contains(lowerTarget),
+      SmartOperator.startsWith =>
+        haystack.startsWith(target) || lowerHaystack.startsWith(lowerTarget),
+      _ => haystack.contains(target) || lowerHaystack.contains(lowerTarget),
+    };
   }
 
   /// Manual BPM override (40–240, prefs-backed) for [song], or null.
-  double? _bpmOf(SongsTableData song, [PulsrAudioHandler? handler]) {
+  double? _bpmOf(SongsTableData song, [BpmOverrideStore? store]) {
     try {
-      final h = handler ?? _audioHandler;
-      if (h != null) {
-        return h.bpmOverrideStore
-            .getBpmForTrack(PulsrAudioHandler.trackKeyFor(song));
+      final s = store ?? _bpmOverrideStore;
+      if (s != null) {
+        return s.getBpmForTrack(PulsrAudioHandler.trackKeyFor(song));
       }
     } catch (_) {}
     return null;

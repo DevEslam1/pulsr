@@ -1,138 +1,169 @@
 // lib/features/audio_profiles/audio_profile_strings.dart
 //
-// Single translation point for the audio-profiles module. Every user-visible
-// string the profile model, service and screen emit lives here, so the module
-// can be localized by translating one class.
+// Localized copy for the audio-profiles module, backed by ARB
+// (`AppLocalizations`) with automatic English fallback in headless tests.
 
-/// English copy for the audio-profiles feature.
+import 'dart:ui' show Locale;
+
+import '../../core/utils/l10n_holder.dart';
+import '../../l10n/generated/app_localizations.dart';
+
+/// User-facing copy for the audio-profiles feature.
 abstract final class AudioProfileStrings {
-  static const String screenTitle = 'Audio profiles';
-  static const String captureAction = 'Capture current setup';
-  static const String importAction = 'Import';
-  static const String refreshTooltip = 'Reload profiles';
+  static final AppLocalizations _fallback =
+      lookupAppLocalizations(const Locale('en'));
 
-  static const String deviceLabelPrefix = 'Current device';
-  static const String deviceUnknown = 'No output device detected';
+  static AppLocalizations _l10n([AppLocalizations? l10n]) =>
+      l10n ?? L10nHolder.current ?? _fallback;
 
-  static const String captureDialogTitle = 'Name this profile';
-  static const String captureDialogMessage =
-      'Saves the current EQ, DSP, output and bit-perfect settings as one file '
-      'you can share.';
-  static const String captureDialogHint = 'e.g. USB DAC - neutral';
-  static const String captureConfirm = 'Save';
-  static const String nameRequired = 'Enter a name for the profile.';
-  static const String captureSaved = 'Profile saved.';
-  static const String captureFailed = 'Saving the profile failed.';
+  static String get screenTitle => _l10n().audioProfScreenTitle;
+  static String get captureAction => _l10n().audioProfCaptureAction;
+  static String get importAction => _l10n().audioProfImportAction;
+  static String get refreshTooltip => _l10n().audioProfRefreshTooltip;
 
-  static const String importSaved = 'Profile imported.';
-  static const String importFailed = 'Could not import that profile file.';
-  static const String importMissing = 'That file no longer exists.';
+  static String get deviceLabelPrefix => _l10n().audioProfDeviceLabelPrefix;
+  static String get deviceUnknown => _l10n().audioProfDeviceUnknown;
 
-  static const String applyConfirm = 'Apply';
-  static const String applyDialogTitle = 'Apply profile?';
-  static const String applyFailed = 'Applying the profile failed.';
-  static const String applyTooltip = 'Apply profile';
-  static const String shareTooltip = 'Share profile';
-  static const String deleteTooltip = 'Delete profile';
+  static String get captureDialogTitle => _l10n().audioProfCaptureDialogTitle;
+  static String get captureDialogMessage =>
+      _l10n().audioProfCaptureDialogMessage;
+  static String get captureDialogHint => _l10n().audioProfCaptureDialogHint;
+  static String get captureConfirm => _l10n().audioProfCaptureConfirm;
+  static String get nameRequired => _l10n().audioProfNameRequired;
+  static String get captureSaved => _l10n().audioProfCaptureSaved;
+  static String get captureFailed => _l10n().audioProfCaptureFailed;
 
-  static const String defaultTooltip = 'Default profile';
-  static const String defaultDialogTitle = 'Default profile';
-  static const String defaultDialogMessage =
-      'Pick the profile marked as this device\'s default. Clearing it keeps '
-      'your current settings untouched.';
-  static const String defaultNone = 'No default';
-  static const String defaultSaved = 'Default profile saved.';
-  static const String defaultCleared = 'Default profile cleared.';
-  static const String defaultMissing =
-      'That profile is no longer available on this device.';
-  static const String defaultBadge = 'Default profile';
-  static const String cancelAction = 'Cancel';
+  static String get importSaved => _l10n().audioProfImportSaved;
+  static String get importFailed => _l10n().audioProfImportFailed;
+  static String get importMissing => _l10n().audioProfImportMissing;
 
-  static const String deleteConfirm = 'Delete';
-  static const String deleteDialogTitle = 'Delete profile?';
-  static const String deleted = 'Profile deleted.';
-  static const String deleteFailed = 'Deleting the profile failed.';
+  static String get applyConfirm => _l10n().audioProfApplyConfirm;
+  static String get applyDialogTitle => _l10n().audioProfApplyDialogTitle;
+  static String get applyFailed => _l10n().audioProfApplyFailed;
+  static String get applyTooltip => _l10n().audioProfApplyTooltip;
+  static String get shareTooltip => _l10n().audioProfShareTooltip;
+  static String get deleteTooltip => _l10n().audioProfDeleteTooltip;
 
-  static const String shareFailed = 'Sharing the profile failed.';
+  static String get defaultTooltip => _l10n().audioProfDefaultTooltip;
+  static String get defaultDialogTitle => _l10n().audioProfDefaultDialogTitle;
+  static String get defaultDialogMessage =>
+      _l10n().audioProfDefaultDialogMessage;
+  static String get defaultNone => _l10n().audioProfDefaultNone;
+  static String get defaultSaved => _l10n().audioProfDefaultSaved;
+  static String get defaultCleared => _l10n().audioProfDefaultCleared;
+  static String get defaultMissing => _l10n().audioProfDefaultMissing;
+  static String get defaultBadge => _l10n().audioProfDefaultBadge;
+  static String get cancelAction => _l10n().audioProfCancelAction;
 
-  static const String emptyTitle = 'No audio profiles yet';
-  static const String emptySubtitle =
-      'Capture your current setup to reuse it on another device or headphone.';
-  static const String errorTitle = 'Profiles could not be loaded';
-  static const String errorSubtitle =
-      'App storage may be unavailable. Try again in a moment.';
-  static const String retry = 'Retry';
+  static String get deleteConfirm => _l10n().audioProfDeleteConfirm;
+  static String get deleteDialogTitle => _l10n().audioProfDeleteDialogTitle;
+  static String get deleted => _l10n().audioProfDeleted;
+  static String get deleteFailed => _l10n().audioProfDeleteFailed;
 
-  static const String formatCorrupt =
-      'This file is not a valid Pulsr audio profile.';
-  static const String formatMissingVersion =
-      'The profile is missing its format version.';
-  static const String formatTooLarge =
-      'The profile file is larger than the 512 KB limit.';
-  static const String formatTooManyValues =
-      'The profile contains more than 200 settings.';
-  static const String formatEmptyKey =
-      'The profile contains an empty setting name.';
-  static const String formatInvalidId = 'The profile identifier is invalid.';
-  static const String storeFailed = 'The profile could not be saved.';
+  static String get shareFailed => _l10n().audioProfShareFailed;
+
+  static String get emptyTitle => _l10n().audioProfEmptyTitle;
+  static String get emptySubtitle => _l10n().audioProfEmptySubtitle;
+  static String get errorTitle => _l10n().audioProfErrorTitle;
+  static String get errorSubtitle => _l10n().audioProfErrorSubtitle;
+  static String get retry => _l10n().audioProfRetry;
+
+  static String get formatCorrupt => _l10n().audioProfFormatCorrupt;
+  static String get formatMissingVersion =>
+      _l10n().audioProfFormatMissingVersion;
+  static String get formatTooLarge => _l10n().audioProfFormatTooLarge;
+  static String get formatTooManyValues => _l10n().audioProfFormatTooManyValues;
+  static String get formatEmptyKey => _l10n().audioProfFormatEmptyKey;
+  static String get formatInvalidId => _l10n().audioProfFormatInvalidId;
+  static String get storeFailed => _l10n().audioProfStoreFailed;
 
   /// Body of the confirmation dialog shown before applying a profile.
-  static String applyDialogBody(String name) =>
-      'This replaces your current audio settings with "$name". A backup of '
-      'the current setup is saved automatically first, so a partial failure '
-      'can be rolled back.';
+  static String applyDialogBody(String name, [AppLocalizations? l10n]) =>
+      _l10n(l10n).audioProfApplyDialogBody(name);
 
   /// Success message after applying [count] settings.
-  static String applyDone(int count) =>
-      count == 1 ? 'Applied 1 setting.' : 'Applied $count settings.';
+  static String applyDone(int count, [AppLocalizations? l10n]) {
+    final l = _l10n(l10n);
+    return count == 1
+        ? l.audioProfApplyDoneOne
+        : l.audioProfApplyDoneMany(count);
+  }
 
   /// Success message when [skipped] settings were outside the whitelist.
-  static String applyDoneWithSkipped(int applied, int skipped) =>
-      '${applyDone(applied)} Skipped $skipped unsupported '
-      '${skipped == 1 ? 'setting' : 'settings'}.';
+  static String applyDoneWithSkipped(
+    int applied,
+    int skipped, [
+    AppLocalizations? l10n,
+  ]) {
+    final l = _l10n(l10n);
+    final appliedMsg = applyDone(applied, l);
+    return skipped == 1
+        ? l.audioProfApplyDoneWithSkippedOne(appliedMsg)
+        : l.audioProfApplyDoneWithSkippedMany(appliedMsg, skipped);
+  }
 
   /// Failure message when [failed] settings were rejected and the previous
   /// values were restored.
-  static String applyFailedRolledBack(int failed) =>
-      '${failed == 1 ? 'One setting' : '$failed settings'} could not be '
-      'written; your previous settings were restored.';
+  static String applyFailedRolledBack(int failed, [AppLocalizations? l10n]) {
+    final l = _l10n(l10n);
+    return failed == 1
+        ? l.audioProfApplyFailedRolledBackOne
+        : l.audioProfApplyFailedRolledBackMany(failed);
+  }
 
   /// Failure message when [failed] settings were rejected and the rollback was
   /// only partially successful.
-  static String applyFailedRollbackIncomplete(int failed) =>
-      '${failed == 1 ? 'One setting' : '$failed settings'} could not be '
-      'written and the previous settings could not be fully restored.';
+  static String applyFailedRollbackIncomplete(
+    int failed, [
+    AppLocalizations? l10n,
+  ]) {
+    final l = _l10n(l10n);
+    return failed == 1
+        ? l.audioProfApplyFailedRollbackIncompleteOne
+        : l.audioProfApplyFailedRollbackIncompleteMany(failed);
+  }
 
   /// Import message when [skipped] unsupported or corrupt settings were
   /// dropped from the imported file.
-  static String importSavedSkipped(int skipped) =>
-      'Profile imported. Skipped $skipped unsupported '
-      '${skipped == 1 ? 'setting' : 'settings'}.';
+  static String importSavedSkipped(int skipped, [AppLocalizations? l10n]) {
+    final l = _l10n(l10n);
+    return skipped == 1
+        ? l.audioProfImportSavedSkippedOne
+        : l.audioProfImportSavedSkippedMany(skipped);
+  }
 
   /// Confirmation body for deleting a profile called [name].
-  static String deleteDialogBody(String name) =>
-      '"$name" will be removed from this device. This cannot be undone.';
+  static String deleteDialogBody(String name, [AppLocalizations? l10n]) =>
+      _l10n(l10n).audioProfDeleteDialogBody(name);
 
   /// Share-sheet body for a profile called [name].
-  static String shareText(String name) => 'Pulsr audio profile: $name';
+  static String shareText(String name, [AppLocalizations? l10n]) =>
+      _l10n(l10n).audioProfShareText(name);
 
   /// Subtitle of a saved profile row.
-  static String profileSummary(int settings) =>
-      settings == 1 ? '1 setting' : '$settings settings';
+  static String profileSummary(int settings, [AppLocalizations? l10n]) {
+    final l = _l10n(l10n);
+    return settings == 1
+        ? l.audioProfSummaryOne
+        : l.audioProfSummaryMany(settings);
+  }
 
   /// Name given to the automatic pre-apply backup of [name].
-  static String backupOf(String name) => 'Before $name';
+  static String backupOf(String name, [AppLocalizations? l10n]) =>
+      _l10n(l10n).audioProfBackupOf(name);
 
   /// Message for a profile written by a newer app version.
-  static String formatNewerVersion(int version) =>
-      'This profile uses format $version, which is newer than this build '
-      'supports. Update Pulsr to import it.';
+  static String formatNewerVersion(int version, [AppLocalizations? l10n]) =>
+      _l10n(l10n).audioProfFormatNewerVersion(version);
 
   /// Message for a numeric format version this build does not accept.
-  static String formatInvalidVersionNumber(int version) =>
-      'Format $version is not a supported profile version.';
+  static String formatInvalidVersionNumber(
+    int version, [
+    AppLocalizations? l10n,
+  ]) =>
+      _l10n(l10n).audioProfFormatInvalidVersionNumber(version);
 
   /// Message for a single setting whose value has an unsupported type.
-  static String formatInvalidValue(String key) =>
-      'The setting "$key" has a value this build cannot read.';
+  static String formatInvalidValue(String key, [AppLocalizations? l10n]) =>
+      _l10n(l10n).audioProfFormatInvalidValue(key);
 }

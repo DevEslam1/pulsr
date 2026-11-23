@@ -138,13 +138,23 @@ spl1 = spl1 + lp1 * amount;''',
     super.dispose();
   }
 
-  void _compileAndRun(BuildContext context) {
+  Future<void> _compileAndRun(BuildContext context) async {
     final code = _codeController.text.trim();
     if (code.isNotEmpty) {
-      context.read<PlayerCubit>().setLiveProgEnabled(true, code: code);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(context.l10n.eelCompiled)),
-      );
+      final cubit = context.read<PlayerCubit>();
+      final messenger = ScaffoldMessenger.maybeOf(context);
+      final compiledMessage = context.l10n.eelCompiled;
+      await cubit.setLiveProgEnabled(true, code: code);
+      if (!mounted) return;
+      final status = cubit.state.liveProgStatus.toLowerCase();
+      final isError = status.contains('error') ||
+          status.contains('fail') ||
+          status.contains('invalid');
+      if (!isError) {
+        messenger?.showSnackBar(
+          SnackBar(content: Text(compiledMessage)),
+        );
+      }
     }
   }
 
@@ -188,19 +198,25 @@ spl1 = spl1 + lp1 * amount;''',
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(
-                      children: [
-                        Icon(Icons.terminal_rounded, color: p.primary),
-                        const SizedBox(width: AppSpacing.s10),
-                        Text(
-                          context.l10n.liveProgDspTitle,
-                          style: TextStyle(
-                            color: p.textPrimary,
-                            fontSize: AppFontSize.title,
-                            fontWeight: FontWeight.w700,
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Icon(Icons.terminal_rounded, color: p.primary),
+                          const SizedBox(width: AppSpacing.s10),
+                          Expanded(
+                            child: Text(
+                              context.l10n.liveProgDspTitle,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: p.textPrimary,
+                                fontSize: AppFontSize.title,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                     Switch.adaptive(
                       value: state.isLiveProgEnabled,

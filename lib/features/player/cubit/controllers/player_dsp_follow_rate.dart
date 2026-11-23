@@ -45,6 +45,7 @@ extension PlayerDspFollowRate on PlayerDspController {
         // Derived from the engine, not the request: bit-perfect, a refused DAC
         // rate or a not-yet-rebuilt sink all leave the factor at 1.
         await AudioEffectsChannel().refreshActiveOversampleMultiplier();
+        if (_isClosed() || _isStaleFollowRequest(song)) return;
         final oversampleMult =
             AudioEffectsChannel().activeOversampleMultiplier;
         final pcmToDsd = AudioEffectsChannel().isPcmToDsdActive;
@@ -133,7 +134,7 @@ extension PlayerDspFollowRate on PlayerDspController {
           _lastFollowedSampleRate = null;
           return;
         }
-        if (_isClosed()) return;
+        if (_isClosed() || _isStaleFollowRequest(song)) return;
         // Re-read state after validateBitPerfectTrackSource acquires/releases
         // _audioModeMutex so an in-flight bit-perfect enable transition that
         // just finished on that mutex is observed here.
@@ -141,7 +142,11 @@ extension PlayerDspFollowRate on PlayerDspController {
         // Re-evaluate tap-side SRC / Remaster target for the new track's rate
         // so a previous track's oversampled target cannot stay latched onto a
         // subsequent track (e.g. switching from 48 kHz music to radio).
-        await _settingsCubit!.syncTapSrcRate(trackSampleRate: song.sampleRate ?? 0);
+        try {
+          await _settingsCubit!
+              .syncTapSrcRate(trackSampleRate: song.sampleRate ?? 0);
+        } on NoSuchMethodError catch (_) {}
+        if (_isClosed() || _isStaleFollowRequest(song)) return;
         final following = settings.strictBitPerfect ||
             (settings.outputFormatNegotiationEnabled &&
                 settings.followTrackSampleRate);
@@ -242,11 +247,13 @@ extension PlayerDspFollowRate on PlayerDspController {
         final deviceDepth = (directOwned && dacMaxDepth > 0)
             ? dacMaxDepth
             : (activeDevice?.maxBitDepth ?? (device?.bitDepth ?? 0));
-        final isKnownMp3 = AudioConflicts.isMp3(path: song.path, codec: song.codec);
+        final isKnownMp3 =
+            AudioConflicts.isMp3(path: song.path, codec: song.codec);
         final rawDepth = effectiveSourceBitDepth(
             tagged: song.bitDepth ?? 0,
             decoded: device?.decodedBitDepth ?? 0);
-        final effectiveSourceDepth = (rawDepth <= 0 && isKnownMp3) ? 16 : rawDepth;
+        final effectiveSourceDepth =
+            (directOwned && rawDepth <= 0 && isKnownMp3) ? 16 : rawDepth;
         var depth = resolveFollowBitDepth(
           trackBitDepth: effectiveSourceDepth,
           streamingBitDepth:
@@ -264,7 +271,7 @@ extension PlayerDspFollowRate on PlayerDspController {
         // reopens the output, so the previous confirmation is no longer valid.
         final producerChannels =
             directOwned ? await usb.getProducerChannels() : 2;
-        if (_isClosed()) return;
+        if (_isClosed() || _isStaleFollowRequest(song)) return;
         final dacSupportsMono = usb.lastStatus.advertisedFormats.any(
           (f) => ((f['channels'] as num?)?.toInt() ?? 0) == 1,
         );

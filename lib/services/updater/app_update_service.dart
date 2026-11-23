@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:crypto/crypto.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
@@ -50,6 +51,7 @@ class UpdateInfo {
   final String tagName;
   final String releaseUrl;
   final String? apkUrl;
+  final String? sha256;
   final String? notes;
   final DateTime? publishedAt;
 
@@ -58,9 +60,19 @@ class UpdateInfo {
     required this.tagName,
     required this.releaseUrl,
     this.apkUrl,
+    this.sha256,
     this.notes,
     this.publishedAt,
   });
+
+  static String? _normalizeSha256(String? raw) {
+    if (raw == null) return null;
+    var cleaned = raw.trim().toLowerCase();
+    if (cleaned.startsWith('sha256:')) {
+      cleaned = cleaned.substring(7).trim();
+    }
+    return RegExp(r'^[a-f0-9]{64}$').hasMatch(cleaned) ? cleaned : null;
+  }
 
   factory UpdateInfo.fromGitHubJson(Map<String, dynamic> json) {
     final tagName = json['tag_name'] as String? ?? '';
@@ -70,6 +82,7 @@ class UpdateInfo {
     final notes = json['body'] as String?;
 
     String? apkUrl;
+    String? sha256;
     final assets = json['assets'] as List<dynamic>?;
     if (assets != null) {
       for (final asset in assets) {
@@ -78,9 +91,22 @@ class UpdateInfo {
           final state = asset['state'] as String? ?? '';
           if (name.toLowerCase().endsWith('.apk') && state == 'uploaded') {
             apkUrl = asset['browser_download_url'] as String?;
+            sha256 = _normalizeSha256(
+              (asset['digest'] as String?) ?? (asset['sha256'] as String?),
+            );
             break;
           }
         }
+      }
+    }
+
+    if (sha256 == null && notes != null && notes.isNotEmpty) {
+      final match = RegExp(
+        r'sha-?256[:\s]+([a-fA-F0-9]{64})',
+        caseSensitive: false,
+      ).firstMatch(notes);
+      if (match != null) {
+        sha256 = match.group(1)?.toLowerCase();
       }
     }
 
@@ -95,6 +121,7 @@ class UpdateInfo {
       tagName: tagName,
       releaseUrl: releaseUrl,
       apkUrl: apkUrl,
+      sha256: sha256,
       notes: notes,
       publishedAt: published,
     );
@@ -119,16 +146,46 @@ class AppUpdateService {
   static const String defaultRepo = 'pulsr-audio/pulsr';
   static const MethodChannel _updaterChannel =
       MethodChannel(PulsrChannels.updater);
+  static const Set<String> allowedApkHostSuffixes = {
+    'github.com',
+    'githubusercontent.com',
+  };
+  static const Duration requestTimeout = Duration(seconds: 15);
+  static const Duration streamChunkTimeout = Duration(seconds: 30);
 
   final http.Client _client;
   String _repo = defaultRepo;
   bool _isChecking = false;
   bool _isDownloading = false;
   bool _cancelDownload = false;
+  Future<File?>? _activeDownloadFuture;
 
   String get repo => _repo;
   bool get isChecking => _isChecking;
   bool get isDownloading => _isDownloading;
+
+  /// Enforces HTTPS and an allowlist of official GitHub release hosts.
+  static bool isAllowedApkUrl(String rawUrl) {
+    final uri = Uri.tryParse(rawUrl.trim());
+    if (uri == null || !uri.hasAuthority) return false;
+    if (uri.scheme.toLowerCase() != 'https') return false;
+    if (uri.userInfo.isNotEmpty) return false;
+    final host = uri.host.toLowerCase();
+    if (host.isEmpty) return false;
+    return allowedApkHostSuffixes.any(
+      (suffix) => host == suffix || host.endsWith('.$suffix'),
+    );
+  }
+
+  /// Sanitizes a version string before interpolating it into an APK filename.
+  static String sanitizeVersionForFilename(String rawVersion) {
+    final sanitized = rawVersion
+        .trim()
+        .replaceAll(RegExp(r'[^0-9A-Za-z._-]'), '_')
+        .replaceAll(RegExp(r'\.{2,}'), '_');
+    final cleaned = sanitized.replaceAll(RegExp(r'^[._-]+|[._-]+$'), '');
+    return cleaned.isEmpty ? 'unknown' : cleaned;
+  }
 
   void configureRepo(String repo) {
     if (repo.trim().isNotEmpty) {
@@ -182,18 +239,60 @@ class AppUpdateService {
   Future<File?> downloadApk(
     UpdateInfo info, {
     void Function(double progress)? onProgress,
+    Directory? cacheDirectoryOverride,
+    Duration? chunkTimeoutOverride,
+  }) {
+    if (_isDownloading && _activeDownloadFuture != null) {
+      return _activeDownloadFuture!;
+    }
+    final future = _performDownloadApk(
+      info,
+      onProgress: onProgress,
+      cacheDirectoryOverride: cacheDirectoryOverride,
+      chunkTimeoutOverride: chunkTimeoutOverride,
+    );
+    _activeDownloadFuture = future;
+    return future;
+  }
+
+  Future<File?> _performDownloadApk(
+    UpdateInfo info, {
+    void Function(double progress)? onProgress,
+    Directory? cacheDirectoryOverride,
+    Duration? chunkTimeoutOverride,
   }) async {
-    final apkUrl = info.apkUrl;
+    final apkUrl = info.apkUrl?.trim();
     if (apkUrl == null || apkUrl.isEmpty) {
       throw StateError(
           'No APK download URL available for release ${info.version}');
     }
+    if (!isAllowedApkUrl(apkUrl)) {
+      throw ArgumentError.value(
+        apkUrl,
+        'apkUrl',
+        'APK download URL must use HTTPS and an allowed GitHub release host.',
+      );
+    }
+    final expectedSha256 = UpdateInfo._normalizeSha256(info.sha256);
+    if (info.sha256 != null &&
+        info.sha256!.trim().isNotEmpty &&
+        expectedSha256 == null) {
+      throw ArgumentError.value(
+        info.sha256,
+        'sha256',
+        'Invalid SHA-256 digest format.',
+      );
+    }
 
     _isDownloading = true;
     _cancelDownload = false;
+    IOSink? sink;
+    File? targetFile;
+    var completedSuccessfully = false;
 
     try {
-      final cacheDir = await getApplicationCacheDirectory();
+      final cacheDir =
+          cacheDirectoryOverride ?? await getApplicationCacheDirectory();
       final updatesDir = Directory('${cacheDir.path}/updates');
       if (!await updatesDir.exists()) {
         await updatesDir.create(recursive: true);
@@ -205,17 +304,15 @@ class AppUpdateService {
             if (f is File) f.deleteSync();
           }
         } catch (e) {
-          // Best effort: a stale APK left behind must not block the
-          // download, but the reason (disk full, permission) is worth one
-          // rate-limited log.
           ErrorLogger.logSwallowed('AppUpdateService.clearUpdatesDir', e);
         }
       }
 
-      final targetFile = File('${updatesDir.path}/pulsr-${info.version}.apk');
+      final safeVersion = sanitizeVersionForFilename(info.version);
+      targetFile = File('${updatesDir.path}/pulsr-$safeVersion.apk');
 
       final request = http.Request('GET', Uri.parse(apkUrl));
-      final response = await _client.send(request);
+      final response = await _client.send(request).timeout(requestTimeout);
 
       if (response.statusCode != 200) {
         throw HttpException(
@@ -224,15 +321,11 @@ class AppUpdateService {
 
       final totalBytes = response.contentLength ?? 0;
       int receivedBytes = 0;
-      final sink = targetFile.openWrite();
+      sink = targetFile.openWrite();
+      final chunkTimeout = chunkTimeoutOverride ?? streamChunkTimeout;
 
-      await for (final chunk in response.stream) {
+      await for (final chunk in response.stream.timeout(chunkTimeout)) {
         if (_cancelDownload) {
-          await sink.close();
-          if (await targetFile.exists()) {
-            await targetFile.delete();
-          }
-          _isDownloading = false;
           return null;
         }
 
@@ -246,11 +339,25 @@ class AppUpdateService {
 
       await sink.flush();
       await sink.close();
+      sink = null;
 
-      _isDownloading = false;
+      if (_cancelDownload) {
+        return null;
+      }
+
+      if (expectedSha256 != null) {
+        final bytes = await targetFile.readAsBytes();
+        final actualSha256 = sha256.convert(bytes).toString().toLowerCase();
+        if (actualSha256 != expectedSha256) {
+          throw StateError(
+            'APK SHA-256 checksum mismatch (expected $expectedSha256, got $actualSha256)',
+          );
+        }
+      }
+
+      completedSuccessfully = true;
       return targetFile;
     } catch (e, st) {
-      _isDownloading = false;
       ErrorLogger.log(
         'AppUpdateService.downloadApk failed',
         error: e,
@@ -258,6 +365,23 @@ class AppUpdateService {
         category: 'Updater',
       );
       rethrow;
+    } finally {
+      try {
+        await sink?.close();
+      } catch (e) {
+        ErrorLogger.logSwallowed('AppUpdateService.closeSink', e);
+      }
+      if (!completedSuccessfully && targetFile != null) {
+        try {
+          if (await targetFile.exists()) {
+            await targetFile.delete();
+          }
+        } catch (e) {
+          ErrorLogger.logSwallowed('AppUpdateService.deletePartialApk', e);
+        }
+      }
+      _isDownloading = false;
+      _activeDownloadFuture = null;
     }
   }
 
@@ -318,5 +442,10 @@ class AppUpdateService {
         ),
       );
     }
+  }
+
+  void dispose() {
+    cancelDownload();
+    _client.close();
   }
 }

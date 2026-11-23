@@ -553,19 +553,56 @@ class SpotifyImporterService {
       throw Exception('Could not match any tracks on YouTube Music.');
     }
 
-    // Create local Pulsr playlist
-    final createRes =
-        await _effectivePlaylistUseCases.createPlaylist(playlistData.title);
-    final createdPlaylistId = createRes.fold(
-      (f) => throw Exception('Failed to create playlist: ${f.message}'),
-      (id) => id,
-    );
-
-    // Persist tracks in songsTable and gather IDs
+    // Persist playlist, tracks, and playlist entries atomically in one transaction
     final db = _effectiveDb;
-    final songIds = <int>[];
+    final createdPlaylistId = await db.transaction<int>(() async {
+      final createRes =
+          await _effectivePlaylistUseCases.createPlaylist(playlistData.title);
+      final playlistRowId = createRes.fold(
+        (f) => throw Exception('Failed to create playlist: ${f.message}'),
+        (id) => id,
+      );
 
-    await db.transaction(() async {
+      final songIds = <int>[];
+      final minRow = await db
+          .customSelect('SELECT MIN(id) AS min_id FROM songs')
+          .getSingleOrNull();
+      final minId = minRow?.readNullable<int>('min_id') ?? 0;
+      var nextFallbackId = minId < 0 ? minId - 1 : -1;
+
+      final takenIds = <int>{};
+      final preferredIds =
+          matchResult.resolved.map((t) => t.toSongData().id).toSet().toList();
+      const chunkSize = 400;
+      for (var i = 0; i < preferredIds.length; i += chunkSize) {
+        final chunk = preferredIds.sublist(
+          i,
+          (i + chunkSize).clamp(0, preferredIds.length),
+        );
+        final rows = await (db.selectOnly(db.songsTable)
+              ..addColumns([db.songsTable.id])
+              ..where(db.songsTable.id.isIn(chunk)))
+            .get();
+        for (final row in rows) {
+          final id = row.read(db.songsTable.id);
+          if (id != null) takenIds.add(id);
+        }
+      }
+
+      int allocateFreeSongId(int preferred) {
+        if (!takenIds.contains(preferred)) {
+          takenIds.add(preferred);
+          return preferred;
+        }
+        while (takenIds.contains(nextFallbackId)) {
+          nextFallbackId -= 1;
+        }
+        final id = nextFallbackId;
+        nextFallbackId -= 1;
+        takenIds.add(id);
+        return id;
+      }
+
       for (final track in matchResult.resolved) {
         final existing = await (db.select(db.songsTable)
               ..where((t) => t.remoteId.equals(track.videoId))
@@ -576,7 +613,7 @@ class SpotifyImporterService {
           songIds.add(existing.id);
         } else {
           final songData = track.toSongData();
-          final id = await _resolveFreeSongId(db, songData.id);
+          final id = allocateFreeSongId(songData.id);
           final inserted = await db.into(db.songsTable).insert(
                 SongsTableCompanion(
                   id: Value(id),
@@ -607,25 +644,26 @@ class SpotifyImporterService {
           }
         }
       }
-    });
 
-    // Add songs to the playlist
-    if (songIds.isNotEmpty) {
-      final addRes = await _effectivePlaylistUseCases.addSongsToPlaylist(
-        createdPlaylistId,
-        songIds,
-      );
-      addRes.fold(
-        (f) {
-          ErrorLogger.log(
-            'Failed to add songs to imported playlist: ${f.message}',
-            category: 'SpotifyImporter',
-          );
-          throw Exception('Failed to add songs to playlist: ${f.message}');
-        },
-        (_) => null,
-      );
-    }
+      if (songIds.isNotEmpty) {
+        final addRes = await _effectivePlaylistUseCases.addSongsToPlaylist(
+          playlistRowId,
+          songIds,
+        );
+        addRes.fold(
+          (f) {
+            ErrorLogger.log(
+              'Failed to add songs to imported playlist: ${f.message}',
+              category: 'SpotifyImporter',
+            );
+            throw Exception('Failed to add songs to playlist: ${f.message}');
+          },
+          (_) => null,
+        );
+      }
+
+      return playlistRowId;
+    });
 
     return SpotifyImportResult(
       playlistId: createdPlaylistId,
@@ -635,18 +673,5 @@ class SpotifyImporterService {
       unmatchedTracks: matchResult.unmatched,
       truncated: playlistData.truncated,
     );
-  }
-
-  Future<int> _resolveFreeSongId(AppDatabase db, int preferred) async {
-    var candidate = preferred;
-    for (var i = 0; i < 4096; i++) {
-      final clash = await (db.select(db.songsTable)
-            ..where((t) => t.id.equals(candidate))
-            ..limit(1))
-          .getSingleOrNull();
-      if (clash == null) return candidate;
-      candidate = candidate < 0 ? candidate - 1 : candidate + 1;
-    }
-    return -(DateTime.now().microsecondsSinceEpoch & 0x3FFFFFFFFFFFFFFF);
   }
 }

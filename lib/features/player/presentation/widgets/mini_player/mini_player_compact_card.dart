@@ -256,18 +256,10 @@ class MiniPlayerCompactCard extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(width: AppSpacing.xs),
-                          // Primary Play/Pause Button with tonal capsule
-                          Container(
-                            width: 40,
-                            height: 40,
-                            margin: const EdgeInsets.symmetric(horizontal: 2),
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: activeAccent.withValues(
-                                alpha: p.isDark ? 0.14 : 0.10,
-                              ),
-                            ),
-                            alignment: Alignment.center,
+                          // Primary Play/Pause Button with tonal capsule (>= 48x48dp hit target)
+                          SizedBox(
+                            width: AppSpacing.minTouchTarget,
+                            height: AppSpacing.minTouchTarget,
                             child: IconButton(
                               padding: EdgeInsets.zero,
                               constraints: const BoxConstraints(
@@ -277,30 +269,43 @@ class MiniPlayerCompactCard extends StatelessWidget {
                               tooltip: state.isPlaying
                                   ? context.l10n.pause
                                   : context.l10n.play,
-                              icon: AnimatedSwitcher(
-                                duration: context.motion(PulsrMotion.state),
-                                transitionBuilder: (child, anim) => allowMotion
-                                    ? ScaleTransition(scale: anim, child: child)
-                                    : child,
-                                child: state.isBuffering
-                                    ? SizedBox(
-                                        key: const ValueKey<String>(
-                                            'buffering'),
-                                        width: 22,
-                                        height: 22,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2.3,
+                              icon: Container(
+                                width: 40,
+                                height: 40,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: activeAccent.withValues(
+                                    alpha: p.isDark ? 0.14 : 0.10,
+                                  ),
+                                ),
+                                alignment: Alignment.center,
+                                child: AnimatedSwitcher(
+                                  duration: context.motion(PulsrMotion.state),
+                                  transitionBuilder: (child, anim) =>
+                                      allowMotion
+                                          ? ScaleTransition(
+                                              scale: anim, child: child)
+                                          : child,
+                                  child: state.isBuffering
+                                      ? SizedBox(
+                                          key: const ValueKey<String>(
+                                              'buffering'),
+                                          width: 22,
+                                          height: 22,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2.3,
+                                            color: activeAccent,
+                                          ),
+                                        )
+                                      : Icon(
+                                          state.isPlaying
+                                              ? Icons.pause_rounded
+                                              : Icons.play_arrow_rounded,
+                                          key: ValueKey<bool>(state.isPlaying),
                                           color: activeAccent,
+                                          size: 28,
                                         ),
-                                      )
-                                    : Icon(
-                                        state.isPlaying
-                                            ? Icons.pause_rounded
-                                            : Icons.play_arrow_rounded,
-                                        key: ValueKey<bool>(state.isPlaying),
-                                        color: activeAccent,
-                                        size: 28,
-                                      ),
+                                ),
                               ),
                               onPressed: () {
                                 PulsrHaptics.lightImpact();

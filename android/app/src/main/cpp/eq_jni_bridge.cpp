@@ -1665,10 +1665,17 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeSetLiveProgSlider(
     });
 }
 
+namespace {
+// Invalidates any staged Direct USB ENOSPC retry block on flush, seek, track
+// resync, reset, teardown, or USB stream lifecycle change (BUG-P1-1).
+std::atomic<uint64_t> g_usbRetryEpoch{0};
+}  // namespace
+
 JNIEXPORT void JNICALL
 Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeDestroyEngine(
         JNIEnv* /* env */, jclass /* clazz */, jlong engineHandle) {
     if (engineHandle == 0) return;
+    g_usbRetryEpoch.fetch_add(1, std::memory_order_acq_rel);
     auto& registry = DspEngineRegistry::instance();
     const int slot = registry.beginTeardown(static_cast<int64_t>(engineHandle));
     if (slot < 0) {
@@ -1690,6 +1697,7 @@ Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeDestroyEngine(
 JNIEXPORT void JNICALL
 Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeResetEngine(
         JNIEnv* /* env */, jclass /* clazz */, jlong engineHandle) {
+    g_usbRetryEpoch.fetch_add(1, std::memory_order_acq_rel);
     if (engineHandle == 0) {
         try {
             AudioDspEngine::instance().reset();
@@ -1799,21 +1807,71 @@ Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeProcessDirectFloatB
         return kDirectUsbRetry;
     }
     try {
-        const jint processed = static_cast<jint>(engine->processInterleaved(
-            floatBuffer, frameCount, channels, transportGains));
+        struct PendingUsbRetry {
+            uint64_t retryEpoch = 0;
+            int64_t handle = 0;
+            int frames = 0;
+            int channels = 0;
+            int sampleRate = 0;
+            int sourceBitDepth = 0;
+            int sourceSampleRate = 0;
+            bool raw = false;
+            bool dop = false;
+            bool active = false;
+            std::vector<float> stagedFloats;
+            std::vector<uint8_t> stagedPcm;
+        };
+        thread_local PendingUsbRetry sPendingRetry;
+
+        const uint64_t currentRetryEpoch =
+            g_usbRetryEpoch.load(std::memory_order_acquire);
+        jint processed = frameCount;
+        bool reusedPendingDsp = false;
+        if (exclusive && sPendingRetry.active) {
+            if (sPendingRetry.retryEpoch == currentRetryEpoch &&
+                sPendingRetry.handle == static_cast<int64_t>(engineHandle) &&
+                sPendingRetry.frames == frameCount &&
+                sPendingRetry.channels == channels) {
+                reusedPendingDsp = true;
+            } else {
+                sPendingRetry.active = false;
+            }
+        } else {
+            sPendingRetry.active = false;
+        }
+
+        if (!reusedPendingDsp) {
+            processed = static_cast<jint>(engine->processInterleaved(
+                floatBuffer, frameCount, channels, transportGains));
+        }
         if (exclusive) {
-            if (processed != frameCount) return reject(EIO);
-            const bool raw = engine->wasLastBlockBitPerfect();
+            if (processed != frameCount) {
+                sPendingRetry.active = false;
+                return reject(EIO);
+            }
+            const bool raw = reusedPendingDsp ? sPendingRetry.raw : engine->wasLastBlockBitPerfect();
+            const bool dop = reusedPendingDsp ? sPendingRetry.dop : engine->wasLastBlockDop();
+            const int targetRate = reusedPendingDsp
+                ? sPendingRetry.sampleRate
+                : static_cast<int>(engine->getSampleRate());
+            const uint8_t* pcmToWrite = reusedPendingDsp
+                ? (sPendingRetry.stagedPcm.empty() ? nullptr : sPendingRetry.stagedPcm.data())
+                : sourceBytes;
+            const int pcmBitDepth = reusedPendingDsp ? sPendingRetry.sourceBitDepth : sourceBitDepth;
+            const int pcmSampleRate = reusedPendingDsp ? sPendingRetry.sourceSampleRate : sourceSampleRate;
+            const float* floatsToWrite = reusedPendingDsp
+                ? sPendingRetry.stagedFloats.data()
+                : floatBuffer;
             bool written = false;
-            if (raw && sourceBytes) {
+            if (raw && pcmToWrite) {
                 // Item 3: the tap knows whether these raw words are DoP-framed, so
                 // the sink can synthesize marker-carrying silence on an underrun
                 // instead of zero-filling and destroying the marker stream.
-                usb.SetProducerDop(engine->wasLastBlockDop());
-                written = usb.WritePcm(sourceBytes, frameCount, channels, sourceBitDepth,
-                                      sourceSampleRate, static_cast<int64_t>(engineHandle));
+                usb.SetProducerDop(dop);
+                written = usb.WritePcm(pcmToWrite, frameCount, channels, pcmBitDepth,
+                                      pcmSampleRate, static_cast<int64_t>(engineHandle));
             } else {
-                if (raw && !sourceBytes) {
+                if (raw && !pcmToWrite) {
                     // The engine declared the block bit-perfect but the tap has no
                     // retained source bytes (e.g. Media3 handed a Buffer without
                     // the original direct view). The float buffer still carries
@@ -1823,14 +1881,47 @@ Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeProcessDirectFloatB
                     sUsbFloatFallbackCount.fetch_add(1, std::memory_order_relaxed);
                 }
                 usb.SetProducerDop(false);
-                written = usb.WriteInterleaved(floatBuffer, frameCount, channels,
-                    static_cast<int>(engine->getSampleRate()), static_cast<int64_t>(engineHandle));
+                written = usb.WriteInterleaved(floatsToWrite, frameCount, channels,
+                    targetRate, static_cast<int64_t>(engineHandle));
             }
-            std::memset(floatBuffer, 0, blockBytes);
             if (!written) {
-                if (usb.GetLastError() == ENOSPC) return kDirectUsbRetry;
+                if (usb.GetLastError() == ENOSPC) {
+                    // Never zero floatBuffer before retry (BUG-P1-1)! Stage the
+                    // already-processed block so Java's retry (which refills
+                    // floatBuffer from inputBuffer) replays the exact processed
+                    // audio without double-advancing DSP state.
+                    if (!reusedPendingDsp) {
+                        const size_t sampleCount =
+                            static_cast<size_t>(frameCount) * static_cast<size_t>(channels);
+                        sPendingRetry.stagedFloats.assign(
+                            floatBuffer, floatBuffer + sampleCount);
+                        if (raw && sourceBytes && sourceBitDepth > 0) {
+                            const size_t pcmBytes =
+                                sampleCount * static_cast<size_t>(sourceBitDepth / 8);
+                            sPendingRetry.stagedPcm.assign(
+                                sourceBytes, sourceBytes + pcmBytes);
+                        } else {
+                            sPendingRetry.stagedPcm.clear();
+                        }
+                        sPendingRetry.retryEpoch = currentRetryEpoch;
+                        sPendingRetry.handle = static_cast<int64_t>(engineHandle);
+                        sPendingRetry.frames = frameCount;
+                        sPendingRetry.channels = channels;
+                        sPendingRetry.sampleRate = targetRate;
+                        sPendingRetry.sourceBitDepth = sourceBitDepth;
+                        sPendingRetry.sourceSampleRate = sourceSampleRate;
+                        sPendingRetry.raw = raw;
+                        sPendingRetry.dop = dop;
+                        sPendingRetry.active = true;
+                    }
+                    return kDirectUsbRetry;
+                }
+                sPendingRetry.active = false;
+                std::memset(floatBuffer, 0, blockBytes);
                 return INT32_MIN;
             }
+            sPendingRetry.active = false;
+            std::memset(floatBuffer, 0, blockBytes);
             return processed;
         }
         return engine->wasLastBlockBitPerfect() ? -processed : processed;
@@ -1842,6 +1933,7 @@ Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeProcessDirectFloatB
 JNIEXPORT void JNICALL
 Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeResyncForTrack(
         JNIEnv* /* env */, jclass /* clazz */, jlong engineHandle, jdouble sampleRate, jint channels) {
+    g_usbRetryEpoch.fetch_add(1, std::memory_order_acq_rel);
     if (channels > 0 && channels <= 8) {
         g_producerChannels.store(static_cast<int>(channels), std::memory_order_relaxed);
     }
@@ -1875,6 +1967,7 @@ Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativePrepareTapSrc(
 JNIEXPORT void JNICALL
 Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeReleaseUsbProducer(
         JNIEnv* /* env */, jclass /* clazz */, jlong engineHandle) {
+    g_usbRetryEpoch.fetch_add(1, std::memory_order_acq_rel);
     pulsr::UsbAudioSink::instance().ReleaseProducer(static_cast<int64_t>(engineHandle));
 }
 
@@ -1888,6 +1981,7 @@ Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeSetUsbPaused(
 JNIEXPORT void JNICALL
 Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeFlushUsbSink(
         JNIEnv* /* env */, jclass /* clazz */, jlong engineHandle) {
+    g_usbRetryEpoch.fetch_add(1, std::memory_order_acq_rel);
     pulsr::UsbAudioSink::instance().FlushStream(static_cast<int64_t>(engineHandle));
 }
 
@@ -2030,6 +2124,7 @@ Java_com_pulsr_music_UsbExclusivePlugin_nativeUsbStreamStartWithFormat(
     // Skipping duplicate SET_INTERFACE prevents resetting the DAC clock back
     // to 48 kHz on UAC1/UAC2 hardware.
     try {
+        g_usbRetryEpoch.fetch_add(1, std::memory_order_acq_rel);
         auto res = pulsr::UsbAudioSink::instance().Open(
                     fd, endpoint, interfaceNumber, altSetting, sampleRate, channels,
                     bytesPerSample, validBitDepth, /*alreadyConfigured=*/true,
@@ -2055,6 +2150,7 @@ Java_com_pulsr_music_UsbExclusivePlugin_nativeUsbRebindInterface(
 JNIEXPORT jboolean JNICALL
 Java_com_pulsr_music_UsbExclusivePlugin_nativeUsbStreamStop(
         JNIEnv* /* env */, jobject /* thiz */) {
+    g_usbRetryEpoch.fetch_add(1, std::memory_order_acq_rel);
     return pulsr::UsbAudioSink::instance().Close() ? JNI_TRUE : JNI_FALSE;
 }
 
@@ -2067,6 +2163,7 @@ Java_com_pulsr_music_UsbExclusivePlugin_nativeUsbStreamStop(
 JNIEXPORT void JNICALL
 Java_com_pulsr_music_UsbExclusivePlugin_nativeUsbStreamAbandon(
         JNIEnv* /* env */, jobject /* thiz */) {
+    g_usbRetryEpoch.fetch_add(1, std::memory_order_acq_rel);
     pulsr::UsbAudioSink::instance().Abandon();
 }
 

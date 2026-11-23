@@ -671,6 +671,10 @@ class _RuleCardState extends State<_RuleCard> {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
+    final availableOperators = _operatorsForField(widget.rule.field);
+    final selectedOperator = availableOperators.contains(widget.rule.operator)
+        ? widget.rule.operator
+        : availableOperators.first;
 
     return Container(
       margin: const EdgeInsets.only(bottom: AppSpacing.xs),
@@ -716,7 +720,14 @@ class _RuleCardState extends State<_RuleCard> {
                       }).toList(),
                       onChanged: (f) {
                         if (f != null) {
-                          widget.onChanged(widget.rule.copyWith(field: f));
+                          final allowedOps = _operatorsForField(f);
+                          final nextOp =
+                              allowedOps.contains(widget.rule.operator)
+                                  ? widget.rule.operator
+                                  : allowedOps.first;
+                          widget.onChanged(
+                            widget.rule.copyWith(field: f, operator: nextOp),
+                          );
                         }
                       },
                     ),
@@ -730,7 +741,8 @@ class _RuleCardState extends State<_RuleCard> {
                   child: Semantics(
                     label: context.l10n.smartOperatorLabel,
                     child: DropdownButtonFormField<SmartOperator>(
-                      initialValue: widget.rule.operator,
+                      key: ValueKey('${widget.rule.field.key}_${selectedOperator.key}'),
+                      initialValue: selectedOperator,
                       decoration: InputDecoration(
                         filled: true,
                         fillColor: p.surfaceContainerHigh,
@@ -742,7 +754,7 @@ class _RuleCardState extends State<_RuleCard> {
                                 BorderRadius.all(Radius.circular(AppRadii.r8)),
                             borderSide: BorderSide.none),
                       ),
-                      items: SmartOperator.values.map((o) {
+                      items: availableOperators.map((o) {
                         return DropdownMenuItem(
                           value: o,
                           child: Text(_localizedOperatorLabel(context.l10n, o),
@@ -862,17 +874,59 @@ class _RuleCardState extends State<_RuleCard> {
         SmartRuleField.bitrate => l.smartCriteriaFieldBitrate,
       };
 
+  List<SmartOperator> _operatorsForField(SmartRuleField field) =>
+      switch (field) {
+        SmartRuleField.artist ||
+        SmartRuleField.album ||
+        SmartRuleField.title ||
+        SmartRuleField.genre =>
+          const [
+            SmartOperator.equals,
+            SmartOperator.contains,
+            SmartOperator.notContains,
+            SmartOperator.startsWith,
+          ],
+        SmartRuleField.isLossless || SmartRuleField.isFavorite => const [
+            SmartOperator.equals,
+          ],
+        SmartRuleField.dateAdded || SmartRuleField.lastPlayed => const [
+            SmartOperator.withinDays,
+            SmartOperator.equals,
+            SmartOperator.greaterThan,
+            SmartOperator.lessThan,
+            SmartOperator.greaterThanOrEqual,
+            SmartOperator.lessThanOrEqual,
+            SmartOperator.between,
+          ],
+        SmartRuleField.playCount ||
+        SmartRuleField.year ||
+        SmartRuleField.decade ||
+        SmartRuleField.durationMs ||
+        SmartRuleField.rating ||
+        SmartRuleField.bpm ||
+        SmartRuleField.loudnessRange ||
+        SmartRuleField.bitrate =>
+          const [
+            SmartOperator.equals,
+            SmartOperator.greaterThan,
+            SmartOperator.lessThan,
+            SmartOperator.greaterThanOrEqual,
+            SmartOperator.lessThanOrEqual,
+            SmartOperator.between,
+          ],
+      };
+
   String _localizedOperatorLabel(AppLocalizations l, SmartOperator op) =>
       switch (op) {
         SmartOperator.equals ||
         SmartOperator.greaterThan ||
         SmartOperator.lessThan ||
         SmartOperator.greaterThanOrEqual ||
-        SmartOperator.lessThanOrEqual ||
-        SmartOperator.notContains ||
-        SmartOperator.startsWith =>
+        SmartOperator.lessThanOrEqual =>
           op.label,
         SmartOperator.contains => l.smartRuleOpContains,
+        SmartOperator.notContains => l.smartRuleOpNotContains,
+        SmartOperator.startsWith => l.smartRuleOpStartsWith,
         SmartOperator.withinDays => l.smartCriteriaOpWithinDays,
         SmartOperator.between => l.smartCriteriaOpBetween,
       };

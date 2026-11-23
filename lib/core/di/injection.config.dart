@@ -181,7 +181,9 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i780.HeadphoneProfilesRepository>(
         () => _i780.HeadphoneProfilesRepository());
     gh.lazySingleton<_i58.ListenTogetherService>(
-        () => _i58.ListenTogetherService());
+      () => _i58.ListenTogetherService(),
+      dispose: (i) => i.dispose(),
+    );
     gh.lazySingleton<_i818.DeviceProfileService>(
         () => _i818.DeviceProfileService());
     gh.lazySingleton<_i451.HiResAudioService>(() => _i451.HiResAudioService());
@@ -396,10 +398,12 @@ extension GetItInjectableX on _i174.GetIt {
               downloadsCubit: gh<_i752.DownloadsCubit>(),
             ));
     gh.singletonAsync<_i134.FileIntentHandler>(
-        () async => _i134.FileIntentHandler(
-              gh<_i320.IMusicRepository>(),
-              await getAsync<_i147.PlayerCubit>(),
-            ));
+      () async => _i134.FileIntentHandler(
+        gh<_i320.IMusicRepository>(),
+        await getAsync<_i147.PlayerCubit>(),
+      ),
+      dispose: (i) => i.dispose(),
+    );
     return this;
   }
 }

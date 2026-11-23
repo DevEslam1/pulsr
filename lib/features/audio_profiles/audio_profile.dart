@@ -166,7 +166,7 @@ class AudioProfile {
   factory AudioProfile.fromJson(Map<String, Object?> json) {
     final version = json['formatVersion'];
     if (version is! int) {
-      throw const ProfileFormatError(
+      throw ProfileFormatError(
         code: 'audio-profile-version-missing',
         userMessage: AudioProfileStrings.formatMissingVersion,
       );
@@ -186,13 +186,13 @@ class AudioProfile {
 
     final rawValues = json['values'];
     if (rawValues != null && rawValues is! Map) {
-      throw const ProfileFormatError(
+      throw ProfileFormatError(
         code: 'audio-profile-values-invalid',
         userMessage: AudioProfileStrings.formatCorrupt,
       );
     }
     if (rawValues is Map && rawValues.length > maxValueCount) {
-      throw const ProfileFormatError(
+      throw ProfileFormatError(
         code: 'audio-profile-too-many-values',
         userMessage: AudioProfileStrings.formatTooManyValues,
       );
@@ -207,7 +207,7 @@ class AudioProfile {
           continue;
         }
         if (key.isEmpty) {
-          throw const ProfileFormatError(
+          throw ProfileFormatError(
             code: 'audio-profile-empty-key',
             userMessage: AudioProfileStrings.formatEmptyKey,
           );
@@ -222,7 +222,7 @@ class AudioProfile {
 
     final id = _readRequiredString(json, 'id');
     if (!isValidId(id)) {
-      throw const ProfileFormatError(
+      throw ProfileFormatError(
         code: 'audio-profile-id-invalid',
         userMessage: AudioProfileStrings.formatInvalidId,
       );
@@ -230,7 +230,7 @@ class AudioProfile {
 
     final createdAt = DateTime.tryParse(_readString(json, 'createdAt') ?? '');
     if (createdAt == null) {
-      throw const ProfileFormatError(
+      throw ProfileFormatError(
         code: 'audio-profile-created-at-invalid',
         userMessage: AudioProfileStrings.formatCorrupt,
       );
@@ -253,7 +253,7 @@ class AudioProfile {
   /// Decodes a profile from raw file [bytes], enforcing the size ceiling.
   static AudioProfile decodeBytes(List<int> bytes) {
     if (bytes.length > maxFileBytes) {
-      throw const ProfileFormatError(
+      throw ProfileFormatError(
         code: 'audio-profile-too-large',
         userMessage: AudioProfileStrings.formatTooLarge,
       );
@@ -275,7 +275,7 @@ class AudioProfile {
   /// Decodes a profile from a JSON [source] string, enforcing the size ceiling.
   static AudioProfile decodeString(String source) {
     if (utf8.encode(source).length > maxFileBytes) {
-      throw const ProfileFormatError(
+      throw ProfileFormatError(
         code: 'audio-profile-too-large',
         userMessage: AudioProfileStrings.formatTooLarge,
       );
@@ -292,7 +292,7 @@ class AudioProfile {
       );
     }
     if (decoded is! Map) {
-      throw const ProfileFormatError(
+      throw ProfileFormatError(
         code: 'audio-profile-not-an-object',
         userMessage: AudioProfileStrings.formatCorrupt,
       );
@@ -310,7 +310,7 @@ class AudioProfile {
     List<String> alreadyIgnored,
   ) {
     if (source.length > maxValueCount) {
-      throw const ProfileFormatError(
+      throw ProfileFormatError(
         code: 'audio-profile-too-many-values',
         userMessage: AudioProfileStrings.formatTooManyValues,
       );
@@ -369,7 +369,7 @@ class AudioProfile {
   static String _readRequiredString(Map<String, Object?> json, String key) {
     final value = _readString(json, key);
     if (value == null || value.trim().isEmpty) {
-      throw const ProfileFormatError(
+      throw ProfileFormatError(
         code: 'audio-profile-missing-field',
         userMessage: AudioProfileStrings.formatCorrupt,
       );

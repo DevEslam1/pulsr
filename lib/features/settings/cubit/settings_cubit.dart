@@ -49,11 +49,12 @@ import 'settings_state.dart';
 import 'theme_schedule_controller.dart';
 part 'settings_proxy_actions.dart';
 part 'settings_audio_actions.dart';
+part 'settings_audio_dsp_actions.dart';
 part 'settings_audio_output_sync.dart';
 
 @singleton
 class SettingsCubit extends PulsrCubit<SettingsState>
-    with SettingsProxyActions, SettingsAudioActions {
+    with SettingsProxyActions, SettingsAudioActions, SettingsAudioDspActions {
   final MediaScannerService _scannerService;
   @override
   final HiResAudioService _hiResAudioService;

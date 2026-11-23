@@ -37,6 +37,8 @@ class AudioProfileBootstrap {
   bool _disposed = false;
   bool _applying = false;
   bool _lastAttached = false;
+  int? _lastVid;
+  int? _lastPid;
   UsbExclusiveStatus? _pendingUsbStatus;
 
   /// Whether the startup pass ran and the status listener is installed.
@@ -64,7 +66,11 @@ class AudioProfileBootstrap {
       );
     }
 
+    if (_disposed) return null;
+
     _lastAttached = status?.attached ?? false;
+    _lastVid = _lastAttached ? status?.vendorId : null;
+    _lastPid = _lastAttached ? status?.productId : null;
 
     try {
       _statusSub = _usb.statusStream.listen(
@@ -85,6 +91,13 @@ class AudioProfileBootstrap {
         stackTrace: st,
         category: 'AudioProfiles',
       );
+    }
+
+    if (_disposed) {
+      final sub = _statusSub;
+      _statusSub = null;
+      if (sub != null) unawaited(sub.cancel());
+      return null;
     }
 
     final report = await _apply(
@@ -117,12 +130,22 @@ class AudioProfileBootstrap {
   Future<void> _handleUsbStatus(UsbExclusiveStatus status) async {
     if (_disposed) return;
     final bool attached = status.attached;
-    if (attached == _lastAttached) return;
+    final int? vid = attached ? status.vendorId : null;
+    final int? pid = attached ? status.productId : null;
+    if (attached == _lastAttached && vid == _lastVid && pid == _lastPid) {
+      return;
+    }
+    final bool wasAttached = _lastAttached;
+    final bool deviceSwapped =
+        wasAttached && attached && (vid != _lastVid || pid != _lastPid);
     _lastAttached = attached;
+    _lastVid = vid;
+    _lastPid = pid;
 
-    if (!attached) {
-      // A detached DAC frees the marker: plugging it back in is a new event
-      // that should re-apply the profile the user assigned to it.
+    if (!attached || deviceSwapped) {
+      // A detached or hot-swapped DAC frees the marker: plugging in a new DAC
+      // (or plugging the previous one back in) is a new event that should
+      // apply the profile assigned to the currently attached device.
       try {
         await _service.clearLastAppliedMarker();
       } catch (e, st) {
@@ -133,13 +156,13 @@ class AudioProfileBootstrap {
           category: 'AudioProfiles',
         );
       }
-      return;
+      if (!attached) return;
     }
 
     await _apply(
       startup: false,
-      vid: status.vendorId,
-      pid: status.productId,
+      vid: vid,
+      pid: pid,
       deviceKey: _deviceKey(status),
     );
   }

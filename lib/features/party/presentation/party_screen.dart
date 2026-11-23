@@ -12,7 +12,14 @@ import 'party_sheet.dart';
 /// route (`/party`); the body is the existing [PartySheet] so there is one
 /// implementation of the state machine, not two.
 class PartyScreen extends StatelessWidget {
-  const PartyScreen({super.key});
+  final String? initialCode;
+  final String? initialServerUrl;
+
+  const PartyScreen({
+    super.key,
+    this.initialCode,
+    this.initialServerUrl,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -30,7 +37,10 @@ class PartyScreen extends StatelessWidget {
         child: Semantics(
           container: true,
           label: context.l10n.partyListenTogether,
-          child: const PartySheet(),
+          child: PartySheet(
+            initialCode: initialCode,
+            initialServerUrl: initialServerUrl,
+          ),
         ),
       ),
     );

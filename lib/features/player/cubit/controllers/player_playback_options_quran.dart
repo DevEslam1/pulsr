@@ -1,6 +1,10 @@
 // lib/features/player/cubit/controllers/player_playback_options_quran.dart
 part of 'player_playback_options_controller.dart';
 
+/// Locale-independent error code stamped on all Quran Mode [AppError]s so the
+/// UI does not rely on matching English substrings in localized text.
+const String kQuranModeErrorCode = 'QURAN_MODE_ERROR';
+
 /// Quran Mode DSP application and its restore-snapshot persistence. Extracted
 /// from [PlayerPlaybackOptionsController] to keep that controller <= 400 lines.
 extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
@@ -30,6 +34,10 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
     _lastQuranError = message;
     return message;
   }
+
+  /// Builds a typed Quran Mode [AppError] with [kQuranModeErrorCode].
+  AppError _quranError(String message) =>
+      uiError(_quranErrorText(message), code: kQuranModeErrorCode);
 
   /// Persists only the adjustments the user actually changed ([ambience],
   /// [warmth], [speed]); the others keep whatever was stored, so touching one
@@ -65,8 +73,7 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
       final current = _getState();
       _emit(current.copyWith(
         playback: current.playback.copyWith(
-            error: uiError(
-                _quranErrorText('Failed to save Quran style adjustments'))),
+            error: _quranError('Failed to save Quran style adjustments')),
       ));
     }
   }
@@ -352,9 +359,8 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
         if (!persisted && !isClosed && gen == _quranToggleGen) {
           final st = _getState();
           _emit(st.copyWith(
-            playback: st.playback.copyWith(
-                error: uiError(
-                    _quranErrorText('Failed to save Quran Mode setting'))),
+            playback: st.playback
+                .copyWith(error: _quranError('Failed to save Quran Mode setting')),
           ));
         }
         if (isClosed || gen != _quranToggleGen) return;
@@ -373,8 +379,7 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
             final st = _getState();
             _emit(st.copyWith(
               playback: st.playback.copyWith(
-                  error: uiError(
-                      _quranErrorText('Failed to apply Quran audio profile'))),
+                  error: _quranError('Failed to apply Quran audio profile')),
             ));
           }
           return;
@@ -414,9 +419,8 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
     if (!persisted && !isClosed && gen == _quranToggleGen) {
       final st = _getState();
       _emit(st.copyWith(
-        playback: st.playback.copyWith(
-            error:
-                uiError(_quranErrorText('Failed to save Quran Mode setting'))),
+        playback: st.playback
+            .copyWith(error: _quranError('Failed to save Quran Mode setting')),
       ));
     }
     if (isClosed || gen != _quranToggleGen) return;
@@ -430,8 +434,8 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
         final st = _getState();
         _emit(st.copyWith(
           playback: st.playback.copyWith(
-              error: uiError(_quranErrorText(
-                  'Failed to restore audio settings from Quran Mode'))),
+              error: _quranError(
+                  'Failed to restore audio settings from Quran Mode')),
         ));
       }
       // Keep both copies until the engine has actually accepted the
@@ -463,8 +467,7 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
         _emit(current.copyWith(
           dsp: current.dsp.copyWith(quranReciterStyle: s.quranReciterStyle),
           playback: current.playback.copyWith(
-              error: uiError(
-                  _quranErrorText('Failed to save Quran reciter style'))),
+              error: _quranError('Failed to save Quran reciter style')),
         ));
         return;
       }
@@ -528,8 +531,7 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
           saturationTilt: prevDsp.saturationTilt,
         ),
         playback: current.playback.copyWith(
-            error: uiError(
-                _quranErrorText('Failed to set Quran vocal warmth: $e'))),
+            error: _quranError('Failed to set Quran vocal warmth: $e')),
       ));
     }
   }
@@ -583,9 +585,8 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
           reverbPreset: prevDsp.reverbPreset,
           reverbWetDry: prevDsp.reverbWetDry,
         ),
-        playback: current.playback.copyWith(
-            error:
-                uiError(_quranErrorText('Failed to set Quran ambience: $e'))),
+        playback: current.playback
+            .copyWith(error: _quranError('Failed to set Quran ambience: $e')),
       ));
     }
   }
@@ -849,8 +850,7 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
         final current = _getState();
         _emit(current.copyWith(
           playback: current.playback.copyWith(
-              error: uiError(
-                  _quranErrorText('Failed to apply Quran audio profile'))),
+              error: _quranError('Failed to apply Quran audio profile')),
         ));
         return false;
       }
@@ -898,8 +898,7 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
         final current = _getState();
         _emit(current.copyWith(
           playback: current.playback.copyWith(
-              error: uiError(
-                  _quranErrorText('Failed to reset Quran style adjustments'))),
+              error: _quranError('Failed to reset Quran style adjustments')),
         ));
       }
       return;
@@ -943,8 +942,7 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
         _emit(current.copyWith(
           playback: current.playback.copyWith(
             playbackSpeed: previous,
-            error:
-                uiError(_quranErrorText('Failed to set Quran learning speed')),
+            error: _quranError('Failed to set Quran learning speed'),
           ),
         ));
       }

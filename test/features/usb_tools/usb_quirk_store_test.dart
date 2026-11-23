@@ -202,5 +202,15 @@ void main() {
 
       expect(store.globalDefaults, isNull);
     });
+
+    test('BUG-P2-9: concurrent put calls are serialized without losing entries',
+        () async {
+      final store = await _newStore();
+      final p1 = UsbQuirkProfile(vid: 1, pid: 1, label: 'DAC 1');
+      final p2 = UsbQuirkProfile(vid: 2, pid: 2, label: 'DAC 2');
+      final p3 = UsbQuirkProfile(vid: 3, pid: 3, label: 'DAC 3');
+      await Future.wait([store.put(p1), store.put(p2), store.put(p3)]);
+      expect(store.all(), hasLength(3));
+    });
   });
 }

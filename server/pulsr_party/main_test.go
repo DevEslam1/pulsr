@@ -15,11 +15,13 @@ import (
 
 	"github.com/pulsr-audio/pulsr/server/party/clock"
 	"github.com/pulsr-audio/pulsr/server/party/config"
+	"github.com/pulsr-audio/pulsr/server/party/party"
 	"github.com/pulsr-audio/pulsr/server/party/presence"
 	"github.com/pulsr-audio/pulsr/server/party/protocol"
 )
 
 func setupTestServer() *httptest.Server {
+	createLimiter = newIPRateLimiter(time.Minute, 100, 100)
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", handleRoot)
 	mux.HandleFunc("GET /healthz", handleHealthz)
@@ -474,11 +476,176 @@ func TestInviteLanding(t *testing.T) {
 	_, _ = buf.ReadFrom(resActive.Body)
 	content := buf.String()
 
-	expectedDeepLinkPrefix := "bitchord://party/" + code
+	expectedDeepLinkPrefix := "pulsr://party/" + code
 	if !strings.Contains(content, expectedDeepLinkPrefix) {
 		t.Errorf("Expected HTML content to contain deep link %s", expectedDeepLinkPrefix)
 	}
 	if !strings.Contains(content, code) {
 		t.Errorf("Expected HTML content to contain party code %s", code)
+	}
+}
+
+func TestInviteLandingOmitsTrackAndDoesNotDoubleEscape(t *testing.T) {
+	ts := setupTestServer()
+	defer ts.Close()
+
+	p, err := store.Create()
+	if err != nil {
+		t.Fatalf("Party creation failed: %v", err)
+	}
+	p.Lock()
+	p.Playback.SetTrack(nil, trackForTest("sec", "Secret Song", "Secret Artist"), 0, true, nil, nil)
+	p.Unlock()
+
+	res, err := http.Get(ts.URL + "/invite/" + p.Code)
+	if err != nil {
+		t.Fatalf("GET /invite/%s failed: %v", p.Code, err)
+	}
+	buf := new(bytes.Buffer)
+	_, _ = buf.ReadFrom(res.Body)
+	content := buf.String()
+	if strings.Contains(content, "Secret Song") || strings.Contains(content, "Secret Artist") {
+		t.Errorf("Expected /invite to omit active track metadata, got: %s", content)
+	}
+
+	resBad, err := http.Get(ts.URL + "/invite/A&B")
+	if err != nil {
+		t.Fatalf("GET /invite/A&B failed: %v", err)
+	}
+	badBuf := new(bytes.Buffer)
+	_, _ = badBuf.ReadFrom(resBad.Body)
+	if strings.Contains(badBuf.String(), "&amp;amp;") {
+		t.Errorf("Expected code not to be double-escaped, got: %s", badBuf.String())
+	}
+}
+
+func trackForTest(id, title, artist string) *party.Track {
+	return &party.Track{VideoId: id, Title: title, Artist: artist}
+}
+
+func TestKickFlushesByeFrameBeforeClose(t *testing.T) {
+	ts := setupTestServer()
+	defer ts.Close()
+
+	// Create Party (Host)
+	hostBody, _ := json.Marshal(map[string]string{
+		"userId": "u_host", "deviceId": "d_host", "displayName": "Host",
+	})
+	res, _ := http.Post(ts.URL+"/api/parties", "application/json", bytes.NewReader(hostBody))
+	var hostResp map[string]interface{}
+	_ = json.NewDecoder(res.Body).Decode(&hostResp)
+	code := hostResp["code"].(string)
+	hostToken := hostResp["token"].(string)
+
+	// Join Party (Guest)
+	guestBody, _ := json.Marshal(map[string]string{
+		"userId": "u_guest", "deviceId": "d_guest", "displayName": "Guest",
+	})
+	gRes, _ := http.Post(fmt.Sprintf("%s/api/parties/%s/join", ts.URL, code), "application/json", bytes.NewReader(guestBody))
+	var guestResp map[string]interface{}
+	_ = json.NewDecoder(gRes.Body).Decode(&guestResp)
+	guestToken := guestResp["token"].(string)
+	guestYou := guestResp["you"].(map[string]interface{})
+	guestMemberId := guestYou["memberId"].(string)
+
+	u, _ := url.Parse(ts.URL)
+	u.Scheme = "ws"
+	u.Path = fmt.Sprintf("/ws/parties/%s", code)
+
+	dialWithToken := func(tok string) *websocket.Conn {
+		h := http.Header{}
+		h.Set("Authorization", "Bearer "+tok)
+		c, _, err := websocket.DefaultDialer.Dial(u.String(), h)
+		if err != nil {
+			t.Fatalf("dial failed: %v", err)
+		}
+		return c
+	}
+
+	hostWS := dialWithToken(hostToken)
+	defer hostWS.Close()
+	guestWS := dialWithToken(guestToken)
+	defer guestWS.Close()
+
+	// Drain initial welcome frame on guest
+	var welcome map[string]interface{}
+	_ = guestWS.SetReadDeadline(time.Now().Add(2 * time.Second))
+	_ = guestWS.ReadJSON(&welcome)
+
+	// Host kicks guest
+	kickFrame := map[string]interface{}{
+		"type":     protocol.FrameControl,
+		"action":   protocol.ActionKick,
+		"memberId": guestMemberId,
+	}
+	if err := hostWS.WriteJSON(kickFrame); err != nil {
+		t.Fatalf("failed to send kick: %v", err)
+	}
+
+	var gotBye bool
+	for i := 0; i < 6; i++ {
+		_ = guestWS.SetReadDeadline(time.Now().Add(2 * time.Second))
+		var msg map[string]interface{}
+		if err := guestWS.ReadJSON(&msg); err != nil {
+			break
+		}
+		if msg["type"] == protocol.FrameBye && msg["reason"] == "kicked" {
+			gotBye = true
+			break
+		}
+	}
+	if !gotBye {
+		t.Fatalf("Expected kicked member to receive FrameBye with reason=kicked before socket close")
+	}
+}
+
+func TestReconnectDoesNotMarkLiveMemberDisconnected(t *testing.T) {
+	ts := setupTestServer()
+	defer ts.Close()
+
+	hostBody, _ := json.Marshal(map[string]string{
+		"userId": "u_rc", "deviceId": "d_rc", "displayName": "Reconnector",
+	})
+	res, _ := http.Post(ts.URL+"/api/parties", "application/json", bytes.NewReader(hostBody))
+	var hostResp map[string]interface{}
+	_ = json.NewDecoder(res.Body).Decode(&hostResp)
+	code := hostResp["code"].(string)
+	token := hostResp["token"].(string)
+
+	u, _ := url.Parse(ts.URL)
+	u.Scheme = "ws"
+	u.Path = fmt.Sprintf("/ws/parties/%s", code)
+	headers := http.Header{}
+	headers.Set("Authorization", "Bearer "+token)
+
+	ws1, _, err := websocket.DefaultDialer.Dial(u.String(), headers)
+	if err != nil {
+		t.Fatalf("first dial failed: %v", err)
+	}
+	defer ws1.Close()
+	var w1 map[string]interface{}
+	_ = ws1.SetReadDeadline(time.Now().Add(2 * time.Second))
+	_ = ws1.ReadJSON(&w1)
+
+	// Open second WebSocket with same member token (superseding ws1 in Hub)
+	ws2, _, err := websocket.DefaultDialer.Dial(u.String(), headers)
+	if err != nil {
+		t.Fatalf("second dial failed: %v", err)
+	}
+	defer ws2.Close()
+	var w2 map[string]interface{}
+	_ = ws2.SetReadDeadline(time.Now().Add(2 * time.Second))
+	_ = ws2.ReadJSON(&w2)
+
+	// Give ws1's defer time to execute after Hub.Attach closed it
+	time.Sleep(80 * time.Millisecond)
+
+	p := store.Find(code)
+	p.Lock()
+	host := p.Host()
+	connected := host != nil && host.Connected
+	p.Unlock()
+	if !connected {
+		t.Fatalf("Expected member to remain Connected=true after ws1 defer ran")
 	}
 }

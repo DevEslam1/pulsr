@@ -293,10 +293,15 @@ public:
     int resampleForTap(const float* in, int inFrames, float* out, int maxOutFrames,
                        int channels, double srcRate, double dstRate);
 
-    // Selects the tap kernel. Reconfigures nothing by itself: the next
-    // prepareTapResampler() call (track/route change) picks it up.
+    // Selects the tap kernel. Thread-safe: stores the target quality atomically,
+    // propagates through the parameter snapshot to all registered engines, and
+    // applies on the render/tap thread so control threads never race
+    // resampleForTap().
     void setTapSrcQuality(int quality);
-    int tapSrcQuality() const { return tapSrcQuality_; }
+    // Lock-free atomic update used by DspEngineRegistry fan-out (avoids
+    // redundant snapshot publications on registered render engines).
+    void setTapSrcQualityAtomic(int quality);
+    int tapSrcQuality() const;
 
     // ---- Remaster: Reconstruction Filter & Output Oversampling ----
     void setOversampleMultiplier(int multiplier);
@@ -494,9 +499,10 @@ private:
     int tapChannels_ = 0;
     int tapChunkFrames_ = 0;
     bool tapSrcEngaged_ = false;
-    // 0 = 64 taps, 1 = 128, 2 = 256 (default), 3 = 512. Control thread only.
+    // 0 = 64 taps, 1 = 128, 2 = 256 (default), 3 = 512.
     // The default matches the documented baseline: 256 taps / 1024 phases.
-    int tapSrcQuality_ = 2;
+    std::atomic<int> tapSrcQuality_{2};
+    int preparedTapSrcQuality_ = 2;
     static constexpr int kTapMaxChannels = 8;
     static constexpr int kTapInputFrames = 2048;
     static constexpr int kTapOutputFrames = 4096;
@@ -536,10 +542,12 @@ private:
     // The bit-perfect bypass forces smoothedReplayGain_ to unity, so leaving it
     // must resume the smoother from this value instead of from 1.0.
     double lastAppliedReplayGain_ = 1.0;
-    // Last requested bit-perfect value, used to detect the bypass edges. Render
-    // thread only: written and read exclusively inside processInterleaved(),
-    // which runs on one thread per engine, so no atomic is needed.
+    // Last requested bit-perfect / A-B bypass values, used to detect bypass
+    // edges. Render thread only: written and read exclusively inside
+    // processInterleaved(), which runs on one thread per engine, so no atomic
+    // is needed.
     bool lastBitPerfectRequested_ = false;
+    bool lastBypassCompareRequested_ = false;
     // Direct Volume Control output gain, smoothed across a 20ms window.
     double smoothedDirectVolume_ = 1.0;
     // Gain the DVC stage actually applied to the last block that ran it. The
@@ -710,6 +718,7 @@ public:
     void setPerformanceProfile(DspPerformanceProfile profile);
     void setThermalLevel(int level);
     void setReverbThreadingMode(ReverbThreadingMode mode);
+    void setTapSrcQuality(int quality);
     void drainRetireQueues();
 
     // Measured chain-of-custody, control-thread API. These operate on the engine

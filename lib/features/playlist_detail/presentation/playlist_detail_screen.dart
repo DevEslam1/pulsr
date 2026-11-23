@@ -1,6 +1,7 @@
 // lib/features/playlist_detail/presentation/playlist_detail_screen.dart
 import 'dart:io';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/semantics.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -19,6 +20,7 @@ import '../../../core/di/injection.dart';
 import '../../../core/services/playlist_share_service.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
+import '../../../core/utils/error_logger.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/utils/playlist_reorder_utils.dart';
@@ -89,6 +91,22 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
   final Set<int> _selectedReorderIds = {};
   Future<void> _orderSaveChain = Future.value();
   int _orderSaveVersion = 0;
+
+  @override
+  void didUpdateWidget(PlaylistDetailScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.playlist.id != widget.playlist.id ||
+        oldWidget.playlist.isSmart != widget.playlist.isSmart ||
+        oldWidget.playlist.smartCriteria != widget.playlist.smartCriteria ||
+        oldWidget.playlistUseCases != widget.playlistUseCases) {
+      _songsStream = null;
+      if (_isReordering) {
+        _isReordering = false;
+        _selectedReorderIds.clear();
+        _reorderSongs = [];
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -356,6 +374,65 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
     }
   }
 
+  Future<String> _saveExportedPlaylistFile(
+    String playlistTitle,
+    File tempFile,
+  ) async {
+    if (!tempFile.existsSync()) {
+      return tempFile.path;
+    }
+    final fileName = tempFile.uri.pathSegments.isNotEmpty
+        ? tempFile.uri.pathSegments.last
+        : 'playlist.m3u';
+    final bytes = await tempFile.readAsBytes();
+    try {
+      final outputUri = await FilePicker.saveFile(
+        dialogTitle: playlistTitle,
+        fileName: fileName,
+        bytes: bytes,
+      );
+      if (outputUri != null) {
+        final pickedPath = outputUri.isScheme('file')
+            ? outputUri.toFilePath()
+            : outputUri.toString();
+        if (pickedPath.trim().isNotEmpty) {
+          if (outputUri.isScheme('file')) {
+            final outFile = File(pickedPath);
+            try {
+              if (!await outFile.exists() || await outFile.length() == 0) {
+                await outFile.writeAsBytes(bytes, flush: true);
+              }
+            } catch (e, st) {
+              ErrorLogger.log('Failed to write picked playlist export file',
+                  error: e, stackTrace: st, category: 'PlaylistExport');
+            }
+          }
+          return pickedPath;
+        }
+      }
+    } catch (e, st) {
+      ErrorLogger.log('FilePicker.saveFile unavailable for playlist export',
+          error: e, stackTrace: st, category: 'PlaylistExport');
+    }
+
+    try {
+      final dir = await getDownloadsDirectory() ??
+          await getExternalStorageDirectory() ??
+          await getApplicationDocumentsDirectory();
+      final exportDir =
+          Directory('${dir.path}${Platform.pathSeparator}Playlists');
+      if (!await exportDir.exists()) {
+        await exportDir.create(recursive: true);
+      }
+      final fallbackFile =
+          File('${exportDir.path}${Platform.pathSeparator}$fileName');
+      await fallbackFile.writeAsBytes(bytes, flush: true);
+      return fallbackFile.path;
+    } catch (_) {
+      return tempFile.path;
+    }
+  }
+
   Future<void> _exportPlaylist(
     BuildContext context,
     List<SongsTableData> songs,
@@ -367,8 +444,10 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
       return;
     }
     final exportUseCase = getIt<PlaylistExportUseCase>();
+    late final String savedPath;
     try {
-      await exportUseCase.exportToFile(playlist.name, songs);
+      final tempFile = await exportUseCase.exportToFile(playlist.name, songs);
+      savedPath = await _saveExportedPlaylistFile(playlist.name, tempFile);
     } catch (_) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -383,7 +462,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(context.l10n.playlistExported(songs.length)),
+          content: Text('${context.l10n.playlistExported(songs.length)} ($savedPath)'),
           behavior: SnackBarBehavior.floating,
         ),
       );

@@ -47,5 +47,34 @@ zoom=1.1
       expect(MilkdropPresetLibrary.presets, isNotEmpty);
       expect(MilkdropPresetLibrary.defaultPreset.name, isNotEmpty);
     });
+
+    test('clamps and sanitizes non-finite or out-of-range scalars', () {
+      const content = '''
+presetName=Dangerous Preset
+zoom=0.0
+zoomexp=NaN
+rot=999.0
+warp=0.0
+decay=-5.0
+gammaadj=Infinity
+wavescale=-1.0
+waver=2.5
+waveg=-0.5
+waveb=NaN
+wavemode=99
+''';
+      final p = MilkdropPreset.fromMilk(content);
+      expect(p.zoom, 0.2);
+      expect(p.zoomExp, 1.0);
+      expect(p.rot, closeTo(6.283185, 1e-6));
+      expect(p.warp, 0.05);
+      expect(p.decay, 0.0);
+      expect(p.gammaAdj, 1.0);
+      expect(p.waveScale, 0.05);
+      expect(p.waveR, 1.0);
+      expect(p.waveG, 0.0);
+      expect(p.waveB, 1.0);
+      expect(p.waveMode, 15);
+    });
   });
 }

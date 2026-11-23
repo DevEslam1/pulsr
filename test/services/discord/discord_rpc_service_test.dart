@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/constants/prefs_keys.dart';
 import 'package:pulsr/data/db/app_database.dart';
@@ -199,23 +200,62 @@ void main() {
     });
   });
 
-  group('DiscordRpcService - Preferences persistence', () {
+  group('DiscordRpcService - Preferences & SecureStorage persistence', () {
+    final Map<String, String> secureStore = {};
+    const MethodChannel secureStorageChannel =
+        MethodChannel('plugins.it_nomads.com/flutter_secure_storage');
+
     setUp(() {
+      secureStore.clear();
       SharedPreferences.setMockInitialValues({});
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(secureStorageChannel, (call) async {
+        final args = (call.arguments as Map?)?.cast<String, dynamic>() ?? {};
+        final key = args['key'] as String?;
+        switch (call.method) {
+          case 'read':
+            return key != null ? secureStore[key] : null;
+          case 'write':
+            final val = args['value'] as String?;
+            if (key != null && val != null) {
+              secureStore[key] = val;
+            }
+            return null;
+          case 'delete':
+            if (key != null) {
+              secureStore.remove(key);
+            }
+            return null;
+          case 'deleteAll':
+            secureStore.clear();
+            return null;
+          default:
+            return null;
+        }
+      });
     });
 
-    test('initializes and saves token and enabled flags', () async {
+    tearDown(() {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(secureStorageChannel, null);
+    });
+
+    test('migrates legacy SharedPreferences token to FlutterSecureStorage and never stores plaintext in prefs', () async {
+      SharedPreferences.setMockInitialValues({
+        PrefsKeys.discordRpcToken: 'legacy_plaintext_token',
+      });
       final prefs = await SharedPreferences.getInstance();
       final service = DiscordRpcService.instance;
 
       await service.init(prefs);
-      expect(service.isEnabled, isFalse);
-      expect(service.token, isEmpty);
+      expect(service.token, 'legacy_plaintext_token');
+      expect(secureStore[PrefsKeys.discordRpcToken], 'legacy_plaintext_token');
+      expect(prefs.getString(PrefsKeys.discordRpcToken), isNull);
 
       await service.setToken('test_discord_token_123');
       expect(service.token, 'test_discord_token_123');
-      expect(
-          prefs.getString(PrefsKeys.discordRpcToken), 'test_discord_token_123');
+      expect(secureStore[PrefsKeys.discordRpcToken], 'test_discord_token_123');
+      expect(prefs.getString(PrefsKeys.discordRpcToken), isNull);
 
       await service.setEnabled(true);
       expect(service.isEnabled, isTrue);
@@ -223,7 +263,28 @@ void main() {
 
       await service.clearAccount();
       expect(service.token, isEmpty);
+      expect(secureStore[PrefsKeys.discordRpcToken], isNull);
       expect(prefs.getString(PrefsKeys.discordRpcToken), isNull);
+    });
+
+    test('strips local file/content artwork URIs, bounds asset cache to 256, and detects fatal close codes', () {
+      expect(DiscordRpcService.isSafeRemoteArtworkUrl('file:///storage/cover.jpg'), isFalse);
+      expect(DiscordRpcService.isSafeRemoteArtworkUrl('content://media/external/1'), isFalse);
+      expect(DiscordRpcService.isSafeRemoteArtworkUrl('/sdcard/Music/cover.jpg'), isFalse);
+      expect(DiscordRpcService.isSafeRemoteArtworkUrl('https://i.ytimg.com/vi/abc/hq.jpg'), isTrue);
+      expect(DiscordRpcService.isFatalCloseCode(4004), isTrue);
+      expect(DiscordRpcService.isFatalCloseCode(4010), isTrue);
+      expect(DiscordRpcService.isFatalCloseCode(1006), isFalse);
+
+      final service = DiscordRpcService.instance;
+      for (var i = 0; i < 300; i++) {
+        service.insertExternalAssetCacheForTesting(
+          'https://example.com/$i.png',
+          'mp:external/$i.png',
+        );
+      }
+      expect(service.externalAssetCacheSize,
+          equals(DiscordRpcService.maxAssetCacheEntries));
     });
   });
 }

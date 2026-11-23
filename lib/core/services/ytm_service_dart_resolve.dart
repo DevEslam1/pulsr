@@ -21,16 +21,30 @@ extension YtmServiceDartResolve on YtmService {
     }
 
     String? guestPoToken;
+    String? playerPoToken;
     String? guestVisitorData;
     try {
-      final poState =
-          await getPoTokenState().timeout(const Duration(seconds: 2));
+      final poStateFuture =
+          getPoTokenState().timeout(const Duration(seconds: 2));
+      final playerPoFuture =
+          getPlayerPoToken(videoId).timeout(const Duration(seconds: 2));
+      final poState = await poStateFuture;
       guestPoToken = poState?['streamingPoToken'] as String?;
       guestVisitorData = poState?['visitorData'] as String?;
+      try {
+        playerPoToken = await playerPoFuture;
+      } catch (e, st) {
+        ErrorLogger.log('Non-critical getPlayerPoToken failed',
+            error: e, stackTrace: st, category: 'YTM');
+      }
     } catch (e, st) {
       ErrorLogger.log('Non-critical YTM operation failed',
           error: e, stackTrace: st, category: 'YTM');
     }
+    final effectivePoToken =
+        (playerPoToken != null && playerPoToken.isNotEmpty)
+            ? playerPoToken
+            : guestPoToken;
 
     final effectiveAndroidVersion =
         androidVersion == '19.44.38' ? '21.26.364' : androidVersion;
@@ -94,8 +108,8 @@ extension YtmServiceDartResolve on YtmService {
         'playbackContext': {
           'contentPlaybackContext': {
             'html5Preference': 'HTML5_PREF_WANTS',
-            if (guestPoToken != null && guestPoToken.isNotEmpty)
-              'poToken': guestPoToken,
+            if (effectivePoToken != null && effectivePoToken.isNotEmpty)
+              'poToken': effectivePoToken,
           },
         },
       });
@@ -131,8 +145,39 @@ extension YtmServiceDartResolve on YtmService {
       if (status == 'LOGIN_REQUIRED' ||
           status == 'UNPLAYABLE' ||
           status.contains('BOT')) {
-        throw YtmException('YTM_UNAVAILABLE',
-            'Dart client ${client.name} answered playability $status');
+        final reason = playability?['reason'] as String? ?? '';
+        final reasonLower = reason.toLowerCase();
+        final isAgeGate = status == 'LOGIN_REQUIRED' &&
+            (reasonLower.contains('confirm your age') ||
+                reasonLower.contains('confirm you are 18') ||
+                reasonLower.contains("confirm you're 18") ||
+                reasonLower.contains('age-restricted') ||
+                reasonLower.contains('age restricted') ||
+                reasonLower.contains('age verification') ||
+                reasonLower.contains('inappropriate for some users') ||
+                reasonLower.contains('mature content') ||
+                reasonLower.contains('over 18'));
+        final isBotBlock = !isAgeGate &&
+            (status.contains('BOT') ||
+                reasonLower.contains('not a bot') ||
+                reasonLower.contains('robot') ||
+                reasonLower.contains('recaptcha') ||
+                reasonLower.contains('automated queries') ||
+                reasonLower.contains('unusual traffic') ||
+                reasonLower.contains('botguard') ||
+                reasonLower.contains('verification required'));
+        final errorCode = isAgeGate
+            ? 'AGE_RESTRICTED'
+            : (isBotBlock
+                ? 'BOT_CHALLENGE'
+                : (status == 'LOGIN_REQUIRED'
+                    ? 'LOGIN_REQUIRED'
+                    : 'YTM_UNAVAILABLE'));
+        throw YtmException(
+          errorCode,
+          'Dart client ${client.name} answered playability $status'
+          '${reason.isEmpty ? '' : ': $reason'}',
+        );
       }
 
       final streamingData = data['streamingData'] as Map<String, dynamic>?;
@@ -178,9 +223,15 @@ extension YtmServiceDartResolve on YtmService {
           .where(
               (f) => ((f.format['mimeType'] as String?) ?? '').contains('mp4'))
           .toList();
-      final pool = (preferM4a && m4a.isNotEmpty)
-          ? m4a
-          : (m4a.isNotEmpty ? m4a : audioFormats);
+      final opus = audioFormats
+          .where((f) {
+            final mime = ((f.format['mimeType'] as String?) ?? '').toLowerCase();
+            return mime.contains('webm') || mime.contains('opus');
+          })
+          .toList();
+      final pool = preferM4a
+          ? (m4a.isNotEmpty ? m4a : audioFormats)
+          : (opus.isNotEmpty ? opus : (m4a.isNotEmpty ? m4a : audioFormats));
 
       final selected = switch (quality.toLowerCase()) {
         'low' => pool.reduce((a, b) => ((a.format['bitrate'] as num?) ?? 0) <
@@ -238,6 +289,12 @@ extension YtmServiceDartResolve on YtmService {
       );
     } catch (e) {
       debugPrint('[YTM_SERVICE] Dart InnerTube client race exhausted: $e');
+      if (e is YtmException &&
+          (e.code == 'BOT_CHALLENGE' ||
+              e.code == 'AGE_RESTRICTED' ||
+              e.code == 'LOGIN_REQUIRED')) {
+        rethrow;
+      }
     }
 
     return null;

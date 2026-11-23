@@ -18,6 +18,7 @@ import 'package:pulsr/core/constants/app_typography.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../cubit/player_cubit.dart';
 import '../../../settings/cubit/settings_state.dart';
+import 'player_shape.dart';
 import 'player_theme.dart';
 import 'theme_registry.dart';
 
@@ -379,10 +380,14 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
                             activeColor: Color(_accentColor),
                             bgColor: p.bg,
                           );
-                          return ThemeRegistry.preview(
-                            _selectedPreviewTheme,
-                            props,
-                            scale: 0.52,
+                          return PlayerShapePreviewOverride(
+                            cornerRadius: _cornerRadius,
+                            ambientGlow: _glowEnabled,
+                            child: ThemeRegistry.preview(
+                              _selectedPreviewTheme,
+                              props,
+                              scale: 0.52,
+                            ),
                           );
                         } catch (_) {
                           return Center(

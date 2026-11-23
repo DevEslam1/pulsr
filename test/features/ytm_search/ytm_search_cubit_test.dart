@@ -659,5 +659,29 @@ void main() {
       expect(cubit.showingCachedResults, isFalse);
       cubit.clearQuery();
     });
+
+    test('direct videoId search sets hasSearched to true', () async {
+      when(() => service.resolveStream('dQw4w9WgXcQ')).thenAnswer(
+        (_) async => const YtmStream(
+          videoId: 'dQw4w9WgXcQ',
+          url: 'https://rr1---sn-x.googlevideo.com/videoplayback',
+          mimeType: 'audio/mp4',
+          container: 'm4a',
+          bitrateKbps: 128,
+          duration: Duration(minutes: 3),
+          title: 'Direct Hit',
+          artist: 'Artist',
+        ),
+      );
+
+      final cubit = build();
+      cubit.onQueryChanged('https://youtu.be/dQw4w9WgXcQ');
+      await Future<void>.delayed(const Duration(milliseconds: 350));
+      await pumpEventQueue();
+
+      expect(cubit.state.hasSearched, isTrue);
+      expect(cubit.state.results.single.videoId, 'dQw4w9WgXcQ');
+      expect(cubit.state.results.single.title, 'Direct Hit');
+    });
   });
 }

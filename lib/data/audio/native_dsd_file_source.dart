@@ -30,7 +30,10 @@ class NativeDsdFileSource {
   final int blockSize;
   int _position = 0;
   int _seekGeneration = 0;
+  bool _closed = false;
   Future<void> _opChain = Future<void>.value();
+
+  bool get isClosed => _closed;
 
   NativeDsdFileSource._({
     required RandomAccessFile file,
@@ -249,11 +252,13 @@ class NativeDsdFileSource {
     _position = byteOffset.clamp(0, totalBytes);
   }
 
-  Future<NativeDsdChunk?> readChunk(int maxBytes) =>
-      _serialized(() => _readChunkUnlocked(maxBytes));
+  Future<NativeDsdChunk?> readChunk(int maxBytes) {
+    if (_closed) return Future<NativeDsdChunk?>.value(null);
+    return _serialized(() => _readChunkUnlocked(maxBytes));
+  }
 
   Future<NativeDsdChunk?> _readChunkUnlocked(int maxBytes) async {
-    if (maxBytes <= 0 || _position >= totalBytes) return null;
+    if (_closed || maxBytes <= 0 || _position >= totalBytes) return null;
     final startGen = _seekGeneration;
     final want = math.min(maxBytes, totalBytes - _position);
     if (isDsf) return _readDsfChunk(want, startGen);
@@ -358,5 +363,9 @@ class NativeDsdFileSource {
     return bytes;
   }
 
-  Future<void> close() => _serialized(() => _file.close());
+  Future<void> close() {
+    if (_closed) return _opChain;
+    _closed = true;
+    return _serialized(() => _file.close());
+  }
 }

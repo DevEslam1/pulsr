@@ -198,6 +198,24 @@ struct UsbAudioSinkTestAccess {
         return sink.writeBlock(nullptr, pcm, frames, sink.channels_, depth,
                                sink.sampleRate_, 7);
     }
+    static void setPullReconfiguring(UsbAudioSink& sink, bool reconf) {
+        sink.pullReconfiguring_.store(reconf, std::memory_order_seq_cst);
+    }
+    static int pullReaders(const UsbAudioSink& sink) {
+        return sink.pullReaders_.load(std::memory_order_seq_cst);
+    }
+    static bool pullWithLease(UsbAudioSink& sink, uint8_t* dst, int frames, int& depth) {
+        const UsbAudioSink::PullReaderLease lease(sink.pullReconfiguring_, sink.pullReaders_);
+        if (!lease.active) return false;
+        (void)sink.fillPullPacket(dst, frames, depth);
+        return true;
+    }
+    static size_t ringRead(const UsbAudioSink& sink) {
+        return sink.ringRead_.load(std::memory_order_acquire);
+    }
+    static size_t ringWrite(const UsbAudioSink& sink) {
+        return sink.ringWrite_.load(std::memory_order_acquire);
+    }
     static size_t underruns(UsbAudioSink& sink) {
         return sink.underrunCount_.load();
     }
@@ -1476,6 +1494,54 @@ int main() {
         check(hiBytes == hiOut.size() && depth == 0 && hiNonZero &&
                   Access::underruns(sink) == 0 && hiAllocsBefore == hiAllocsAfter,
               "high-rate 7681-frame ASRC packet must fill cleanly with zero underruns and zero allocations");
+
+        // 5) BUG-P0-1 & BUG-P0-2: pullReconfiguring_ gate blocks concurrent
+        // writes / WaitForWriteSpace / PullReaderLease during StartPcmFile
+        // reconfiguration, and FlushStream monotonically advances ringRead_ /
+        // pullRenderer_ without unsigned underflow.
+        Access::preparePull(sink, /*mode=*/1, /*bufferMs=*/100);
+        Access::setPullReconfiguring(sink, true);
+        check(sink.WaitForWriteSpace(48, 0) == 1,
+              "WaitForWriteSpace must report backpressure (1) while pullReconfiguring_ is active");
+        check(!sink.WritePcm(hiOut.data(), 48, 2, 16, 48000, 101) &&
+                  sink.GetLastError() == EBUSY,
+              "WritePcm must refuse with EBUSY while pullReconfiguring_ is active");
+        check(!Access::pullWithLease(sink, hiOut.data(), 48, depth),
+              "PullReaderLease must refuse entry while pullReconfiguring_ is active");
+        check(Access::pullReaders(sink) == 0,
+              "pullReaders_ must return to 0 after refused lease");
+        Access::setPullReconfiguring(sink, false);
+
+        // Concurrent worker lease + StartPcmFile reconfigure (nonexistent file
+        // still runs the full quiescence barrier safely without racing).
+        {
+            std::atomic<bool> stopWorker{false};
+            std::thread fakeWorker([&]() {
+                std::vector<uint8_t> pktBuf(48 * 4, 0);
+                int d = 0;
+                while (!stopWorker.load(std::memory_order_acquire)) {
+                    (void)Access::pullWithLease(sink, pktBuf.data(), 48, d);
+                }
+            });
+            for (int iter = 0; iter < 50; ++iter) {
+                (void)sink.StartPcmFile("/nonexistent/pulsr_test_reconf.wav");
+                sink.FlushStream(101);
+            }
+            stopWorker.store(true, std::memory_order_release);
+            fakeWorker.join();
+            check(Access::pullReaders(sink) == 0,
+                  "concurrent StartPcmFile barrier + FlushStream against live pull worker leaves 0 readers");
+        }
+
+        Access::prepare(sink, 4, 32, 4096, 0);
+        const std::vector<uint8_t> flushPcm(48 * 8, 0x33);
+        check(sink.WritePcm(flushPcm.data(), 48, 2, 32, 48000, 101),
+              "BestEffort write before FlushStream must succeed");
+        check(Access::ringWrite(sink) == 48 && Access::ringRead(sink) == 0,
+              "BestEffort ring holds 48 frames before FlushStream");
+        sink.FlushStream(101);
+        check(Access::ringRead(sink) == 48 && sink.GetBufferedMsFast() < 100.0,
+              "FlushStream advances ringRead_ to ringWrite_ monotonically");
 
         Access::stopPull(sink);
     }

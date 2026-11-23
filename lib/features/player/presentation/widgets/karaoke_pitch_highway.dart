@@ -60,13 +60,14 @@ class KaraokePitchHighway extends StatefulWidget {
 }
 
 class _KaraokePitchHighwayState extends State<KaraokePitchHighway>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late final AnimationController _animController;
   late final ValueNotifier<PitchResult> _pitchNotifier;
   final EmaPitchSmoother _pitchSmoother = EmaPitchSmoother(alpha: 0.28);
   final List<_PitchPoint> _trail = [];
   PitchResult _lastSmoothed = PitchResult.unvoiced;
   double _phase = 0.0;
+  bool _isAppActive = true;
 
   static const double _minMidi = 48.0; // C3
   static const double _maxMidi = 72.0; // C5
@@ -75,6 +76,7 @@ class _KaraokePitchHighwayState extends State<KaraokePitchHighway>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     // Initial pitch calculation for first frame
     final initialRaw = _generateSimulatedPitch();
     if (initialRaw.isVoiced) {
@@ -95,6 +97,19 @@ class _KaraokePitchHighwayState extends State<KaraokePitchHighway>
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _isAppActive = true;
+      _syncAnimation();
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.detached) {
+      _isAppActive = false;
+      _syncAnimation();
+    }
+  }
+
+  @override
   void didUpdateWidget(covariant KaraokePitchHighway oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.isPlaying != oldWidget.isPlaying) {
@@ -112,7 +127,10 @@ class _KaraokePitchHighwayState extends State<KaraokePitchHighway>
   }
 
   void _syncAnimation() {
+    final isVisible = TickerMode.valuesOf(context).enabled;
     if (widget.isPlaying &&
+        _isAppActive &&
+        isVisible &&
         context.motionEnabled &&
         !KaraokePitchHighway.isTesting) {
       if (!_animController.isAnimating) {
@@ -126,7 +144,13 @@ class _KaraokePitchHighwayState extends State<KaraokePitchHighway>
   }
 
   void _onTick() {
-    if (!mounted || !widget.isPlaying) return;
+    if (!mounted ||
+        !widget.isPlaying ||
+        !_isAppActive ||
+        (!KaraokePitchHighway.isTesting &&
+            !TickerMode.valuesOf(context).enabled)) {
+      return;
+    }
 
     _phase += 0.05;
     if (_phase > 2 * math.pi) _phase -= 2 * math.pi;
@@ -158,7 +182,9 @@ class _KaraokePitchHighwayState extends State<KaraokePitchHighway>
   }
 
   PitchResult _generateSimulatedPitch() {
-    if (widget.lyrics.isEmpty || widget.activeLineIndex < 0) {
+    if (widget.lyrics.isEmpty ||
+        widget.activeLineIndex < 0 ||
+        widget.activeLineIndex >= widget.lyrics.length) {
       return PitchResult.unvoiced;
     }
 
@@ -213,6 +239,7 @@ class _KaraokePitchHighwayState extends State<KaraokePitchHighway>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _animController.removeListener(_onTick);
     _animController.dispose();
     _pitchNotifier.dispose();
@@ -224,34 +251,37 @@ class _KaraokePitchHighwayState extends State<KaraokePitchHighway>
     final p = context.palette;
     final accent = widget.accentColor;
 
-    return Container(
-      height: widget.height,
-      decoration: BoxDecoration(
-        color: p.surfaceContainerHigh.withValues(alpha: 0.4),
-        borderRadius: AppRadii.r12All,
-        border: Border.all(
-          color: p.hairline.withValues(alpha: 0.6),
-          width: 1.0,
+    return RepaintBoundary(
+      child: Container(
+        height: widget.height,
+        decoration: BoxDecoration(
+          color: p.surfaceContainerHigh.withValues(alpha: 0.4),
+          borderRadius: AppRadii.r12All,
+          border: Border.all(
+            color: p.hairline.withValues(alpha: 0.6),
+            width: 1.0,
+          ),
         ),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Stack(
-        children: [
-          // Highway Canvas
-          Positioned.fill(
-            child: CustomPaint(
-              painter: _PitchHighwayPainter(
-                controller: _animController,
-                pitchNotifier: _pitchNotifier,
-                trail: _trail,
-                accentColor: accent,
-                hairlineColor: p.hairline,
-                minMidi: _minMidi,
-                maxMidi: _maxMidi,
-                gpuSaver: GpuBudget.isGpuSaverActive,
+        clipBehavior: Clip.antiAlias,
+        child: Stack(
+          children: [
+            // Highway Canvas
+            Positioned.fill(
+              child: RepaintBoundary(
+                child: CustomPaint(
+                  painter: _PitchHighwayPainter(
+                    controller: _animController,
+                    pitchNotifier: _pitchNotifier,
+                    trail: _trail,
+                    accentColor: accent,
+                    hairlineColor: p.hairline,
+                    minMidi: _minMidi,
+                    maxMidi: _maxMidi,
+                    gpuSaver: GpuBudget.isGpuSaverActive,
+                  ),
+                ),
               ),
             ),
-          ),
           // Simulated Pitch Indicator Badge ("SIM")
           if (widget.audioBuffer == null || widget.audioBuffer!.isEmpty)
             PositionedDirectional(
@@ -337,6 +367,7 @@ class _KaraokePitchHighwayState extends State<KaraokePitchHighway>
             ),
           ),
         ],
+      ),
       ),
     );
   }

@@ -159,16 +159,16 @@ class DspTelemetryCubit extends Cubit<DspTelemetry> {
       await _activeFetch;
       if (isClosed) return;
     }
-    await _fetchTelemetry();
+    await _fetchTelemetry(forceEmit: true);
   }
 
-  Future<void> _fetchTelemetry() {
+  Future<void> _fetchTelemetry({bool forceEmit = false}) {
     // Skip timer ticks while a previous fetch is still in flight: the 200ms
     // timer can fire before the channel timeout, and overlapping polls could
     // emit telemetry out of order.
     if (_activeFetch != null) return Future<void>.value();
     late final Future<void> run;
-    run = _performFetchTelemetry().whenComplete(() {
+    run = _performFetchTelemetry(forceEmit: forceEmit).whenComplete(() {
       if (identical(_activeFetch, run)) {
         _activeFetch = null;
       }
@@ -177,7 +177,7 @@ class DspTelemetryCubit extends Cubit<DspTelemetry> {
     return run;
   }
 
-  Future<void> _performFetchTelemetry() async {
+  Future<void> _performFetchTelemetry({bool forceEmit = false}) async {
     try {
       // Bound the cubit's own wait as well: a channel/fake that never completes
       // would otherwise leave _activeFetch non-null until timeout.
@@ -185,8 +185,9 @@ class DspTelemetryCubit extends Cubit<DspTelemetry> {
             const Duration(seconds: 1),
           );
       // A fetch that lands after the last consumer unsubscribed (or after
-      // close) must not resurrect stale meters.
-      if (isClosed || _listenerCount == 0) return;
+      // close) must not resurrect stale meters unless explicitly requested via
+      // refreshOnce().
+      if (isClosed || (!forceEmit && _listenerCount == 0)) return;
       _consecutiveFailures = 0;
       _retryCount = 0;
       _didLogFailure = false;

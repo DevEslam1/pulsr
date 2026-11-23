@@ -140,22 +140,25 @@ class PlaybackInterruptionManager {
       return InterruptionDecision.ignore;
     }
 
-    _pausedForNoisy = false;
     final pauseTime = _noisyPauseTime;
-    _noisyPauseTime = null;
-
     if (!autoResumeEnabled || pauseTime == null) {
+      _pausedForNoisy = false;
+      _noisyPauseTime = null;
       return InterruptionDecision.ignore;
     }
 
     if (now.difference(pauseTime) > timeout) {
+      _pausedForNoisy = false;
+      _noisyPauseTime = null;
       return InterruptionDecision.ignore;
     }
 
-    if (!hasHeadsetOutput) {
-      return InterruptionDecision.ignore;
+    if (hasHeadsetOutput) {
+      _pausedForNoisy = false;
+      _noisyPauseTime = null;
+      return InterruptionDecision.resume;
     }
 
-    return InterruptionDecision.resume;
+    return InterruptionDecision.ignore;
   }
 }

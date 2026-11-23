@@ -164,10 +164,37 @@ mixin PulsrQueueAdvance on PulsrAudioQueueEngine, PulsrAudioNativeDsd {
         !isNativeDsdCandidate(_songs[warmIdx])) {
       unawaited(_tripleBufferPipeline.preloadNext(_songs[warmIdx]));
     }
-    if (depth >= 2 &&
-        _songs.length > index + 2 &&
-        !isNativeDsdCandidate(_songs[index + 2])) {
-      unawaited(_tripleBufferPipeline.prefetchAhead(_songs[index + 2]));
+    if (depth >= 2) {
+      int? prefetchIdx;
+      if (_activePlayer.shuffleModeEnabled) {
+        final shuffleOrder = _activePlayer.shuffleIndices;
+        final posInShuffle = shuffleOrder.indexOf(index);
+        if (posInShuffle >= 0 && shuffleOrder.length == _songs.length) {
+          final targetPos = posInShuffle + 2;
+          if (targetPos < shuffleOrder.length) {
+            prefetchIdx = shuffleOrder[targetPos];
+          } else if (_activePlayer.loopMode == LoopMode.all &&
+              shuffleOrder.isNotEmpty) {
+            prefetchIdx = shuffleOrder[targetPos % shuffleOrder.length];
+          }
+        } else {
+          prefetchIdx = _queueStateMachine.peekNextIndex(
+            offset: 2,
+            shuffleModeEnabled: true,
+            loopMode: _activePlayer.loopMode,
+          );
+        }
+      } else if (index + 2 < _songs.length) {
+        prefetchIdx = index + 2;
+      }
+      if (prefetchIdx != null &&
+          prefetchIdx != index &&
+          prefetchIdx != warmIdx &&
+          prefetchIdx >= 0 &&
+          prefetchIdx < _songs.length &&
+          !isNativeDsdCandidate(_songs[prefetchIdx])) {
+        unawaited(_tripleBufferPipeline.prefetchAhead(_songs[prefetchIdx]));
+      }
     }
   }
 }

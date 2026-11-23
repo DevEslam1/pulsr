@@ -56,7 +56,7 @@ class SleepTimerManager {
   /// a ducked level. When both are null the manager behaves exactly as before
   /// (drives the player volume directly), which keeps it usable without a
   /// handler (e.g. unit tests).
-  void Function(double factor)? onFadeFactor;
+  FutureOr<void> Function(double factor)? onFadeFactor;
   double Function()? baseVolumeProvider;
 
   /// Clean baseline for the standalone fade path: the handler's un-faded target
@@ -429,7 +429,13 @@ class SleepTimerManager {
     // crossfade). Avoids this manager and the duck path both writing setVolume.
     final sink = onFadeFactor;
     if (sink != null) {
-      sink(f);
+      final res = sink(f);
+      if (res is Future<void>) {
+        unawaited(res.catchError((Object e, StackTrace st) {
+          ErrorLogger.log('SleepTimer fade factor failed',
+              error: e, stackTrace: st, category: 'SleepTimer');
+        }));
+      }
       return;
     }
     // Standalone fallback: drive the player directly from a clean baseline.
@@ -484,7 +490,7 @@ class SleepTimerManager {
       // restore in `finally` re-applies the pre-fade level afterwards.
       try {
         if (onFadeFactor != null) {
-          onFadeFactor!(0.0);
+          await onFadeFactor!(0.0);
         } else {
           await curvePlayer.setVolume(0);
         }
@@ -497,7 +503,7 @@ class SleepTimerManager {
         );
       }
       try {
-        curvePlayer.dspClearGainCurve().catchError((e, st) {
+        await curvePlayer.dspClearGainCurve().catchError((e, st) {
           ErrorLogger.log('dspClearGainCurve failed in expiration',
               error: e, stackTrace: st, category: 'SleepTimer');
           return false;
@@ -543,7 +549,7 @@ class SleepTimerManager {
           // target itself (the player is paused by now, so this just leaves the
           // right level for the next resume). Never a stale/ducked snapshot.
           try {
-            onFadeFactor!(1.0);
+            await onFadeFactor!(1.0);
           } catch (e, st) {
             ErrorLogger.log('Best-effort SleepTimer operation failed',
                 error: e, stackTrace: st, category: 'SleepTimer');
@@ -618,12 +624,7 @@ class SleepTimerManager {
       if (onFadeFactor != null) {
         // Coordinated mode: release the fade factor so the handler restores the
         // clean, duck-aware target (not a possibly-ducked snapshot).
-        try {
-          onFadeFactor!(1.0);
-        } catch (e, st) {
-          ErrorLogger.log('Best-effort SleepTimer operation failed',
-              error: e, stackTrace: st, category: 'SleepTimer');
-        }
+        _invokeFadeFactorFireAndForget(1.0);
         _preFadeVolume = null;
       } else if (_preFadeVolume != null) {
         try {
@@ -635,15 +636,27 @@ class SleepTimerManager {
         _preFadeVolume = null;
       }
     } else if (onFadeFactor != null) {
-      try {
-        onFadeFactor!(1.0);
-      } catch (e, st) {
-        ErrorLogger.log('Best-effort SleepTimer operation failed',
-            error: e, stackTrace: st, category: 'SleepTimer');
-      }
+      _invokeFadeFactorFireAndForget(1.0);
       _preFadeVolume = null;
     }
     _clearPersistedState();
+  }
+
+  void _invokeFadeFactorFireAndForget(double factor) {
+    final sink = onFadeFactor;
+    if (sink == null) return;
+    try {
+      final res = sink(factor);
+      if (res is Future<void>) {
+        unawaited(res.catchError((Object e, StackTrace st) {
+          ErrorLogger.log('Best-effort SleepTimer operation failed',
+              error: e, stackTrace: st, category: 'SleepTimer');
+        }));
+      }
+    } catch (e, st) {
+      ErrorLogger.log('Best-effort SleepTimer operation failed',
+          error: e, stackTrace: st, category: 'SleepTimer');
+    }
   }
 
   // Persisted alongside [PrefsKeys.sleepTimerTarget] so restore can tell whether

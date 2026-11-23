@@ -19795,6 +19795,2388 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Import Complete'**
   String get spotifyImportComplete;
+
+  /// Now-playing title when the favorites request resolves
+  ///
+  /// In en, this message translates to:
+  /// **'Favorites'**
+  String get assistantFavoritesTitle;
+
+  /// Now-playing title when the last album resumes
+  ///
+  /// In en, this message translates to:
+  /// **'Last album'**
+  String get assistantLastAlbumTitle;
+
+  /// Fallback now-playing title for an artist radio request
+  ///
+  /// In en, this message translates to:
+  /// **'Artist radio'**
+  String get assistantArtistRadioGeneric;
+
+  /// Now-playing title for a named artist radio request
+  ///
+  /// In en, this message translates to:
+  /// **'{artist} radio'**
+  String assistantArtistRadioNamed(String artist);
+
+  /// Message when a lookup found nothing without a search term
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing in your library matched that request.'**
+  String get assistantNothingMatchedGeneric;
+
+  /// Message when a lookup found nothing for a search term
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing in your library matched \"{term}\".'**
+  String assistantNothingMatchedTerm(String term);
+
+  /// Message shown when the favorites list is empty
+  ///
+  /// In en, this message translates to:
+  /// **'No favorite tracks yet.'**
+  String get assistantNoFavorites;
+
+  /// Message shown when there is no recent album to resume
+  ///
+  /// In en, this message translates to:
+  /// **'No recent album to resume.'**
+  String get assistantNoLastAlbum;
+
+  /// Message shown when a library callback failed
+  ///
+  /// In en, this message translates to:
+  /// **'Could not read your library. Try again.'**
+  String get assistantLibraryUnavailable;
+
+  /// Assistant settings screen title
+  ///
+  /// In en, this message translates to:
+  /// **'Assistant & search'**
+  String get assistantSettingsTitle;
+
+  /// Search suggestions toggle title
+  ///
+  /// In en, this message translates to:
+  /// **'Search suggestions'**
+  String get assistantSuggestionsTitle;
+
+  /// Search suggestions toggle subtitle
+  ///
+  /// In en, this message translates to:
+  /// **'Show recent library tracks in the system search box. Off by default: the cache is readable by the privileged search UI.'**
+  String get assistantSuggestionsSubtitle;
+
+  /// Section label above the search suggestions toggle
+  ///
+  /// In en, this message translates to:
+  /// **'System search'**
+  String get assistantSuggestionsSection;
+
+  /// Notice shown when suggestions are disabled and cache cleared
+  ///
+  /// In en, this message translates to:
+  /// **'Suggestions are off. Any cached rows were cleared.'**
+  String get assistantSuggestionsOffNotice;
+
+  /// App bar title of the announcements screen
+  ///
+  /// In en, this message translates to:
+  /// **'Announcements'**
+  String get annScreenTitle;
+
+  /// Section header for the announcements master switch
+  ///
+  /// In en, this message translates to:
+  /// **'Announcements'**
+  String get annSectionAnnouncements;
+
+  /// Master switch label for track announcements
+  ///
+  /// In en, this message translates to:
+  /// **'Speak track details'**
+  String get annMasterTitle;
+
+  /// Master switch explanation for track announcements
+  ///
+  /// In en, this message translates to:
+  /// **'Read the selected details aloud when a track starts.'**
+  String get annMasterSubtitle;
+
+  /// Section header for announcement element toggles
+  ///
+  /// In en, this message translates to:
+  /// **'What to announce'**
+  String get annSectionElements;
+
+  /// Section subtitle for announcement element toggles
+  ///
+  /// In en, this message translates to:
+  /// **'Items are spoken in the order they are listed.'**
+  String get annElementsSubtitle;
+
+  /// Section header for delay, volume and ducking
+  ///
+  /// In en, this message translates to:
+  /// **'Timing and volume'**
+  String get annSectionTiming;
+
+  /// Section subtitle for timing and volume
+  ///
+  /// In en, this message translates to:
+  /// **'Applied to every announcement on this device.'**
+  String get annSectionTimingSubtitle;
+
+  /// Delay slider label
+  ///
+  /// In en, this message translates to:
+  /// **'Delay before speaking'**
+  String get annDelayLabel;
+
+  /// Delay slider explanation
+  ///
+  /// In en, this message translates to:
+  /// **'Waits briefly so the track is playing before the voice starts.'**
+  String get annDelaySubtitle;
+
+  /// Announcement volume slider label
+  ///
+  /// In en, this message translates to:
+  /// **'Announcement volume'**
+  String get annVolumeLabel;
+
+  /// Announcement volume slider explanation
+  ///
+  /// In en, this message translates to:
+  /// **'Separate from the music volume.'**
+  String get annVolumeSubtitle;
+
+  /// Maximum announcement length slider label
+  ///
+  /// In en, this message translates to:
+  /// **'Maximum length'**
+  String get annMaxLengthLabel;
+
+  /// Maximum announcement length slider explanation
+  ///
+  /// In en, this message translates to:
+  /// **'Longer details are shortened to this many characters.'**
+  String get annMaxLengthSubtitle;
+
+  /// Ducking switch label
+  ///
+  /// In en, this message translates to:
+  /// **'Duck the music while speaking'**
+  String get annDuckAudioTitle;
+
+  /// Ducking switch explanation
+  ///
+  /// In en, this message translates to:
+  /// **'Lowers the music so the voice stays intelligible.'**
+  String get annDuckAudioSubtitle;
+
+  /// Section header for skip rules
+  ///
+  /// In en, this message translates to:
+  /// **'Skip announcements'**
+  String get annSectionSkip;
+
+  /// Section subtitle for skip rules
+  ///
+  /// In en, this message translates to:
+  /// **'Some outputs should never be interrupted by a voice.'**
+  String get annSectionSkipSubtitle;
+
+  /// Skip while casting switch label
+  ///
+  /// In en, this message translates to:
+  /// **'While casting'**
+  String get annSkipCastingTitle;
+
+  /// Skip while casting switch explanation
+  ///
+  /// In en, this message translates to:
+  /// **'Cast receivers already show the track details on screen.'**
+  String get annSkipCastingSubtitle;
+
+  /// Skip during bit-perfect switch label
+  ///
+  /// In en, this message translates to:
+  /// **'During bit-perfect playback'**
+  String get annSkipBitPerfectTitle;
+
+  /// Skip during bit-perfect switch explanation
+  ///
+  /// In en, this message translates to:
+  /// **'Keeps the exclusive output free of system audio.'**
+  String get annSkipBitPerfectSubtitle;
+
+  /// Section header for voice selection
+  ///
+  /// In en, this message translates to:
+  /// **'Voice'**
+  String get annSectionVoice;
+
+  /// Section subtitle for voice selection
+  ///
+  /// In en, this message translates to:
+  /// **'Voices are provided by the platform speech engine.'**
+  String get annSectionVoiceSubtitle;
+
+  /// Voice picker row label
+  ///
+  /// In en, this message translates to:
+  /// **'System voice'**
+  String get annVoiceLabel;
+
+  /// Dropdown entry keeping the platform default voice
+  ///
+  /// In en, this message translates to:
+  /// **'System default'**
+  String get annVoiceSystemDefault;
+
+  /// Shown while installed voices are loading
+  ///
+  /// In en, this message translates to:
+  /// **'Loading installed voices…'**
+  String get annVoiceLoading;
+
+  /// Shown when no extra voices are installed
+  ///
+  /// In en, this message translates to:
+  /// **'No additional voices installed.'**
+  String get annVoiceNoneInstalled;
+
+  /// Test announcement row label
+  ///
+  /// In en, this message translates to:
+  /// **'Test announcement'**
+  String get annTestTitle;
+
+  /// Test announcement row explanation
+  ///
+  /// In en, this message translates to:
+  /// **'Speaks the current selection with the saved volume.'**
+  String get annTestSubtitle;
+
+  /// Test announcement button label
+  ///
+  /// In en, this message translates to:
+  /// **'Speak test'**
+  String get annTestButton;
+
+  /// Sample track title read out by the test button
+  ///
+  /// In en, this message translates to:
+  /// **'Pulsr Music'**
+  String get annPreviewTrackTitle;
+
+  /// Sample artist read out by the test button
+  ///
+  /// In en, this message translates to:
+  /// **'Announcement test'**
+  String get annPreviewTrackArtist;
+
+  /// Shown when no element is selected to announce
+  ///
+  /// In en, this message translates to:
+  /// **'Select at least one item to announce.'**
+  String get annEmptySelection;
+
+  /// Status title when TTS is unavailable on this platform
+  ///
+  /// In en, this message translates to:
+  /// **'Not available on this platform'**
+  String get annUnavailableTitle;
+
+  /// Status body when TTS is unavailable on this platform
+  ///
+  /// In en, this message translates to:
+  /// **'Spoken announcements need the Android text-to-speech engine. Every other setting keeps working.'**
+  String get annUnavailableBody;
+
+  /// Announcement element label: Title
+  ///
+  /// In en, this message translates to:
+  /// **'Title'**
+  String get annElementTitle;
+
+  /// Announcement element label: Artist
+  ///
+  /// In en, this message translates to:
+  /// **'Artist'**
+  String get annElementArtist;
+
+  /// Announcement element label: Album
+  ///
+  /// In en, this message translates to:
+  /// **'Album'**
+  String get annElementAlbum;
+
+  /// Announcement element label: Year
+  ///
+  /// In en, this message translates to:
+  /// **'Year'**
+  String get annElementYear;
+
+  /// Announcement element label: Track number
+  ///
+  /// In en, this message translates to:
+  /// **'Track number'**
+  String get annElementTrackNumber;
+
+  /// Example subtitle for Title announcement element
+  ///
+  /// In en, this message translates to:
+  /// **'“Blue in Green”'**
+  String get annElementSubtitleTitle;
+
+  /// Example subtitle for Artist announcement element
+  ///
+  /// In en, this message translates to:
+  /// **'“Miles Davis”'**
+  String get annElementSubtitleArtist;
+
+  /// Example subtitle for Album announcement element
+  ///
+  /// In en, this message translates to:
+  /// **'“Kind of Blue”'**
+  String get annElementSubtitleAlbum;
+
+  /// Example subtitle for Year announcement element
+  ///
+  /// In en, this message translates to:
+  /// **'Spoken as “from 1959”.'**
+  String get annElementSubtitleYear;
+
+  /// Example subtitle for Track number announcement element
+  ///
+  /// In en, this message translates to:
+  /// **'Spoken as “track 4”.'**
+  String get annElementSubtitleTrackNumber;
+
+  /// Delay value when set to zero
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get annDelayOff;
+
+  /// Delay value formatted in seconds
+  ///
+  /// In en, this message translates to:
+  /// **'{seconds} s'**
+  String annDelaySeconds(String seconds);
+
+  /// Maximum announcement length in characters
+  ///
+  /// In en, this message translates to:
+  /// **'{characters} characters'**
+  String annMaxLengthValue(int characters);
+
+  /// Refresh action tooltip for installed voices
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh voices'**
+  String get annVoiceRefresh;
+
+  /// System behaviour screen title
+  ///
+  /// In en, this message translates to:
+  /// **'System behaviour'**
+  String get sysBehavScreenTitle;
+
+  /// Audio focus section header
+  ///
+  /// In en, this message translates to:
+  /// **'Audio focus'**
+  String get sysBehavSectionFocus;
+
+  /// USB output section header
+  ///
+  /// In en, this message translates to:
+  /// **'USB output'**
+  String get sysBehavSectionUsb;
+
+  /// Volume section header
+  ///
+  /// In en, this message translates to:
+  /// **'Volume'**
+  String get sysBehavSectionVolume;
+
+  /// Fade and lifecycle section header
+  ///
+  /// In en, this message translates to:
+  /// **'Fade and lifecycle'**
+  String get sysBehavSectionLifecycle;
+
+  /// Pause on notification sound switch title
+  ///
+  /// In en, this message translates to:
+  /// **'Pause for notification sounds'**
+  String get sysBehavPauseOnNotifTitle;
+
+  /// Pause on notification sound switch subtitle
+  ///
+  /// In en, this message translates to:
+  /// **'Pauses instead of ducking when a system alert or navigation prompt plays. Turn this off to keep the music at a reduced level.'**
+  String get sysBehavPauseOnNotifSubtitle;
+
+  /// Resume after calls switch title
+  ///
+  /// In en, this message translates to:
+  /// **'Resume after calls'**
+  String get sysBehavResumeAfterCallTitle;
+
+  /// Resume after calls switch subtitle
+  ///
+  /// In en, this message translates to:
+  /// **'Continues playback when a phone call or another interruption ends, as long as nothing else took audio focus in the meantime.'**
+  String get sysBehavResumeAfterCallSubtitle;
+
+  /// USB release on focus loss title
+  ///
+  /// In en, this message translates to:
+  /// **'USB release on focus loss'**
+  String get sysBehavUsbReleaseTitle;
+
+  /// USB release on focus loss subtitle
+  ///
+  /// In en, this message translates to:
+  /// **'Drops the exclusive USB claim when another app or a call takes audio focus, so the DAC can be claimed again afterwards.'**
+  String get sysBehavUsbReleaseSubtitle;
+
+  /// USB release option: Never
+  ///
+  /// In en, this message translates to:
+  /// **'Never'**
+  String get sysBehavUsbReleaseNever;
+
+  /// USB release option: Permanent
+  ///
+  /// In en, this message translates to:
+  /// **'Permanent'**
+  String get sysBehavUsbReleasePermanent;
+
+  /// USB release option: Transient
+  ///
+  /// In en, this message translates to:
+  /// **'Transient'**
+  String get sysBehavUsbReleaseTransient;
+
+  /// Accessibility label for Never USB release option
+  ///
+  /// In en, this message translates to:
+  /// **'Keep USB on every focus loss'**
+  String get sysBehavUsbReleaseNeverIconLabel;
+
+  /// Accessibility label for Permanent USB release option
+  ///
+  /// In en, this message translates to:
+  /// **'Release USB on permanent focus loss'**
+  String get sysBehavUsbReleasePermanentIconLabel;
+
+  /// Accessibility label for Transient USB release option
+  ///
+  /// In en, this message translates to:
+  /// **'Release USB on any focus loss'**
+  String get sysBehavUsbReleaseTransientIconLabel;
+
+  /// Close USB in background switch title
+  ///
+  /// In en, this message translates to:
+  /// **'Close USB in background'**
+  String get sysBehavCloseUsbBgTitle;
+
+  /// Close USB in background switch subtitle
+  ///
+  /// In en, this message translates to:
+  /// **'Releases the exclusive claim when the app leaves the foreground, so another app on the device can use the DAC.'**
+  String get sysBehavCloseUsbBgSubtitle;
+
+  /// Volume rocker track switch title
+  ///
+  /// In en, this message translates to:
+  /// **'Double-press volume to skip'**
+  String get sysBehavVolumeRockerTitle;
+
+  /// Volume rocker track switch subtitle
+  ///
+  /// In en, this message translates to:
+  /// **'A double press of the hardware volume rocker skips to the next track instead of changing the volume twice.'**
+  String get sysBehavVolumeRockerSubtitle;
+
+  /// Software volume curve title
+  ///
+  /// In en, this message translates to:
+  /// **'Volume curve'**
+  String get sysBehavVolumeCurveTitle;
+
+  /// Software volume curve subtitle
+  ///
+  /// In en, this message translates to:
+  /// **'Linear moves the same amount of gain per step. Logarithmic moves the same amount of perceived loudness, which keeps the first steps quiet and the last steps usable.'**
+  String get sysBehavVolumeCurveSubtitle;
+
+  /// Linear volume curve label
+  ///
+  /// In en, this message translates to:
+  /// **'Linear'**
+  String get sysBehavCurveLinear;
+
+  /// Logarithmic volume curve label
+  ///
+  /// In en, this message translates to:
+  /// **'Logarithmic'**
+  String get sysBehavCurveLogarithmic;
+
+  /// Accessibility label for linear volume curve
+  ///
+  /// In en, this message translates to:
+  /// **'Use a linear volume curve'**
+  String get sysBehavCurveLinearIconLabel;
+
+  /// Accessibility label for logarithmic volume curve
+  ///
+  /// In en, this message translates to:
+  /// **'Use a logarithmic volume curve'**
+  String get sysBehavCurveLogarithmicIconLabel;
+
+  /// Volume step percent slider title
+  ///
+  /// In en, this message translates to:
+  /// **'Volume step'**
+  String get sysBehavVolumeStepTitle;
+
+  /// Volume step percent slider subtitle
+  ///
+  /// In en, this message translates to:
+  /// **'How far one volume step moves, as a percentage of the full scale.'**
+  String get sysBehavVolumeStepSubtitle;
+
+  /// Fade out on pause slider title
+  ///
+  /// In en, this message translates to:
+  /// **'Fade out before pause'**
+  String get sysBehavFadeOutPauseTitle;
+
+  /// Fade out on pause slider subtitle
+  ///
+  /// In en, this message translates to:
+  /// **'Ramps the volume to zero before pausing, so an interruption does not cut the music off. Set to 0 to pause immediately.'**
+  String get sysBehavFadeOutPauseSubtitle;
+
+  /// Fade out value when set to zero
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get sysBehavFadeOffValue;
+
+  /// Stop when task removed switch title
+  ///
+  /// In en, this message translates to:
+  /// **'Stop when swiped away'**
+  String get sysBehavStopTaskRemovedTitle;
+
+  /// Stop when task removed switch subtitle
+  ///
+  /// In en, this message translates to:
+  /// **'Stops playback when the app is removed from the recent apps list instead of pausing and keeping the queue.'**
+  String get sysBehavStopTaskRemovedSubtitle;
+
+  /// Platform limitation note for stop-when-task-removed
+  ///
+  /// In en, this message translates to:
+  /// **'Android-only: this platform gives the app no task-removal callback, so the setting cannot take effect here.'**
+  String get sysBehavAndroidOnlyLimit;
+
+  /// Platform limitation note for USB output settings
+  ///
+  /// In en, this message translates to:
+  /// **'Android-only: exclusive USB output does not exist on this platform, so the setting cannot take effect here.'**
+  String get sysBehavUsbOnlyLimit;
+
+  /// Platform limitation note for volume rocker track switch
+  ///
+  /// In en, this message translates to:
+  /// **'Android-only: hardware volume keys are not delivered to the app on this platform, so the setting cannot take effect here.'**
+  String get sysBehavVolumeRockerLimit;
+
+  /// Fade length shown next to the slider in milliseconds
+  ///
+  /// In en, this message translates to:
+  /// **'{milliseconds} ms'**
+  String sysBehavFadeValueMs(int milliseconds);
+
+  /// Volume step percentage shown next to the slider
+  ///
+  /// In en, this message translates to:
+  /// **'{percent} %'**
+  String sysBehavVolumeStepValue(int percent);
+
+  /// DLNA screen title
+  ///
+  /// In en, this message translates to:
+  /// **'DLNA Renderers'**
+  String get dlnaTitle;
+
+  /// DLNA screen subtitle
+  ///
+  /// In en, this message translates to:
+  /// **'Play on a TV or speaker on your Wi-Fi network.'**
+  String get dlnaSubtitle;
+
+  /// DLNA scan button label
+  ///
+  /// In en, this message translates to:
+  /// **'Scan for devices'**
+  String get dlnaScan;
+
+  /// Cast local file button label
+  ///
+  /// In en, this message translates to:
+  /// **'Cast file'**
+  String get dlnaCastFile;
+
+  /// Cast current track button label
+  ///
+  /// In en, this message translates to:
+  /// **'Cast current track'**
+  String get dlnaCastCurrentTrack;
+
+  /// Semantics label for cast file action
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a local audio file to cast to the renderer'**
+  String get dlnaCastFileSemantics;
+
+  /// Semantics label for cast current track action
+  ///
+  /// In en, this message translates to:
+  /// **'Cast the track currently playing on this device to the renderer'**
+  String get dlnaCastCurrentSemantics;
+
+  /// Label shown while DLNA discovery runs
+  ///
+  /// In en, this message translates to:
+  /// **'Searching for renderers'**
+  String get dlnaScanning;
+
+  /// Empty-state message when no DLNA renderers are found
+  ///
+  /// In en, this message translates to:
+  /// **'No DLNA renderers found. Check that your TV or speaker is on the same network and that media sharing is enabled.'**
+  String get dlnaNoDevices;
+
+  /// Connect to DLNA device button label
+  ///
+  /// In en, this message translates to:
+  /// **'Connect'**
+  String get dlnaConnect;
+
+  /// Badge shown for connected DLNA device
+  ///
+  /// In en, this message translates to:
+  /// **'Connected'**
+  String get dlnaConnected;
+
+  /// Placeholder when nothing is playing on DLNA renderer
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing playing'**
+  String get dlnaNothingPlaying;
+
+  /// DLNA pause control label
+  ///
+  /// In en, this message translates to:
+  /// **'Pause'**
+  String get dlnaPause;
+
+  /// DLNA previous control label
+  ///
+  /// In en, this message translates to:
+  /// **'Previous'**
+  String get dlnaPrevious;
+
+  /// DLNA next control label
+  ///
+  /// In en, this message translates to:
+  /// **'Next'**
+  String get dlnaNext;
+
+  /// DLNA resume control label
+  ///
+  /// In en, this message translates to:
+  /// **'Resume'**
+  String get dlnaResume;
+
+  /// DLNA stop control label
+  ///
+  /// In en, this message translates to:
+  /// **'Stop'**
+  String get dlnaStop;
+
+  /// DLNA seek slider label
+  ///
+  /// In en, this message translates to:
+  /// **'Seek'**
+  String get dlnaSeek;
+
+  /// DLNA now-playing card heading
+  ///
+  /// In en, this message translates to:
+  /// **'Now playing'**
+  String get dlnaNowPlaying;
+
+  /// DLNA error banner retry button
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get dlnaRetry;
+
+  /// DLNA error banner title
+  ///
+  /// In en, this message translates to:
+  /// **'Could not reach the device'**
+  String get dlnaErrorTitle;
+
+  /// Banner message after repeated DLNA position-poll failures
+  ///
+  /// In en, this message translates to:
+  /// **'Lost contact with the renderer. The state shown may be out of date; retry to reconnect the poll.'**
+  String get dlnaPollLost;
+
+  /// Semantics label for DLNA scan button
+  ///
+  /// In en, this message translates to:
+  /// **'Scan the network for DLNA renderers'**
+  String get dlnaScanSemantics;
+
+  /// Semantics label for connecting to a named DLNA device
+  ///
+  /// In en, this message translates to:
+  /// **'Connect to {deviceName}'**
+  String dlnaConnectTo(String deviceName);
+
+  /// Transport label while DLNA position poll is lost
+  ///
+  /// In en, this message translates to:
+  /// **'Connection lost'**
+  String get dlnaStateStale;
+
+  /// DLNA transport state: idle/ready
+  ///
+  /// In en, this message translates to:
+  /// **'Ready'**
+  String get dlnaStateReady;
+
+  /// DLNA transport state: discovering
+  ///
+  /// In en, this message translates to:
+  /// **'Scanning'**
+  String get dlnaStateScanning;
+
+  /// DLNA transport state: connecting
+  ///
+  /// In en, this message translates to:
+  /// **'Connecting'**
+  String get dlnaStateConnecting;
+
+  /// DLNA transport state: playing
+  ///
+  /// In en, this message translates to:
+  /// **'Playing'**
+  String get dlnaStatePlaying;
+
+  /// DLNA transport state: paused
+  ///
+  /// In en, this message translates to:
+  /// **'Paused'**
+  String get dlnaStatePaused;
+
+  /// DLNA transport state: stopped
+  ///
+  /// In en, this message translates to:
+  /// **'Stopped'**
+  String get dlnaStateStopped;
+
+  /// DLNA transport state: error
+  ///
+  /// In en, this message translates to:
+  /// **'Error'**
+  String get dlnaStateError;
+
+  /// Remote sources screen title
+  ///
+  /// In en, this message translates to:
+  /// **'Remote sources'**
+  String get remoteSrcTitle;
+
+  /// Remote sources intro text
+  ///
+  /// In en, this message translates to:
+  /// **'Play music stored on a NAS, a WebDAV server or an FTP host.'**
+  String get remoteSrcIntro;
+
+  /// Add remote source button label
+  ///
+  /// In en, this message translates to:
+  /// **'Add source'**
+  String get remoteSrcAddSource;
+
+  /// Add remote source button tooltip
+  ///
+  /// In en, this message translates to:
+  /// **'Add a remote source'**
+  String get remoteSrcAddSourceTooltip;
+
+  /// Empty state title for remote sources
+  ///
+  /// In en, this message translates to:
+  /// **'No remote sources yet'**
+  String get remoteSrcEmptyTitle;
+
+  /// Empty state body for remote sources
+  ///
+  /// In en, this message translates to:
+  /// **'Add a WebDAV, FTP or SMB library to browse it from here.'**
+  String get remoteSrcEmptyBody;
+
+  /// Error when saved remote sources could not be read
+  ///
+  /// In en, this message translates to:
+  /// **'The saved sources could not be read. They were kept on disk.'**
+  String get remoteSrcLoadFailed;
+
+  /// Retry button label in remote sources
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get remoteSrcRetry;
+
+  /// Load more button label in remote browser
+  ///
+  /// In en, this message translates to:
+  /// **'Load more'**
+  String get remoteSrcLoadMore;
+
+  /// Tooltip for source row actions menu
+  ///
+  /// In en, this message translates to:
+  /// **'Source actions'**
+  String get remoteSrcActionsTooltip;
+
+  /// Edit remote source menu item
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get remoteSrcEditSource;
+
+  /// Delete remote source menu item
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get remoteSrcDeleteSource;
+
+  /// Test remote source connection action
+  ///
+  /// In en, this message translates to:
+  /// **'Test connection'**
+  String get remoteSrcTestConnection;
+
+  /// Tooltip for test connection action
+  ///
+  /// In en, this message translates to:
+  /// **'Test this connection'**
+  String get remoteSrcTestConnectionTooltip;
+
+  /// Status while testing a remote connection
+  ///
+  /// In en, this message translates to:
+  /// **'Testing…'**
+  String get remoteSrcTesting;
+
+  /// Browse remote source button label
+  ///
+  /// In en, this message translates to:
+  /// **'Browse'**
+  String get remoteSrcBrowse;
+
+  /// Remote source editor title when adding
+  ///
+  /// In en, this message translates to:
+  /// **'Add a remote source'**
+  String get remoteSrcEditorAddTitle;
+
+  /// Remote source editor title when editing
+  ///
+  /// In en, this message translates to:
+  /// **'Edit remote source'**
+  String get remoteSrcEditorEditTitle;
+
+  /// Remote source type field label
+  ///
+  /// In en, this message translates to:
+  /// **'Type'**
+  String get remoteSrcKindLabel;
+
+  /// Remote source name field label
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get remoteSrcNameLabel;
+
+  /// Remote source name field hint
+  ///
+  /// In en, this message translates to:
+  /// **'Living room NAS'**
+  String get remoteSrcNameHint;
+
+  /// Remote source host field label
+  ///
+  /// In en, this message translates to:
+  /// **'Host'**
+  String get remoteSrcHostLabel;
+
+  /// Remote source host field hint
+  ///
+  /// In en, this message translates to:
+  /// **'192.168.1.10 or nas.local'**
+  String get remoteSrcHostHint;
+
+  /// Remote source port field label
+  ///
+  /// In en, this message translates to:
+  /// **'Port'**
+  String get remoteSrcPortLabel;
+
+  /// Use HTTPS toggle label
+  ///
+  /// In en, this message translates to:
+  /// **'Use HTTPS'**
+  String get remoteSrcTlsLabel;
+
+  /// Warning when HTTPS is disabled
+  ///
+  /// In en, this message translates to:
+  /// **'HTTPS is off: your password and library traffic will be sent unencrypted. Enable it unless the server has no TLS support.'**
+  String get remoteSrcCleartextWarning;
+
+  /// Remote source root folder field label
+  ///
+  /// In en, this message translates to:
+  /// **'Root folder'**
+  String get remoteSrcRootLabel;
+
+  /// Root folder hint for WebDAV/FTP
+  ///
+  /// In en, this message translates to:
+  /// **'/Music'**
+  String get remoteSrcRootHint;
+
+  /// Root folder hint for SMB shares
+  ///
+  /// In en, this message translates to:
+  /// **'/Share/Folder'**
+  String get remoteSrcRootHintShare;
+
+  /// Remote source username field label
+  ///
+  /// In en, this message translates to:
+  /// **'Username'**
+  String get remoteSrcUsernameLabel;
+
+  /// Remote source password field label
+  ///
+  /// In en, this message translates to:
+  /// **'Password'**
+  String get remoteSrcPasswordLabel;
+
+  /// Hint when editing password of existing remote source
+  ///
+  /// In en, this message translates to:
+  /// **'Leave empty to keep the saved one'**
+  String get remoteSrcPasswordKeepHint;
+
+  /// Subsonic server URL field label
+  ///
+  /// In en, this message translates to:
+  /// **'Server URL'**
+  String get remoteSrcSubsonicUrlLabel;
+
+  /// Subsonic server URL field hint
+  ///
+  /// In en, this message translates to:
+  /// **'https://music.example.com'**
+  String get remoteSrcSubsonicUrlHint;
+
+  /// Validation error for invalid Subsonic server URL
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the full server URL, for example https://music.example.com.'**
+  String get remoteSrcSubsonicUrlInvalid;
+
+  /// Cancel button label in remote sources
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get remoteSrcCancel;
+
+  /// Save button label in remote sources
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get remoteSrcSave;
+
+  /// Error when saving a remote source fails
+  ///
+  /// In en, this message translates to:
+  /// **'The source could not be saved.'**
+  String get remoteSrcSaveFailed;
+
+  /// Error when secure credential storage fails
+  ///
+  /// In en, this message translates to:
+  /// **'The source was saved, but the password could not be stored securely.'**
+  String get remoteSrcCredentialsFailed;
+
+  /// Validation error when host is empty
+  ///
+  /// In en, this message translates to:
+  /// **'Host is required.'**
+  String get remoteSrcHostRequired;
+
+  /// Validation error when port is out of range
+  ///
+  /// In en, this message translates to:
+  /// **'Port must be between 1 and 65535.'**
+  String get remoteSrcPortRange;
+
+  /// Validation error when name is empty
+  ///
+  /// In en, this message translates to:
+  /// **'Name is required.'**
+  String get remoteSrcNameRequired;
+
+  /// Validation error when root folder is empty
+  ///
+  /// In en, this message translates to:
+  /// **'Set a root, for example /Music.'**
+  String get remoteSrcRootRequired;
+
+  /// Validation error when SMB share is missing
+  ///
+  /// In en, this message translates to:
+  /// **'SMB needs a share in the root, for example /Music.'**
+  String get remoteSrcShareRequired;
+
+  /// Prefix for connection latency status
+  ///
+  /// In en, this message translates to:
+  /// **'Connected in'**
+  String get remoteSrcConnectedIn;
+
+  /// Status when connection has not been tested
+  ///
+  /// In en, this message translates to:
+  /// **'Not tested yet'**
+  String get remoteSrcNotTested;
+
+  /// Label for anonymous remote source connection
+  ///
+  /// In en, this message translates to:
+  /// **'Anonymous'**
+  String get remoteSrcAnonymous;
+
+  /// Remote folder browser title
+  ///
+  /// In en, this message translates to:
+  /// **'Browse'**
+  String get remoteSrcBrowserTitle;
+
+  /// Root breadcrumb label in remote browser
+  ///
+  /// In en, this message translates to:
+  /// **'Root'**
+  String get remoteSrcRootCrumb;
+
+  /// Empty folder message in remote browser
+  ///
+  /// In en, this message translates to:
+  /// **'This folder is empty.'**
+  String get remoteSrcEmptyFolder;
+
+  /// Error when reading a remote folder fails
+  ///
+  /// In en, this message translates to:
+  /// **'This folder could not be read.'**
+  String get remoteSrcFolderLoadFailed;
+
+  /// Close button label in remote browser
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get remoteSrcClose;
+
+  /// Fallback label for a remote file with unknown name
+  ///
+  /// In en, this message translates to:
+  /// **'File'**
+  String get remoteSrcFileNameUnknown;
+
+  /// Semantics/type label for a remote folder
+  ///
+  /// In en, this message translates to:
+  /// **'Folder'**
+  String get remoteSrcFolderLabel;
+
+  /// Search remote library tooltip/title
+  ///
+  /// In en, this message translates to:
+  /// **'Search library'**
+  String get remoteSrcSearchLibrary;
+
+  /// Search input hint in remote library
+  ///
+  /// In en, this message translates to:
+  /// **'Search artists, albums, songs…'**
+  String get remoteSrcSearchHint;
+
+  /// Clear search button tooltip
+  ///
+  /// In en, this message translates to:
+  /// **'Clear search'**
+  String get remoteSrcSearchClear;
+
+  /// Empty search results message
+  ///
+  /// In en, this message translates to:
+  /// **'No results found.'**
+  String get remoteSrcNoSearchResults;
+
+  /// Artists section header in remote search
+  ///
+  /// In en, this message translates to:
+  /// **'Artists'**
+  String get remoteSrcArtistsHeader;
+
+  /// Albums section header in remote search
+  ///
+  /// In en, this message translates to:
+  /// **'Albums'**
+  String get remoteSrcAlbumsHeader;
+
+  /// Songs section header in remote search
+  ///
+  /// In en, this message translates to:
+  /// **'Songs'**
+  String get remoteSrcSongsHeader;
+
+  /// Remote audio cache section title
+  ///
+  /// In en, this message translates to:
+  /// **'Cached audio'**
+  String get remoteSrcCacheTitle;
+
+  /// Remote audio cache explanation
+  ///
+  /// In en, this message translates to:
+  /// **'Files you played are kept for fast seeking.'**
+  String get remoteSrcCacheBody;
+
+  /// Clear remote cache button label
+  ///
+  /// In en, this message translates to:
+  /// **'Clear cache'**
+  String get remoteSrcClearCache;
+
+  /// Clear remote cache button tooltip
+  ///
+  /// In en, this message translates to:
+  /// **'Delete cached audio'**
+  String get remoteSrcClearCacheTooltip;
+
+  /// Confirmation snackbar after clearing remote cache
+  ///
+  /// In en, this message translates to:
+  /// **'Cached audio deleted.'**
+  String get remoteSrcCacheCleared;
+
+  /// Shown while calculating cache size
+  ///
+  /// In en, this message translates to:
+  /// **'Calculating…'**
+  String get remoteSrcCalculating;
+
+  /// UPnP server picker title
+  ///
+  /// In en, this message translates to:
+  /// **'UPnP media servers'**
+  String get remoteSrcUpnpTitle;
+
+  /// UPnP server picker intro text
+  ///
+  /// In en, this message translates to:
+  /// **'Find a DLNA media server on this network and browse it here.'**
+  String get remoteSrcUpnpIntro;
+
+  /// UPnP search button label
+  ///
+  /// In en, this message translates to:
+  /// **'Search for servers'**
+  String get remoteSrcUpnpSearch;
+
+  /// UPnP searching status text
+  ///
+  /// In en, this message translates to:
+  /// **'Searching for media servers…'**
+  String get remoteSrcUpnpSearching;
+
+  /// UPnP empty result text
+  ///
+  /// In en, this message translates to:
+  /// **'No media server found'**
+  String get remoteSrcUpnpNone;
+
+  /// UPnP select server button label
+  ///
+  /// In en, this message translates to:
+  /// **'Use this server'**
+  String get remoteSrcUpnpUse;
+
+  /// UPnP discovery error message
+  ///
+  /// In en, this message translates to:
+  /// **'Media servers could not be discovered. Check that this device is on the same network.'**
+  String get remoteSrcUpnpFailed;
+
+  /// Generic delete source dialog title
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this source?'**
+  String get remoteSrcDeleteTitle;
+
+  /// Delete source dialog confirmation body
+  ///
+  /// In en, this message translates to:
+  /// **'Its saved password and cached audio are removed too.'**
+  String get remoteSrcDeleteBody;
+
+  /// Description for WebDAV source type
+  ///
+  /// In en, this message translates to:
+  /// **'Nextcloud, ownCloud, Apache mod_dav'**
+  String get remoteSrcKindWebdavDesc;
+
+  /// Description for FTP source type
+  ///
+  /// In en, this message translates to:
+  /// **'Plain FTP servers and routers'**
+  String get remoteSrcKindFtpDesc;
+
+  /// Description for SMB source type
+  ///
+  /// In en, this message translates to:
+  /// **'Windows shares and Samba (Android only)'**
+  String get remoteSrcKindSmbDesc;
+
+  /// Description for Subsonic source type
+  ///
+  /// In en, this message translates to:
+  /// **'Navidrome, Airsonic, Gonic and other Subsonic servers'**
+  String get remoteSrcKindSubsonicDesc;
+
+  /// Description for UPnP source type
+  ///
+  /// In en, this message translates to:
+  /// **'DLNA media servers discovered on your network'**
+  String get remoteSrcKindUpnpDesc;
+
+  /// Connection test latency readout
+  ///
+  /// In en, this message translates to:
+  /// **'Connected in {milliseconds} ms'**
+  String remoteSrcConnectedInMs(int milliseconds);
+
+  /// Confirmation title for deleting a named remote source
+  ///
+  /// In en, this message translates to:
+  /// **'Delete \"{name}\"?'**
+  String remoteSrcDeleteConfirmTitle(String name);
+
+  /// Audio profiles screen title
+  ///
+  /// In en, this message translates to:
+  /// **'Audio profiles'**
+  String get audioProfScreenTitle;
+
+  /// Capture current audio setup action
+  ///
+  /// In en, this message translates to:
+  /// **'Capture current setup'**
+  String get audioProfCaptureAction;
+
+  /// Import audio profile action
+  ///
+  /// In en, this message translates to:
+  /// **'Import'**
+  String get audioProfImportAction;
+
+  /// Reload audio profiles tooltip
+  ///
+  /// In en, this message translates to:
+  /// **'Reload profiles'**
+  String get audioProfRefreshTooltip;
+
+  /// Prefix label for current output device
+  ///
+  /// In en, this message translates to:
+  /// **'Current device'**
+  String get audioProfDeviceLabelPrefix;
+
+  /// Shown when no audio output device is detected
+  ///
+  /// In en, this message translates to:
+  /// **'No output device detected'**
+  String get audioProfDeviceUnknown;
+
+  /// Capture profile dialog title
+  ///
+  /// In en, this message translates to:
+  /// **'Name this profile'**
+  String get audioProfCaptureDialogTitle;
+
+  /// Capture profile dialog description
+  ///
+  /// In en, this message translates to:
+  /// **'Saves the current EQ, DSP, output and bit-perfect settings as one file you can share.'**
+  String get audioProfCaptureDialogMessage;
+
+  /// Capture profile name field hint
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. USB DAC - neutral'**
+  String get audioProfCaptureDialogHint;
+
+  /// Capture profile confirm button
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get audioProfCaptureConfirm;
+
+  /// Validation error when profile name is empty
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a name for the profile.'**
+  String get audioProfNameRequired;
+
+  /// Snackbar after saving an audio profile
+  ///
+  /// In en, this message translates to:
+  /// **'Profile saved.'**
+  String get audioProfCaptureSaved;
+
+  /// Error when saving an audio profile fails
+  ///
+  /// In en, this message translates to:
+  /// **'Saving the profile failed.'**
+  String get audioProfCaptureFailed;
+
+  /// Snackbar after importing an audio profile
+  ///
+  /// In en, this message translates to:
+  /// **'Profile imported.'**
+  String get audioProfImportSaved;
+
+  /// Error when importing a profile file fails
+  ///
+  /// In en, this message translates to:
+  /// **'Could not import that profile file.'**
+  String get audioProfImportFailed;
+
+  /// Error when selected profile file does not exist
+  ///
+  /// In en, this message translates to:
+  /// **'That file no longer exists.'**
+  String get audioProfImportMissing;
+
+  /// Apply profile confirm button
+  ///
+  /// In en, this message translates to:
+  /// **'Apply'**
+  String get audioProfApplyConfirm;
+
+  /// Apply profile confirmation dialog title
+  ///
+  /// In en, this message translates to:
+  /// **'Apply profile?'**
+  String get audioProfApplyDialogTitle;
+
+  /// Error when applying an audio profile fails
+  ///
+  /// In en, this message translates to:
+  /// **'Applying the profile failed.'**
+  String get audioProfApplyFailed;
+
+  /// Apply profile icon tooltip
+  ///
+  /// In en, this message translates to:
+  /// **'Apply profile'**
+  String get audioProfApplyTooltip;
+
+  /// Share profile icon tooltip
+  ///
+  /// In en, this message translates to:
+  /// **'Share profile'**
+  String get audioProfShareTooltip;
+
+  /// Delete profile icon tooltip
+  ///
+  /// In en, this message translates to:
+  /// **'Delete profile'**
+  String get audioProfDeleteTooltip;
+
+  /// Default profile action tooltip
+  ///
+  /// In en, this message translates to:
+  /// **'Default profile'**
+  String get audioProfDefaultTooltip;
+
+  /// Default profile picker dialog title
+  ///
+  /// In en, this message translates to:
+  /// **'Default profile'**
+  String get audioProfDefaultDialogTitle;
+
+  /// Default profile picker dialog message
+  ///
+  /// In en, this message translates to:
+  /// **'Pick the profile marked as this device\'s default. Clearing it keeps your current settings untouched.'**
+  String get audioProfDefaultDialogMessage;
+
+  /// Option to clear default profile
+  ///
+  /// In en, this message translates to:
+  /// **'No default'**
+  String get audioProfDefaultNone;
+
+  /// Snackbar when default profile is saved
+  ///
+  /// In en, this message translates to:
+  /// **'Default profile saved.'**
+  String get audioProfDefaultSaved;
+
+  /// Snackbar when default profile is cleared
+  ///
+  /// In en, this message translates to:
+  /// **'Default profile cleared.'**
+  String get audioProfDefaultCleared;
+
+  /// Error when default profile no longer exists
+  ///
+  /// In en, this message translates to:
+  /// **'That profile is no longer available on this device.'**
+  String get audioProfDefaultMissing;
+
+  /// Badge shown on the default profile
+  ///
+  /// In en, this message translates to:
+  /// **'Default profile'**
+  String get audioProfDefaultBadge;
+
+  /// Cancel button in audio profiles dialogs
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get audioProfCancelAction;
+
+  /// Delete confirm button in audio profiles
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get audioProfDeleteConfirm;
+
+  /// Delete profile dialog title
+  ///
+  /// In en, this message translates to:
+  /// **'Delete profile?'**
+  String get audioProfDeleteDialogTitle;
+
+  /// Snackbar after deleting a profile
+  ///
+  /// In en, this message translates to:
+  /// **'Profile deleted.'**
+  String get audioProfDeleted;
+
+  /// Error when deleting a profile fails
+  ///
+  /// In en, this message translates to:
+  /// **'Deleting the profile failed.'**
+  String get audioProfDeleteFailed;
+
+  /// Error when sharing a profile fails
+  ///
+  /// In en, this message translates to:
+  /// **'Sharing the profile failed.'**
+  String get audioProfShareFailed;
+
+  /// Empty state title for audio profiles
+  ///
+  /// In en, this message translates to:
+  /// **'No audio profiles yet'**
+  String get audioProfEmptyTitle;
+
+  /// Empty state subtitle for audio profiles
+  ///
+  /// In en, this message translates to:
+  /// **'Capture your current setup to reuse it on another device or headphone.'**
+  String get audioProfEmptySubtitle;
+
+  /// Error state title for audio profiles
+  ///
+  /// In en, this message translates to:
+  /// **'Profiles could not be loaded'**
+  String get audioProfErrorTitle;
+
+  /// Error state subtitle for audio profiles
+  ///
+  /// In en, this message translates to:
+  /// **'App storage may be unavailable. Try again in a moment.'**
+  String get audioProfErrorSubtitle;
+
+  /// Retry button label in audio profiles
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get audioProfRetry;
+
+  /// Validation error for corrupt audio profile file
+  ///
+  /// In en, this message translates to:
+  /// **'This file is not a valid Pulsr audio profile.'**
+  String get audioProfFormatCorrupt;
+
+  /// Validation error for missing profile format version
+  ///
+  /// In en, this message translates to:
+  /// **'The profile is missing its format version.'**
+  String get audioProfFormatMissingVersion;
+
+  /// Validation error for oversized profile file
+  ///
+  /// In en, this message translates to:
+  /// **'The profile file is larger than the 512 KB limit.'**
+  String get audioProfFormatTooLarge;
+
+  /// Validation error for too many settings in profile
+  ///
+  /// In en, this message translates to:
+  /// **'The profile contains more than 200 settings.'**
+  String get audioProfFormatTooManyValues;
+
+  /// Validation error for empty setting key in profile
+  ///
+  /// In en, this message translates to:
+  /// **'The profile contains an empty setting name.'**
+  String get audioProfFormatEmptyKey;
+
+  /// Validation error for invalid profile ID
+  ///
+  /// In en, this message translates to:
+  /// **'The profile identifier is invalid.'**
+  String get audioProfFormatInvalidId;
+
+  /// Error when storing a profile fails
+  ///
+  /// In en, this message translates to:
+  /// **'The profile could not be saved.'**
+  String get audioProfStoreFailed;
+
+  /// Apply profile confirmation body
+  ///
+  /// In en, this message translates to:
+  /// **'This replaces your current audio settings with \"{name}\". A backup of the current setup is saved automatically first, so a partial failure can be rolled back.'**
+  String audioProfApplyDialogBody(String name);
+
+  /// Success message after applying 1 setting
+  ///
+  /// In en, this message translates to:
+  /// **'Applied 1 setting.'**
+  String get audioProfApplyDoneOne;
+
+  /// Success message after applying multiple settings
+  ///
+  /// In en, this message translates to:
+  /// **'Applied {count} settings.'**
+  String audioProfApplyDoneMany(int count);
+
+  /// Success message when 1 setting was skipped
+  ///
+  /// In en, this message translates to:
+  /// **'{appliedMessage} Skipped 1 unsupported setting.'**
+  String audioProfApplyDoneWithSkippedOne(String appliedMessage);
+
+  /// Success message when multiple settings were skipped
+  ///
+  /// In en, this message translates to:
+  /// **'{appliedMessage} Skipped {skipped} unsupported settings.'**
+  String audioProfApplyDoneWithSkippedMany(String appliedMessage, int skipped);
+
+  /// Rollback message when 1 setting failed
+  ///
+  /// In en, this message translates to:
+  /// **'One setting could not be written; your previous settings were restored.'**
+  String get audioProfApplyFailedRolledBackOne;
+
+  /// Rollback message when multiple settings failed
+  ///
+  /// In en, this message translates to:
+  /// **'{failed} settings could not be written; your previous settings were restored.'**
+  String audioProfApplyFailedRolledBackMany(int failed);
+
+  /// Incomplete rollback message when 1 setting failed
+  ///
+  /// In en, this message translates to:
+  /// **'One setting could not be written and the previous settings could not be fully restored.'**
+  String get audioProfApplyFailedRollbackIncompleteOne;
+
+  /// Incomplete rollback message when multiple settings failed
+  ///
+  /// In en, this message translates to:
+  /// **'{failed} settings could not be written and the previous settings could not be fully restored.'**
+  String audioProfApplyFailedRollbackIncompleteMany(int failed);
+
+  /// Import message when 1 setting was skipped
+  ///
+  /// In en, this message translates to:
+  /// **'Profile imported. Skipped 1 unsupported setting.'**
+  String get audioProfImportSavedSkippedOne;
+
+  /// Import message when multiple settings were skipped
+  ///
+  /// In en, this message translates to:
+  /// **'Profile imported. Skipped {skipped} unsupported settings.'**
+  String audioProfImportSavedSkippedMany(int skipped);
+
+  /// Confirmation body for deleting a named profile
+  ///
+  /// In en, this message translates to:
+  /// **'\"{name}\" will be removed from this device. This cannot be undone.'**
+  String audioProfDeleteDialogBody(String name);
+
+  /// Share-sheet text for a profile
+  ///
+  /// In en, this message translates to:
+  /// **'Pulsr audio profile: {name}'**
+  String audioProfShareText(String name);
+
+  /// Profile summary subtitle for 1 setting
+  ///
+  /// In en, this message translates to:
+  /// **'1 setting'**
+  String get audioProfSummaryOne;
+
+  /// Profile summary subtitle for multiple settings
+  ///
+  /// In en, this message translates to:
+  /// **'{settings} settings'**
+  String audioProfSummaryMany(int settings);
+
+  /// Name of automatic pre-apply backup profile
+  ///
+  /// In en, this message translates to:
+  /// **'Before {name}'**
+  String audioProfBackupOf(String name);
+
+  /// Error for a profile from a newer format version
+  ///
+  /// In en, this message translates to:
+  /// **'This profile uses format {version}, which is newer than this build supports. Update Pulsr to import it.'**
+  String audioProfFormatNewerVersion(int version);
+
+  /// Error for an unsupported numeric profile version
+  ///
+  /// In en, this message translates to:
+  /// **'Format {version} is not a supported profile version.'**
+  String audioProfFormatInvalidVersionNumber(int version);
+
+  /// Error for a setting with an unsupported value type
+  ///
+  /// In en, this message translates to:
+  /// **'The setting \"{key}\" has a value this build cannot read.'**
+  String audioProfFormatInvalidValue(String key);
+
+  /// USB ergonomics screen title
+  ///
+  /// In en, this message translates to:
+  /// **'USB ergonomics'**
+  String get usbErgoScreenTitle;
+
+  /// Attached DAC section header
+  ///
+  /// In en, this message translates to:
+  /// **'Attached DAC'**
+  String get usbErgoSectionDevice;
+
+  /// Device quirks section header
+  ///
+  /// In en, this message translates to:
+  /// **'Device quirks'**
+  String get usbErgoSectionQuirks;
+
+  /// USB ergonomics diagnostics section header
+  ///
+  /// In en, this message translates to:
+  /// **'Diagnostics'**
+  String get usbErgoSectionDiagnostics;
+
+  /// Profile JSON preview section header
+  ///
+  /// In en, this message translates to:
+  /// **'Profile JSON'**
+  String get usbErgoSectionJson;
+
+  /// Subtitle under the profile JSON preview
+  ///
+  /// In en, this message translates to:
+  /// **'Copy or share this to reproduce the setup on another device.'**
+  String get usbErgoJsonHint;
+
+  /// Empty state title when no USB DAC is attached
+  ///
+  /// In en, this message translates to:
+  /// **'No USB DAC attached'**
+  String get usbErgoNoDeviceTitle;
+
+  /// Empty state subtitle when no USB DAC is attached
+  ///
+  /// In en, this message translates to:
+  /// **'Connect a USB audio device to edit its quirks.'**
+  String get usbErgoNoDeviceSubtitle;
+
+  /// Retry checking for attached USB DAC
+  ///
+  /// In en, this message translates to:
+  /// **'Check again'**
+  String get usbErgoRefreshAction;
+
+  /// Fallback label when DAC reports no name
+  ///
+  /// In en, this message translates to:
+  /// **'USB DAC'**
+  String get usbErgoUnknownDevice;
+
+  /// HID media keys switch title
+  ///
+  /// In en, this message translates to:
+  /// **'HID media keys'**
+  String get usbErgoHidTitle;
+
+  /// HID media keys switch hint
+  ///
+  /// In en, this message translates to:
+  /// **'Reads play/pause, skip and volume from the DAC buttons.'**
+  String get usbErgoHidHint;
+
+  /// Audio transport quirks section header
+  ///
+  /// In en, this message translates to:
+  /// **'Audio transport quirks'**
+  String get usbErgoAudioSectionTitle;
+
+  /// Audio transport quirks section hint
+  ///
+  /// In en, this message translates to:
+  /// **'Applied only to the direct USB path. Values that change bit-perfect semantics are reported in the stream status.'**
+  String get usbErgoAudioSectionHint;
+
+  /// Force 16-bit output switch title
+  ///
+  /// In en, this message translates to:
+  /// **'Force 16-bit output'**
+  String get usbErgoForce16Title;
+
+  /// Force 16-bit output switch hint
+  ///
+  /// In en, this message translates to:
+  /// **'Truncates wider sources; the stream can no longer claim bit-perfect.'**
+  String get usbErgoForce16Hint;
+
+  /// Reset alt setting on stop switch title
+  ///
+  /// In en, this message translates to:
+  /// **'Reset alt setting on stop'**
+  String get usbErgoAltResetTitle;
+
+  /// Reset alt setting on stop switch hint
+  ///
+  /// In en, this message translates to:
+  /// **'Returns the DAC to alt 0 before releasing the interface.'**
+  String get usbErgoAltResetHint;
+
+  /// Ignore feedback endpoint switch title
+  ///
+  /// In en, this message translates to:
+  /// **'Ignore feedback endpoint'**
+  String get usbErgoDisableFeedbackTitle;
+
+  /// Ignore feedback endpoint switch hint
+  ///
+  /// In en, this message translates to:
+  /// **'For DACs whose feedback stream is broken; drift is then steered.'**
+  String get usbErgoDisableFeedbackHint;
+
+  /// Re-assert UAC1 rate switch title
+  ///
+  /// In en, this message translates to:
+  /// **'Re-assert UAC1 rate'**
+  String get usbErgoUac1ReassertTitle;
+
+  /// Re-assert UAC1 rate switch hint
+  ///
+  /// In en, this message translates to:
+  /// **'Writes the sample rate again after selecting the alt setting.'**
+  String get usbErgoUac1ReassertHint;
+
+  /// Do not program UAC2 clock switch title
+  ///
+  /// In en, this message translates to:
+  /// **'Do not program UAC2 clock'**
+  String get usbErgoDisableClockSwitchTitle;
+
+  /// Do not program UAC2 clock switch hint
+  ///
+  /// In en, this message translates to:
+  /// **'The DAC keeps its own clock; bit-perfect cannot be verified.'**
+  String get usbErgoDisableClockSwitchHint;
+
+  /// Pre-open silence field label
+  ///
+  /// In en, this message translates to:
+  /// **'Silence before start (ms)'**
+  String get usbErgoSilenceLabel;
+
+  /// Transfer size field label
+  ///
+  /// In en, this message translates to:
+  /// **'Transfer size (bytes, 0 = auto)'**
+  String get usbErgoTransferSizeLabel;
+
+  /// Buffer target field label
+  ///
+  /// In en, this message translates to:
+  /// **'Buffer target (ms, 0 = auto)'**
+  String get usbErgoBufferLabel;
+
+  /// Clock selector pin field label
+  ///
+  /// In en, this message translates to:
+  /// **'Clock selector pin (blank = auto)'**
+  String get usbErgoSelectorPinLabel;
+
+  /// Volume calibration field label
+  ///
+  /// In en, this message translates to:
+  /// **'Volume calibration (dB, -24.0 to +24.0)'**
+  String get usbErgoVolumeCalibrationLabel;
+
+  /// Validation error for numeric USB quirk field
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a number in the allowed range.'**
+  String get usbErgoNumberInvalid;
+
+  /// Probe USB bus speed action
+  ///
+  /// In en, this message translates to:
+  /// **'Probe bus speed'**
+  String get usbErgoProbeAction;
+
+  /// Probe USB bus speed tooltip
+  ///
+  /// In en, this message translates to:
+  /// **'Measure USB bus speed'**
+  String get usbErgoProbeTooltip;
+
+  /// Bus speed before measurement
+  ///
+  /// In en, this message translates to:
+  /// **'Not measured'**
+  String get usbErgoBusSpeedUnknown;
+
+  /// HID status row label
+  ///
+  /// In en, this message translates to:
+  /// **'HID status'**
+  String get usbErgoHidStatusLabel;
+
+  /// HID status when not claimed
+  ///
+  /// In en, this message translates to:
+  /// **'Not claimed'**
+  String get usbErgoHidNotClaimed;
+
+  /// HID status when claimed with consumer controls
+  ///
+  /// In en, this message translates to:
+  /// **'Claimed, consumer controls ready'**
+  String get usbErgoHidClaimed;
+
+  /// HID status when claimed without consumer report
+  ///
+  /// In en, this message translates to:
+  /// **'Claimed, no consumer report'**
+  String get usbErgoHidClaimedNoConsumer;
+
+  /// Reset alt setting action label
+  ///
+  /// In en, this message translates to:
+  /// **'Reset alt setting'**
+  String get usbErgoResetAltAction;
+
+  /// Reset alt setting tooltip
+  ///
+  /// In en, this message translates to:
+  /// **'Return the DAC to alt setting 0'**
+  String get usbErgoResetAltTooltip;
+
+  /// Save USB ergonomics profile action
+  ///
+  /// In en, this message translates to:
+  /// **'Save profile'**
+  String get usbErgoSaveAction;
+
+  /// Save USB ergonomics profile tooltip
+  ///
+  /// In en, this message translates to:
+  /// **'Save this device profile'**
+  String get usbErgoSaveTooltip;
+
+  /// Delete USB ergonomics profile action
+  ///
+  /// In en, this message translates to:
+  /// **'Delete profile'**
+  String get usbErgoDeleteAction;
+
+  /// Delete USB ergonomics profile tooltip
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this device profile'**
+  String get usbErgoDeleteTooltip;
+
+  /// Export profile JSON tooltip
+  ///
+  /// In en, this message translates to:
+  /// **'Export JSON'**
+  String get usbErgoExportTooltip;
+
+  /// Copy profile JSON tooltip
+  ///
+  /// In en, this message translates to:
+  /// **'Copy JSON'**
+  String get usbErgoCopyTooltip;
+
+  /// Snackbar after copying profile JSON
+  ///
+  /// In en, this message translates to:
+  /// **'Profile JSON copied'**
+  String get usbErgoCopied;
+
+  /// Snackbar after saving USB profile
+  ///
+  /// In en, this message translates to:
+  /// **'Profile saved and applied'**
+  String get usbErgoSaved;
+
+  /// Snackbar after deleting USB profile
+  ///
+  /// In en, this message translates to:
+  /// **'Profile deleted, using defaults'**
+  String get usbErgoDeleted;
+
+  /// Active USB profile diagnostics row label
+  ///
+  /// In en, this message translates to:
+  /// **'Active profile'**
+  String get usbErgoActiveProfileLabel;
+
+  /// Shown when no custom USB profile is stored
+  ///
+  /// In en, this message translates to:
+  /// **'Defaults (nothing stored)'**
+  String get usbErgoNoProfileStored;
+
+  /// Error when saving USB profile fails
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save the profile.'**
+  String get usbErgoSaveFailed;
+
+  /// Error when deleting USB profile fails
+  ///
+  /// In en, this message translates to:
+  /// **'Could not delete the profile.'**
+  String get usbErgoDeleteFailed;
+
+  /// Error when DAC has no USB VID/PID
+  ///
+  /// In en, this message translates to:
+  /// **'The DAC reports no USB ids, so no profile can be stored.'**
+  String get usbErgoNoDeviceId;
+
+  /// Error when native USB ergonomics apply fails
+  ///
+  /// In en, this message translates to:
+  /// **'The native USB ergonomics call failed.'**
+  String get usbErgoApplyFailed;
+
+  /// Error when bus speed is unavailable
+  ///
+  /// In en, this message translates to:
+  /// **'Bus speed is not reported by this device.'**
+  String get usbErgoBusSpeedUnavailable;
+
+  /// Error when resetting alt setting fails
+  ///
+  /// In en, this message translates to:
+  /// **'Resetting the alternate setting failed.'**
+  String get usbErgoResetAltFailed;
+
+  /// Snackbar when export callback is unavailable
+  ///
+  /// In en, this message translates to:
+  /// **'Export is not available on this screen.'**
+  String get usbErgoExportUnavailable;
+
+  /// Diagnostics screen title
+  ///
+  /// In en, this message translates to:
+  /// **'Diagnostics'**
+  String get diagScreenTitle;
+
+  /// Refresh diagnostics button tooltip
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh diagnostics'**
+  String get diagRefreshTooltip;
+
+  /// Retry button label in diagnostics
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get diagRetry;
+
+  /// Build mode label: debug
+  ///
+  /// In en, this message translates to:
+  /// **'debug'**
+  String get diagBuildModeDebug;
+
+  /// Build mode label: profile
+  ///
+  /// In en, this message translates to:
+  /// **'profile'**
+  String get diagBuildModeProfile;
+
+  /// Build mode label: release
+  ///
+  /// In en, this message translates to:
+  /// **'release'**
+  String get diagBuildModeRelease;
+
+  /// Output device section title
+  ///
+  /// In en, this message translates to:
+  /// **'Output device'**
+  String get diagDeviceTitle;
+
+  /// Fallback when output device is unknown
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown output device'**
+  String get diagDeviceUnknown;
+
+  /// Shown when USB diagnostics are unavailable
+  ///
+  /// In en, this message translates to:
+  /// **'USB diagnostics unavailable'**
+  String get diagUsbUnavailable;
+
+  /// Output paths section title
+  ///
+  /// In en, this message translates to:
+  /// **'Output paths'**
+  String get diagPathsTitle;
+
+  /// Status tag when native engine does not report counters
+  ///
+  /// In en, this message translates to:
+  /// **'native-not-reported'**
+  String get diagPathsNativeNotReported;
+
+  /// Explanation when native engine does not report xrun counters
+  ///
+  /// In en, this message translates to:
+  /// **'The native engine on this build does not report xrun counters. Zeros below mean \"not measured\", not \"no glitches\".'**
+  String get diagPathsUnavailable;
+
+  /// DSP stages section title
+  ///
+  /// In en, this message translates to:
+  /// **'DSP stages'**
+  String get diagDspTitle;
+
+  /// Shown when no DSP stages are enabled
+  ///
+  /// In en, this message translates to:
+  /// **'No DSP stages are enabled'**
+  String get diagDspNone;
+
+  /// Safe mode section title
+  ///
+  /// In en, this message translates to:
+  /// **'Safe mode'**
+  String get diagSafeModeTitle;
+
+  /// Safe mode active status
+  ///
+  /// In en, this message translates to:
+  /// **'Safe mode is active'**
+  String get diagSafeModeOn;
+
+  /// Safe mode inactive status
+  ///
+  /// In en, this message translates to:
+  /// **'Safe mode is off'**
+  String get diagSafeModeOff;
+
+  /// Reset safe mode button label
+  ///
+  /// In en, this message translates to:
+  /// **'Reset safe mode'**
+  String get diagSafeModeReset;
+
+  /// Enter safe mode button label
+  ///
+  /// In en, this message translates to:
+  /// **'Enter safe mode'**
+  String get diagSafeModeEnter;
+
+  /// Exit safe mode button label
+  ///
+  /// In en, this message translates to:
+  /// **'Exit safe mode'**
+  String get diagSafeModeExit;
+
+  /// Snackbar after entering safe mode
+  ///
+  /// In en, this message translates to:
+  /// **'Safe mode is on. AAudio, USB volume and strict bit-perfect are off.'**
+  String get diagSafeModeEntered;
+
+  /// Snackbar after exiting safe mode
+  ///
+  /// In en, this message translates to:
+  /// **'Safe mode is off. Your previous output settings were restored.'**
+  String get diagSafeModeExited;
+
+  /// Snackbar after resetting safe mode
+  ///
+  /// In en, this message translates to:
+  /// **'Safe mode was reset.'**
+  String get diagSafeModeResetDone;
+
+  /// Error when resetting safe mode fails
+  ///
+  /// In en, this message translates to:
+  /// **'Resetting safe mode failed.'**
+  String get diagSafeModeResetFailed;
+
+  /// Error when persisting safe-mode state fails
+  ///
+  /// In en, this message translates to:
+  /// **'The safe-mode state could not be saved.'**
+  String get diagSafeModePersistFailed;
+
+  /// Recent log section title
+  ///
+  /// In en, this message translates to:
+  /// **'Recent log'**
+  String get diagLogsTitle;
+
+  /// Shown when diagnostic log buffer is empty
+  ///
+  /// In en, this message translates to:
+  /// **'No log entries are buffered yet.'**
+  String get diagLogsEmpty;
+
+  /// Export diagnostics bundle button label
+  ///
+  /// In en, this message translates to:
+  /// **'Export bundle'**
+  String get diagExportAction;
+
+  /// Error when exporting diagnostics bundle fails
+  ///
+  /// In en, this message translates to:
+  /// **'Exporting the diagnostics bundle failed.'**
+  String get diagExportFailed;
+
+  /// Share-sheet text for diagnostics bundle
+  ///
+  /// In en, this message translates to:
+  /// **'Pulsr diagnostics bundle'**
+  String get diagShareText;
+
+  /// Re-run diagnostics self-test action
+  ///
+  /// In en, this message translates to:
+  /// **'Re-run self test'**
+  String get diagSelfTestAction;
+
+  /// Status while self-test is running
+  ///
+  /// In en, this message translates to:
+  /// **'Running the self test...'**
+  String get diagSelfTestRunning;
+
+  /// Error title when diagnostics bundle fails to build
+  ///
+  /// In en, this message translates to:
+  /// **'Diagnostics unavailable'**
+  String get diagErrorTitle;
+
+  /// Error subtitle when diagnostics bundle fails to build
+  ///
+  /// In en, this message translates to:
+  /// **'The bundle could not be built. Retry in a moment.'**
+  String get diagErrorSubtitle;
+
+  /// App/version summary shown at the top of diagnostics
+  ///
+  /// In en, this message translates to:
+  /// **'Pulsr {version} - {platform} - {mode} build'**
+  String diagAppSummary(String version, String platform, String mode);
+
+  /// Output path counter summary
+  ///
+  /// In en, this message translates to:
+  /// **'xruns {xruns} - underruns {underruns}'**
+  String diagCounterSummary(int xruns, int underruns);
+
+  /// Shown when xrun counters are reported by native engine
+  ///
+  /// In en, this message translates to:
+  /// **'Reported by the native engine'**
+  String get diagCountersReported;
+
+  /// Shown when xrun counters are not reported by native engine
+  ///
+  /// In en, this message translates to:
+  /// **'Not reported by the native engine'**
+  String get diagCountersNotReported;
+
+  /// Summary of enabled DSP stages
+  ///
+  /// In en, this message translates to:
+  /// **'{enabled} of {total} stages enabled'**
+  String diagDspSummary(int enabled, int total);
+
+  /// Single consecutive output failure count
+  ///
+  /// In en, this message translates to:
+  /// **'1 consecutive output failure'**
+  String get diagSafeModeFailuresOne;
+
+  /// Multiple consecutive output failures count
+  ///
+  /// In en, this message translates to:
+  /// **'{count} consecutive output failures'**
+  String diagSafeModeFailuresMany(int count);
+
+  /// Safe-mode fallback threshold explanation
+  ///
+  /// In en, this message translates to:
+  /// **'Falls back after {threshold} consecutive failures.'**
+  String diagSafeModeThreshold(int threshold);
+
+  /// Human description returned by safe-mode fallback
+  ///
+  /// In en, this message translates to:
+  /// **'Turned off AAudio direct output, USB hardware volume and strict bit-perfect, and switched DSD to PCM for {device} after {failures} consecutive output failures.'**
+  String diagSafeModeFallbackDescription(String device, int failures);
+
+  /// Self-test success line
+  ///
+  /// In en, this message translates to:
+  /// **'Self test passed: {sections} sections collected in {elapsedMs} ms.'**
+  String diagSelfTestPassed(int sections, int elapsedMs);
+
+  /// Self-test failure line
+  ///
+  /// In en, this message translates to:
+  /// **'Self test failed: {message}'**
+  String diagSelfTestFailed(String message);
+
+  /// Primary CTA button on the final onboarding step
+  ///
+  /// In en, this message translates to:
+  /// **'Start Listening'**
+  String get onboardingStartListening;
+
+  /// Surah ayah count shown in the surah picker list
+  ///
+  /// In en, this message translates to:
+  /// **'{count} Ayahs'**
+  String quranAyahsCount(int count);
+
+  /// Active ayah progress badge in Quran Mushaf view
+  ///
+  /// In en, this message translates to:
+  /// **'Ayah {current} / {total}'**
+  String quranAyahProgress(int current, int total);
+
+  /// Total verses label in Quran Mushaf header
+  ///
+  /// In en, this message translates to:
+  /// **'{count} Verses'**
+  String quranVersesCount(int count);
+
+  /// Chip label to open DSP tools in the parametric EQ tab
+  ///
+  /// In en, this message translates to:
+  /// **'DSP Tools'**
+  String get dspTools;
+
+  /// DSP pipeline latency detail in sync diagnostics sheet
+  ///
+  /// In en, this message translates to:
+  /// **'{frames} frames @ {khz} kHz'**
+  String syncPipelineFramesDetail(int frames, String khz);
+
+  /// USB buffer underrun/overrun counters in sync diagnostics sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Underruns: {underruns} | Overruns: {overruns}'**
+  String syncUsbUnderrunsOverrunsDetail(int underruns, int overruns);
+
+  /// Error when selected ViPER-DDC file cannot be accessed
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid or inaccessible file'**
+  String get vdcInvalidFile;
+
+  /// Error when selected ViPER-DDC file size is out of range
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid file size (must be > 0 and < 2MB)'**
+  String get vdcInvalidFileSize;
+
+  /// Badge label for external LRC lyrics file source
+  ///
+  /// In en, this message translates to:
+  /// **'LRC File'**
+  String get lyricsSourceExternalLrc;
 }
 
 class _AppLocalizationsDelegate

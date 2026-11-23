@@ -299,30 +299,30 @@ class SacdDsfExtractor {
     }
     final trackEndBytes = track.startOffsetBytes + track.lengthBytes;
     final reader = await Iso9660Reader.open(iso);
-    if (trackEndBytes > reader.fileLength) {
-      await reader.close();
-      throw SacdDsfException(
-        'Track ${track.index} ends at byte $trackEndBytes, past the '
-        '${reader.fileLength}-byte image',
-      );
-    }
-    final directory = outDir ?? await cache.directory();
-    if (outDir == null) {
-      // Fail before writing when the shared cache has no room for this track.
-      await cache.ensureRoom(totalBytes, keepSourcePath: iso.path);
-    }
-    final output = await cache.trackFile(
-      iso,
-      track,
-      sectorHeaderBytes: sectorHeaderBytes,
-      blockSizePerChannel: blockSizePerChannel,
-      reverseBits: reverseBits,
-      directory: directory,
-    );
     RandomAccessFile? handle;
+    File? output;
     var completed = false;
     var written = 0;
     try {
+      if (trackEndBytes > reader.fileLength) {
+        throw SacdDsfException(
+          'Track ${track.index} ends at byte $trackEndBytes, past the '
+          '${reader.fileLength}-byte image',
+        );
+      }
+      final directory = outDir ?? await cache.directory();
+      if (outDir == null) {
+        // Fail before writing when the shared cache has no room for this track.
+        await cache.ensureRoom(totalBytes, keepSourcePath: iso.path);
+      }
+      output = await cache.trackFile(
+        iso,
+        track,
+        sectorHeaderBytes: sectorHeaderBytes,
+        blockSizePerChannel: blockSizePerChannel,
+        reverseBits: reverseBits,
+        directory: directory,
+      );
       await directory.create(recursive: true);
       handle = await output.open(mode: FileMode.write);
       final header = DsfHeaderWriter(
@@ -394,7 +394,7 @@ class SacdDsfExtractor {
         category: 'SacdExtract',
       );
       throw SacdDsfException(
-        'Could not write track ${track.index} to ${output.path}: '
+        'Could not write track ${track.index} to ${output?.path ?? iso.path}: '
         '${error.osError?.message ?? error.message}',
       );
     } finally {
@@ -422,13 +422,18 @@ class SacdDsfExtractor {
           category: 'SacdExtract',
         );
       }
-      if (!completed) {
+      if (!completed && output != null) {
         await _discardPartial(output);
       }
     }
   }
 
   void _validateTrack(SacdTrack track) {
+    if (track.isDstCompressed) {
+      throw SacdDstUnsupportedException(
+        'Track ${track.index} is DST-compressed (frame_format == 0), which is not supported',
+      );
+    }
     if (track.lengthSectors <= 0) {
       throw SacdDsfException('Track ${track.index} has no sectors to extract');
     }

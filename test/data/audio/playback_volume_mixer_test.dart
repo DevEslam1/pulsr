@@ -95,5 +95,17 @@ void main() {
       // In DVC, effective user volume is 1.0, duck is 0.5 -> 0.5
       expect(playerA.volume, closeTo(0.5, 0.001));
     });
+
+    test('6. BUG-P3-1: non-finite values are ignored by volume mixer setters',
+        () async {
+      mixer.setUserVolume(0.7);
+      mixer.setUserVolume(double.nan);
+      mixer.setUserVolume(double.infinity);
+      mixer.setActiveTargetFactor(double.nan);
+      mixer.setDuckFactor(double.negativeInfinity);
+      mixer.setSleepFadeFactor(double.nan);
+      expect(mixer.userVolume, closeTo(0.7, 0.001));
+      expect(mixer.calculatedActiveVolume, closeTo(0.7, 0.001));
+    });
   });
 }

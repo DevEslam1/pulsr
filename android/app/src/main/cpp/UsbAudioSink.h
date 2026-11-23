@@ -397,6 +397,33 @@ private:
     std::atomic<bool> running_{false};
     std::atomic<bool> paused_{false};
     std::atomic<bool> prefillResetRequested_{false};
+    // Lock-free reader/reconfigure quiescence barrier for reconfiguring
+    // pullRenderer_ on a live BitPerfectPull stream (StartPcmFile) without
+    // UAF or data races on any non-controlMutex_ caller (workerLoop,
+    // FlushStream, SetPaused, GetBufferedMsFast, NeedsPrefillCushion).
+    std::atomic<bool> pullReconfiguring_{false};
+    mutable std::atomic<int> pullReaders_{0};
+    struct PullReaderLease {
+        std::atomic<int>* readers = nullptr;
+        bool active = false;
+        PullReaderLease(const std::atomic<bool>& reconfiguring,
+                        std::atomic<int>& readerCount) noexcept {
+            readerCount.fetch_add(1, std::memory_order_seq_cst);
+            if (reconfiguring.load(std::memory_order_seq_cst)) {
+                readerCount.fetch_sub(1, std::memory_order_release);
+            } else {
+                readers = &readerCount;
+                active = true;
+            }
+        }
+        ~PullReaderLease() {
+            if (active && readers) {
+                readers->fetch_sub(1, std::memory_order_release);
+            }
+        }
+        PullReaderLease(const PullReaderLease&) = delete;
+        PullReaderLease& operator=(const PullReaderLease&) = delete;
+    };
     std::atomic<int> lastError_{0};
     std::atomic<int64_t> lastFaultLogNs_{0};
     std::atomic<int64_t> lastRejectLogNs_{0};

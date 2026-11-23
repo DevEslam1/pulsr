@@ -52,7 +52,6 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
   // on every rebuild and reset the StreamBuilder's snapshot.
   late Stream<Result<List<AlbumsTableData>>> _albumsStream;
   late Stream<Result<List<SongsTableData>>> _songsStream;
-  List<SongsTableData> _latestSongs = const [];
 
   @override
   void initState() {
@@ -75,23 +74,15 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
   }
 
   void _updateSongsStream() {
-    _songsStream =
-        _useCase.watchArtistSongs(widget.artist.id).distinct().map((res) {
-      res.fold(
-        (_) => _latestSongs = const [],
-        (songs) => _latestSongs = songs,
-      );
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) setState(() {});
-      });
-      return res;
-    });
+    _songsStream = _useCase.watchArtistSongs(widget.artist.id).distinct();
   }
 
   @override
   void didUpdateWidget(ArtistDetailScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.artist.id != oldWidget.artist.id) {
+    if (widget.artist.id != oldWidget.artist.id ||
+        widget.getArtistsUseCase != oldWidget.getArtistsUseCase) {
+      _useCase = widget.getArtistsUseCase ?? getIt<GetArtistsUseCase>();
       setState(() {
         _bioFuture = _bioService.getArtistInfo(widget.artist.name);
         _rebuildStreams();
@@ -167,12 +158,21 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
     final isTablet = Adaptive.isTablet(context);
     final artist = widget.artist;
 
-    return DetailScaffold(
-      titleText: artist.name,
-      onRefresh: () async {
-        if (mounted) setState(() {});
-      },
-      hero: Container(
+    return StreamBuilder<Result<List<SongsTableData>>>(
+      stream: _songsStream,
+      builder: (context, songsSnapshot) {
+        final currentSongs = songsSnapshot.data?.fold(
+              (_) => const <SongsTableData>[],
+              (songs) => songs,
+            ) ??
+            const <SongsTableData>[];
+
+        return DetailScaffold(
+          titleText: artist.name,
+          onRefresh: () async {
+            if (mounted) setState(() {});
+          },
+          hero: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [
@@ -244,7 +244,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
                 horizontal: AppSpacing.s20,
                 vertical: AppSpacing.xs,
               ),
-              child: _actionButtons(context, _latestSongs),
+              child: _actionButtons(context, currentSongs),
             ),
             const SizedBox(height: AppSpacing.xs),
 
@@ -486,9 +486,8 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
           ),
 
           // Top Tracks
-          StreamBuilder<Result<List<SongsTableData>>>(
-            stream: _songsStream,
-            builder: (context, snapshot) {
+          Builder(
+            builder: (context) {
               Widget buildErrorSection() => _ErrorSection(
                     title: context.l10n.browseTopTracks,
                     message: context.l10n.browseCouldNotLoadTopTracks,
@@ -496,7 +495,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
                   );
 
               return AsyncStateBuilder<Result<List<SongsTableData>>>(
-                snapshot: snapshot,
+                snapshot: songsSnapshot,
                 loadingWidget: Semantics(
                   liveRegion: true,
                   child: Padding(
@@ -543,6 +542,8 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
           ),
         ],
       ),
+        );
+      },
     );
   }
 }

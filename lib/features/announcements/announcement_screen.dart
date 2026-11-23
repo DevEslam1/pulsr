@@ -109,7 +109,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
         backgroundColor: palette.bg,
         foregroundColor: palette.textPrimary,
         elevation: 0,
-        title: const Text(
+        title: Text(
           AnnouncementStrings.screenTitle,
           style: TextStyle(fontWeight: FontWeight.w800),
         ),
@@ -276,8 +276,8 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
               return ListTile(
                 contentPadding: _rowPadding,
                 leading: const SettingsIconBox(Icons.record_voice_over_rounded),
-                title: const Text(AnnouncementStrings.voiceLabel),
-                subtitle: const Text(
+                title: Text(AnnouncementStrings.voiceLabel),
+                subtitle: Text(
                   AnnouncementStrings.unavailableTitle,
                 ),
                 trailing: _refreshVoicesButton(),
@@ -287,8 +287,8 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
               return ListTile(
                 contentPadding: _rowPadding,
                 leading: const SettingsIconBox(Icons.record_voice_over_rounded),
-                title: const Text(AnnouncementStrings.voiceLabel),
-                subtitle: const Text(AnnouncementStrings.voiceLoading),
+                title: Text(AnnouncementStrings.voiceLabel),
+                subtitle: Text(AnnouncementStrings.voiceLoading),
               );
             }
             return _voicePicker(
@@ -302,11 +302,11 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
         ListTile(
           contentPadding: _rowPadding,
           leading: const SettingsIconBox(Icons.play_circle_outline_rounded),
-          title: const Text(AnnouncementStrings.testTitle),
-          subtitle: const Text(AnnouncementStrings.testSubtitle),
+          title: Text(AnnouncementStrings.testTitle),
+          subtitle: Text(AnnouncementStrings.testSubtitle),
           trailing: FilledButton(
             onPressed: widget.engine.isAvailable ? _speakPreview : null,
-            child: const Text(AnnouncementStrings.testButton),
+            child: Text(AnnouncementStrings.testButton),
           ),
         ),
       ],
@@ -323,8 +323,8 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
       return ListTile(
         contentPadding: _rowPadding,
         leading: const SettingsIconBox(Icons.record_voice_over_rounded),
-        title: const Text(AnnouncementStrings.voiceLabel),
-        subtitle: const Text(AnnouncementStrings.voiceNoneInstalled),
+        title: Text(AnnouncementStrings.voiceLabel),
+        subtitle: Text(AnnouncementStrings.voiceNoneInstalled),
         trailing: _refreshVoicesButton(),
       );
     }
@@ -335,7 +335,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
     return ListTile(
       contentPadding: _rowPadding,
       leading: const SettingsIconBox(Icons.record_voice_over_rounded),
-      title: const Text(AnnouncementStrings.voiceLabel),
+      title: Text(AnnouncementStrings.voiceLabel),
       trailing: _refreshVoicesButton(),
       subtitle: Padding(
         padding: const EdgeInsetsDirectional.only(top: AppSpacing.xs),
@@ -352,7 +352,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
               fontWeight: FontWeight.w600,
             ),
             items: [
-              const DropdownMenuItem<String>(
+              DropdownMenuItem<String>(
                 value: '',
                 child: Text(AnnouncementStrings.voiceSystemDefault),
               ),
@@ -409,7 +409,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
     final settings = widget.settings;
     final messenger = ScaffoldMessenger.maybeOf(context);
     final track = widget.previewTrack ??
-        const AnnouncementTrack(
+        AnnouncementTrack(
           title: AnnouncementStrings.previewTrackTitle,
           artist: AnnouncementStrings.previewTrackArtist,
         );
@@ -419,7 +419,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
       maxLength: settings.maxLength,
     );
     if (text.isEmpty) {
-      messenger?.showSnackBar(const SnackBar(
+      messenger?.showSnackBar(SnackBar(
         content: Text(AnnouncementStrings.emptySelection),
       ));
       return;
@@ -437,7 +437,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
         stackTrace: stackTrace,
         category: 'Announcements',
       );
-      messenger?.showSnackBar(const SnackBar(
+      messenger?.showSnackBar(SnackBar(
         content: Text(AnnouncementStrings.unavailableTitle),
       ));
     }

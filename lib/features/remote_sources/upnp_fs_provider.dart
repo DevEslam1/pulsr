@@ -205,7 +205,7 @@ class UpnpFsProvider implements RemoteFsProvider {
 
     final uri = await _resourceUri(target.objectId);
     final fullRead = start == 0 && end == null;
-    final request = http.Request('GET', uri);
+    final request = http.Request('GET', uri)..followRedirects = false;
     if (!fullRead) {
       request.headers[HttpHeaders.rangeHeader] = rangeHeader(start, end);
     }

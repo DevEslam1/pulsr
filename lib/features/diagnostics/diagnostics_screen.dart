@@ -196,7 +196,7 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
       );
       messenger?.showSnackBar(
         SnackBar(
-          content: const Text(DiagnosticsStrings.exportFailed),
+          content: Text(DiagnosticsStrings.exportFailed),
           backgroundColor: errorColor,
         ),
       );
@@ -217,7 +217,7 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
       if (!mounted) return;
       setState(_syncSafeMode);
       messenger?.showSnackBar(
-        const SnackBar(content: Text(DiagnosticsStrings.safeModeEntered)),
+        SnackBar(content: Text(DiagnosticsStrings.safeModeEntered)),
       );
     } catch (e, st) {
       ErrorLogger.log(
@@ -228,7 +228,7 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
       );
       messenger?.showSnackBar(
         SnackBar(
-          content: const Text(DiagnosticsStrings.safeModeResetFailed),
+          content: Text(DiagnosticsStrings.safeModeResetFailed),
           backgroundColor: errorColor,
         ),
       );
@@ -246,7 +246,7 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
       if (!mounted) return;
       setState(_syncSafeMode);
       messenger?.showSnackBar(
-        const SnackBar(content: Text(DiagnosticsStrings.safeModeExited)),
+        SnackBar(content: Text(DiagnosticsStrings.safeModeExited)),
       );
     } catch (e, st) {
       ErrorLogger.log(
@@ -257,7 +257,7 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
       );
       messenger?.showSnackBar(
         SnackBar(
-          content: const Text(DiagnosticsStrings.safeModeResetFailed),
+          content: Text(DiagnosticsStrings.safeModeResetFailed),
           backgroundColor: errorColor,
         ),
       );
@@ -315,7 +315,7 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(DiagnosticsStrings.screenTitle),
+        title: Text(DiagnosticsStrings.screenTitle),
         actions: <Widget>[
           IconButton(
             tooltip: DiagnosticsStrings.refreshTooltip,
@@ -372,7 +372,7 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
           child: FilledButton.icon(
             onPressed: _busy ? null : _exportBundle,
             icon: const Icon(Icons.ios_share_rounded),
-            label: const Text(DiagnosticsStrings.exportAction),
+            label: Text(DiagnosticsStrings.exportAction),
           ),
         ),
         const SizedBox(height: AppSpacing.xs),
@@ -382,7 +382,7 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
           child: OutlinedButton.icon(
             onPressed: _busy ? null : _runSelfTest,
             icon: const Icon(Icons.check_circle_outline_rounded),
-            label: const Text(DiagnosticsStrings.selfTestAction),
+            label: Text(DiagnosticsStrings.selfTestAction),
           ),
         ),
         if (_selfTestMessage != null) ...<Widget>[
@@ -472,7 +472,7 @@ class _CountersCard extends StatelessWidget {
             ),
           ),
         if (paths.isEmpty)
-          const _Row(
+          _Row(
               label: 'paths', value: DiagnosticsStrings.pathsUnavailable),
         _Row(
           label: 'source',

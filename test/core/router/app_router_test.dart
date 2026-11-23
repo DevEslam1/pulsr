@@ -22,6 +22,7 @@ import 'package:pulsr/features/artist_detail/presentation/artist_detail_screen.d
 import 'package:pulsr/features/folder_detail/presentation/folder_detail_screen.dart';
 import 'package:pulsr/features/genre_detail/presentation/genre_detail_screen.dart';
 import 'package:pulsr/features/onboarding/presentation/onboarding_screen.dart';
+import 'package:pulsr/features/party/presentation/party_screen.dart';
 import 'package:pulsr/features/playlist_detail/presentation/manage_playlist_screen.dart';
 import 'package:pulsr/features/playlist_detail/presentation/online_playlist_detail_screen.dart';
 import 'package:pulsr/features/playlist_detail/presentation/playlist_detail_screen.dart';
@@ -623,6 +624,24 @@ void main() {
       final notFound = builder(context, stateFor('/playlist'))
           as MaterialPage<void>;
       expect(notFound.child, isA<Scaffold>());
+    });
+
+    testWidgets('/party/:code passes code and server query param to PartyScreen',
+        (tester) async {
+      await pumpContext(tester);
+      final route = routeFor('/party/:code');
+      expect(route.parentNavigatorKey, same(rootNavigatorKey));
+      final page = route.pageBuilder!(
+        context,
+        stateFor(
+          '/party/ABC123?server=https%3A%2F%2Fparty.example.com',
+          pathParameters: const {'code': 'ABC123'},
+        ),
+      ) as MaterialPage<void>;
+      expect(page.child, isA<PartyScreen>());
+      final screen = page.child as PartyScreen;
+      expect(screen.initialCode, 'ABC123');
+      expect(screen.initialServerUrl, 'https://party.example.com');
     });
   });
 

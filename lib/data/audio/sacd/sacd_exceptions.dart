@@ -16,3 +16,15 @@ class SacdDsfException implements Exception {
   @override
   String toString() => 'SacdDsfException: $message';
 }
+
+/// Thrown when a SACD TOC or audio frame uses DST lossless compression
+/// (`frame_format == 0`), which cannot be extracted as raw uncompressed DSD.
+class SacdDstUnsupportedException extends SacdDsfException {
+  const SacdDstUnsupportedException([
+    super.message =
+        'DST-compressed SACD frames (frame_format == 0) are not supported',
+  ]);
+
+  @override
+  String toString() => 'SacdDstUnsupportedException: $message';
+}

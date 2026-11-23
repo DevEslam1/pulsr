@@ -343,6 +343,7 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
           safeEmit(state.copyWith(
               results: List<YtmTrack>.unmodifiable([track]),
               isLoading: false,
+              hasSearched: true,
               error: null));
           return;
         } catch (e, st) {

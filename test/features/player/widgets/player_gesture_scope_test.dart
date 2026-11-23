@@ -95,7 +95,8 @@ void main() {
     verifyNever(() => player.toggleFavorite(any()));
   });
 
-  testWidgets('double-tap does nothing when NowPlayingDoubleTapAction.none',
+  testWidgets(
+      'NowPlayingDoubleTapAction.none disables double-tap delay so single tap fires immediately',
       (tester) async {
     await tester.pumpWidget(
       wrapScope(
@@ -105,14 +106,20 @@ void main() {
       ),
     );
 
+    final detector = tester.widget<GestureDetector>(
+      find.descendant(
+        of: find.byType(PlayerGestureScope),
+        matching: find.byType(GestureDetector),
+      ),
+    );
+    expect(detector.onDoubleTap, isNull);
+
     final center = tester.getCenter(find.text('Stage'));
     await tester.tapAt(center);
     await tester.pump(const Duration(milliseconds: 50));
-    await tester.tapAt(center);
-    await tester.pumpAndSettle();
 
     verifyNever(() => player.toggleFavorite(any()));
-    verifyNever(() => player.toggleLyricsVisibility());
+    verify(() => player.toggleLyricsVisibility()).called(1);
   });
 
   testWidgets('horizontal fling left/right calls next/previous when enabled',

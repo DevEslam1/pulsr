@@ -41,9 +41,14 @@ func TestPartyCreationAndJoin(t *testing.T) {
 		t.Errorf("First member should be host")
 	}
 
-	// Re-join with same deviceId should return existing member with fresh token
+	// Re-join with same deviceId without token must be rejected
+	if _, err := p.Join("attacker", "device1", "Hijacker", nil); err == nil {
+		t.Fatalf("Expected unauthenticated deviceId rejoin to be rejected")
+	}
+
+	// Re-join with same deviceId and valid token should return existing member with fresh token
 	oldToken := m1.Token
-	m1Again, err := p.Join("user1", "device1", "Alice New", &avatar)
+	m1Again, err := p.Join("user1", "device1", "Alice New", &avatar, oldToken)
 	if err != nil {
 		t.Fatalf("Re-join failed: %v", err)
 	}
@@ -55,6 +60,60 @@ func TestPartyCreationAndJoin(t *testing.T) {
 	}
 	if m1Again.DisplayName != "Alice New" {
 		t.Errorf("Re-join should update displayName")
+	}
+}
+
+func TestRemovePromotesOldestConnectedMemberDeterministically(t *testing.T) {
+	p := NewParty("HOSTPR")
+	host, _ := p.Join("u1", "d1", "Host", nil)
+	m2, _ := p.Join("u2", "d2", "OfflineOlder", nil)
+	m3, _ := p.Join("u3", "d3", "ConnectedOlder", nil)
+	m4, _ := p.Join("u4", "d4", "ConnectedNewer", nil)
+
+	host.JoinedAtMs = 100
+	m2.JoinedAtMs = 200
+	m2.Connected = false
+	m3.JoinedAtMs = 300
+	m3.Connected = true
+	m4.JoinedAtMs = 400
+	m4.Connected = true
+
+	p.Remove(host.MemberId)
+	if !m3.IsHost {
+		t.Fatalf("Expected oldest connected member m3 to become host, got host=%v", p.Host())
+	}
+}
+
+func TestDuplicateInHistoryRemoveAndMoveUpcoming(t *testing.T) {
+	ps := NewPlaybackState()
+	dup := &Track{VideoId: "dup", Title: "Dup"}
+	curr := &Track{VideoId: "curr", Title: "Current"}
+	dupUpcoming := &Track{VideoId: "dup", Title: "Dup Upcoming"}
+	other := &Track{VideoId: "other", Title: "Other"}
+
+	// Queue: [dup (history, idx 0), curr (playing, idx 1), dup (upcoming, idx 2), other (upcoming, idx 3)]
+	ps.SetTrack(nil, curr, 0, true, nil, nil)
+	ps.SetQueue(nil, []*Track{dup, curr, dupUpcoming, other}, 1)
+
+	memberId := "m1"
+	// MoveUpcoming by videoId "dup" must move index 2 (upcoming) to index 3, not touch history index 0
+	if !ps.MoveUpcoming(&memberId, 0, 3, "dup") {
+		t.Fatalf("Expected MoveUpcoming to find upcoming duplicate at index 2")
+	}
+	if ps.Queue[0].VideoId != "dup" || ps.Queue[1].VideoId != "curr" || ps.Queue[2].VideoId != "other" || ps.Queue[3].VideoId != "dup" {
+		t.Fatalf("Unexpected queue order after MoveUpcoming: %v, %v, %v, %v",
+			ps.Queue[0].VideoId, ps.Queue[1].VideoId, ps.Queue[2].VideoId, ps.Queue[3].VideoId)
+	}
+
+	// RemoveUpcoming for "dup" must remove index 3 (upcoming) and leave history index 0 intact
+	if !ps.RemoveUpcoming(&memberId, "dup") {
+		t.Fatalf("Expected RemoveUpcoming to remove upcoming duplicate")
+	}
+	if len(ps.Queue) != 3 || ps.Queue[0].VideoId != "dup" || ps.Queue[1].VideoId != "curr" || ps.Queue[2].VideoId != "other" {
+		t.Fatalf("Unexpected queue after RemoveUpcoming: len=%d", len(ps.Queue))
+	}
+	if ps.QueueIndex != 1 {
+		t.Fatalf("Expected QueueIndex to remain 1, got %d", ps.QueueIndex)
 	}
 }
 

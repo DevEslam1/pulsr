@@ -340,11 +340,10 @@ extension _AudioQualityRateBitDepth on AudioQualitySheet {
                             size: 16,
                             color: p.textTertiary,
                           ),
-                          visualDensity: VisualDensity.compact,
                           padding: EdgeInsets.zero,
                           constraints: const BoxConstraints(
-                            minWidth: 32,
-                            minHeight: 32,
+                            minWidth: AppSpacing.minTouchTarget,
+                            minHeight: AppSpacing.minTouchTarget,
                           ),
                           tooltip: context.l10n.dspAboutBitPerfect,
                           onPressed: () {

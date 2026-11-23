@@ -12,8 +12,16 @@ extension AudioHandlerSessionWiring on PulsrAudioHandler {
   /// Called once from the audio-session setup; the caller keeps the session
   /// configuration and the error handling around it.
   void wireSessionStreams(AudioSession session) {
+    Future<void> sessionEventQueue = Future<void>.value();
+    Future<void> serializeSessionEvent(Future<void> Function() action) {
+      final next = sessionEventQueue.then((_) => action());
+      sessionEventQueue = next.catchError((Object _) {});
+      return next;
+    }
+
     _subscriptions.add(
-      session.interruptionEventStream.listen((event) async {
+      session.interruptionEventStream.listen((event) {
+        unawaited(serializeSessionEvent(() async {
         try {
           if (event.begin) {
             switch (event.type) {
@@ -278,11 +286,13 @@ extension AudioHandlerSessionWiring on PulsrAudioHandler {
         ErrorLogger.log('Error handling audio interruption event',
             error: e, stackTrace: st, category: 'AudioHandler');
       }
+      }));
       }),
     );
 
     _subscriptions.add(
-      session.becomingNoisyEventStream.listen((_) async {
+      session.becomingNoisyEventStream.listen((_) {
+        unawaited(serializeSessionEvent(() async {
         try {
           // Debounce: wired + BT stacks can emit noisy twice for one unplug.
           final now = DateTime.now();
@@ -310,13 +320,16 @@ extension AudioHandlerSessionWiring on PulsrAudioHandler {
           final bool noisyDelivered =
               noisyHooks != null && await noisyHooks.onHeadsetUnplug();
           if (!noisyDelivered) await pause();
-          _noisyPauseTime = now;
-          _pausedForNoisy = true;
-          await _captureOutputDeviceBaseline();
+          if (!_isEffectivelyPlaying && !_pendingPlaybackStart) {
+            _noisyPauseTime = now;
+            _pausedForNoisy = true;
+            await _captureOutputDeviceBaseline();
+          }
         } catch (e, st) {
           ErrorLogger.log('Error handling becoming noisy event',
               error: e, stackTrace: st, category: 'AudioHandler');
         }
+      }));
       }),
     );
 

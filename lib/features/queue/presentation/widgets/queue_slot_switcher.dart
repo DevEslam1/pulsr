@@ -47,8 +47,10 @@ class QueueSlotSwitcher extends StatelessWidget {
             button: true,
             selected: isSelected,
             label: '$label, $tooltip',
+            excludeSemantics: true,
             child: Tooltip(
               message: tooltip,
+              excludeFromSemantics: true,
               child: ConstrainedBox(
                 constraints: const BoxConstraints(
                   minWidth: AppSpacing.minTouchTarget,

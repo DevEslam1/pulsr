@@ -338,8 +338,9 @@ extension _EqSpatialHrtfTab on _EqualizerSheetState {
               max: 1.0,
               defaultValue: 0.0,
               divisions: 20,
-              enabled:
-                  state.isVirtualizerEnabled && state.isVirtualizerSupported,
+              enabled: dspBlocked == null &&
+                  state.isVirtualizerEnabled &&
+                  state.isVirtualizerSupported,
               onChanged: (val) => cubit.setVirtualizerStrength(val),
             ),
           ),

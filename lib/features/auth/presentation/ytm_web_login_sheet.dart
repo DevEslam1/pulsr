@@ -346,18 +346,20 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
       document.cookie = "PREF=${YtmLocale.prefCookieValue().replaceAll(r'\', r'\\').replaceAll('"', r'\"')}; domain=.youtube.com; path=/";
     } catch(e) {}
 
-    // Hook ytcfg to enforce Egypt region and disable unavailable state
+    // Hook ytcfg to enforce locale region and disable unavailable state
     try {
+      var gl = '${YtmLocale.gl().replaceAll(r'\', r'\\').replaceAll("'", r"\'")}';
+      var hl = '${YtmLocale.hl().replaceAll(r'\', r'\\').replaceAll("'", r"\'")}';
       var patchData = function(data) {
         if (!data || typeof data !== 'object') return data;
-        data.GL = 'EG';
-        data.HL = 'en';
+        data.GL = gl;
+        data.HL = hl;
         data.IS_UNAVAILABLE = false;
         data.IS_UNAVAILABLE_IN_REGION = false;
         data.UNAVAILABLE_IN_REGION = false;
         if (data.INNERTUBE_CONTEXT && data.INNERTUBE_CONTEXT.client) {
-          data.INNERTUBE_CONTEXT.client.gl = 'EG';
-          data.INNERTUBE_CONTEXT.client.hl = 'en';
+          data.INNERTUBE_CONTEXT.client.gl = gl;
+          data.INNERTUBE_CONTEXT.client.hl = hl;
         }
         return data;
       };

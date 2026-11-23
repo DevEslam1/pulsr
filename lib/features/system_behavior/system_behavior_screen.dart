@@ -49,24 +49,24 @@ class _SystemBehaviorScreenState extends State<SystemBehaviorScreen> {
   Widget build(BuildContext context) {
     final bool android = PlatformCapabilities.isAndroid;
     return Scaffold(
-      appBar: AppBar(title: const Text(SystemBehaviorStrings.screenTitle)),
+      appBar: AppBar(title: Text(SystemBehaviorStrings.screenTitle)),
       body: SafeArea(
         child: ListenableBuilder(
           listenable: widget.settings,
           builder: (BuildContext context, Widget? child) => ListView(
             padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
             children: <Widget>[
-              const _SectionHeader(title: SystemBehaviorStrings.sectionFocus),
+              _SectionHeader(title: SystemBehaviorStrings.sectionFocus),
               _NotificationSoundRow(settings: widget.settings),
               _ResumeRow(settings: widget.settings),
               _FadeRow(settings: widget.settings),
-              const _SectionHeader(title: SystemBehaviorStrings.sectionVolume),
+              _SectionHeader(title: SystemBehaviorStrings.sectionVolume),
               _VolumeCurveRow(settings: widget.settings),
               _VolumeStepRow(settings: widget.settings),
-              const _SectionHeader(title: SystemBehaviorStrings.sectionUsb),
+              _SectionHeader(title: SystemBehaviorStrings.sectionUsb),
               _UsbReleaseRow(settings: widget.settings, android: android),
               _CloseUsbRow(settings: widget.settings, android: android),
-              const _SectionHeader(
+              _SectionHeader(
                 title: SystemBehaviorStrings.sectionLifecycle,
               ),
               _TaskRemovedRow(settings: widget.settings, android: android),
@@ -259,7 +259,7 @@ class _VolumeCurveRow extends StatelessWidget {
       title: SystemBehaviorStrings.softwareVolumeCurveTitle,
       subtitle: SystemBehaviorStrings.softwareVolumeCurveSubtitle,
       value: settings.softwareVolumeCurve,
-      segments: const <ButtonSegment<SoftwareVolumeCurve>>[
+      segments: <ButtonSegment<SoftwareVolumeCurve>>[
         ButtonSegment<SoftwareVolumeCurve>(
           value: SoftwareVolumeCurve.linear,
           label: Text(SystemBehaviorStrings.curveLinear),
@@ -317,7 +317,7 @@ class _UsbReleaseRow extends StatelessWidget {
       subtitle: SystemBehaviorStrings.usbReleaseOnFocusLossSubtitle,
       value: settings.usbReleaseOnFocusLoss,
       disabledReason: android ? null : SystemBehaviorStrings.usbOnlyLimit,
-      segments: const <ButtonSegment<UsbReleaseOnFocusLoss>>[
+      segments: <ButtonSegment<UsbReleaseOnFocusLoss>>[
         ButtonSegment<UsbReleaseOnFocusLoss>(
           value: UsbReleaseOnFocusLoss.never,
           label: Text(SystemBehaviorStrings.usbReleaseNever),

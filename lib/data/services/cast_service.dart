@@ -639,6 +639,9 @@ class CastService {
   void dispose() {
     if (_disposed) return;
     _disposed = true;
+    if (identical(_instance, this)) {
+      _instance = null;
+    }
     _subscription?.cancel();
     _subscription = null;
     _sessionSubscription?.cancel();

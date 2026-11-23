@@ -23,9 +23,6 @@ import '../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../core/widgets/pulsr_pressable.dart';
 import '../../../core/widgets/pulsr_search_field.dart';
 import '../../../domain/models/genre_item.dart';
-import '../../audio_profiles/audio_profiles_screen.dart';
-import '../../diagnostics/diagnostics_screen.dart';
-import '../../dlna/dlna_screen.dart';
 import '../../player/cubit/player_cubit.dart';
 import '../../player/presentation/widgets/audio_quality_sheet.dart';
 import '../../player/presentation/widgets/equalizer_sheet.dart';
@@ -346,9 +343,7 @@ class _CommandPaletteSheetState extends State<CommandPaletteSheet> {
           'report',
           'troubleshoot',
         ],
-        onSelect: (ctx) => Navigator.of(ctx).push(
-          MaterialPageRoute<void>(builder: (_) => const DiagnosticsScreen()),
-        ),
+        onSelect: (ctx) => ctx.push('/diagnostics'),
       ),
       CommandPaletteItem(
         id: 'nav_audio_profiles',
@@ -364,9 +359,7 @@ class _CommandPaletteSheetState extends State<CommandPaletteSheet> {
           'dsp',
           'dac',
         ],
-        onSelect: (ctx) => Navigator.of(ctx).push(
-          MaterialPageRoute<void>(builder: (_) => const AudioProfilesScreen()),
-        ),
+        onSelect: (ctx) => ctx.push('/audio-profiles'),
       ),
       CommandPaletteItem(
         id: 'nav_dlna',
@@ -383,9 +376,7 @@ class _CommandPaletteSheetState extends State<CommandPaletteSheet> {
           'network audio',
           'wifi speaker',
         ],
-        onSelect: (ctx) => Navigator.of(ctx).push(
-          MaterialPageRoute<void>(builder: (_) => const DlnaScreen()),
-        ),
+        onSelect: (ctx) => ctx.push('/dlna'),
       ),
       CommandPaletteItem(
         id: 'nav_podcasts_audiobooks',
@@ -700,6 +691,11 @@ class _CommandPaletteSheetState extends State<CommandPaletteSheet> {
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
 
+    if (event.logicalKey == LogicalKeyboardKey.escape) {
+      Navigator.of(context).pop();
+      return KeyEventResult.handled;
+    }
+
     final allItems = _cachedAllItems ?? _buildAllItems(context);
     final entries = _buildVisibleEntries(allItems);
 
@@ -724,9 +720,6 @@ class _CommandPaletteSheetState extends State<CommandPaletteSheet> {
         _handleSelect(entries[_selectedIndex].item);
         return KeyEventResult.handled;
       }
-    } else if (event.logicalKey == LogicalKeyboardKey.escape) {
-      Navigator.of(context).pop();
-      return KeyEventResult.handled;
     }
 
     return KeyEventResult.ignored;
@@ -1006,7 +999,10 @@ class _CommandPaletteSheetState extends State<CommandPaletteSheet> {
                                               width: AppSpacing.xxs,
                                             ),
                                             Icon(
-                                              Icons.chevron_right_rounded,
+                                              Directionality.of(context) ==
+                                                      TextDirection.rtl
+                                                  ? Icons.chevron_left_rounded
+                                                  : Icons.chevron_right_rounded,
                                               size: 16,
                                               color: isHighlighted
                                                   ? p.accent

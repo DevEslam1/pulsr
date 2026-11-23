@@ -1,96 +1,122 @@
 // lib/features/diagnostics/diagnostics_strings.dart
 //
-// Single translation point for the diagnostics module: screen copy, bundle
-// labels and the safe-mode description all live here.
+// Localized copy for the diagnostics module, backed by ARB (`AppLocalizations`)
+// with automatic English fallback in headless tests.
 
-/// English copy for the diagnostics and safe-mode features.
+import 'dart:ui' show Locale;
+
+import '../../core/utils/l10n_holder.dart';
+import '../../l10n/generated/app_localizations.dart';
+
+/// User-facing copy for the diagnostics and safe-mode features.
 abstract final class DiagnosticsStrings {
-  static const String screenTitle = 'Diagnostics';
-  static const String refreshTooltip = 'Refresh diagnostics';
-  static const String retry = 'Retry';
+  static final AppLocalizations _fallback =
+      lookupAppLocalizations(const Locale('en'));
 
-  static const String buildModeDebug = 'debug';
-  static const String buildModeProfile = 'profile';
-  static const String buildModeRelease = 'release';
+  static AppLocalizations _l10n([AppLocalizations? l10n]) =>
+      l10n ?? L10nHolder.current ?? _fallback;
 
-  static const String deviceTitle = 'Output device';
-  static const String deviceUnknown = 'Unknown output device';
-  static const String usbUnavailable = 'USB diagnostics unavailable';
+  static String get screenTitle => _l10n().diagScreenTitle;
+  static String get refreshTooltip => _l10n().diagRefreshTooltip;
+  static String get retry => _l10n().diagRetry;
 
-  static const String pathsTitle = 'Output paths';
-  static const String pathsNativeNotReported = 'native-not-reported';
-  static const String pathsUnavailable =
-      'The native engine on this build does not report xrun counters. Zeros '
-      'below mean "not measured", not "no glitches".';
+  static String get buildModeDebug => _l10n().diagBuildModeDebug;
+  static String get buildModeProfile => _l10n().diagBuildModeProfile;
+  static String get buildModeRelease => _l10n().diagBuildModeRelease;
 
-  static const String dspTitle = 'DSP stages';
-  static const String dspNone = 'No DSP stages are enabled';
+  static String get deviceTitle => _l10n().diagDeviceTitle;
+  static String get deviceUnknown => _l10n().diagDeviceUnknown;
+  static String get usbUnavailable => _l10n().diagUsbUnavailable;
 
-  static const String safeModeTitle = 'Safe mode';
-  static const String safeModeOn = 'Safe mode is active';
-  static const String safeModeOff = 'Safe mode is off';
-  static const String safeModeReset = 'Reset safe mode';
-  static const String safeModeEnter = 'Enter safe mode';
-  static const String safeModeExit = 'Exit safe mode';
-  static const String safeModeEntered =
-      'Safe mode is on. AAudio, USB volume and strict bit-perfect are off.';
-  static const String safeModeExited =
-      'Safe mode is off. Your previous output settings were restored.';
-  static const String safeModeResetDone = 'Safe mode was reset.';
-  static const String safeModeResetFailed = 'Resetting safe mode failed.';
-  static const String safeModePersistFailed =
-      'The safe-mode state could not be saved.';
+  static String get pathsTitle => _l10n().diagPathsTitle;
+  static String get pathsNativeNotReported =>
+      _l10n().diagPathsNativeNotReported;
+  static String get pathsUnavailable => _l10n().diagPathsUnavailable;
 
-  static const String logsTitle = 'Recent log';
-  static const String logsEmpty = 'No log entries are buffered yet.';
+  static String get dspTitle => _l10n().diagDspTitle;
+  static String get dspNone => _l10n().diagDspNone;
 
-  static const String exportAction = 'Export bundle';
-  static const String exportFailed = 'Exporting the diagnostics bundle failed.';
-  static const String shareText = 'Pulsr diagnostics bundle';
+  static String get safeModeTitle => _l10n().diagSafeModeTitle;
+  static String get safeModeOn => _l10n().diagSafeModeOn;
+  static String get safeModeOff => _l10n().diagSafeModeOff;
+  static String get safeModeReset => _l10n().diagSafeModeReset;
+  static String get safeModeEnter => _l10n().diagSafeModeEnter;
+  static String get safeModeExit => _l10n().diagSafeModeExit;
+  static String get safeModeEntered => _l10n().diagSafeModeEntered;
+  static String get safeModeExited => _l10n().diagSafeModeExited;
+  static String get safeModeResetDone => _l10n().diagSafeModeResetDone;
+  static String get safeModeResetFailed => _l10n().diagSafeModeResetFailed;
+  static String get safeModePersistFailed => _l10n().diagSafeModePersistFailed;
 
-  static const String selfTestAction = 'Re-run self test';
-  static const String selfTestRunning = 'Running the self test...';
+  static String get logsTitle => _l10n().diagLogsTitle;
+  static String get logsEmpty => _l10n().diagLogsEmpty;
 
-  static const String errorTitle = 'Diagnostics unavailable';
-  static const String errorSubtitle =
-      'The bundle could not be built. Retry in a moment.';
+  static String get exportAction => _l10n().diagExportAction;
+  static String get exportFailed => _l10n().diagExportFailed;
+  static String get shareText => _l10n().diagShareText;
+
+  static String get selfTestAction => _l10n().diagSelfTestAction;
+  static String get selfTestRunning => _l10n().diagSelfTestRunning;
+
+  static String get errorTitle => _l10n().diagErrorTitle;
+  static String get errorSubtitle => _l10n().diagErrorSubtitle;
 
   /// App/version summary shown at the top of the screen.
-  static String appSummary(String version, String platform, String mode) =>
-      'Pulsr $version - $platform - $mode build';
+  static String appSummary(
+    String version,
+    String platform,
+    String mode, [
+    AppLocalizations? l10n,
+  ]) =>
+      _l10n(l10n).diagAppSummary(version, platform, mode);
 
   /// One output path's counters.
-  static String counterSummary(int xruns, int underruns) =>
-      'xruns $xruns - underruns $underruns';
+  static String counterSummary(
+    int xruns,
+    int underruns, [
+    AppLocalizations? l10n,
+  ]) =>
+      _l10n(l10n).diagCounterSummary(xruns, underruns);
 
   /// Whether the counters came from the native engine.
-  static String countersReported(bool reported) => reported
-      ? 'Reported by the native engine'
-      : 'Not reported by the native engine';
+  static String countersReported(bool reported, [AppLocalizations? l10n]) {
+    final l = _l10n(l10n);
+    return reported ? l.diagCountersReported : l.diagCountersNotReported;
+  }
 
   /// How many DSP stages are on.
-  static String dspSummary(int enabled, int total) =>
-      '$enabled of $total stages enabled';
+  static String dspSummary(int enabled, int total, [AppLocalizations? l10n]) =>
+      _l10n(l10n).diagDspSummary(enabled, total);
 
   /// Consecutive failure count for the current device.
-  static String safeModeFailures(int count) => count == 1
-      ? '1 consecutive output failure'
-      : '$count consecutive output failures';
+  static String safeModeFailures(int count, [AppLocalizations? l10n]) {
+    final l = _l10n(l10n);
+    return count == 1
+        ? l.diagSafeModeFailuresOne
+        : l.diagSafeModeFailuresMany(count);
+  }
 
   /// Failure threshold the controller falls back at.
-  static String safeModeThreshold(int threshold) =>
-      'Falls back after $threshold consecutive failures.';
+  static String safeModeThreshold(int threshold, [AppLocalizations? l10n]) =>
+      _l10n(l10n).diagSafeModeThreshold(threshold);
 
   /// Human description returned by the fallback.
-  static String safeModeFallbackDescription(String device, int failures) =>
-      'Turned off AAudio direct output, USB hardware volume and strict '
-      'bit-perfect, and switched DSD to PCM for $device after $failures '
-      'consecutive output failures.';
+  static String safeModeFallbackDescription(
+    String device,
+    int failures, [
+    AppLocalizations? l10n,
+  ]) =>
+      _l10n(l10n).diagSafeModeFallbackDescription(device, failures);
 
   /// Self-test success line.
-  static String selfTestPassed(int sections, int elapsedMs) =>
-      'Self test passed: $sections sections collected in $elapsedMs ms.';
+  static String selfTestPassed(
+    int sections,
+    int elapsedMs, [
+    AppLocalizations? l10n,
+  ]) =>
+      _l10n(l10n).diagSelfTestPassed(sections, elapsedMs);
 
   /// Self-test failure line.
-  static String selfTestFailed(String message) => 'Self test failed: $message';
+  static String selfTestFailed(String message, [AppLocalizations? l10n]) =>
+      _l10n(l10n).diagSelfTestFailed(message);
 }

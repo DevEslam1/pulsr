@@ -242,4 +242,24 @@ void main() {
     expect(await provider.testConnection(), isTrue);
     expect(calls.single.method, 'probe');
   });
+
+  test('rejects .., %2e%2e and null-byte path traversal before calling native',
+      () async {
+    install((call) async => <Map<String, Object?>>[]);
+    final provider = SmbFsProvider(_smbSource());
+
+    await expectLater(
+      provider.list('../Secrets'),
+      throwsA(isA<RemoteProtocolError>()),
+    );
+    await expectLater(
+      provider.list('Albums/%2e%2e/Secrets'),
+      throwsA(isA<RemoteProtocolError>()),
+    );
+    await expectLater(
+      provider.stat('Albums/track\u0000.mp3'),
+      throwsA(isA<RemoteProtocolError>()),
+    );
+    expect(calls, isEmpty);
+  });
 }

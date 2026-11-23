@@ -101,4 +101,18 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('SIM'), findsNothing);
   });
+
+  testWidgets(
+      'BUG-P1-10 handles out-of-range activeLineIndex without RangeError',
+      (tester) async {
+    await tester.pumpWidget(
+      buildHighway(
+        isPlaying: true,
+        activeLineIndex: 99,
+      ),
+    );
+    await tester.pump();
+    expect(tester.takeException(), isNull);
+    expect(find.byType(KaraokePitchHighway), findsOneWidget);
+  });
 }

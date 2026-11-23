@@ -109,6 +109,12 @@ class _PlayerVolumeBarState extends State<PlayerVolumeBar> {
                   });
                   widget.cubit.setVolume(v);
                 },
+                onChangeCancel: () {
+                  setState(() {
+                    _isDragging = false;
+                    _dragVolume = null;
+                  });
+                },
               ),
             ),
           ),

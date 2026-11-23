@@ -95,4 +95,123 @@ void main() {
 
     verify(() => partyService.setCustomServerUrl('https://my-party.pulsr.app')).called(1);
   });
+
+  testWidgets(
+      'in-party host view wires host-only lock toggle, kick member, and shared queue remove',
+      (tester) async {
+    const host = PartyMember(
+      memberId: 'm_host',
+      displayName: 'Host User',
+      isHost: true,
+      connected: true,
+    );
+    const guest = PartyMember(
+      memberId: 'm_guest',
+      displayName: 'Guest User',
+      isHost: false,
+      connected: true,
+    );
+    const currentTrack = PartyTrack(
+      videoId: 'vid_now',
+      title: 'Now Playing Track',
+      artist: 'Artist A',
+    );
+    const nextTrack = PartyTrack(
+      videoId: 'vid_next',
+      title: 'Upcoming Track',
+      artist: 'Artist B',
+    );
+    const snap = PartySnapshot(
+      code: 'ABC123',
+      maxMembers: 5,
+      hostOnlyControl: false,
+      members: [host, guest],
+      playback: PartyPlayback(track: currentTrack, isPlaying: true),
+      queue: PartyQueue(index: 0, items: [currentTrack, nextTrack]),
+    );
+
+    when(() => partyService.inParty).thenReturn(true);
+    when(() => partyService.isHost).thenReturn(true);
+    when(() => partyService.partySnapshot)
+        .thenReturn(ValueNotifier<PartySnapshot?>(snap));
+    when(() => partyService.currentMember)
+        .thenReturn(ValueNotifier<PartyMember?>(host));
+    when(() => partyService.connectionState)
+        .thenReturn(ValueNotifier<PartyConnectionState>(PartyConnectionState.live));
+    when(() => partyService.clockSynced).thenReturn(ValueNotifier<bool>(true));
+    when(() => partyService.roundTripMs).thenReturn(ValueNotifier<int>(24));
+    when(() => partyService.sendKick(any())).thenReturn(null);
+    when(() => partyService.sendSetHostOnlyControl(any())).thenReturn(null);
+    when(() => partyService.sendQueueRemove(any())).thenReturn(null);
+
+    await tester.pumpWidget(buildHost());
+    await tester.pumpAndSettle();
+
+    // 1. Kick button appears for guest, not for host
+    expect(find.byKey(const ValueKey<String>('party_kick_m_guest')), findsOneWidget);
+    expect(find.byKey(const ValueKey<String>('party_kick_m_host')), findsNothing);
+    await tester.tap(find.byKey(const ValueKey<String>('party_kick_m_guest')));
+    await tester.pump();
+    verify(() => partyService.sendKick('m_guest')).called(1);
+
+    // 2. Host-only control lock toggle wires to sendSetHostOnlyControl
+    final lockSwitch = find.byKey(const ValueKey<String>('party_host_only_switch'));
+    expect(lockSwitch, findsOneWidget);
+    await tester.tap(lockSwitch);
+    await tester.pump();
+    verify(() => partyService.sendSetHostOnlyControl(true)).called(1);
+
+    // 3. Shared queue shows upcoming track and remove button wires to sendQueueRemove
+    expect(find.text('Upcoming Track'), findsOneWidget);
+    final removeBtn = find.byKey(const ValueKey<String>('party_queue_remove_vid_next'));
+    expect(removeBtn, findsOneWidget);
+    await tester.tap(removeBtn);
+    await tester.pump();
+    verify(() => partyService.sendQueueRemove('vid_next')).called(1);
+  });
+
+  testWidgets('in-party guest view hides queue remove when hostOnlyControl is true',
+      (tester) async {
+    const host = PartyMember(
+      memberId: 'm_host',
+      displayName: 'Host User',
+      isHost: true,
+      connected: true,
+    );
+    const guest = PartyMember(
+      memberId: 'm_guest',
+      displayName: 'Guest User',
+      isHost: false,
+      connected: true,
+    );
+    const nextTrack = PartyTrack(
+      videoId: 'vid_next',
+      title: 'Locked Upcoming Track',
+      artist: 'Artist B',
+    );
+    const snap = PartySnapshot(
+      code: 'ABC123',
+      maxMembers: 5,
+      hostOnlyControl: true,
+      members: [host, guest],
+      queue: PartyQueue(index: -1, items: [nextTrack]),
+    );
+
+    when(() => partyService.inParty).thenReturn(true);
+    when(() => partyService.isHost).thenReturn(false);
+    when(() => partyService.partySnapshot)
+        .thenReturn(ValueNotifier<PartySnapshot?>(snap));
+    when(() => partyService.currentMember)
+        .thenReturn(ValueNotifier<PartyMember?>(guest));
+    when(() => partyService.connectionState)
+        .thenReturn(ValueNotifier<PartyConnectionState>(PartyConnectionState.live));
+
+    await tester.pumpWidget(buildHost());
+    await tester.pumpAndSettle();
+
+    expect(find.text('Locked Upcoming Track'), findsOneWidget);
+    expect(find.byKey(const ValueKey<String>('party_host_only_switch')), findsNothing);
+    expect(find.byKey(const ValueKey<String>('party_kick_m_host')), findsNothing);
+    expect(find.byKey(const ValueKey<String>('party_queue_remove_vid_next')), findsNothing);
+  });
 }

@@ -299,12 +299,14 @@ class AbxCubit extends Cubit<AbxState> {
   }
 
   Future<void> _restore() async {
-    try {
-      await _switchCondition(false);
-    } catch (_) {
-      // The bridge logs its own failures; a failed restore must not keep the
-      // route from closing.
-    }
+    await _playConditionMutex.protect(() async {
+      try {
+        await _switchCondition(false);
+      } catch (_) {
+        // The bridge logs its own failures; a failed restore must not keep the
+        // route from closing.
+      }
+    });
   }
 
   void _publish() {

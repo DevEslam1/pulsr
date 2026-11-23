@@ -829,17 +829,11 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
         child: Row(
           children: [
             AnimatedSize(
-              duration: PulsrMotion.shouldAnimate(context)
-                  ? context.motion(PulsrMotion.state)
-                  : Duration.zero,
+              duration: context.motion(PulsrMotion.state),
               curve: context.motionCurve(PulsrMotion.enter),
               child: AnimatedSwitcher(
-                duration: PulsrMotion.shouldAnimate(context)
-                    ? context.motion(PulsrMotion.state)
-                    : Duration.zero,
-                reverseDuration: PulsrMotion.shouldAnimate(context)
-                    ? context.motion(PulsrMotion.state)
-                    : Duration.zero,
+                duration: context.motion(PulsrMotion.state),
+                reverseDuration: context.motion(PulsrMotion.state),
                 switchInCurve: context.motionCurve(PulsrMotion.enter),
                 switchOutCurve: context.motionCurve(PulsrMotion.exit),
                 transitionBuilder: (child, animation) => FadeTransition(

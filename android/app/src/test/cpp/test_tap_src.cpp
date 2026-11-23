@@ -558,6 +558,36 @@ int main() {
             input.data(), frames, dsdOut.data(), static_cast<int>(dsdOut.size()), 4, nativeConsumed);
         check(nativeBytes > 0 && nativeConsumed > 0 && (nativeBytes % 8) == 0,
               "convertPcmToDsdNative(bps=4) produces complete 8-byte stereo DSD_U32 frames");
+
+        // BUG-P2-1: setTapSrcQuality() on the singleton control engine must
+        // propagate to registered render engines and rebuild the tap resampler
+        // on the render thread without a control/render data race.
+        {
+            auto& registry = DspEngineRegistry::instance();
+            auto renderEngine = std::make_unique<AudioDspEngine>();
+            const int64_t handle =
+                static_cast<int64_t>(reinterpret_cast<intptr_t>(renderEngine.get()));
+            AudioDspEngine::instance().setTapSrcQuality(0);
+            check(registry.registerEngine(renderEngine.get()),
+                  "register render engine for tap SRC quality broadcast test");
+            check(renderEngine->tapSrcQuality() == 0,
+                  "registered engine inherits initial tapSrcQuality from singleton");
+            renderEngine->prepareTapResampler(44100.0, 48000.0, 2);
+
+            AudioDspEngine::instance().setTapSrcQuality(2);
+            check(renderEngine->tapSrcQuality() == 2,
+                  "setTapSrcQuality on singleton broadcasts immediately to registered engine");
+            const int maxOut = maxOutBound(1024, 44100.0, 48000.0);
+            std::vector<float> tapOut(static_cast<size_t>(maxOut) * 2);
+            const int got = renderEngine->resampleForTap(
+                input.data(), 1024, tapOut.data(), maxOut, 2, 44100.0, 48000.0);
+            check(got > 0, "render engine reconfigures tap resampler to new quality on render thread");
+
+            const int slot = registry.beginTeardown(handle);
+            registry.waitForRenderers(slot);
+            registry.unregisterEngine(renderEngine.get());
+            registry.finishTeardown(slot);
+        }
     }
 
     if (gFailures != 0) {

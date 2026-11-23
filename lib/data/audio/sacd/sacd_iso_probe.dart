@@ -26,6 +26,13 @@ Future<bool> isSacdIso(String path) async {
   try {
     if (!await file.exists()) return false;
     reader = await Iso9660Reader.open(file);
+    const masterOffset = SacdLayout.masterTocLba * SacdLayout.sectorSize;
+    if (reader.fileLength >= masterOffset + 8) {
+      final magic = await reader.readAt(masterOffset, 8);
+      if (magic.length == 8 && String.fromCharCodes(magic) == 'SACDMTOC') {
+        return true;
+      }
+    }
     final area = await reader.lookupPath(SacdLayout.directoryName);
     if (area == null || !area.isDirectory) return false;
     final children = await reader.list(area);

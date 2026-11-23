@@ -314,6 +314,7 @@ void main() {
       if (call.method == 'writeTags') {
         writeTagsCalls++;
         lastWriteTagsArgs = (call.arguments as Map).cast<Object?, Object?>();
+        return true;
       }
       return null;
     });
@@ -1350,6 +1351,7 @@ void main() {
           if (writeTagsCalls == 1) {
             service.cancel(videoId);
           }
+          return true;
         }
         return null;
       });

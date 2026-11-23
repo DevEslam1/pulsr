@@ -342,6 +342,12 @@ class SmbFsProvider implements RemoteFsProvider {
   /// The result is *share-relative*: `basePath` is sent separately and the
   /// native `joinPath` prepends it exactly once. Never prepend base here.
   String _shareRelativePath(String path) {
+    if (path.contains('\u0000')) {
+      throw const RemoteProtocolError(
+        code: 'SMB_PATH_TRAVERSAL',
+        userMessage: 'That path is not allowed.',
+      );
+    }
     var value = path.trim().replaceAll('\\', '/');
     while (value.startsWith('/')) {
       value = value.substring(1);
@@ -349,7 +355,31 @@ class SmbFsProvider implements RemoteFsProvider {
     while (value.endsWith('/')) {
       value = value.substring(0, value.length - 1);
     }
+    for (final segment in value.split('/')) {
+      if (_isTraversalSegment(segment)) {
+        throw const RemoteProtocolError(
+          code: 'SMB_PATH_TRAVERSAL',
+          userMessage: 'That path is not allowed.',
+        );
+      }
+    }
     return value;
+  }
+
+  static bool _isTraversalSegment(String segment) {
+    if (segment.isEmpty) return false;
+    if (segment == '..' || segment.contains('\u0000')) return true;
+    try {
+      final decoded = Uri.decodeComponent(segment);
+      return decoded == '..' ||
+          decoded.contains('\u0000') ||
+          decoded.contains('/') ||
+          decoded.contains('\\');
+    } on ArgumentError {
+      return true;
+    } on FormatException {
+      return true;
+    }
   }
 
   String _relativeFromNative(String nativePath) {

@@ -17,6 +17,7 @@ import '../../core/utils/error_logger.dart';
 import '../../domain/repositories/music_repository_interface.dart';
 import '../audio/mp4_box_parser.dart';
 import '../db/app_database.dart';
+import '../repositories/music_repository.dart';
 
 class ScanError {
   final String path;
@@ -391,16 +392,6 @@ class MediaScannerService {
               : (s.dateAdded ?? 0);
           return modSec >= lastEpoch;
         }).toList();
-
-        if (songsToProcess.isEmpty) {
-          _emitProgress(1.0,
-              currentFile: 'No modified or new tracks found',
-              scannedCount: 0,
-              totalCount: songs.length,
-              isIncremental: true);
-          await markScanComplete(epochSec: scanStartEpochSec);
-          return 0;
-        }
       }
 
       _emitProgress(0.2,
@@ -526,6 +517,7 @@ class MediaScannerService {
                   '_data': raw['_data'] ?? raw['data'],
                   'album_id': raw['album_id'] ?? raw['albumId'],
                   'artist_id': raw['artist_id'] ?? raw['artistId'],
+                  'year': raw['year'],
                 };
               }).toList()
             : null,
@@ -540,15 +532,17 @@ class MediaScannerService {
           totalCount: songsToProcess.length,
           isIncremental: incremental);
 
-      final syncResult = await _repository.syncScannedMusic(
-        songs: parseResult.songs,
-        albums: parseResult.albums,
-        artists: parseResult.artists,
-      );
-      syncResult.fold(
-        (failure) => throw StateError('Library sync failed: $failure'),
-        (_) {},
-      );
+      if (parseResult.songs.isNotEmpty || !incremental) {
+        final syncResult = await _repository.syncScannedMusic(
+          songs: parseResult.songs,
+          albums: parseResult.albums,
+          artists: parseResult.artists,
+        );
+        syncResult.fold(
+          (failure) => throw StateError('Library sync failed: $failure'),
+          (_) {},
+        );
+      }
 
       _emitProgress(0.9,
           currentFile: 'Pruning orphaned catalog entries...',
@@ -557,8 +551,8 @@ class MediaScannerService {
       // A truncated pass has not seen the whole library, so pruning against
       // its partial valid-id set would mark/delete valid tracks. Skip both
       // destructive post-passes and leave the next scan to complete them.
-      bool shouldPruneOrphans = !incremental;
-      if (incremental) {
+      bool shouldPruneOrphans = !incremental || songsToProcess.isEmpty;
+      if (incremental && !shouldPruneOrphans) {
         final lastPrune = _lastOrphanPruneAt;
         if (lastPrune == null ||
             DateTime.now().difference(lastPrune) >= orphanPruningInterval) {
@@ -567,9 +561,7 @@ class MediaScannerService {
       }
 
       if (!truncated && shouldPruneOrphans) {
-        final validIdsForCleanup = incremental
-            ? songs.map((s) => s.id).toSet()
-            : parseResult.validSongIds;
+        final validIdsForCleanup = parseResult.validSongIds;
         final cleanupResult = await _repository.cleanupOrphanedSongs(
           validIdsForCleanup,
           excludedFolderPrefixes: excludedFolders,
@@ -647,20 +639,48 @@ class MediaScannerService {
         final genre = (tags['genre'] as String?)?.trim();
         final yearStr = (tags['year'] as String?)?.trim();
         final trackStr = (tags['trackNumber'] as String?)?.trim();
+        final discStr =
+            ((tags['discNumber'] ?? tags['disc']) as String?)?.trim();
 
-        final year = yearStr != null ? int.tryParse(yearStr) : null;
-        final trackNumber = trackStr != null ? int.tryParse(trackStr) : null;
+        final year = _parseTagYear(yearStr);
+        int? trackNumber = _parseTagTrackOrDisc(trackStr);
+        int? discNumber = _parseTagTrackOrDisc(discStr);
+        if (trackNumber != null && trackNumber >= 1000 && discNumber == null) {
+          discNumber = trackNumber ~/ 1000;
+          trackNumber = trackNumber % 1000;
+        }
 
-        await _repository.updateSongTags(
-          path: path,
-          title: (title != null && title.isNotEmpty) ? title : 'Unknown Song',
-          artist:
-              (artist != null && artist.isNotEmpty) ? artist : 'Unknown Artist',
-          album: (album != null && album.isNotEmpty) ? album : 'Unknown Album',
-          genre: genre,
-          year: year,
-          trackNumber: trackNumber,
-        );
+        final repo = _repository;
+        if (repo is MusicRepository) {
+          await repo.updateSongTags(
+            path: path,
+            title:
+                (title != null && title.isNotEmpty) ? title : 'Unknown Song',
+            artist: (artist != null && artist.isNotEmpty)
+                ? artist
+                : 'Unknown Artist',
+            album:
+                (album != null && album.isNotEmpty) ? album : 'Unknown Album',
+            genre: genre,
+            year: year,
+            trackNumber: trackNumber,
+            discNumber: discNumber,
+          );
+        } else {
+          await repo.updateSongTags(
+            path: path,
+            title:
+                (title != null && title.isNotEmpty) ? title : 'Unknown Song',
+            artist: (artist != null && artist.isNotEmpty)
+                ? artist
+                : 'Unknown Artist',
+            album:
+                (album != null && album.isNotEmpty) ? album : 'Unknown Album',
+            genre: genre,
+            year: year,
+            trackNumber: trackNumber,
+          );
+        }
       }
     } catch (e, stack) {
       if (!_errorController.isClosed) {
@@ -768,7 +788,7 @@ class MediaScannerService {
             bitrateKbps != null && bitrateKbps > 0 ? bitrateKbps : null,
         codec: (codec != null && codec.isNotEmpty)
             ? codec
-            : 'UNKNOWN',
+            : 'UNPROBED_FAILED',
         loudnessRange: lraVal,
       );
     } catch (e, stack) {
@@ -807,6 +827,7 @@ class MediaScannerService {
             return false;
           }
           final c = song.codec?.toUpperCase();
+          if (c == 'UNPROBED_FAILED') return false;
           final isExtensionGuessed = c == null ||
               c.isEmpty ||
               c == 'M4A' ||
@@ -903,12 +924,41 @@ class MediaScannerService {
                       bitrateKbps != null && bitrateKbps > 0 ? bitrateKbps : null,
                   codec: (codec != null && codec.isNotEmpty)
                       ? codec
-                      : 'UNKNOWN',
+                      : 'UNPROBED_FAILED',
                   loudnessRange: lraVal,
                 ));
+              } else {
+                updates.add((
+                  songId: song.id,
+                  path: song.path,
+                  sampleRate: song.sampleRate,
+                  bitDepth: song.bitDepth,
+                  bitrateKbps: song.bitrateKbps,
+                  codec: 'UNPROBED_FAILED',
+                  loudnessRange: song.loudnessRange,
+                ));
               }
+            } else {
+              updates.add((
+                songId: song.id,
+                path: song.path,
+                sampleRate: song.sampleRate,
+                bitDepth: song.bitDepth,
+                bitrateKbps: song.bitrateKbps,
+                codec: 'UNPROBED_FAILED',
+                loudnessRange: song.loudnessRange,
+              ));
             }
           } catch (e, st) {
+            updates.add((
+              songId: song.id,
+              path: song.path,
+              sampleRate: song.sampleRate,
+              bitDepth: song.bitDepth,
+              bitrateKbps: song.bitrateKbps,
+              codec: 'UNPROBED_FAILED',
+              loudnessRange: song.loudnessRange,
+            ));
             ErrorLogger.log('Failed to enrich audio quality for ${song.path}',
                 error: e, stackTrace: st, category: 'MediaScanner');
           }
@@ -936,6 +986,23 @@ class MediaScannerService {
     if (value is int) return value;
     if (value is num) return value.toInt();
     return int.tryParse(value?.toString() ?? '');
+  }
+
+  static int? _parseTagTrackOrDisc(String? raw) {
+    if (raw == null) return null;
+    final first = raw.split('/').first.trim();
+    if (first.isEmpty) return null;
+    return int.tryParse(first);
+  }
+
+  static int? _parseTagYear(String? raw) {
+    if (raw == null) return null;
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) return null;
+    final direct = int.tryParse(trimmed);
+    if (direct != null) return direct;
+    final match = RegExp(r'^(\d{4})').firstMatch(trimmed);
+    return match != null ? int.tryParse(match.group(1)!) : null;
   }
 }
 
@@ -982,7 +1049,9 @@ _ScanMediaResult _parseScannedMediaInIsolate(_ScanMediaInput input) {
   final Map<int, AlbumsTableCompanion> albumMap = {};
   final Map<int, ArtistsTableCompanion> artistMap = {};
   final Map<int, int> albumSongCounts = {};
+  final Map<int, int> albumYears = {};
   final Map<int, int> artistSongCounts = {};
+  final Map<int, Set<int>> artistAlbumIds = {};
   final Set<int> validSongIds = {};
   int nativeDecoderRequiredCount = 0;
 
@@ -1075,7 +1144,14 @@ _ScanMediaResult _parseScannedMediaInIsolate(_ScanMediaInput input) {
     final artistId = parseInt(raw['artist_id']) ?? parseInt(raw['artistId']);
     final albumId = parseInt(raw['album_id']) ?? parseInt(raw['albumId']);
     final uri = parseString(raw['_uri']) ?? parseString(raw['uri']);
-    final track = parseInt(raw['track']);
+    final rawTrack = parseInt(raw['track']);
+    int? discNumber =
+        parseInt(raw['disc_number']) ?? parseInt(raw['discNumber']);
+    int? track = rawTrack;
+    if (rawTrack != null && rawTrack >= 1000) {
+      discNumber ??= rawTrack ~/ 1000;
+      track = rawTrack % 1000;
+    }
     final dateAdded = parseInt(raw['date_added']) ?? parseInt(raw['dateAdded']);
     final size = parseInt(raw['_size']) ?? parseInt(raw['size']);
 
@@ -1093,6 +1169,7 @@ _ScanMediaResult _parseScannedMediaInIsolate(_ScanMediaInput input) {
         path: Value(path),
         uri: Value(uri),
         trackNumber: Value(track),
+        discNumber: Value(discNumber),
         dateAdded: Value(dateAdded != null
             ? (dateAdded < 10000000000 ? dateAdded * 1000 : dateAdded)
             : null),
@@ -1106,13 +1183,24 @@ _ScanMediaResult _parseScannedMediaInIsolate(_ScanMediaInput input) {
     // Aggregate Albums
     if (albumId != null) {
       albumSongCounts[albumId] = (albumSongCounts[albumId] ?? 0) + 1;
+      if (year != null && year > 0 && !albumYears.containsKey(albumId)) {
+        albumYears[albumId] = year;
+      }
+      if (artistId != null) {
+        artistAlbumIds.putIfAbsent(artistId, () => <int>{}).add(albumId);
+      }
       if (!albumMap.containsKey(albumId)) {
         albumMap[albumId] = AlbumsTableCompanion(
           id: Value(albumId),
           title: Value(album),
           artist: Value(artist),
           artistId: Value(artistId),
+          year: year != null && year > 0 ? Value(year) : const Value.absent(),
         );
+      } else if (year != null &&
+          year > 0 &&
+          !albumMap[albumId]!.year.present) {
+        albumMap[albumId] = albumMap[albumId]!.copyWith(year: Value(year));
       }
     }
 
@@ -1157,10 +1245,18 @@ _ScanMediaResult _parseScannedMediaInIsolate(_ScanMediaInput input) {
       })) {
         continue;
       }
+      validSongIds.add(id);
       final albumId = parseInt(raw['album_id']) ?? parseInt(raw['albumId']);
       final artistId = parseInt(raw['artist_id']) ?? parseInt(raw['artistId']);
+      final year = parseInt(raw['year']);
       if (albumId != null) {
         albumSongCounts[albumId] = (albumSongCounts[albumId] ?? 0) + 1;
+        if (year != null && year > 0 && !albumYears.containsKey(albumId)) {
+          albumYears[albumId] = year;
+        }
+        if (artistId != null) {
+          artistAlbumIds.putIfAbsent(artistId, () => <int>{}).add(albumId);
+        }
       }
       if (artistId != null) {
         artistSongCounts[artistId] = (artistSongCounts[artistId] ?? 0) + 1;
@@ -1168,11 +1264,18 @@ _ScanMediaResult _parseScannedMediaInIsolate(_ScanMediaInput input) {
     }
   }
   final finalAlbums = albumMap.entries.map((e) {
-    return e.value.copyWith(songCount: Value(albumSongCounts[e.key] ?? 1));
+    final yr = albumYears[e.key];
+    return e.value.copyWith(
+      songCount: Value(albumSongCounts[e.key] ?? 1),
+      year: yr != null ? Value(yr) : e.value.year,
+    );
   }).toList();
 
   final finalArtists = artistMap.entries.map((e) {
-    return e.value.copyWith(songCount: Value(artistSongCounts[e.key] ?? 1));
+    return e.value.copyWith(
+      songCount: Value(artistSongCounts[e.key] ?? 1),
+      albumCount: Value(artistAlbumIds[e.key]?.length ?? 0),
+    );
   }).toList();
 
   return _ScanMediaResult(

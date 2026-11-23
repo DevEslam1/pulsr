@@ -562,121 +562,132 @@ class _FoldableTabletopLayout extends StatelessWidget {
               child: LayoutBuilder(
                 builder: (context, constraints) {
                   final isCompactDeck = constraints.maxHeight < 175;
-                  return Column(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      // Top Deck Header: Track Metadata + Quick Console Actions
-                      Row(
+                  return SingleChildScrollView(
+                    physics: const ClampingScrollPhysics(),
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        minHeight: constraints.maxHeight.isFinite
+                            ? constraints.maxHeight
+                            : 0.0,
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          AnimatedContainer(
-                            duration: context.motionMs(260),
-                            width: 8,
-                            height: 8,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: state.isPlaying
-                                  ? activeColor
-                                  : p.textSecondary.withValues(alpha: 0.4),
-                              boxShadow: state.isPlaying
-                                  ? [
-                                      BoxShadow(
-                                        color:
-                                            activeColor.withValues(alpha: 0.6),
-                                        blurRadius: 8,
-                                      ),
-                                    ]
-                                  : null,
-                            ),
-                          ),
-                          const SizedBox(width: AppSpacing.sm),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  song?.title ?? '',
-                                  style: TextStyle(
-                                    color: p.textPrimary,
-                                    fontSize: AppFontSize.body,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
+                          // Top Deck Header: Track Metadata + Quick Console Actions
+                          Row(
+                            children: [
+                              AnimatedContainer(
+                                duration: context.motionMs(260),
+                                width: 8,
+                                height: 8,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: state.isPlaying
+                                      ? activeColor
+                                      : p.textSecondary.withValues(alpha: 0.4),
+                                  boxShadow: state.isPlaying
+                                      ? [
+                                          BoxShadow(
+                                            color: activeColor.withValues(
+                                                alpha: 0.6),
+                                            blurRadius: 8,
+                                          ),
+                                        ]
+                                      : null,
                                 ),
-                                if (!isCompactDeck &&
-                                    (song?.artist.isNotEmpty ?? false))
-                                  Text(
-                                    song!.artist,
-                                    style: TextStyle(
-                                      color: activeColor,
-                                      fontSize: AppFontSize.bodySmall,
-                                      fontWeight: FontWeight.w600,
+                              ),
+                              const SizedBox(width: AppSpacing.sm),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      song?.title ?? '',
+                                      style: TextStyle(
+                                        color: p.textPrimary,
+                                        fontSize: AppFontSize.body,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                     ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                              ],
-                            ),
+                                    if (!isCompactDeck &&
+                                        (song?.artist.isNotEmpty ?? false))
+                                      Text(
+                                        song!.artist,
+                                        style: TextStyle(
+                                          color: activeColor,
+                                          fontSize: AppFontSize.bodySmall,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: AppSpacing.xs),
+                              _DeckQuickActionButton(
+                                icon: Icons.lyrics_rounded,
+                                label: context.l10n.lyrics,
+                                isActive: state.isLyricsVisible,
+                                activeColor: activeColor,
+                                onTap: () {
+                                  PulsrHaptics.selectionClick();
+                                  cubit.toggleLyricsVisibility();
+                                },
+                              ),
+                              const SizedBox(width: 4),
+                              _DeckQuickActionButton(
+                                icon: Icons.queue_music_rounded,
+                                label: context.l10n.queue,
+                                isActive: state.isQueueVisible,
+                                activeColor: activeColor,
+                                onTap: () {
+                                  PulsrHaptics.selectionClick();
+                                  cubit.toggleQueueVisibility();
+                                },
+                              ),
+                              const SizedBox(width: 4),
+                              _DeckQuickActionButton(
+                                icon: Icons.tune_rounded,
+                                label: context.l10n.equalizer,
+                                isActive: state.isEqEnabled,
+                                activeColor: activeColor,
+                                onTap: () {
+                                  PulsrHaptics.lightImpact();
+                                  EqualizerSheet.show(context);
+                                },
+                              ),
+                            ],
                           ),
-                          const SizedBox(width: AppSpacing.xs),
-                          _DeckQuickActionButton(
-                            icon: Icons.lyrics_rounded,
-                            label: context.l10n.lyrics,
-                            isActive: state.isLyricsVisible,
+
+                          // Center Seek Bar
+                          PlayerSeekBar(
+                            duration: state.duration,
                             activeColor: activeColor,
-                            onTap: () {
-                              PulsrHaptics.selectionClick();
-                              cubit.toggleLyricsVisibility();
-                            },
+                            showUpNext: false,
+                            onSeek: (pos) => cubit.seek(pos),
                           ),
-                          const SizedBox(width: 4),
-                          _DeckQuickActionButton(
-                            icon: Icons.queue_music_rounded,
-                            label: context.l10n.queue,
-                            isActive: state.isQueueVisible,
-                            activeColor: activeColor,
-                            onTap: () {
-                              PulsrHaptics.selectionClick();
-                              cubit.toggleQueueVisibility();
-                            },
-                          ),
-                          const SizedBox(width: 4),
-                          _DeckQuickActionButton(
-                            icon: Icons.tune_rounded,
-                            label: context.l10n.equalizer,
-                            isActive: state.isEqEnabled,
-                            activeColor: activeColor,
-                            onTap: () {
-                              PulsrHaptics.lightImpact();
-                              EqualizerSheet.show(context);
-                            },
+
+                          // Primary Transport Controls
+                          PlayerControls(
+                            isPlaying: state.isPlaying,
+                            isBuffering: state.isBuffering,
+                            isShuffle: state.isShuffle,
+                            repeatMode: state.repeatMode,
+                            primaryColor: activeColor,
+                            onPlayPause: () => cubit.togglePlayPause(),
+                            onNext: () => cubit.next(),
+                            onPrevious: () => cubit.previous(),
+                            onToggleShuffle: () => cubit.toggleShuffle(),
+                            onToggleRepeat: () => cubit.toggleRepeat(),
                           ),
                         ],
                       ),
-
-                      // Center Seek Bar
-                      PlayerSeekBar(
-                        duration: state.duration,
-                        activeColor: activeColor,
-                        showUpNext: false,
-                        onSeek: (pos) => cubit.seek(pos),
-                      ),
-
-                      // Primary Transport Controls
-                      PlayerControls(
-                        isPlaying: state.isPlaying,
-                        isBuffering: state.isBuffering,
-                        isShuffle: state.isShuffle,
-                        repeatMode: state.repeatMode,
-                        primaryColor: activeColor,
-                        onPlayPause: () => cubit.togglePlayPause(),
-                        onNext: () => cubit.next(),
-                        onPrevious: () => cubit.previous(),
-                        onToggleShuffle: () => cubit.toggleShuffle(),
-                        onToggleRepeat: () => cubit.toggleRepeat(),
-                      ),
-                    ],
+                    ),
                   );
                 },
               ),
@@ -711,15 +722,16 @@ class _DeckQuickActionButton extends StatelessWidget {
       toggled: isActive,
       label: label,
       excludeSemantics: true,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(
-          minWidth: AppSpacing.minTouchTarget,
-          minHeight: AppSpacing.minTouchTarget,
-        ),
-        child: Center(
-          child: PulsrPressable(
-            pressedScale: 0.92,
-            onTap: onTap,
+      child: PulsrPressable(
+        pressedScale: 0.92,
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(
+            minWidth: AppSpacing.minTouchTarget,
+            minHeight: AppSpacing.minTouchTarget,
+          ),
+          child: Center(
             child: AnimatedContainer(
               duration: context.motionMs(200),
               width: 38,

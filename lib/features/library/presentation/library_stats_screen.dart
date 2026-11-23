@@ -101,8 +101,16 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
     }
 
     final totalDurationMs = songs.fold<int>(0, (sum, s) => sum + s.durationMs);
-    final totalSizeBytes =
-        songs.fold<int>(0, (sum, s) => sum + (s.fileSize ?? 0));
+    final seenCueContainerPaths = <String>{};
+    var totalSizeBytes = 0;
+    for (final s in songs) {
+      if (s.cueStartMs != null ||
+          (s.cueFile != null && s.cueFile!.isNotEmpty)) {
+        final key = s.path.replaceAll('\\', '/').toLowerCase();
+        if (!seenCueContainerPaths.add(key)) continue;
+      }
+      totalSizeBytes += s.fileSize ?? 0;
+    }
     final totalPlays = songs.fold<int>(0, (sum, s) => sum + s.playCount);
     final losslessCount = songs.where(isLosslessSong).length;
     final lossyCount = songs.length - losslessCount;

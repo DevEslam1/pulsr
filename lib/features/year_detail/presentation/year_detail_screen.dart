@@ -1,9 +1,12 @@
 // lib/features/year_detail/presentation/year_detail_screen.dart
+import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/theme/aura_theme.dart';
+import '../../../core/utils/error_logger.dart';
 import '../../../core/responsive/detail_scaffold.dart';
 import '../../../core/widgets/async_state_builder.dart';
 import '../../../core/widgets/pulsr_empty_state.dart';
@@ -13,6 +16,8 @@ import '../../../core/widgets/shimmer_skeleton.dart';
 import '../../../core/widgets/song_tile.dart';
 import '../../../data/db/app_database.dart';
 import '../../../domain/models/year_item.dart';
+import '../../../domain/repositories/music_repository_interface.dart';
+import '../../../domain/usecases/folder_usecases.dart';
 import '../../../domain/usecases/get_years_usecase.dart';
 import '../../player/cubit/player_cubit.dart';
 import '../../sheets/song_options_sheet.dart';
@@ -23,11 +28,13 @@ import 'package:pulsr/core/constants/app_typography.dart';
 class YearDetailScreen extends StatefulWidget {
   final YearItem yearItem;
   final GetYearsUseCase? getYearsUseCase;
+  final List<String> excludedFolders;
 
   const YearDetailScreen({
     super.key,
     required this.yearItem,
     this.getYearsUseCase,
+    this.excludedFolders = const [],
   });
 
   @override
@@ -36,19 +43,90 @@ class YearDetailScreen extends StatefulWidget {
 
 class _YearDetailScreenState extends State<YearDetailScreen> {
   late GetYearsUseCase _useCase;
+  late List<String> _excludedFolders;
   late Stream<Result<List<SongsTableData>>> _songsStream;
 
   @override
   void initState() {
     super.initState();
     _useCase = widget.getYearsUseCase ?? getIt<GetYearsUseCase>();
-    // Recreated only on retry so rebuilds do not resubscribe to the DB watch
-    // stream.
+    _excludedFolders = List<String>.unmodifiable(widget.excludedFolders);
+    // Recreated only on retry, prop change, or exclusion change so rebuilds do
+    // not resubscribe to the DB watch stream.
     _updateStream();
+    if (_excludedFolders.isEmpty) {
+      unawaited(_loadExcludedFolders());
+    }
+  }
+
+  Future<void> _loadExcludedFolders() async {
+    try {
+      List<String> fetched = const [];
+      if (getIt.isRegistered<FolderUseCases>()) {
+        final res = await getIt<FolderUseCases>().getExcludedFolders();
+        fetched = res.fold((_) => const <String>[], (r) => r);
+      } else if (getIt.isRegistered<IMusicRepository>()) {
+        final res = await getIt<IMusicRepository>().getExcludedFolderPaths();
+        fetched = res.fold((_) => const <String>[], (r) => r);
+      }
+      if (!mounted || listEquals(fetched, _excludedFolders)) return;
+      setState(() {
+        _excludedFolders = List<String>.unmodifiable(fetched);
+        _updateStream();
+      });
+    } catch (e, st) {
+      ErrorLogger.log('Failed to load excluded folders for YearDetailScreen',
+          error: e, stackTrace: st, category: 'YearDetail');
+    }
+  }
+
+  @override
+  void didUpdateWidget(YearDetailScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final excludedChanged =
+        !listEquals(oldWidget.excludedFolders, widget.excludedFolders);
+    if (oldWidget.yearItem.year != widget.yearItem.year ||
+        oldWidget.getYearsUseCase != widget.getYearsUseCase ||
+        excludedChanged) {
+      _useCase = widget.getYearsUseCase ?? getIt<GetYearsUseCase>();
+      if (excludedChanged) {
+        _excludedFolders = List<String>.unmodifiable(widget.excludedFolders);
+      }
+      setState(_updateStream);
+      if (excludedChanged && _excludedFolders.isEmpty) {
+        unawaited(_loadExcludedFolders());
+      }
+    }
+  }
+
+  static bool _isExcludedPath(String path, List<String> excludedFolders) {
+    if (excludedFolders.isEmpty || path.isEmpty) return false;
+    final normPath = path.replaceAll('\\', '/').toLowerCase();
+    for (final raw in excludedFolders) {
+      var folder = raw.replaceAll('\\', '/').toLowerCase().trim();
+      while (folder.endsWith('/')) {
+        folder = folder.substring(0, folder.length - 1);
+      }
+      if (folder.isEmpty) continue;
+      if (normPath == folder || normPath.startsWith('$folder/')) return true;
+    }
+    return false;
   }
 
   void _updateStream() {
-    _songsStream = _useCase.watchYearSongs(widget.yearItem.year).distinct();
+    final base = _useCase.watchYearSongs(widget.yearItem.year).distinct();
+    final excluded = _excludedFolders;
+    if (excluded.isEmpty) {
+      _songsStream = base;
+    } else {
+      _songsStream = base.map(
+        (result) => result.map(
+          (songs) => songs
+              .where((s) => !_isExcludedPath(s.path, excluded))
+              .toList(growable: false),
+        ),
+      );
+    }
   }
 
   @override

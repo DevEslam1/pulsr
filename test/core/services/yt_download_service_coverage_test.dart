@@ -265,7 +265,10 @@ void main() {
       }
     });
     _mockChannel(_tagChannel, (call) async {
-      if (call.method == 'writeTags') writeTagsCalls++;
+      if (call.method == 'writeTags') {
+        writeTagsCalls++;
+        return true;
+      }
       return null;
     });
   });
@@ -400,6 +403,7 @@ void main() {
         tagAttempts++;
         writeTagsCalls++;
         if (tagAttempts == 1) throw PlatformException(code: 'FLAKY');
+        return true;
       }
       return null;
     });

@@ -250,6 +250,57 @@ int main() {
         check(std::abs(engine->getLoudnessDeltaDb() - measuredDb) < 1e-6,
               "A/B bypass must freeze (not reset) the measured loudness delta");
         engine->setBypassCompare(false, 0.0);
+
+        // BUG-P1-2: Exiting A/B bypass while attenuated (DVC, ReplayGain, or
+        // Direct USB software gain) must immediately restore the attenuated
+        // gain instead of starting from 1.0 (0 dB blast/pop over 20ms).
+        {
+            auto abEngine = makeEngine();
+            auto abSnap = baseSnapshot();
+            abSnap->directVolume.enabled = true;
+            abSnap->directVolume.gainLinear = 0.25; // -12 dB DVC
+            abSnap->replayGain.enabled = true;
+            abSnap->replayGain.mode = ReplayGainMode::Track;
+            abSnap->replayGain.hasTrackGain = true;
+            abSnap->replayGain.trackGainDb = -6.0;  // ~0.501187 linear
+            abSnap->bitPerfect.directUsbActive = true;
+            abSnap->bitPerfect.directUsbGain = 0.5; // -6 dB USB software gain
+            abSnap->limiter.enabled = false;
+            abSnap->headphoneSafety.enabled = false;
+            abEngine->setSampleRate(abSnap->sampleRate);
+            abEngine->setAutoDegradeMonitorEnabled(false);
+            abEngine->publishParams(abSnap);
+
+            // Settle smoothers before entering A/B bypass
+            for (int b = 0; b < 80; ++b) {
+                auto work = input;
+                abEngine->processInterleaved(work.data(), frames, channels);
+            }
+            auto preBypassBlock = input;
+            abEngine->processInterleaved(preBypassBlock.data(), frames, channels);
+
+            // Enter A/B bypass for several blocks (internally sets smoothers to 1.0)
+            abEngine->setBypassCompare(true, 0.0);
+            for (int b = 0; b < 8; ++b) {
+                auto work = input;
+                abEngine->processInterleaved(work.data(), frames, channels);
+            }
+
+            // Exit A/B bypass: first block MUST match the settled attenuated
+            // pre-bypass level without a unity-gain transient spike at sample 0.
+            abEngine->setBypassCompare(false, 0.0);
+            auto postBypassBlock = input;
+            abEngine->processInterleaved(postBypassBlock.data(), frames, channels);
+            double exitDiff = 0.0;
+            for (size_t i = 0; i < postBypassBlock.size(); ++i) {
+                exitDiff = std::max(
+                    exitDiff,
+                    std::abs(static_cast<double>(postBypassBlock[i]) -
+                             static_cast<double>(preBypassBlock[i])));
+            }
+            check(exitDiff < 1e-4,
+                  "exiting A/B bypass while attenuated must snap smoothers back to target attenuation with zero volume spike");
+        }
     }
 
     {

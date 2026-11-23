@@ -34,6 +34,8 @@ class _EngineTelemetryPanelState extends State<EngineTelemetryPanel>
   DspBatteryEstimate? _batteryEstimate;
   bool _batteryFetchInFlight = false;
 
+  bool _isSubscribed = false;
+
   @override
   void initState() {
     super.initState();
@@ -49,20 +51,36 @@ class _EngineTelemetryPanelState extends State<EngineTelemetryPanel>
     }
 
     if (_isExpanded) {
-      _cubit.subscribe();
+      _subscribeTelemetry();
       _startBatteryPolling();
     }
+  }
+
+  void _subscribeTelemetry() {
+    if (_isSubscribed) return;
+    _isSubscribed = true;
+    _cubit.subscribe();
+  }
+
+  void _unsubscribeTelemetry() {
+    if (!_isSubscribed) return;
+    _isSubscribed = false;
+    _cubit.unsubscribe();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      if (_isExpanded && _batteryTimer == null) {
-        _startBatteryPolling();
+      if (_isExpanded) {
+        _subscribeTelemetry();
+        if (_batteryTimer == null) {
+          _startBatteryPolling();
+        }
       }
     } else if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.inactive ||
         state == AppLifecycleState.detached) {
+      _unsubscribeTelemetry();
       _stopBatteryPolling();
     }
   }
@@ -108,9 +126,7 @@ class _EngineTelemetryPanelState extends State<EngineTelemetryPanel>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _stopBatteryPolling();
-    if (_isExpanded) {
-      _cubit.unsubscribe();
-    }
+    _unsubscribeTelemetry();
     if (_ownsCubit) {
       _cubit.close();
     }
@@ -121,10 +137,10 @@ class _EngineTelemetryPanelState extends State<EngineTelemetryPanel>
     setState(() {
       _isExpanded = !_isExpanded;
       if (_isExpanded) {
-        _cubit.subscribe();
+        _subscribeTelemetry();
         _startBatteryPolling();
       } else {
-        _cubit.unsubscribe();
+        _unsubscribeTelemetry();
         _stopBatteryPolling();
       }
     });
@@ -190,15 +206,19 @@ class _EngineTelemetryPanelState extends State<EngineTelemetryPanel>
               color: rtfColor,
             ),
             const SizedBox(width: AppSpacing.sm),
-            Text(
-              context.l10n.dspEngineTelemetry,
-              style: TextStyle(
-                fontSize: AppFontSize.bodySmall,
-                color: p.textPrimary,
-                fontWeight: FontWeight.w600,
+            Expanded(
+              child: Text(
+                context.l10n.dspEngineTelemetry,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: AppFontSize.bodySmall,
+                  color: p.textPrimary,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
-            const Spacer(),
+            const SizedBox(width: AppSpacing.xs),
             if (telemetry.isAutoDegraded)
               Container(
                 margin: const EdgeInsetsDirectional.only(end: AppSpacing.sm),

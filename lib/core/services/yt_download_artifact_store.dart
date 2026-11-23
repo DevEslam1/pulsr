@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/services.dart';
@@ -160,10 +161,11 @@ class YtDownloadArtifactStore {
     File? temp,
     File? tempArt,
     Future<String?>? artworkFuture,
+    bool wasCanceled = false,
   }) async {
-    if (artworkFuture != null) {
+    Future<void> deleteArtFromFuture(Future<String?> future) async {
       try {
-        final resolvedArtPath = await artworkFuture;
+        final resolvedArtPath = await future;
         if (resolvedArtPath != null) {
           final resolvedArtFile = File(resolvedArtPath);
           if (await resolvedArtFile.exists()) {
@@ -172,6 +174,14 @@ class YtDownloadArtifactStore {
         }
       } catch (_) {
         // Best-effort: failure intentionally ignored on this non-critical path.
+      }
+    }
+
+    if (artworkFuture != null) {
+      if (wasCanceled) {
+        unawaited(deleteArtFromFuture(artworkFuture));
+      } else {
+        await deleteArtFromFuture(artworkFuture);
       }
     }
     if (temp != null) {

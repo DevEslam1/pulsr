@@ -159,6 +159,10 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
     private volatile int tapSrcTargetRate = 0;
     // Playback-thread mirror: true while the configured format is converted.
     private boolean tapSrcActive = false;
+    // When tapSrcActive and Direct USB returns DIRECT_USB_RETRY, resampleScratch
+    // already holds the resampled output for the pending inputBuffer; reuse it
+    // instead of double-feeding tapResampler_ on retry (BUG-P1-1).
+    private int pendingTapSrcRetryFrames = -1;
 
     /**
      * Sets the device output sample rate for tap-side SRC. A change takes
@@ -634,27 +638,33 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
         FloatBuffer emitFloats = floats;
         ByteBuffer emitNativeBuffer = scratch;
         if (tapSrcActive) {
-            final double ratio = (double) outputAudioFormat.sampleRate
-                    / (double) inputAudioFormat.sampleRate;
-            final int maxOut = (int) Math.ceil(frameCount * ratio)
-                    + (int) Math.ceil(64.0 * ratio) + 32;
-            FloatBuffer resampled = ensureResampleScratch(maxOut * channelCount);
-            if (tapSrcFailure != null) throw tapSrcFailure;
-            final int got;
-            try {
-                got = resampleTapBlock(scratch, frameCount, channelCount,
-                        resampleScratch, maxOut,
-                        inputAudioFormat.sampleRate, outputAudioFormat.sampleRate);
-            } catch (RuntimeException | UnsatisfiedLinkError e) {
-                throw new TapSrcException("Tap SRC failed before source consumption", e);
+            if (pendingTapSrcRetryFrames >= 0 && resampleScratch != null && resampleScratchFloats != null) {
+                emitFrames = pendingTapSrcRetryFrames;
+                emitFloats = resampleScratchFloats;
+                emitNativeBuffer = resampleScratch;
+            } else {
+                final double ratio = (double) outputAudioFormat.sampleRate
+                        / (double) inputAudioFormat.sampleRate;
+                final int maxOut = (int) Math.ceil(frameCount * ratio)
+                        + (int) Math.ceil(64.0 * ratio) + 32;
+                FloatBuffer resampled = ensureResampleScratch(maxOut * channelCount);
+                if (tapSrcFailure != null) throw tapSrcFailure;
+                final int got;
+                try {
+                    got = resampleTapBlock(scratch, frameCount, channelCount,
+                            resampleScratch, maxOut,
+                            inputAudioFormat.sampleRate, outputAudioFormat.sampleRate);
+                } catch (RuntimeException | UnsatisfiedLinkError e) {
+                    throw new TapSrcException("Tap SRC failed before source consumption", e);
+                }
+                if (got < 0 || got > maxOut) {
+                    throw new TapSrcException("Invalid Tap SRC frame count: " + got, null);
+                }
+                // Zero is valid priming, unlike a negative result or JNI failure.
+                emitFrames = got;
+                emitFloats = resampled;
+                emitNativeBuffer = resampleScratch;
             }
-            if (got < 0 || got > maxOut) {
-                throw new TapSrcException("Invalid Tap SRC frame count: " + got, null);
-            }
-            // Zero is valid priming, unlike a negative result or JNI failure.
-            emitFrames = got;
-            emitFloats = resampled;
-            emitNativeBuffer = resampleScratch;
         }
 
         // ---- Transport gain, computed BEFORE the native call ----
@@ -755,6 +765,9 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
                         rawEligible ? sourceBitDepth : 0, sourceSampleRate);
                 if (processed == DIRECT_USB_RETRY) {
                     directUsbBackpressured = true;
+                    if (tapSrcActive) {
+                        pendingTapSrcRetryFrames = emitFrames;
+                    }
                     return;
                 }
                 exclusiveSilence = processed == Integer.MIN_VALUE;
@@ -768,6 +781,7 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
                 bitPerfect = false;
             }
         }
+        pendingTapSrcRetryFrames = -1;
         // Commit transport gain/ramp progress only after native delivery
         // succeeds (backpressure retries reuse the exact same frames & curve).
         transitionGain = profileGain;
@@ -857,6 +871,7 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
     @SuppressWarnings("deprecation")
     protected void onFlush() {
         directUsbBackpressured = false;
+        pendingTapSrcRetryFrames = -1;
         releaseUsbProducer();
         tapSrcFailure = null;
         tapSrcActive = inputAudioFormat.sampleRate > 0 && outputAudioFormat.sampleRate > 0
@@ -907,6 +922,7 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
     protected void onReset() {
         sampleRate = 0;
         directUsbBackpressured = false;
+        pendingTapSrcRetryFrames = -1;
         transitionMuted = false;
         transitionGain = 1.0f;
         tapSrcActive = false;

@@ -161,7 +161,7 @@ class _UpnpServerPickerSheetState extends State<UpnpServerPickerSheet> {
               const SizedBox(height: 16),
               FilledButton.tonal(
                 onPressed: _search,
-                child: const Text(RemoteSourcesStrings.retry),
+                child: Text(RemoteSourcesStrings.retry),
               ),
             ],
           ),
@@ -186,7 +186,7 @@ class _UpnpServerPickerSheetState extends State<UpnpServerPickerSheet> {
               const SizedBox(height: 16),
               FilledButton.tonal(
                 onPressed: _search,
-                child: const Text(RemoteSourcesStrings.retry),
+                child: Text(RemoteSourcesStrings.retry),
               ),
             ],
           ),
@@ -213,7 +213,7 @@ class _UpnpServerPickerSheetState extends State<UpnpServerPickerSheet> {
           subtitle: details.isEmpty ? null : Text(details),
           trailing: FilledButton.tonal(
             onPressed: () => Navigator.of(context).pop(server),
-            child: const Text(RemoteSourcesStrings.upnpUse),
+            child: Text(RemoteSourcesStrings.upnpUse),
           ),
         );
       },

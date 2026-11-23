@@ -46,6 +46,7 @@ class PlaybackVolumeMixer {
   bool get isCrossfading => _isCrossfading;
 
   void setUserVolume(double volume) {
+    if (!volume.isFinite) return;
     _userVolume = volume.clamp(0.0, 1.0);
   }
 
@@ -54,14 +55,17 @@ class PlaybackVolumeMixer {
   }
 
   void setActiveTargetFactor(double factor) {
+    if (!factor.isFinite) return;
     _targetActiveFactor = factor.clamp(0.0, 2.0);
   }
 
   void setInactiveTargetFactor(double factor) {
+    if (!factor.isFinite) return;
     _targetInactiveFactor = factor.clamp(0.0, 2.0);
   }
 
   void setDuckFactor(double factor) {
+    if (!factor.isFinite) return;
     _duckFactor = factor.clamp(0.0, 1.0);
   }
 
@@ -70,6 +74,7 @@ class PlaybackVolumeMixer {
   }
 
   void setSleepFadeFactor(double factor) {
+    if (!factor.isFinite) return;
     _sleepFadeFactor = factor.clamp(0.0, 1.0);
   }
 
@@ -82,8 +87,12 @@ class PlaybackVolumeMixer {
     required double incomingGain,
     required bool isCrossfading,
   }) {
-    _crossfadeOutgoingGain = outgoingGain.clamp(0.0, 1.0);
-    _crossfadeIncomingGain = incomingGain.clamp(0.0, 1.0);
+    if (outgoingGain.isFinite) {
+      _crossfadeOutgoingGain = outgoingGain.clamp(0.0, 1.0);
+    }
+    if (incomingGain.isFinite) {
+      _crossfadeIncomingGain = incomingGain.clamp(0.0, 1.0);
+    }
     _isCrossfading = isCrossfading;
   }
 
@@ -173,6 +182,7 @@ class PlaybackVolumeMixer {
 
   /// Direct volume update for a specific player (used during standalone transitions).
   Future<void> applyDirectToPlayer(AudioPlayer player, double volume) async {
+    if (!volume.isFinite) return;
     try {
       await player.setVolume(volume.clamp(0.0, 1.0));
     } catch (e, st) {

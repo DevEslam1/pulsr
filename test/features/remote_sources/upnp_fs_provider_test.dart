@@ -312,6 +312,28 @@ void main() {
       await expectFailure(416, throwsA(isA<RemoteProtocolError>()));
       await expectFailure(503, throwsA(isA<RemoteUnavailableError>()));
     });
+
+    test('disables redirects to prevent redirect-SSRF', () async {
+      bool? followRedirects;
+      final provider = _provider(
+        _server(
+          resource: (request) {
+            followRedirects = request.followRedirects;
+            return http.StreamedResponse(
+              Stream<List<int>>.value(const <int>[]),
+              302,
+              headers: const {'location': 'http://127.0.0.1:12345/secret'},
+            );
+          },
+        ),
+      );
+
+      await expectLater(
+        provider.openRead('i/10').toList(),
+        throwsA(isA<RemoteProtocolError>()),
+      );
+      expect(followRedirects, isFalse);
+    });
   });
 
   group('testConnection', () {

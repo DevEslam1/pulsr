@@ -294,19 +294,25 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: [
-                      Icon(Icons.tune_rounded, color: p.primary),
-                      const SizedBox(width: AppSpacing.s10),
-                      Text(
-                        context.l10n.studioCompressor,
-                        style: TextStyle(
-                          color: p.textPrimary,
-                          fontSize: AppFontSize.title,
-                          fontWeight: FontWeight.w700,
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Icon(Icons.tune_rounded, color: p.primary),
+                        const SizedBox(width: AppSpacing.s10),
+                        Expanded(
+                          child: Text(
+                            context.l10n.studioCompressor,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: p.textPrimary,
+                              fontSize: AppFontSize.title,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                   Switch.adaptive(
                     value: _params.limiterEnabled,

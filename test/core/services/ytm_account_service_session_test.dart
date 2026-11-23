@@ -237,6 +237,8 @@ void main() {
       expect(service.loginState.value, isFalse);
       verify(() => secure.delete(key: _cookieKey))
           .called(greaterThanOrEqualTo(1));
+      verify(() => ytm.clearNativeSession()).called(1);
+      verify(() => ytm.syncCookies('')).called(1);
     });
 
     test('without cookies the OAuth restore path is attempted', () async {

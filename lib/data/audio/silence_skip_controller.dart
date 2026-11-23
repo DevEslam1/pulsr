@@ -24,11 +24,12 @@ class SilenceSkipController {
     try {
       final prefs = await SharedPreferences.getInstance();
       enabled = prefs.getBool(prefsEnabledKey) ?? false;
-      sensitivity = (prefs.getInt(prefsSensitivityKey) ?? (enabled ? 50 : 0))
-          .clamp(0, 100);
-      if (!enabled && sensitivity > 0) {
-        // Legacy installs stored only the bool; default mid sensitivity.
+      final savedSensitivity = prefs.getInt(prefsSensitivityKey);
+      if (savedSensitivity == null || (!enabled && savedSensitivity <= 0)) {
+        // Legacy installs stored only the bool (or 0 when disabled); default mid sensitivity.
         sensitivity = 50;
+      } else {
+        sensitivity = savedSensitivity.clamp(0, 100);
       }
     } catch (e, st) {
       ErrorLogger.log('Failed to load silence skip settings',

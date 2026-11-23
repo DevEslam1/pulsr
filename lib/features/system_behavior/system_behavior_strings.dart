@@ -1,96 +1,103 @@
 // lib/features/system_behavior/system_behavior_strings.dart
 //
-// Single translation point for the system-behaviour module. Every user-visible
-// string the screen emits lives here, so the module can be localized by
-// translating one class.
+// Localized copy for the system-behaviour module, backed by ARB
+// (`AppLocalizations`) with automatic English fallback in headless tests.
 
-/// English copy for the system-behaviour feature.
+import 'dart:ui' show Locale;
+
+import '../../core/utils/l10n_holder.dart';
+import '../../l10n/generated/app_localizations.dart';
+
+/// User-facing copy for the system-behaviour feature.
 abstract final class SystemBehaviorStrings {
-  static const String screenTitle = 'System behaviour';
+  static final AppLocalizations _fallback =
+      lookupAppLocalizations(const Locale('en'));
 
-  static const String sectionFocus = 'Audio focus';
-  static const String sectionUsb = 'USB output';
-  static const String sectionVolume = 'Volume';
-  static const String sectionLifecycle = 'Fade and lifecycle';
+  static AppLocalizations _l10n([AppLocalizations? l10n]) =>
+      l10n ?? L10nHolder.current ?? _fallback;
 
-  static const String pauseOnNotificationSoundTitle =
-      'Pause for notification sounds';
-  static const String pauseOnNotificationSoundSubtitle =
-      'Pauses instead of ducking when a system alert or navigation prompt '
-      'plays. Turn this off to keep the music at a reduced level.';
+  static String get screenTitle => _l10n().sysBehavScreenTitle;
 
-  static const String resumeAfterCallTitle = 'Resume after calls';
-  static const String resumeAfterCallSubtitle =
-      'Continues playback when a phone call or another interruption ends, as '
-      'long as nothing else took audio focus in the meantime.';
+  static String get sectionFocus => _l10n().sysBehavSectionFocus;
+  static String get sectionUsb => _l10n().sysBehavSectionUsb;
+  static String get sectionVolume => _l10n().sysBehavSectionVolume;
+  static String get sectionLifecycle => _l10n().sysBehavSectionLifecycle;
 
-  static const String usbReleaseOnFocusLossTitle = 'USB release on focus loss';
-  static const String usbReleaseOnFocusLossSubtitle =
-      'Drops the exclusive USB claim when another app or a call takes audio '
-      'focus, so the DAC can be claimed again afterwards.';
+  static String get pauseOnNotificationSoundTitle =>
+      _l10n().sysBehavPauseOnNotifTitle;
+  static String get pauseOnNotificationSoundSubtitle =>
+      _l10n().sysBehavPauseOnNotifSubtitle;
 
-  static const String usbReleaseNever = 'Never';
-  static const String usbReleasePermanent = 'Permanent';
-  static const String usbReleaseTransient = 'Transient';
-  static const String usbReleaseNeverIconLabel = 'Keep USB on every focus loss';
-  static const String usbReleasePermanentIconLabel =
-      'Release USB on permanent focus loss';
-  static const String usbReleaseTransientIconLabel =
-      'Release USB on any focus loss';
+  static String get resumeAfterCallTitle =>
+      _l10n().sysBehavResumeAfterCallTitle;
+  static String get resumeAfterCallSubtitle =>
+      _l10n().sysBehavResumeAfterCallSubtitle;
 
-  static const String closeUsbWhenBackgroundedTitle = 'Close USB in background';
-  static const String closeUsbWhenBackgroundedSubtitle =
-      'Releases the exclusive claim when the app leaves the foreground, so '
-      'another app on the device can use the DAC.';
+  static String get usbReleaseOnFocusLossTitle =>
+      _l10n().sysBehavUsbReleaseTitle;
+  static String get usbReleaseOnFocusLossSubtitle =>
+      _l10n().sysBehavUsbReleaseSubtitle;
 
-  static const String volumeRockerTrackSwitchTitle =
-      'Double-press volume to skip';
-  static const String volumeRockerTrackSwitchSubtitle =
-      'A double press of the hardware volume rocker skips to the next track '
-      'instead of changing the volume twice.';
+  static String get usbReleaseNever => _l10n().sysBehavUsbReleaseNever;
+  static String get usbReleasePermanent => _l10n().sysBehavUsbReleasePermanent;
+  static String get usbReleaseTransient => _l10n().sysBehavUsbReleaseTransient;
+  static String get usbReleaseNeverIconLabel =>
+      _l10n().sysBehavUsbReleaseNeverIconLabel;
+  static String get usbReleasePermanentIconLabel =>
+      _l10n().sysBehavUsbReleasePermanentIconLabel;
+  static String get usbReleaseTransientIconLabel =>
+      _l10n().sysBehavUsbReleaseTransientIconLabel;
 
-  static const String softwareVolumeCurveTitle = 'Volume curve';
-  static const String softwareVolumeCurveSubtitle =
-      'Linear moves the same amount of gain per step. Logarithmic moves the '
-      'same amount of perceived loudness, which keeps the first steps quiet '
-      'and the last steps usable.';
+  static String get closeUsbWhenBackgroundedTitle =>
+      _l10n().sysBehavCloseUsbBgTitle;
+  static String get closeUsbWhenBackgroundedSubtitle =>
+      _l10n().sysBehavCloseUsbBgSubtitle;
 
-  static const String curveLinear = 'Linear';
-  static const String curveLogarithmic = 'Logarithmic';
-  static const String curveLinearIconLabel = 'Use a linear volume curve';
-  static const String curveLogarithmicIconLabel =
-      'Use a logarithmic volume curve';
+  static String get volumeRockerTrackSwitchTitle =>
+      _l10n().sysBehavVolumeRockerTitle;
+  static String get volumeRockerTrackSwitchSubtitle =>
+      _l10n().sysBehavVolumeRockerSubtitle;
 
-  static const String volumeStepPercentTitle = 'Volume step';
-  static const String volumeStepPercentSubtitle =
-      'How far one volume step moves, as a percentage of the full scale.';
+  static String get softwareVolumeCurveTitle =>
+      _l10n().sysBehavVolumeCurveTitle;
+  static String get softwareVolumeCurveSubtitle =>
+      _l10n().sysBehavVolumeCurveSubtitle;
 
-  static const String fadeOutOnPauseMsTitle = 'Fade out before pause';
-  static const String fadeOutOnPauseMsSubtitle =
-      'Ramps the volume to zero before pausing, so an interruption does not '
-      'cut the music off. Set to 0 to pause immediately.';
+  static String get curveLinear => _l10n().sysBehavCurveLinear;
+  static String get curveLogarithmic => _l10n().sysBehavCurveLogarithmic;
+  static String get curveLinearIconLabel =>
+      _l10n().sysBehavCurveLinearIconLabel;
+  static String get curveLogarithmicIconLabel =>
+      _l10n().sysBehavCurveLogarithmicIconLabel;
 
-  static const String fadeOffValue = 'Off';
+  static String get volumeStepPercentTitle => _l10n().sysBehavVolumeStepTitle;
+  static String get volumeStepPercentSubtitle =>
+      _l10n().sysBehavVolumeStepSubtitle;
 
-  static const String stopWhenTaskRemovedTitle = 'Stop when swiped away';
-  static const String stopWhenTaskRemovedSubtitle =
-      'Stops playback when the app is removed from the recent apps list '
-      'instead of pausing and keeping the queue.';
+  static String get fadeOutOnPauseMsTitle => _l10n().sysBehavFadeOutPauseTitle;
+  static String get fadeOutOnPauseMsSubtitle =>
+      _l10n().sysBehavFadeOutPauseSubtitle;
 
-  static const String androidOnlyLimit =
-      'Android-only: this platform gives the app no task-removal callback, so '
-      'the setting cannot take effect here.';
-  static const String usbOnlyLimit =
-      'Android-only: exclusive USB output does not exist on this platform, so '
-      'the setting cannot take effect here.';
-  static const String volumeRockerLimit =
-      'Android-only: hardware volume keys are not delivered to the app on this '
-      'platform, so the setting cannot take effect here.';
+  static String get fadeOffValue => _l10n().sysBehavFadeOffValue;
+
+  static String get stopWhenTaskRemovedTitle =>
+      _l10n().sysBehavStopTaskRemovedTitle;
+  static String get stopWhenTaskRemovedSubtitle =>
+      _l10n().sysBehavStopTaskRemovedSubtitle;
+
+  static String get androidOnlyLimit => _l10n().sysBehavAndroidOnlyLimit;
+  static String get usbOnlyLimit => _l10n().sysBehavUsbOnlyLimit;
+  static String get volumeRockerLimit => _l10n().sysBehavVolumeRockerLimit;
 
   /// Fade length shown next to the slider.
-  static String fadeValue(int milliseconds) =>
-      milliseconds == 0 ? fadeOffValue : '$milliseconds ms';
+  static String fadeValue(int milliseconds, [AppLocalizations? l10n]) {
+    final l = _l10n(l10n);
+    return milliseconds == 0
+        ? l.sysBehavFadeOffValue
+        : l.sysBehavFadeValueMs(milliseconds);
+  }
 
   /// Volume step shown next to the slider.
-  static String volumeStepValue(int percent) => '$percent %';
+  static String volumeStepValue(int percent, [AppLocalizations? l10n]) =>
+      _l10n(l10n).sysBehavVolumeStepValue(percent);
 }

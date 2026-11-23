@@ -763,7 +763,7 @@ void main() {
       final service = _newService();
       service.debugHttpClient = MockClient((request) async {
         return http.Response(
-          jsonEncode(_playerBody(status: 'LOGIN_REQUIRED')),
+          jsonEncode(_playerBody(status: 'ERROR')),
           200,
           headers: {'content-type': 'application/json'},
         );

@@ -5,13 +5,17 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/di/injection.dart';
+import 'package:pulsr/core/errors/app_error.dart';
 import 'package:pulsr/core/services/earbud_optimization_service.dart';
 import 'package:pulsr/core/widgets/pulsr_switch.dart';
 import 'package:pulsr/domain/models/quran_metadata.dart';
 import 'package:pulsr/domain/models/quran_mode_profile.dart';
 import 'package:pulsr/domain/models/quran_surah.dart';
 import 'package:pulsr/domain/repositories/quran_repository.dart';
+import 'package:pulsr/features/player/cubit/controllers/player_playback_options_controller.dart'
+    show kQuranModeErrorCode;
 import 'package:pulsr/features/player/cubit/player_state.dart';
+import 'package:pulsr/features/player/presentation/widgets/quran_error_card.dart';
 import 'package:pulsr/features/player/presentation/widgets/quran_mode_sheet.dart';
 import 'package:pulsr/features/player/presentation/widgets/quran_mushaf_view.dart';
 
@@ -577,6 +581,37 @@ void main() {
         reason:
             'QuranMushafView must not rebuild on position ticks when activeAyah has not changed',
       );
+    });
+
+    testWidgets(
+        'BUG-P2-27 shows QuranErrorCard for typed kQuranModeErrorCode even when message is non-English',
+        (tester) async {
+      final repo = MockQuranRepository();
+      when(() => repo.getMetadataForTrack(any())).thenAnswer((_) async => null);
+      when(() => repo.getBookmark(any())).thenAnswer((_) async => null);
+      when(() => repo.getAyahsForSurah(any())).thenReturn(const []);
+      getIt.registerSingleton<QuranRepository>(repo);
+
+      final stateWithLocalizedQuranError = quranState(enabled: true).copyWith(
+        playback: PlaybackSlice(
+          currentSong: testSong,
+          error: uiError(
+            'فشل تطبيق ملف الصوت',
+            code: kQuranModeErrorCode,
+          ),
+        ),
+      );
+      final cubit = quranCubit(stateWithLocalizedQuranError);
+      when(() => cubit.reapplyQuranProfile()).thenAnswer((_) async {});
+
+      await tester.pumpWidget(sheetHost(
+        playerCubit: cubit,
+        child: const SingleChildScrollView(child: QuranModePanel()),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(QuranErrorCard), findsOneWidget);
+      expect(find.text('فشل تطبيق ملف الصوت'), findsOneWidget);
     });
   });
 }

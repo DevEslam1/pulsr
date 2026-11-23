@@ -262,7 +262,7 @@ class _DlnaScreenState extends State<DlnaScreen> {
             onPressed:
                 busy || selected == null ? null : _pickAndCast,
             icon: const Icon(Icons.audio_file_rounded),
-            label: const Text(DlnaStrings.castFile),
+            label: Text(DlnaStrings.castFile),
             style: OutlinedButton.styleFrom(
               foregroundColor: palette.accent,
               minimumSize: const Size(0, 48),
@@ -282,7 +282,7 @@ class _DlnaScreenState extends State<DlnaScreen> {
             child: OutlinedButton.icon(
               onPressed: busy ? null : () => _castCurrentTrack(localTrack),
               icon: const Icon(Icons.cast_connected_rounded),
-              label: const Text(DlnaStrings.castCurrentTrack),
+              label: Text(DlnaStrings.castCurrentTrack),
               style: OutlinedButton.styleFrom(
                 foregroundColor: palette.accent,
                 minimumSize: const Size(0, 48),

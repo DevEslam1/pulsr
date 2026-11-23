@@ -278,7 +278,7 @@ class _RemoteSourceEditorDialogState extends State<RemoteSourceEditorDialog> {
               DropdownButtonFormField<RemoteSourceKind>(
                 initialValue: _kind,
                 isExpanded: true,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: RemoteSourcesStrings.kindLabel,
                   border: OutlineInputBorder(),
                 ),
@@ -337,7 +337,7 @@ class _RemoteSourceEditorDialogState extends State<RemoteSourceEditorDialog> {
                 if (_kind == RemoteSourceKind.webdav) ...[
                   SwitchListTile.adaptive(
                     contentPadding: EdgeInsets.zero,
-                    title: const Text(RemoteSourcesStrings.tlsLabel),
+                    title: Text(RemoteSourcesStrings.tlsLabel),
                     value: _useTls,
                     onChanged: (value) => setState(() {
                       final currentPort = _port.text.trim();
@@ -392,11 +392,11 @@ class _RemoteSourceEditorDialogState extends State<RemoteSourceEditorDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text(RemoteSourcesStrings.cancel),
+          child: Text(RemoteSourcesStrings.cancel),
         ),
         FilledButton(
           onPressed: _submit,
-          child: const Text(RemoteSourcesStrings.save),
+          child: Text(RemoteSourcesStrings.save),
         ),
       ],
     );

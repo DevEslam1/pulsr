@@ -330,5 +330,13 @@ void main() {
       final result = await service.setPlaybackStateResult('play');
       expect(result.success, isTrue);
     });
+
+    test('dispose resets singleton instance so a fresh instance is created', () {
+      final before = CastService();
+      before.dispose();
+      final after = CastService();
+      expect(identical(before, after), isFalse);
+      after.dispose();
+    });
   });
 }

@@ -19,11 +19,11 @@ import '../../../../domain/models/radio_station.dart';
 class RadioDirectorySheet extends StatefulWidget {
   const RadioDirectorySheet({
     super.key,
-    required this.service,
+    this.service,
     required this.store,
   });
 
-  final RadioBrowserService service;
+  final RadioBrowserService? service;
   final RadioStationStore store;
 
   static Future<void> show(
@@ -44,7 +44,7 @@ class RadioDirectorySheet extends StatefulWidget {
           child: FractionallySizedBox(
             heightFactor: isLandscape ? 0.94 : 0.88,
             child: RadioDirectorySheet(
-              service: service ?? RadioBrowserService(),
+              service: service,
               store: store ?? RadioStationStore(),
             ),
           ),
@@ -62,6 +62,9 @@ class _RadioDirectorySheetState extends State<RadioDirectorySheet> {
   final Set<String> _addedIds = <String>{};
   final Set<String> _checkingIds = <String>{};
 
+  late RadioBrowserService _service;
+  late bool _ownsService;
+
   List<RadioStation> _results = const [];
   bool _loading = true;
   bool _failed = false;
@@ -70,6 +73,8 @@ class _RadioDirectorySheetState extends State<RadioDirectorySheet> {
   @override
   void initState() {
     super.initState();
+    _ownsService = widget.service == null;
+    _service = widget.service ?? RadioBrowserService();
     for (final existing in widget.store.list) {
       _addedIds.add(existing.id);
     }
@@ -77,7 +82,22 @@ class _RadioDirectorySheetState extends State<RadioDirectorySheet> {
   }
 
   @override
+  void didUpdateWidget(covariant RadioDirectorySheet oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.service != widget.service) {
+      if (_ownsService) {
+        _service.dispose();
+      }
+      _ownsService = widget.service == null;
+      _service = widget.service ?? RadioBrowserService();
+    }
+  }
+
+  @override
   void dispose() {
+    if (_ownsService) {
+      _service.dispose();
+    }
     _controller.dispose();
     super.dispose();
   }
@@ -95,7 +115,7 @@ class _RadioDirectorySheetState extends State<RadioDirectorySheet> {
     });
 
     try {
-      final results = await widget.service.search(query: query);
+      final results = await _service.search(query: query);
       if (!mounted || generation != _generation) return;
       setState(() {
         _results = results;
@@ -115,7 +135,7 @@ class _RadioDirectorySheetState extends State<RadioDirectorySheet> {
       return;
     }
     setState(() => _checkingIds.add(station.id));
-    final reachable = await widget.service.isReachable(station.url);
+    final reachable = await _service.isReachable(station.url);
     if (!mounted) return;
     setState(() => _checkingIds.remove(station.id));
     if (!reachable) {

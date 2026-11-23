@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -97,12 +99,21 @@ class DiscordUser {
 class DiscordRpcService {
   static final DiscordRpcService instance = DiscordRpcService._internal();
 
-  DiscordRpcService._internal({http.Client? httpClient})
-      : _httpClient = httpClient ?? http.Client();
+  DiscordRpcService._internal({
+    http.Client? httpClient,
+    FlutterSecureStorage? secureStorage,
+  })  : _httpClient = httpClient ?? http.Client(),
+        _secureStorage = secureStorage ?? const FlutterSecureStorage();
 
-  factory DiscordRpcService({http.Client? httpClient}) {
-    if (httpClient != null) {
-      return DiscordRpcService._internal(httpClient: httpClient);
+  factory DiscordRpcService({
+    http.Client? httpClient,
+    FlutterSecureStorage? secureStorage,
+  }) {
+    if (httpClient != null || secureStorage != null) {
+      return DiscordRpcService._internal(
+        httpClient: httpClient,
+        secureStorage: secureStorage,
+      );
     }
     return instance;
   }
@@ -113,8 +124,12 @@ class DiscordRpcService {
   static const String fallbackArtUrl =
       'https://raw.githubusercontent.com/pulsr-audio/pulsr/main/assets/app_icon/app_icon_plus.png';
   static const String githubRepoUrl = 'https://github.com/pulsr-audio/pulsr';
+  static const int maxAssetCacheEntries = 256;
+  static const Duration httpTimeout = Duration(seconds: 10);
+  static const int maxReconnectAttempts = 8;
 
   final http.Client _httpClient;
+  final FlutterSecureStorage _secureStorage;
   final Map<String, String> _externalAssetCache = {};
 
   SharedPreferences? _prefs;
@@ -133,11 +148,48 @@ class DiscordRpcService {
   bool _sessionReady = false;
   bool _awaitingAck = false;
   int _sequence = 0;
+  int _connectGeneration = 0;
+  int _reconnectAttempts = 0;
   String? _sessionId;
   String? _resumeGatewayUrl;
   int _heartbeatInterval = 41250;
   int get heartbeatInterval => _heartbeatInterval;
   bool _disposed = false;
+
+  @visibleForTesting
+  int get externalAssetCacheSize => _externalAssetCache.length;
+
+  @visibleForTesting
+  void insertExternalAssetCacheForTesting(String key, String value) {
+    _putExternalAssetCache(key, value);
+  }
+
+  void _putExternalAssetCache(String key, String value) {
+    _externalAssetCache.remove(key);
+    if (_externalAssetCache.length >= maxAssetCacheEntries) {
+      _externalAssetCache.remove(_externalAssetCache.keys.first);
+    }
+    _externalAssetCache[key] = value;
+  }
+
+  static bool isFatalCloseCode(int? code) => code == 4004 || code == 4010;
+
+  static bool isSafeRemoteArtworkUrl(String? rawUrl) {
+    if (rawUrl == null) return false;
+    final trimmed = rawUrl.trim();
+    if (trimmed.isEmpty) return false;
+    final lower = trimmed.toLowerCase();
+    if (lower.startsWith('file:') ||
+        lower.startsWith('content:') ||
+        lower.startsWith('/')) {
+      return false;
+    }
+    if (lower.startsWith('mp:')) return true;
+    final uri = Uri.tryParse(trimmed);
+    if (uri == null || !uri.hasAuthority) return false;
+    final scheme = uri.scheme.toLowerCase();
+    return scheme == 'https' || scheme == 'http';
+  }
 
   Map<String, dynamic>? _lastPresencePayload;
   SongsTableData? _lastSong;
@@ -152,11 +204,43 @@ class DiscordRpcService {
   DiscordUser? get currentUser => _currentUser;
   bool get isConnected => _isConnected && _sessionReady;
 
-  /// Initializes configuration from [SharedPreferences].
+  /// Initializes configuration from [SharedPreferences] and [FlutterSecureStorage].
   Future<void> init(SharedPreferences prefs) async {
     _prefs = prefs;
     _enabled = prefs.getBool(PrefsKeys.discordRpcEnabled) ?? false;
-    _token = prefs.getString(PrefsKeys.discordRpcToken) ?? '';
+    String? secureToken;
+    try {
+      secureToken = await _secureStorage.read(key: PrefsKeys.discordRpcToken);
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Failed to read Discord token from secure storage',
+        error: e,
+        stackTrace: st,
+        category: 'DiscordRPC',
+      );
+    }
+    final legacyToken = prefs.getString(PrefsKeys.discordRpcToken);
+    if (legacyToken != null) {
+      if (legacyToken.isNotEmpty &&
+          (secureToken == null || secureToken.isEmpty)) {
+        secureToken = legacyToken;
+        try {
+          await _secureStorage.write(
+            key: PrefsKeys.discordRpcToken,
+            value: legacyToken,
+          );
+        } catch (e, st) {
+          ErrorLogger.log(
+            'Failed to migrate Discord token to secure storage',
+            error: e,
+            stackTrace: st,
+            category: 'DiscordRPC',
+          );
+        }
+      }
+      await prefs.remove(PrefsKeys.discordRpcToken);
+    }
+    _token = secureToken ?? '';
     _applicationId =
         prefs.getString(PrefsKeys.discordApplicationId) ?? defaultApplicationId;
 
@@ -174,6 +258,7 @@ class DiscordRpcService {
     _enabled = enabled;
     await _prefs?.setBool(PrefsKeys.discordRpcEnabled, enabled);
     if (enabled) {
+      _reconnectAttempts = 0;
       if (_token.isNotEmpty) {
         connect();
       }
@@ -187,7 +272,25 @@ class DiscordRpcService {
   Future<void> setToken(String token) async {
     final clean = token.trim();
     _token = clean;
-    await _prefs?.setString(PrefsKeys.discordRpcToken, clean);
+    _reconnectAttempts = 0;
+    await _prefs?.remove(PrefsKeys.discordRpcToken);
+    try {
+      if (clean.isEmpty) {
+        await _secureStorage.delete(key: PrefsKeys.discordRpcToken);
+      } else {
+        await _secureStorage.write(
+          key: PrefsKeys.discordRpcToken,
+          value: clean,
+        );
+      }
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Failed to persist Discord token in secure storage',
+        error: e,
+        stackTrace: st,
+        category: 'DiscordRPC',
+      );
+    }
     _currentUser = null;
 
     if (clean.isNotEmpty) {
@@ -213,6 +316,16 @@ class DiscordRpcService {
     _token = '';
     _currentUser = null;
     await _prefs?.remove(PrefsKeys.discordRpcToken);
+    try {
+      await _secureStorage.delete(key: PrefsKeys.discordRpcToken);
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Failed to delete Discord token from secure storage',
+        error: e,
+        stackTrace: st,
+        category: 'DiscordRPC',
+      );
+    }
     await clearPresence();
     disconnect();
   }
@@ -241,7 +354,7 @@ class DiscordRpcService {
           'User-Agent': DiscordSuperProperties.userAgent,
           'X-Super-Properties': DiscordSuperProperties.getBase64(),
         },
-      );
+      ).timeout(httpTimeout);
       if (res.statusCode == 200) {
         final json = jsonDecode(res.body) as Map<String, dynamic>;
         return DiscordUser.fromJson(json);
@@ -261,11 +374,12 @@ class DiscordRpcService {
 
   /// Establishes the Gateway WebSocket connection.
   Future<void> connect() async {
-    if (_disposed || _isConnecting || _isConnected) return;
+    if (_disposed || !_enabled || _isConnecting || _isConnected) return;
     if (_token.isEmpty) return;
 
     _isConnecting = true;
     _reconnectTimer?.cancel();
+    final generation = ++_connectGeneration;
 
     final url = _resumeGatewayUrl ?? defaultGatewayUrl;
     try {
@@ -278,6 +392,19 @@ class DiscordRpcService {
         },
       ).timeout(const Duration(seconds: 15));
 
+      if (_disposed ||
+          !_enabled ||
+          _token.isEmpty ||
+          generation != _connectGeneration) {
+        _isConnecting = false;
+        try {
+          await socket.close();
+        } catch (e) {
+          ErrorLogger.logSwallowed('DiscordRpcService.closeStaleSocket', e);
+        }
+        return;
+      }
+
       _webSocket = socket;
       _isConnected = true;
       _isConnecting = false;
@@ -285,23 +412,27 @@ class DiscordRpcService {
       socket.listen(
         _onMessage,
         onError: (e) {
+          if (generation != _connectGeneration) return;
           debugPrint('[DiscordRPC] WebSocket error: $e');
-          _onDisconnect();
+          _onDisconnect(closeCode: socket.closeCode);
         },
         onDone: () {
-          debugPrint('[DiscordRPC] WebSocket closed.');
-          _onDisconnect();
+          if (generation != _connectGeneration) return;
+          debugPrint(
+              '[DiscordRPC] WebSocket closed (code=${socket.closeCode}).');
+          _onDisconnect(closeCode: socket.closeCode);
         },
         cancelOnError: true,
       );
     } catch (e) {
+      if (generation != _connectGeneration) return;
       debugPrint('[DiscordRPC] Connection failed: $e');
       _isConnecting = false;
       _onDisconnect();
     }
   }
 
-  void _onDisconnect() {
+  void _onDisconnect({int? closeCode}) {
     _isConnected = false;
     _sessionReady = false;
     _awaitingAck = false;
@@ -310,9 +441,23 @@ class DiscordRpcService {
     _webSocket?.close();
     _webSocket = null;
 
+    if (isFatalCloseCode(closeCode)) {
+      debugPrint(
+          '[DiscordRPC] Fatal close code $closeCode; halting auto-reconnect.');
+      return;
+    }
+
     if (_enabled && !_disposed && _token.isNotEmpty) {
+      _reconnectAttempts++;
+      if (_reconnectAttempts > maxReconnectAttempts) {
+        debugPrint(
+            '[DiscordRPC] Max reconnect attempts ($maxReconnectAttempts) reached.');
+        return;
+      }
       _reconnectTimer?.cancel();
-      _reconnectTimer = Timer(const Duration(seconds: 5), () {
+      final delaySeconds =
+          math.min(60, 5 * (1 << (_reconnectAttempts - 1)));
+      _reconnectTimer = Timer(Duration(seconds: delaySeconds), () {
         if (_enabled && !_disposed && !_isConnected) {
           connect();
         }
@@ -323,6 +468,7 @@ class DiscordRpcService {
   /// Force a reconnect.
   void reconnect() {
     disconnect();
+    _reconnectAttempts = 0;
     if (_enabled && _token.isNotEmpty) {
       connect();
     }
@@ -330,6 +476,8 @@ class DiscordRpcService {
 
   /// Disconnects the socket without erasing credentials.
   void disconnect() {
+    _connectGeneration++;
+    _isConnecting = false;
     _reconnectTimer?.cancel();
     _heartbeatTimer?.cancel();
     _heartbeatTimer = null;
@@ -387,9 +535,11 @@ class DiscordRpcService {
                 _resumeGatewayUrl = '$resumeUrl/?v=9&encoding=json';
               }
             }
+            _reconnectAttempts = 0;
             _sessionReady = true;
             _replayLastPresence();
           } else if (t == 'RESUMED') {
+            _reconnectAttempts = 0;
             _sessionReady = true;
             _replayLastPresence();
           }
@@ -486,24 +636,28 @@ class DiscordRpcService {
     if (!imageUrl.startsWith('http://') && !imageUrl.startsWith('https://')) {
       return null;
     }
-    if (_externalAssetCache.containsKey(imageUrl)) {
-      return _externalAssetCache[imageUrl];
+    final cached = _externalAssetCache.remove(imageUrl);
+    if (cached != null) {
+      _externalAssetCache[imageUrl] = cached;
+      return cached;
     }
 
     try {
-      final res = await _httpClient.post(
-        Uri.parse(
-            'https://discord.com/api/v9/applications/$_applicationId/external-assets'),
-        headers: {
-          'Authorization': _token,
-          'User-Agent': DiscordSuperProperties.userAgent,
-          'X-Super-Properties': DiscordSuperProperties.getBase64(),
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
-          'urls': [imageUrl],
-        }),
-      );
+      final res = await _httpClient
+          .post(
+            Uri.parse(
+                'https://discord.com/api/v9/applications/$_applicationId/external-assets'),
+            headers: {
+              'Authorization': _token,
+              'User-Agent': DiscordSuperProperties.userAgent,
+              'X-Super-Properties': DiscordSuperProperties.getBase64(),
+              'Content-Type': 'application/json',
+            },
+            body: jsonEncode({
+              'urls': [imageUrl],
+            }),
+          )
+          .timeout(httpTimeout);
 
       if (res.statusCode == 200) {
         final decoded = jsonDecode(res.body);
@@ -512,7 +666,7 @@ class DiscordRpcService {
           final path = first['external_asset_path'] as String?;
           if (path != null && path.isNotEmpty) {
             final asset = 'mp:$path';
-            _externalAssetCache[imageUrl] = asset;
+            _putExternalAssetCache(imageUrl, asset);
             return asset;
           }
         }
@@ -551,7 +705,9 @@ class DiscordRpcService {
 
     String largeImage = fallbackArtUrl;
     final artUrl = song.remoteArtworkUrl ?? song.artworkUri;
-    if (artUrl != null && artUrl.isNotEmpty) {
+    if (artUrl != null &&
+        artUrl.isNotEmpty &&
+        isSafeRemoteArtworkUrl(artUrl)) {
       final proxied = await fetchExternalAsset(artUrl);
       if (proxied != null) {
         largeImage = proxied;

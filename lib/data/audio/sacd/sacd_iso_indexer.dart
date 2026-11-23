@@ -115,8 +115,55 @@ class SacdIsoIndexer {
   Future<SacdIsoIndex> _build(File iso) async {
     final reader = await Iso9660Reader.open(iso);
     try {
+      final imageLengthSectors = reader.fileLength ~/ SacdLayout.sectorSize;
       final area = await reader.lookupPath(SacdLayout.directoryName);
       if (area == null || !area.isDirectory) {
+        const masterOffset = SacdLayout.masterTocLba * SacdLayout.sectorSize;
+        if (reader.fileLength >= masterOffset + SacdLayout.sectorSize) {
+          final masterBytes =
+              await reader.readAt(masterOffset, SacdLayout.sectorSize);
+          if (masterBytes.length >= 8 &&
+              String.fromCharCodes(masterBytes, 0, 8) == 'SACDMTOC') {
+            final master = SacdMasterToc.parse(
+              masterBytes,
+              imageLengthSectors: imageLengthSectors,
+            );
+            final areas = <SacdToc>[];
+            if (master.area1Toc1Start > 0) {
+              final a1Bytes = await reader.readAt(
+                master.area1Toc1Start * SacdLayout.sectorSize,
+                master.area1TocSizeSectors * SacdLayout.sectorSize,
+              );
+              areas.add(
+                SacdToc.parse(
+                  a1Bytes,
+                  fileName: 'TWOCHTOC.TOC',
+                  imageLengthSectors: imageLengthSectors,
+                ),
+              );
+            }
+            if (master.area2Toc1Start > 0) {
+              final a2Bytes = await reader.readAt(
+                master.area2Toc1Start * SacdLayout.sectorSize,
+                master.area2TocSizeSectors * SacdLayout.sectorSize,
+              );
+              areas.add(
+                SacdToc.parse(
+                  a2Bytes,
+                  fileName: 'MULCHTOC.TOC',
+                  imageLengthSectors: imageLengthSectors,
+                ),
+              );
+            }
+            if (areas.isNotEmpty) {
+              return SacdIsoIndex(
+                isoPath: iso.absolute.path,
+                imageLengthSectors: imageLengthSectors,
+                areas: List<SacdToc>.unmodifiable(areas),
+              );
+            }
+          }
+        }
         throw IsoFormatException(
           'Image ${iso.path} has no ${SacdLayout.directoryName} directory',
         );
@@ -135,7 +182,6 @@ class SacdIsoIndexer {
           '/${SacdLayout.directoryName}',
         );
       }
-      final imageLengthSectors = reader.fileLength ~/ SacdLayout.sectorSize;
       final areas = <SacdToc>[];
       final failures = <String>[];
       for (final entry in tocEntries) {

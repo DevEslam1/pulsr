@@ -1,50 +1,66 @@
 // lib/features/assistant/assistant_strings.dart
 //
-// Single translation point for every English string the assistant module
-// shows or logs as user copy. A localisation pass only touches this file.
+// Localized copy for the assistant / search surface, backed by ARB
+// (`AppLocalizations`) with automatic English fallback in headless tests.
+
+import 'dart:ui' show Locale;
+
+import '../../core/utils/l10n_holder.dart';
+import '../../l10n/generated/app_localizations.dart';
 
 /// User-facing copy for the assistant / search surface.
 abstract final class AssistantStrings {
+  static final AppLocalizations _fallback =
+      lookupAppLocalizations(const Locale('en'));
+
+  static AppLocalizations _l10n([AppLocalizations? l10n]) =>
+      l10n ?? L10nHolder.current ?? _fallback;
+
   /// Now-playing title used when the favourites request resolves.
-  static const String favoritesTitle = 'Favorites';
+  static String get favoritesTitle => _l10n().assistantFavoritesTitle;
 
   /// Now-playing title used when the last album resumes.
-  static const String lastAlbumTitle = 'Last album';
+  static String get lastAlbumTitle => _l10n().assistantLastAlbumTitle;
 
   /// Now-playing title for an artist radio request.
-  static String artistRadioTitle(String artist) =>
-      artist.isEmpty ? 'Artist radio' : '$artist radio';
+  static String artistRadioTitle(String artist, [AppLocalizations? l10n]) {
+    final l = _l10n(l10n);
+    return artist.isEmpty
+        ? l.assistantArtistRadioGeneric
+        : l.assistantArtistRadioNamed(artist);
+  }
 
   /// Message shown when a lookup found nothing for [term].
-  static String nothingMatched(String term) => term.isEmpty
-      ? 'Nothing in your library matched that request.'
-      : 'Nothing in your library matched "$term".';
+  static String nothingMatched(String term, [AppLocalizations? l10n]) {
+    final l = _l10n(l10n);
+    return term.isEmpty
+        ? l.assistantNothingMatchedGeneric
+        : l.assistantNothingMatchedTerm(term);
+  }
 
   /// Message shown when the favourites list is empty.
-  static const String noFavorites = 'No favorite tracks yet.';
+  static String get noFavorites => _l10n().assistantNoFavorites;
 
   /// Message shown when there is no recent album to resume.
-  static const String noLastAlbum = 'No recent album to resume.';
+  static String get noLastAlbum => _l10n().assistantNoLastAlbum;
 
   /// Message shown when a library callback failed.
-  static const String libraryUnavailable =
-      'Could not read your library. Try again.';
+  static String get libraryUnavailable => _l10n().assistantLibraryUnavailable;
 
   /// Settings screen title.
-  static const String settingsTitle = 'Assistant & search';
+  static String get settingsTitle => _l10n().assistantSettingsTitle;
 
   /// Suggestion toggle title.
-  static const String suggestionsTitle = 'Search suggestions';
+  static String get suggestionsTitle => _l10n().assistantSuggestionsTitle;
 
   /// Suggestion toggle subtitle.
-  static const String suggestionsSubtitle =
-      'Show recent library tracks in the system search box. Off by default: '
-      'the cache is readable by the privileged search UI.';
+  static String get suggestionsSubtitle =>
+      _l10n().assistantSuggestionsSubtitle;
 
   /// Section label above the toggle.
-  static const String suggestionsSection = 'System search';
+  static String get suggestionsSection => _l10n().assistantSuggestionsSection;
 
   /// Shown while suggestions are off and cached rows are removed.
-  static const String suggestionsOffNotice =
-      'Suggestions are off. Any cached rows were cleared.';
+  static String get suggestionsOffNotice =>
+      _l10n().assistantSuggestionsOffNotice;
 }

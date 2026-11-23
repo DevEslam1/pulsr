@@ -53,6 +53,9 @@ import '../../features/library/presentation/favorites_screen.dart';
 import '../../features/playlist_detail/presentation/online_playlist_detail_screen.dart';
 import '../../features/playlists/cubit/playlist_cubit.dart';
 import '../../features/quran_mode/presentation/quran_mode_screen.dart';
+import '../../features/audio_profiles/audio_profiles_screen.dart';
+import '../../features/diagnostics/diagnostics_screen.dart';
+import '../../features/dlna/dlna_screen.dart';
 import '../services/ytm_account_service.dart';
 import '../widgets/pulsr_modal_tracker.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
@@ -500,7 +503,22 @@ GoRouter createRouter(MediaScannerService scannerService,
         parentNavigatorKey: rootNavigatorKey,
         pageBuilder: (context, state) => _buildPulsrPageRoute(
           key: state.pageKey,
-          child: const PartyScreen(),
+          child: PartyScreen(
+            initialCode: state.uri.queryParameters['code'],
+            initialServerUrl: state.uri.queryParameters['server'],
+          ),
+        ),
+      ),
+      GoRoute(
+        path: '/party/:code',
+        name: 'party-invite',
+        parentNavigatorKey: rootNavigatorKey,
+        pageBuilder: (context, state) => _buildPulsrPageRoute(
+          key: state.pageKey,
+          child: PartyScreen(
+            initialCode: state.pathParameters['code'],
+            initialServerUrl: state.uri.queryParameters['server'],
+          ),
         ),
       ),
       GoRoute(
@@ -918,6 +936,33 @@ GoRouter createRouter(MediaScannerService scannerService,
         pageBuilder: (context, state) => _buildPulsrPageRoute(
           key: state.pageKey,
           child: const HiddenFoldersScreen(),
+        ),
+      ),
+      GoRoute(
+        path: '/diagnostics',
+        name: 'diagnostics',
+        parentNavigatorKey: rootNavigatorKey,
+        pageBuilder: (context, state) => _buildPulsrPageRoute(
+          key: state.pageKey,
+          child: const DiagnosticsScreen(),
+        ),
+      ),
+      GoRoute(
+        path: '/audio-profiles',
+        name: 'audio-profiles',
+        parentNavigatorKey: rootNavigatorKey,
+        pageBuilder: (context, state) => _buildPulsrPageRoute(
+          key: state.pageKey,
+          child: const AudioProfilesScreen(),
+        ),
+      ),
+      GoRoute(
+        path: '/dlna',
+        name: 'dlna',
+        parentNavigatorKey: rootNavigatorKey,
+        pageBuilder: (context, state) => _buildPulsrPageRoute(
+          key: state.pageKey,
+          child: const DlnaScreen(),
         ),
       ),
     ],

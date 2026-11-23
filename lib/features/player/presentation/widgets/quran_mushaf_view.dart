@@ -27,6 +27,7 @@ class QuranMushafView extends StatefulWidget {
   final ValueChanged<Duration>? onSeek;
   final ValueChanged<int>? onSelectSurah;
   final bool isExpanded;
+  final QuranRepository? repository;
 
   const QuranMushafView({
     super.key,
@@ -36,6 +37,7 @@ class QuranMushafView extends StatefulWidget {
     this.onSeek,
     this.onSelectSurah,
     this.isExpanded = false,
+    this.repository,
   });
 
   @override
@@ -49,10 +51,13 @@ class _QuranMushafViewState extends State<QuranMushafView> {
   final Set<int> _revealedAyahs = {};
   int _lastActiveAyah = -1;
   int? _browsedSurah;
+  QuranRepository? _fallbackRepo;
 
-  QuranRepository get _repo => getIt.isRegistered<QuranRepository>()
-      ? getIt<QuranRepository>()
-      : QuranRepositoryImpl();
+  QuranRepository get _repo =>
+      widget.repository ??
+      (getIt.isRegistered<QuranRepository>()
+          ? getIt<QuranRepository>()
+          : (_fallbackRepo ??= QuranRepositoryImpl()));
 
   @override
   void dispose() {
@@ -171,7 +176,7 @@ class _QuranMushafViewState extends State<QuranMushafView> {
                 ),
               ),
               subtitle: Text(
-                '${s.nameEnglish} • ${s.totalAyahs} Ayahs • ${s.revelationPlace}',
+                '${s.nameEnglish} • ${ctx.l10n.quranAyahsCount(s.totalAyahs)} • ${s.revelationPlace}',
                 style: TextStyle(
                     fontSize: AppFontSize.caption, color: p.textSecondary),
               ),
@@ -272,7 +277,10 @@ class _QuranMushafViewState extends State<QuranMushafView> {
                           child: Text(
                             activeAyah == null
                                 ? context.l10n.quranReadingOnly
-                                : 'Ayah $activeAyah / ${surah.totalAyahs}',
+                                : context.l10n.quranAyahProgress(
+                                    activeAyah,
+                                    surah.totalAyahs,
+                                  ),
                             style: TextStyle(
                               fontSize: AppFontSize.caption,
                               fontWeight: FontWeight.w700,
@@ -283,7 +291,7 @@ class _QuranMushafViewState extends State<QuranMushafView> {
                       ],
                     ),
                     Text(
-                      '${surah.nameEnglish} • ${surah.revelationPlace} (${surah.totalAyahs} Verses)',
+                      '${surah.nameEnglish} • ${surah.revelationPlace} (${context.l10n.quranVersesCount(surah.totalAyahs)})',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(

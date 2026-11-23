@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"sort"
+	"strings"
 	"sync"
 
 	"github.com/pulsr-audio/pulsr/server/party/clock"
@@ -363,21 +364,22 @@ func (p *PlaybackState) AddUpcoming(memberId *string, tracks []*Track, playNext 
 }
 
 func (p *PlaybackState) RemoveUpcoming(memberId *string, videoId string) bool {
+	startIdx := p.QueueIndex + 1
+	if startIdx < 0 {
+		startIdx = 0
+	}
 	match := -1
-	for i, item := range p.Queue {
-		if item.VideoId == videoId {
+	for i := startIdx; i < len(p.Queue); i++ {
+		if p.Queue[i].VideoId == videoId {
 			match = i
 			break
 		}
 	}
-	if match == -1 || match == p.QueueIndex {
+	if match == -1 {
 		return false
 	}
 
 	p.Queue = append(p.Queue[:match], p.Queue[match+1:]...)
-	if p.QueueIndex > match {
-		p.QueueIndex--
-	}
 	p.touchQueue(memberId)
 	return true
 }
@@ -400,9 +402,13 @@ func (p *PlaybackState) ClearUpcoming(memberId *string) bool {
 
 func (p *PlaybackState) MoveUpcoming(memberId *string, fromIdx, toIdx int, videoId string) bool {
 	if videoId != "" {
+		startIdx := p.QueueIndex + 1
+		if startIdx < 0 {
+			startIdx = 0
+		}
 		match := -1
-		for i, item := range p.Queue {
-			if item.VideoId == videoId {
+		for i := startIdx; i < len(p.Queue); i++ {
+			if p.Queue[i].VideoId == videoId {
 				match = i
 				break
 			}
@@ -575,11 +581,20 @@ func (p *Party) Host() *Member {
 	return nil
 }
 
-func (p *Party) Join(userId, deviceId, displayName string, avatarUrl *string) (*Member, error) {
+func (p *Party) Join(userId, deviceId, displayName string, avatarUrl *string, existingToken ...string) (*Member, error) {
 	now := clock.NowMs()
-	// Rejoining device check
+	var suppliedToken string
+	if len(existingToken) > 0 {
+		suppliedToken = strings.TrimSpace(existingToken[0])
+	}
+	// Rejoining device check: require the existing member's token so an
+	// unauthenticated caller cannot hijack an existing member/host slot solely by
+	// knowing or guessing its deviceId.
 	for _, m := range p.Members {
 		if m.DeviceId == deviceId {
+			if suppliedToken == "" || subtle.ConstantTimeCompare([]byte(m.Token), []byte(suppliedToken)) != 1 {
+				return nil, NewPartyError(401, "bad_token", "Valid member token is required to rejoin an existing device slot.")
+			}
 			m.DisplayName = displayName
 			m.AvatarUrl = avatarUrl
 			m.UserId = userId
@@ -671,9 +686,25 @@ func (p *Party) Remove(memberId string) *Member {
 	}
 	delete(p.Members, memberId)
 	if m.IsHost && len(p.Members) > 0 {
-		for _, next := range p.Members {
-			next.IsHost = true
-			break
+		var best *Member
+		for _, candidate := range p.Members {
+			if best == nil {
+				best = candidate
+				continue
+			}
+			if candidate.Connected != best.Connected {
+				if candidate.Connected {
+					best = candidate
+				}
+				continue
+			}
+			if candidate.JoinedAtMs < best.JoinedAtMs ||
+				(candidate.JoinedAtMs == best.JoinedAtMs && candidate.MemberId < best.MemberId) {
+				best = candidate
+			}
+		}
+		if best != nil {
+			best.IsHost = true
 		}
 	}
 	p.Touch()

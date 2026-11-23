@@ -139,12 +139,25 @@ extension _EqSheetShell on _EqualizerSheetState {
 
   String? _dspBlockedReason(BuildContext context) {
     try {
-      final settings = context.watch<SettingsCubit>().state;
+      final (
+        bitPerfectOutput,
+        bypassDspOnBitPerfect,
+        device,
+        aaudioEnabled,
+      ) = context.select<SettingsCubit,
+          (bool, bool, AudioOutputInfo?, bool)>(
+        (c) => (
+          c.state.bitPerfectOutput,
+          c.state.bypassDspOnBitPerfect,
+          c.state.currentOutputDevice,
+          c.state.aaudioOutputEnabled,
+        ),
+      );
       return AudioConflicts.dspBlockedByBitPerfect(
-        bitPerfectOutput: settings.bitPerfectOutput,
-        bypassDspOnBitPerfect: settings.bypassDspOnBitPerfect,
-        device: settings.currentOutputDevice,
-        aaudioEnabled: settings.aaudioOutputEnabled,
+        bitPerfectOutput: bitPerfectOutput,
+        bypassDspOnBitPerfect: bypassDspOnBitPerfect,
+        device: device,
+        aaudioEnabled: aaudioEnabled,
         dsdDopActive: DsdDecoderHelper.dsdDopActive,
       );
     } catch (_) {

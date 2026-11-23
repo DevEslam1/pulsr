@@ -1,6 +1,7 @@
 // lib/features/playlist_detail/presentation/manage_playlist_screen.dart
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
@@ -13,6 +14,7 @@ import '../../../core/errors/failures.dart';
 import '../../../core/motion/pulsr_motion.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
+import '../../../core/utils/error_logger.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/utils/search_algorithm_utils.dart';
@@ -27,14 +29,22 @@ import '../../../core/widgets/pulsr_toast.dart';
 import '../../../core/widgets/shimmer_skeleton.dart';
 import '../../../core/widgets/staggered_list_item.dart';
 import '../../../data/db/app_database.dart';
+import '../../../domain/repositories/music_repository_interface.dart';
+import '../../../domain/usecases/folder_usecases.dart';
 import '../../../domain/usecases/get_songs_usecase.dart';
 import '../../../domain/usecases/playlist_usecases.dart';
 
 import '../../../core/utils/pulsr_haptics.dart';
+
 class ManagePlaylistScreen extends StatefulWidget {
   final PlaylistsTableData playlist;
+  final List<String> excludedFolders;
 
-  const ManagePlaylistScreen({super.key, required this.playlist});
+  const ManagePlaylistScreen({
+    super.key,
+    required this.playlist,
+    this.excludedFolders = const [],
+  });
 
   @override
   State<ManagePlaylistScreen> createState() => _ManagePlaylistScreenState();
@@ -44,6 +54,7 @@ class _ManagePlaylistScreenState extends State<ManagePlaylistScreen> {
   final Set<int> _selectedSongIds = {};
   final Set<int> _initialSongIds = {};
   final TextEditingController _searchController = TextEditingController();
+  final Map<int, ({String title, String artist, String album})> _normCache = {};
   String _searchQuery = '';
   bool _showSelectedOnly = false;
   bool _isLoading = true;
@@ -52,18 +63,69 @@ class _ManagePlaylistScreenState extends State<ManagePlaylistScreen> {
 
   late final PlaylistUseCases _playlistUseCases;
   late final GetSongsUseCase _getSongsUseCase;
-  late final Stream<Result<List<SongsTableData>>> _songsStream;
+  late List<String> _excludedFolders;
+  late Stream<Result<List<SongsTableData>>> _songsStream;
 
   @override
   void initState() {
     super.initState();
     _playlistUseCases = getIt<PlaylistUseCases>();
     _getSongsUseCase = getIt<GetSongsUseCase>();
+    _excludedFolders = List<String>.unmodifiable(widget.excludedFolders);
+    _updateSongsStream();
+    if (_excludedFolders.isEmpty) {
+      unawaited(_loadExcludedFolders());
+    }
+    _loadInitialPlaylistSongs();
+  }
+
+  void _updateSongsStream() {
     _songsStream = _getSongsUseCase
-        .watchSongs()
+        .watchSongs(excludedFolders: _excludedFolders)
         .distinct()
         .asBroadcastStream(onCancel: (sub) => sub.cancel());
-    _loadInitialPlaylistSongs();
+  }
+
+  Future<void> _loadExcludedFolders() async {
+    try {
+      List<String> fetched = const [];
+      if (getIt.isRegistered<FolderUseCases>()) {
+        final res = await getIt<FolderUseCases>().getExcludedFolders();
+        fetched = res.fold((_) => const <String>[], (r) => r);
+      } else if (getIt.isRegistered<IMusicRepository>()) {
+        final res = await getIt<IMusicRepository>().getExcludedFolderPaths();
+        fetched = res.fold((_) => const <String>[], (r) => r);
+      }
+      if (!mounted || listEquals(fetched, _excludedFolders)) return;
+      setState(() {
+        _excludedFolders = List<String>.unmodifiable(fetched);
+        _updateSongsStream();
+      });
+    } catch (e, st) {
+      ErrorLogger.log('Failed to load excluded folders for ManagePlaylistScreen',
+          error: e, stackTrace: st, category: 'ManagePlaylist');
+    }
+  }
+
+  @override
+  void didUpdateWidget(ManagePlaylistScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final excludedChanged =
+        !listEquals(oldWidget.excludedFolders, widget.excludedFolders);
+    if (excludedChanged) {
+      _excludedFolders = List<String>.unmodifiable(widget.excludedFolders);
+      setState(_updateSongsStream);
+      if (_excludedFolders.isEmpty) {
+        unawaited(_loadExcludedFolders());
+      }
+    }
+    if (oldWidget.playlist.id != widget.playlist.id) {
+      setState(() {
+        _isLoading = true;
+        _loadError = null;
+      });
+      _loadInitialPlaylistSongs();
+    }
   }
 
   @override
@@ -121,9 +183,17 @@ class _ManagePlaylistScreenState extends State<ManagePlaylistScreen> {
     if (_searchQuery.trim().isEmpty) return filtered.toList();
     final query = SearchAlgorithmUtils.normalize(_searchQuery);
     return filtered.where((s) {
-      return SearchAlgorithmUtils.normalize(s.title).contains(query) ||
-          SearchAlgorithmUtils.normalize(s.artist).contains(query) ||
-          SearchAlgorithmUtils.normalize(s.album).contains(query);
+      final norm = _normCache.putIfAbsent(
+        s.id,
+        () => (
+          title: SearchAlgorithmUtils.normalize(s.title),
+          artist: SearchAlgorithmUtils.normalize(s.artist),
+          album: SearchAlgorithmUtils.normalize(s.album),
+        ),
+      );
+      return norm.title.contains(query) ||
+          norm.artist.contains(query) ||
+          norm.album.contains(query);
     }).toList();
   }
 

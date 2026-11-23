@@ -76,7 +76,9 @@ public:
     // Control-thread operations; the stream must be quiesced.
     // reset(): drop buffered audio AND all counters/state.
     // flush(): drop buffered audio only (seek); counters survive, the prefill
-    //          gate is re-armed, pause state is untouched.
+    //          gate is re-armed, pause state is untouched. Safe to call while
+    //          the consumer thread is active: advances an atomic watermark and
+    //          monotonic read index without zeroing indices or racing copyOut().
     void reset();
     void flush();
 
@@ -137,7 +139,10 @@ public:
 private:
     // Consumer-side copy without counters; returns frames copied. May be
     // called only when the prefill gate and pause gate have been passed.
-    size_t copyOut(uint8_t* dst, size_t frames);
+    // Sets *flushed = true if a concurrent flush() invalidated the copy.
+    size_t copyOut(uint8_t* dst, size_t frames, bool* flushed = nullptr);
+    // Monotonically advances readIndex_ to at least `target` (never moves backward).
+    uint64_t advanceReadIndexAtLeast(uint64_t target) const;
 
     std::vector<uint8_t> ring_;   // capacityFrames_ * frameBytes_, Configure only
     int sampleRate_ = 0;
@@ -156,8 +161,12 @@ private:
     alignas(64) std::atomic<uint64_t> overrunEvents_{0};
 
     // Consumer-owned cache line(s).
-    alignas(64) std::atomic<uint64_t> readIndex_{0};
+    alignas(64) mutable std::atomic<uint64_t> readIndex_{0};
     alignas(64) std::atomic<uint64_t> framesPulled_{0};
+    // Hazard read index while copyOut() is reading ring_ bytes (UINT64_MAX when idle).
+    alignas(64) mutable std::atomic<uint64_t> consumerPin_{UINT64_MAX};
+    // Monotonic flush watermark: frames < flushWatermark_ are pre-seek and discarded.
+    alignas(64) std::atomic<uint64_t> flushWatermark_{0};
 
     // Written by one side, read by the other.
     alignas(64) std::atomic<uint64_t> underrunEvents_{0};

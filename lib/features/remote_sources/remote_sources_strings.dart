@@ -1,118 +1,116 @@
 // lib/features/remote_sources/remote_sources_strings.dart
 //
-// P0-1 "remote sources": every English string this module renders.
-//
-// One file so the strings can be handed to a translator (or moved into the
-// generated ARB catalogue) without touching the widgets.
+// Localized copy for the remote sources module, backed by ARB
+// (`AppLocalizations`) with automatic English fallback in headless tests.
+
+import 'dart:ui' show Locale;
+
+import '../../core/utils/l10n_holder.dart';
 import '../../domain/models/remote_source.dart';
+import '../../l10n/generated/app_localizations.dart';
 
 /// User-facing text for the remote sources module.
 abstract final class RemoteSourcesStrings {
+  static final AppLocalizations _fallback =
+      lookupAppLocalizations(const Locale('en'));
+
+  static AppLocalizations _l10n([AppLocalizations? l10n]) =>
+      l10n ?? L10nHolder.current ?? _fallback;
+
   // Screen chrome.
-  static const String title = 'Remote sources';
-  static const String intro =
-      'Play music stored on a NAS, a WebDAV server or an FTP host.';
-  static const String addSource = 'Add source';
-  static const String addSourceTooltip = 'Add a remote source';
-  static const String emptyTitle = 'No remote sources yet';
-  static const String emptyBody =
-      'Add a WebDAV, FTP or SMB library to browse it from here.';
-  static const String loadFailed =
-      'The saved sources could not be read. They were kept on disk.';
-  static const String retry = 'Retry';
-  static const String loadMore = 'Load more';
+  static String get title => _l10n().remoteSrcTitle;
+  static String get intro => _l10n().remoteSrcIntro;
+  static String get addSource => _l10n().remoteSrcAddSource;
+  static String get addSourceTooltip => _l10n().remoteSrcAddSourceTooltip;
+  static String get emptyTitle => _l10n().remoteSrcEmptyTitle;
+  static String get emptyBody => _l10n().remoteSrcEmptyBody;
+  static String get loadFailed => _l10n().remoteSrcLoadFailed;
+  static String get retry => _l10n().remoteSrcRetry;
+  static String get loadMore => _l10n().remoteSrcLoadMore;
 
   // Row actions.
-  static const String actionsTooltip = 'Source actions';
-  static const String editSource = 'Edit';
-  static const String deleteSource = 'Delete';
-  static const String testConnection = 'Test connection';
-  static const String testConnectionTooltip = 'Test this connection';
-  static const String testing = 'Testing…';
-  static const String browse = 'Browse';
+  static String get actionsTooltip => _l10n().remoteSrcActionsTooltip;
+  static String get editSource => _l10n().remoteSrcEditSource;
+  static String get deleteSource => _l10n().remoteSrcDeleteSource;
+  static String get testConnection => _l10n().remoteSrcTestConnection;
+  static String get testConnectionTooltip =>
+      _l10n().remoteSrcTestConnectionTooltip;
+  static String get testing => _l10n().remoteSrcTesting;
+  static String get browse => _l10n().remoteSrcBrowse;
 
   // Editor.
-  static const String editorAddTitle = 'Add a remote source';
-  static const String editorEditTitle = 'Edit remote source';
-  static const String kindLabel = 'Type';
-  static const String nameLabel = 'Name';
-  static const String nameHint = 'Living room NAS';
-  static const String hostLabel = 'Host';
-  static const String hostHint = '192.168.1.10 or nas.local';
-  static const String portLabel = 'Port';
-  static const String tlsLabel = 'Use HTTPS';
-  static const String cleartextWarning =
-      'HTTPS is off: your password and library traffic will be sent '
-      'unencrypted. Enable it unless the server has no TLS support.';
-  static const String rootLabel = 'Root folder';
-  static const String rootHint = '/Music';
-  static const String rootHintShare = '/Share/Folder';
-  static const String usernameLabel = 'Username';
-  static const String passwordLabel = 'Password';
-  static const String passwordKeepHint = 'Leave empty to keep the saved one';
-  static const String subsonicUrlLabel = 'Server URL';
-  static const String subsonicUrlHint = 'https://music.example.com';
-  static const String subsonicUrlInvalid =
-      'Enter the full server URL, for example https://music.example.com.';
-  static const String cancel = 'Cancel';
-  static const String save = 'Save';
-  static const String saveFailed = 'The source could not be saved.';
-  static const String credentialsFailed =
-      'The source was saved, but the password could not be stored securely.';
+  static String get editorAddTitle => _l10n().remoteSrcEditorAddTitle;
+  static String get editorEditTitle => _l10n().remoteSrcEditorEditTitle;
+  static String get kindLabel => _l10n().remoteSrcKindLabel;
+  static String get nameLabel => _l10n().remoteSrcNameLabel;
+  static String get nameHint => _l10n().remoteSrcNameHint;
+  static String get hostLabel => _l10n().remoteSrcHostLabel;
+  static String get hostHint => _l10n().remoteSrcHostHint;
+  static String get portLabel => _l10n().remoteSrcPortLabel;
+  static String get tlsLabel => _l10n().remoteSrcTlsLabel;
+  static String get cleartextWarning => _l10n().remoteSrcCleartextWarning;
+  static String get rootLabel => _l10n().remoteSrcRootLabel;
+  static String get rootHint => _l10n().remoteSrcRootHint;
+  static String get rootHintShare => _l10n().remoteSrcRootHintShare;
+  static String get usernameLabel => _l10n().remoteSrcUsernameLabel;
+  static String get passwordLabel => _l10n().remoteSrcPasswordLabel;
+  static String get passwordKeepHint => _l10n().remoteSrcPasswordKeepHint;
+  static String get subsonicUrlLabel => _l10n().remoteSrcSubsonicUrlLabel;
+  static String get subsonicUrlHint => _l10n().remoteSrcSubsonicUrlHint;
+  static String get subsonicUrlInvalid => _l10n().remoteSrcSubsonicUrlInvalid;
+  static String get cancel => _l10n().remoteSrcCancel;
+  static String get save => _l10n().remoteSrcSave;
+  static String get saveFailed => _l10n().remoteSrcSaveFailed;
+  static String get credentialsFailed => _l10n().remoteSrcCredentialsFailed;
 
   // Validation.
-  static const String hostRequired = 'Host is required.';
-  static const String portRange = 'Port must be between 1 and 65535.';
-  static const String nameRequired = 'Name is required.';
-  static const String rootRequired = 'Set a root, for example /Music.';
-  static const String shareRequired =
-      'SMB needs a share in the root, for example /Music.';
+  static String get hostRequired => _l10n().remoteSrcHostRequired;
+  static String get portRange => _l10n().remoteSrcPortRange;
+  static String get nameRequired => _l10n().remoteSrcNameRequired;
+  static String get rootRequired => _l10n().remoteSrcRootRequired;
+  static String get shareRequired => _l10n().remoteSrcShareRequired;
 
   // Status.
-  static const String connectedIn = 'Connected in';
-  static const String notTested = 'Not tested yet';
-  static const String anonymous = 'Anonymous';
+  static String get connectedIn => _l10n().remoteSrcConnectedIn;
+  static String get notTested => _l10n().remoteSrcNotTested;
+  static String get anonymous => _l10n().remoteSrcAnonymous;
 
   // Browser.
-  static const String browserTitle = 'Browse';
-  static const String rootCrumb = 'Root';
-  static const String emptyFolder = 'This folder is empty.';
-  static const String folderLoadFailed = 'This folder could not be read.';
-  static const String close = 'Close';
-  static const String fileNameUnknown = 'File';
-  static const String folderLabel = 'Folder';
-  static const String searchLibrary = 'Search library';
-  static const String searchHint = 'Search artists, albums, songs…';
-  static const String searchClear = 'Clear search';
-  static const String noSearchResults = 'No results found.';
-  static const String artistsHeader = 'Artists';
-  static const String albumsHeader = 'Albums';
-  static const String songsHeader = 'Songs';
+  static String get browserTitle => _l10n().remoteSrcBrowserTitle;
+  static String get rootCrumb => _l10n().remoteSrcRootCrumb;
+  static String get emptyFolder => _l10n().remoteSrcEmptyFolder;
+  static String get folderLoadFailed => _l10n().remoteSrcFolderLoadFailed;
+  static String get close => _l10n().remoteSrcClose;
+  static String get fileNameUnknown => _l10n().remoteSrcFileNameUnknown;
+  static String get folderLabel => _l10n().remoteSrcFolderLabel;
+  static String get searchLibrary => _l10n().remoteSrcSearchLibrary;
+  static String get searchHint => _l10n().remoteSrcSearchHint;
+  static String get searchClear => _l10n().remoteSrcSearchClear;
+  static String get noSearchResults => _l10n().remoteSrcNoSearchResults;
+  static String get artistsHeader => _l10n().remoteSrcArtistsHeader;
+  static String get albumsHeader => _l10n().remoteSrcAlbumsHeader;
+  static String get songsHeader => _l10n().remoteSrcSongsHeader;
 
   // Cache.
-  static const String cacheTitle = 'Cached audio';
-  static const String cacheBody = 'Files you played are kept for fast seeking.';
-  static const String clearCache = 'Clear cache';
-  static const String clearCacheTooltip = 'Delete cached audio';
-  static const String cacheCleared = 'Cached audio deleted.';
-  static const String calculating = 'Calculating…';
+  static String get cacheTitle => _l10n().remoteSrcCacheTitle;
+  static String get cacheBody => _l10n().remoteSrcCacheBody;
+  static String get clearCache => _l10n().remoteSrcClearCache;
+  static String get clearCacheTooltip => _l10n().remoteSrcClearCacheTooltip;
+  static String get cacheCleared => _l10n().remoteSrcCacheCleared;
+  static String get calculating => _l10n().remoteSrcCalculating;
 
   // UPnP discovery.
-  static const String upnpTitle = 'UPnP media servers';
-  static const String upnpIntro =
-      'Find a DLNA media server on this network and browse it here.';
-  static const String upnpSearch = 'Search for servers';
-  static const String upnpSearching = 'Searching for media servers…';
-  static const String upnpNone = 'No media server found';
-  static const String upnpUse = 'Use this server';
-  static const String upnpFailed =
-      'Media servers could not be discovered. Check that this device is on '
-      'the same network.';
+  static String get upnpTitle => _l10n().remoteSrcUpnpTitle;
+  static String get upnpIntro => _l10n().remoteSrcUpnpIntro;
+  static String get upnpSearch => _l10n().remoteSrcUpnpSearch;
+  static String get upnpSearching => _l10n().remoteSrcUpnpSearching;
+  static String get upnpNone => _l10n().remoteSrcUpnpNone;
+  static String get upnpUse => _l10n().remoteSrcUpnpUse;
+  static String get upnpFailed => _l10n().remoteSrcUpnpFailed;
 
   // Delete.
-  static const String deleteTitle = 'Delete this source?';
-  static const String deleteBody =
-      'Its saved password and cached audio are removed too.';
+  static String get deleteTitle => _l10n().remoteSrcDeleteTitle;
+  static String get deleteBody => _l10n().remoteSrcDeleteBody;
 
   /// Label shown for a [RemoteSourceKind].
   static String kindLabelFor(RemoteSourceKind kind) {
@@ -131,18 +129,22 @@ abstract final class RemoteSourcesStrings {
   }
 
   /// One-line hint shown under the type selector.
-  static String kindDescriptionFor(RemoteSourceKind kind) {
+  static String kindDescriptionFor(
+    RemoteSourceKind kind, [
+    AppLocalizations? l10n,
+  ]) {
+    final l = _l10n(l10n);
     switch (kind) {
       case RemoteSourceKind.webdav:
-        return 'Nextcloud, ownCloud, Apache mod_dav';
+        return l.remoteSrcKindWebdavDesc;
       case RemoteSourceKind.ftp:
-        return 'Plain FTP servers and routers';
+        return l.remoteSrcKindFtpDesc;
       case RemoteSourceKind.smb:
-        return 'Windows shares and Samba (Android only)';
+        return l.remoteSrcKindSmbDesc;
       case RemoteSourceKind.subsonic:
-        return 'Navidrome, Airsonic, Gonic and other Subsonic servers';
+        return l.remoteSrcKindSubsonicDesc;
       case RemoteSourceKind.upnp:
-        return 'DLNA media servers discovered on your network';
+        return l.remoteSrcKindUpnpDesc;
     }
   }
 
@@ -158,9 +160,10 @@ abstract final class RemoteSourcesStrings {
   }
 
   /// `Connected in 42 ms`.
-  static String connectedInLabel(int milliseconds) =>
-      '$connectedIn $milliseconds ms';
+  static String connectedInLabel(int milliseconds, [AppLocalizations? l10n]) =>
+      _l10n(l10n).remoteSrcConnectedInMs(milliseconds);
 
   /// `Delete "Living room NAS"?`.
-  static String deleteConfirmTitle(String name) => 'Delete "$name"?';
+  static String deleteConfirmTitle(String name, [AppLocalizations? l10n]) =>
+      _l10n(l10n).remoteSrcDeleteConfirmTitle(name);
 }

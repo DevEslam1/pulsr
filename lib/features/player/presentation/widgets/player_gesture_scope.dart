@@ -42,40 +42,42 @@ class PlayerGestureScope extends StatelessWidget {
       behavior: behavior,
       onTap:
           onTap ?? () => context.read<PlayerCubit>().toggleLyricsVisibility(),
-      onDoubleTap: () {
-        final cubit = context.read<PlayerCubit>();
-        final song = cubit.state.currentSong;
-        switch (nowPlayingDoubleTap) {
-          case NowPlayingDoubleTapAction.toggleFavorite:
-            if (song != null) {
-              PulsrHaptics.selectionClick();
-              cubit.toggleFavorite(song.id);
-            }
-            break;
-          case NowPlayingDoubleTapAction.toggleLyrics:
-            PulsrHaptics.selectionClick();
-            cubit.toggleLyricsVisibility();
-            break;
-          case NowPlayingDoubleTapAction.none:
-            break;
-        }
-      },
-      onHorizontalDragEnd: (details) {
-        if (nowPlayingArtworkSwipe != NowPlayingArtworkSwipeAction.nextPrev) {
-          return;
-        }
-        final velocity = details.primaryVelocity;
-        if (velocity == null) return;
+      onDoubleTap: nowPlayingDoubleTap == NowPlayingDoubleTapAction.none
+          ? null
+          : () {
+              final cubit = context.read<PlayerCubit>();
+              final song = cubit.state.currentSong;
+              switch (nowPlayingDoubleTap) {
+                case NowPlayingDoubleTapAction.toggleFavorite:
+                  if (song != null) {
+                    PulsrHaptics.selectionClick();
+                    cubit.toggleFavorite(song.id);
+                  }
+                  break;
+                case NowPlayingDoubleTapAction.toggleLyrics:
+                  PulsrHaptics.selectionClick();
+                  cubit.toggleLyricsVisibility();
+                  break;
+                case NowPlayingDoubleTapAction.none:
+                  break;
+              }
+            },
+      onHorizontalDragEnd:
+          nowPlayingArtworkSwipe != NowPlayingArtworkSwipeAction.nextPrev
+              ? null
+              : (details) {
+                  final velocity = details.primaryVelocity;
+                  if (velocity == null) return;
 
-        final cubit = context.read<PlayerCubit>();
-        if (velocity < -200) {
-          PulsrHaptics.lightImpact();
-          cubit.next();
-        } else if (velocity > 200) {
-          PulsrHaptics.lightImpact();
-          cubit.previous();
-        }
-      },
+                  final cubit = context.read<PlayerCubit>();
+                  if (velocity < -200) {
+                    PulsrHaptics.lightImpact();
+                    cubit.next();
+                  } else if (velocity > 200) {
+                    PulsrHaptics.lightImpact();
+                    cubit.previous();
+                  }
+                },
       child: child,
     );
   }

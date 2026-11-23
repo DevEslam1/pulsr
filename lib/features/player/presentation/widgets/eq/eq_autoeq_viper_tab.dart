@@ -108,7 +108,8 @@ extension _EqAutoEqViperTab on _EqualizerSheetState {
 
               // Active Headphone Profile Banner
               if (state.selectedHeadphoneProfile != null) ...[
-                _buildAutoEqAppliedBanner(context, cubit, state, p),
+                _buildAutoEqAppliedBanner(
+                    context, cubit, state, p, dspBlocked),
                 const SizedBox(height: AppSpacing.xs),
               ],
             ]),
@@ -140,6 +141,7 @@ extension _EqAutoEqViperTab on _EqualizerSheetState {
                 state: state,
                 profile: filteredProfiles[index],
                 p: p,
+                dspBlocked: dspBlocked,
               ),
             ),
           ),
@@ -162,8 +164,13 @@ extension _EqAutoEqViperTab on _EqualizerSheetState {
     );
   }
 
-  Widget _buildAutoEqAppliedBanner(BuildContext context, PlayerCubit cubit,
-      PlayerState state, PulsrPalette p) {
+  Widget _buildAutoEqAppliedBanner(
+    BuildContext context,
+    PlayerCubit cubit,
+    PlayerState state,
+    PulsrPalette p,
+    String? dspBlocked,
+  ) {
     return Container(
       padding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.s14, vertical: AppSpacing.s10),
@@ -200,7 +207,7 @@ extension _EqAutoEqViperTab on _EqualizerSheetState {
             ),
           ),
           TextButton(
-            onPressed: () => cubit.resetToFlat(),
+            onPressed: dspBlocked != null ? null : () => cubit.resetToFlat(),
             child: Text(
               context.l10n.resetToFlat,
               style: TextStyle(
@@ -220,25 +227,30 @@ extension _EqAutoEqViperTab on _EqualizerSheetState {
     required PlayerState state,
     required HeadphoneProfile profile,
     required PulsrPalette p,
+    required String? dspBlocked,
   }) {
     final isApplied = state.selectedHeadphoneProfile?.id == profile.id;
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.xs),
-      child: Material(
-        type: MaterialType.transparency,
-        child: InkWell(
-          onTap: () async {
-            if (isApplied) {
-              await cubit.resetToFlat();
-            } else {
-              if (!state.isEqEnabled) {
-                await cubit.setEqualizerEnabled(true);
-              }
-              await cubit.applyHeadphoneProfile(profile);
-            }
-          },
-          borderRadius: AppRadii.cardRadius,
-          child: Ink(
+      child: Opacity(
+        opacity: dspBlocked != null ? 0.5 : 1.0,
+        child: Material(
+          type: MaterialType.transparency,
+          child: InkWell(
+            onTap: dspBlocked != null
+                ? null
+                : () async {
+                    if (isApplied) {
+                      await cubit.resetToFlat();
+                    } else {
+                      if (!state.isEqEnabled) {
+                        await cubit.setEqualizerEnabled(true);
+                      }
+                      await cubit.applyHeadphoneProfile(profile);
+                    }
+                  },
+            borderRadius: AppRadii.cardRadius,
+            child: Ink(
             padding: const EdgeInsets.symmetric(
                 horizontal: AppSpacing.s14, vertical: AppSpacing.sm),
             decoration: BoxDecoration(
@@ -301,12 +313,14 @@ extension _EqAutoEqViperTab on _EqualizerSheetState {
                     icon: Icon(Icons.delete_outline_rounded,
                         size: 18, color: p.error),
                     tooltip: context.l10n.dspDeleteCustomPreset,
-                    onPressed: () async {
-                      await _headphoneRepo.removeProfile(profile.id);
-                      if (!mounted) return;
-                      if (isApplied) await cubit.resetToFlat();
-                      if (mounted) _setStateSafe(() {});
-                    },
+                    onPressed: dspBlocked != null
+                        ? null
+                        : () async {
+                            await _headphoneRepo.removeProfile(profile.id);
+                            if (!mounted) return;
+                            if (isApplied) await cubit.resetToFlat();
+                            if (mounted) _setStateSafe(() {});
+                          },
                   ),
                   const SizedBox(width: AppSpacing.xxs),
                 ],
@@ -362,6 +376,7 @@ extension _EqAutoEqViperTab on _EqualizerSheetState {
               ],
             ),
           ),
+        ),
         ),
       ),
     );

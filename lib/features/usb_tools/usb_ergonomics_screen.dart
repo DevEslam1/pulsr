@@ -188,7 +188,7 @@ class _UsbErgonomicsScreenState extends State<UsbErgonomicsScreen> {
     final state = _service.state;
     return Scaffold(
       appBar: AppBar(
-        title: const Text(UsbErgonomicsStrings.screenTitle),
+        title: Text(UsbErgonomicsStrings.screenTitle),
         actions: <Widget>[
           _SemIconButton(
             tooltip: UsbErgonomicsStrings.copyTooltip,
@@ -241,7 +241,7 @@ class _UsbErgonomicsScreenState extends State<UsbErgonomicsScreen> {
         FilledButton.icon(
           onPressed: _busy ? null : () => unawaited(_save()),
           icon: const Icon(Icons.save_rounded),
-          label: const Text(UsbErgonomicsStrings.saveAction),
+          label: Text(UsbErgonomicsStrings.saveAction),
           style: FilledButton.styleFrom(
             minimumSize: const Size.fromHeight(AppSpacing.minTouchTarget),
           ),
@@ -250,7 +250,7 @@ class _UsbErgonomicsScreenState extends State<UsbErgonomicsScreen> {
         OutlinedButton.icon(
           onPressed: _busy ? null : () => unawaited(_delete()),
           icon: const Icon(Icons.delete_outline_rounded),
-          label: const Text(UsbErgonomicsStrings.deleteAction),
+          label: Text(UsbErgonomicsStrings.deleteAction),
           style: OutlinedButton.styleFrom(
             minimumSize: const Size.fromHeight(AppSpacing.minTouchTarget),
           ),
@@ -380,7 +380,7 @@ class _DiagnosticsCard extends StatelessWidget {
           OutlinedButton.icon(
             onPressed: busy ? null : onProbe,
             icon: const Icon(Icons.speed_rounded),
-            label: const Text(UsbErgonomicsStrings.probeAction),
+            label: Text(UsbErgonomicsStrings.probeAction),
             style: OutlinedButton.styleFrom(
               minimumSize: const Size.fromHeight(AppSpacing.minTouchTarget),
             ),
@@ -409,7 +409,7 @@ class _DiagnosticsCard extends StatelessWidget {
           OutlinedButton.icon(
             onPressed: busy ? null : onResetAlt,
             icon: const Icon(Icons.restart_alt_rounded),
-            label: const Text(UsbErgonomicsStrings.resetAltAction),
+            label: Text(UsbErgonomicsStrings.resetAltAction),
             style: OutlinedButton.styleFrom(
               minimumSize: const Size.fromHeight(AppSpacing.minTouchTarget),
             ),

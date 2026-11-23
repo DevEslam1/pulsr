@@ -215,7 +215,7 @@ class AudioProfileService {
       return _prefs.remove(defaultProfileKey);
     }
     if (!_safeId.hasMatch(profileId)) {
-      throw const AudioProfileStoreError(
+      throw AudioProfileStoreError(
         code: 'audio-profile-invalid-id',
         userMessage: AudioProfileStrings.formatInvalidId,
       );
@@ -294,7 +294,7 @@ class AudioProfileService {
   }) async {
     final trimmed = name.trim();
     if (trimmed.isEmpty) {
-      throw const AudioProfileStoreError(
+      throw AudioProfileStoreError(
         code: 'audio-profile-name-empty',
         userMessage: AudioProfileStrings.nameRequired,
       );
@@ -498,7 +498,7 @@ class AudioProfileService {
     try {
       final file = File(path);
       if (!await file.exists()) {
-        throw const AudioProfileStoreError(
+        throw AudioProfileStoreError(
           code: 'audio-profile-import-missing',
           userMessage: AudioProfileStrings.importMissing,
         );
@@ -642,7 +642,7 @@ class AudioProfileService {
   Future<void> _deleteUnlocked(String id) async {
     try {
       if (!_safeId.hasMatch(id)) {
-        throw const AudioProfileStoreError(
+        throw AudioProfileStoreError(
           code: 'audio-profile-invalid-id',
           userMessage: AudioProfileStrings.formatInvalidId,
         );
@@ -759,7 +759,7 @@ class AudioProfileService {
   Future<AudioProfile> _readProfile(File file) async {
     final length = await file.length();
     if (length > AudioProfile.maxFileBytes) {
-      throw const ProfileFormatError(
+      throw ProfileFormatError(
         code: 'audio-profile-too-large',
         userMessage: AudioProfileStrings.formatTooLarge,
       );

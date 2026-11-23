@@ -383,6 +383,8 @@ class _MilkdropLiveCanvasState extends State<_MilkdropLiveCanvas>
   final List<double> _currentBands = List<double>.filled(_numBands, 0.0);
   final List<double> _targetBands = List<double>.filled(_numBands, 0.0);
   List<double> _spareSnapshot = List<double>.filled(_numBands, 0.0);
+  int _snapshotGeneration = 0;
+  bool _claimedNativeSession = false;
   final Stopwatch _phaseClock = Stopwatch()..start();
 
   StreamSubscription<dynamic>? _nativeSub;
@@ -461,6 +463,7 @@ class _MilkdropLiveCanvasState extends State<_MilkdropLiveCanvas>
         oldWidget.trackPath != widget.trackPath) {
       if (_isStaticMode) {
         _seedStaticSnapshot();
+        _snapshotGeneration++;
         _bandsNotifier.value = List<double>.from(_currentBands);
       }
     }
@@ -531,6 +534,10 @@ class _MilkdropLiveCanvasState extends State<_MilkdropLiveCanvas>
         .invokeMethod('setAudioSessionId', {'audioSessionId': sessionId})
         .catchError((_) {});
 
+    if (!_claimedNativeSession) {
+      _claimedNativeSession = true;
+      AudioVisualizerState.acquireNativeVisualizerSession();
+    }
     _nativeSub = _eventChannel.receiveBroadcastStream().listen(
       (dynamic event) {
         if (event is List) {
@@ -553,6 +560,12 @@ class _MilkdropLiveCanvasState extends State<_MilkdropLiveCanvas>
   void _stopNativeStream() {
     _nativeSub?.cancel();
     _nativeSub = null;
+    if (_claimedNativeSession) {
+      _claimedNativeSession = false;
+      AudioVisualizerState.releaseNativeVisualizerSession(
+        isAndroid: _isAndroid,
+      );
+    }
   }
 
   void _onTick() {
@@ -612,6 +625,7 @@ class _MilkdropLiveCanvasState extends State<_MilkdropLiveCanvas>
       emit[i] = _currentBands[i];
     }
     _spareSnapshot = _bandsNotifier.value;
+    _snapshotGeneration++;
     _bandsNotifier.value = emit;
 
     if (!widget.isPlaying && settled) {
@@ -648,6 +662,7 @@ class _MilkdropLiveCanvasState extends State<_MilkdropLiveCanvas>
               preset: widget.preset,
               forceCanvasFallback: forceCanvas || isGpuSaver,
               transparentBackground: false,
+              generation: _snapshotGeneration,
             );
           },
         );

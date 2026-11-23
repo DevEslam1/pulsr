@@ -46,7 +46,7 @@ class RemoteBrowserSheet extends StatefulWidget {
 class _RemoteBrowserSheetState extends State<RemoteBrowserSheet> {
   String _path = '';
   final List<_Crumb> _crumbs = <_Crumb>[
-    const _Crumb('', RemoteSourcesStrings.rootCrumb),
+    _Crumb('', RemoteSourcesStrings.rootCrumb),
   ];
   List<RemoteEntry> _entries = const [];
   bool _loading = true;
@@ -456,7 +456,7 @@ class _RemoteBrowserSheetState extends State<RemoteBrowserSheet> {
     }
     final results = _searchResults;
     if (results == null) {
-      return const Center(
+      return Center(
         child: Padding(
           padding: EdgeInsetsDirectional.all(24),
           child: Text(RemoteSourcesStrings.searchHint),
@@ -464,7 +464,7 @@ class _RemoteBrowserSheetState extends State<RemoteBrowserSheet> {
       );
     }
     if (results.isEmpty) {
-      return const Center(
+      return Center(
         child: Padding(
           padding: EdgeInsetsDirectional.all(24),
           child: Text(RemoteSourcesStrings.noSearchResults),
@@ -534,7 +534,7 @@ class _RemoteBrowserSheetState extends State<RemoteBrowserSheet> {
     }
     final entries = _entries;
     if (entries.isEmpty) {
-      return const Center(
+      return Center(
         child: Padding(
           padding: EdgeInsetsDirectional.all(24),
           child: Text(RemoteSourcesStrings.emptyFolder),
@@ -690,7 +690,7 @@ class _ErrorState extends StatelessWidget {
             const SizedBox(height: 16),
             FilledButton.tonal(
               onPressed: onRetry,
-              child: const Text(RemoteSourcesStrings.retry),
+              child: Text(RemoteSourcesStrings.retry),
             ),
           ],
         ),

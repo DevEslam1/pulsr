@@ -320,6 +320,10 @@ class _ExtrasScreenState extends State<ExtrasScreen> {
         if (owns) await owned?.dispose();
         return;
       }
+      final prevOwned = _ownsSafeMode ? _safeMode : null;
+      if (prevOwned != null && !identical(prevOwned, safeMode)) {
+        unawaited(prevOwned.dispose());
+      }
       setState(() {
         _safeMode = safeMode;
         _ownsSafeMode = owns;
@@ -346,6 +350,10 @@ class _ExtrasScreenState extends State<ExtrasScreen> {
         if (owns) owned?.dispose();
         return;
       }
+      final prevOwned = _ownsSystemBehavior ? _systemBehavior : null;
+      if (prevOwned != null && !identical(prevOwned, behavior)) {
+        prevOwned.dispose();
+      }
       setState(() {
         _systemBehavior = behavior;
         _ownsSystemBehavior = owns;
@@ -368,6 +376,10 @@ class _ExtrasScreenState extends State<ExtrasScreen> {
       if (!mounted) {
         if (owns) owned?.dispose();
         return;
+      }
+      final prevOwned = _ownsUsbErgonomics ? _usbErgonomics : null;
+      if (prevOwned != null && !identical(prevOwned, usbErgonomics)) {
+        prevOwned.dispose();
       }
       setState(() {
         _usbErgonomics = usbErgonomics;

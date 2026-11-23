@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"html"
 	"html/template"
 	"io"
 	"log"
@@ -242,7 +241,7 @@ func handleRoot(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	jsonResponse(w, http.StatusOK, map[string]interface{}{
-		"service":    "bitchord-listen-together",
+		"service":    "pulsr-listen-together",
 		"members":    store.MemberCount(),
 		"parties":    store.Len(),
 		"serverMs":   clock.NowMs(),
@@ -358,13 +357,13 @@ func handleCreateParty(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, http.StatusInternalServerError, "server_error", "Failed to create party.")
 		return
 	}
+	p.Lock()
 	// This must be present in the creation response. Waiting for the first
 	// WebSocket control can lose the setting before that socket is established.
 	if req.AutoplayEnabled != nil {
 		p.Playback.AutoplayEnabled = *req.AutoplayEnabled
 	}
 
-	p.Lock()
 	m, err := p.Join(req.UserId, req.DeviceId, req.DisplayName, req.AvatarUrl)
 	if err != nil {
 		p.Unlock()
@@ -411,8 +410,13 @@ func handleJoinParty(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	existingToken := parseBearerToken(r)
+	if existingToken == "" && req.Token != nil {
+		existingToken = strings.TrimSpace(*req.Token)
+	}
+
 	p.Lock()
-	m, err := p.Join(req.UserId, req.DeviceId, req.DisplayName, req.AvatarUrl)
+	m, err := p.Join(req.UserId, req.DeviceId, req.DisplayName, req.AvatarUrl, existingToken)
 	if err != nil {
 		p.Unlock()
 		if pe, ok := err.(*party.PartyError); ok {
@@ -595,7 +599,7 @@ var inviteTemplate = template.Must(template.New("invite").Parse(`<!DOCTYPE html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BitChord Listen Together - Party {{.Code}}</title>
+    <title>Pulsr Listen Together - Party {{.Code}}</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -730,7 +734,7 @@ var inviteTemplate = template.Must(template.New("invite").Parse(`<!DOCTYPE html>
                 <span>Listen Together • {{.MemberCount}} in party</span>
             </div>
             <h1>Join the Music Party</h1>
-            <p class="subtitle">Opening BitChord to sync playback in real time.</p>
+            <p class="subtitle">Opening Pulsr to sync playback in real time.</p>
             <div class="code-box">
                 <div class="code-label">Party Code</div>
                 <div class="code-val">{{.Code}}</div>
@@ -738,10 +742,10 @@ var inviteTemplate = template.Must(template.New("invite").Parse(`<!DOCTYPE html>
                     <div class="now-playing">🎵 {{.CurrentSongTitle}} - {{.CurrentSongArtist}}</div>
                 {{end}}
             </div>
-            <a id="joinBtn" href="{{.IntentURI}}" class="btn">Join Party in BitChord</a>
+            <a id="joinBtn" href="{{.IntentURI}}" class="btn">Join Party in Pulsr</a>
             <p class="footer-note">
                 Didn’t open automatically? Tap the button above.<br>
-                Don't have BitChord yet? <a href="https://github.com/kushagrasinghx/BitChord/releases" target="_blank" rel="noopener">Download it here</a>.
+                Don't have Pulsr yet? <a href="https://github.com/pulsr-audio/pulsr/releases" target="_blank" rel="noopener">Download it here</a>.
             </p>
             <script>
                 var intentUri = {{.IntentURI}};
@@ -802,7 +806,7 @@ func handleInviteLanding(w http.ResponseWriter, r *http.Request) {
 	if len(code) != codes.CodeLength {
 		w.WriteHeader(http.StatusBadRequest)
 		_ = inviteTemplate.Execute(w, invitePageData{
-			Code:     html.EscapeString(r.PathValue("code")),
+			Code:     r.PathValue("code"),
 			IsActive: false,
 		})
 		return
@@ -818,30 +822,22 @@ func handleInviteLanding(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	deepLink := fmt.Sprintf("bitchord://party/%s?server=%s", url.PathEscape(code), url.QueryEscape(origin))
-	intentURI := fmt.Sprintf("intent://party/%s?server=%s#Intent;scheme=bitchord;end", url.PathEscape(code), url.QueryEscape(origin))
+	deepLink := fmt.Sprintf("pulsr://party/%s?server=%s", url.PathEscape(code), url.QueryEscape(origin))
+	intentURI := fmt.Sprintf("intent://party/%s?server=%s#Intent;scheme=pulsr;end", url.PathEscape(code), url.QueryEscape(origin))
 
-	currentSongTitle := ""
-	currentSongArtist := ""
 	p.Lock()
-	if p.Playback != nil && p.Playback.Track != nil {
-		currentSongTitle = p.Playback.Track.Title
-		currentSongArtist = p.Playback.Track.Artist
-	}
 	memberCount := len(p.Members)
 	p.Unlock()
 
 	w.WriteHeader(http.StatusOK)
 	_ = inviteTemplate.Execute(w, invitePageData{
-		Code:              code,
-		DeepLink:          deepLink,
-		IntentURI:         template.URL(intentURI),
-		SafeDeepLink:      template.URL(deepLink),
-		ServerOrigin:      origin,
-		CurrentSongTitle:  currentSongTitle,
-		CurrentSongArtist: currentSongArtist,
-		MemberCount:       memberCount,
-		IsActive:          true,
+		Code:         code,
+		DeepLink:     deepLink,
+		IntentURI:    template.URL(intentURI),
+		SafeDeepLink: template.URL(deepLink),
+		ServerOrigin: origin,
+		MemberCount:  memberCount,
+		IsActive:     true,
 	})
 }
 
@@ -901,8 +897,11 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 	// Read loop
 	defer func() {
-		hubInst.Detach(p.Code, member.MemberId, sc)
+		wasActive := hubInst.Detach(p.Code, member.MemberId, sc)
 		_ = sc.Close()
+		if !wasActive {
+			return
+		}
 
 		p.Lock()
 		p.MarkConnected(member, false)
@@ -929,8 +928,8 @@ func handleSocketFrame(p *party.Party, member *party.Member, sc *hub.SafeConn, f
 	}
 
 	p.Lock()
-	defer p.Unlock()
 	if !p.SpendFrameBudget(member) {
+		p.Unlock()
 		_ = sc.WriteJSON(map[string]interface{}{
 			"type": protocol.FrameError, "error": "rate_limited", "message": "Too many messages at once.",
 		})
@@ -941,17 +940,23 @@ func handleSocketFrame(p *party.Party, member *party.Member, sc *hub.SafeConn, f
 
 	switch kind {
 	case protocol.FramePing:
-		_ = sc.WriteJSON(map[string]interface{}{
+		pong := map[string]interface{}{
 			"type":     protocol.FramePong,
 			"clientMs": frame["clientMs"],
 			"serverMs": clock.NowMs(),
-		})
+		}
+		p.Unlock()
+		_ = sc.WriteJSON(pong)
 
 	case protocol.FrameSync:
-		_ = sc.WriteJSON(stateFrame(p))
+		sf := stateFrame(p)
+		p.Unlock()
+		_ = sc.WriteJSON(sf)
 
 	case protocol.FrameSyncQueue:
-		_ = sc.WriteJSON(queueFrame(p))
+		qf := queueFrame(p)
+		p.Unlock()
+		_ = sc.WriteJSON(qf)
 
 	case protocol.FrameReport:
 		// Playhead position report from client for monitoring
@@ -961,9 +966,11 @@ func handleSocketFrame(p *party.Party, member *party.Member, sc *hub.SafeConn, f
 				log.Printf("party %s: %s drifted %dms", p.Code, member.DisplayName, drift)
 			}
 		}
+		p.Unlock()
 
 	case protocol.FrameControl:
 		if !p.SpendControlBudget(member) {
+			p.Unlock()
 			_ = sc.WriteJSON(map[string]interface{}{
 				"type":    protocol.FrameError,
 				"error":   "rate_limited",
@@ -977,24 +984,51 @@ func handleSocketFrame(p *party.Party, member *party.Member, sc *hub.SafeConn, f
 		success, errCode, errMsg := applyControl(p, member, action, frame)
 		if success {
 			p.Touch()
-			// If queue changed, broadcast queue first
+			var qf, sf, mf, af map[string]interface{}
 			if p.Playback.QueueSeq != queueBefore {
-				hubInst.Broadcast(p.Code, queueFrame(p), "")
+				qf = queueFrame(p)
 			}
-			hubInst.Broadcast(p.Code, stateFrame(p), "")
+			sf = stateFrame(p)
 			if action == protocol.ActionKick ||
 				action == protocol.ActionSetMaxMembers ||
 				action == protocol.ActionSetHostOnlyControl {
-				hubInst.Broadcast(p.Code, membersFrame(p), "")
+				mf = membersFrame(p)
 			}
-			hubInst.Broadcast(p.Code, activityFrame(member, action, frame), "")
-		} else if errCode != "" {
-			_ = sc.WriteJSON(map[string]interface{}{
-				"type":    protocol.FrameError,
-				"error":   errCode,
-				"message": errMsg,
-			})
+			af = activityFrame(member, action, frame)
+			var kickedID string
+			if action == protocol.ActionKick {
+				kickedID, _ = frame["memberId"].(string)
+			}
+			p.Unlock()
+
+			if kickedID != "" {
+				hubInst.CloseMemberWithBye(p.Code, kickedID, map[string]interface{}{
+					"type":    protocol.FrameBye,
+					"reason":  "kicked",
+					"message": "The host removed you from this party.",
+				})
+			}
+			if qf != nil {
+				hubInst.Broadcast(p.Code, qf, "")
+			}
+			hubInst.Broadcast(p.Code, sf, "")
+			if mf != nil {
+				hubInst.Broadcast(p.Code, mf, "")
+			}
+			hubInst.Broadcast(p.Code, af, "")
+		} else {
+			p.Unlock()
+			if errCode != "" {
+				_ = sc.WriteJSON(map[string]interface{}{
+					"type":    protocol.FrameError,
+					"error":   errCode,
+					"message": errMsg,
+				})
+			}
 		}
+
+	default:
+		p.Unlock()
 	}
 }
 
@@ -1177,12 +1211,6 @@ func applyControl(p *party.Party, member *party.Member, action string, frame map
 		if !member.IsHost { return false, "host_only", "Only the host can remove listeners." }
 		if targetID == "" || targetID == member.MemberId { return false, "invalid_member", "Choose another listener to remove." }
 		if p.Remove(targetID) == nil { return false, "not_found", "That listener is no longer in this party." }
-		hubInst.Send(p.Code, targetID, map[string]interface{}{
-			"type":    protocol.FrameBye,
-			"reason":  "kicked",
-			"message": "The host removed you from this party.",
-		})
-		hubInst.CloseMember(p.Code, targetID)
 		return true, "", ""
 
 	default:

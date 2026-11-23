@@ -19,12 +19,26 @@ import '../../../data/party/party_models.dart';
 
 import '../../../core/utils/pulsr_haptics.dart';
 class PartySheet extends StatefulWidget {
-  const PartySheet({super.key});
+  final String? initialCode;
+  final String? initialServerUrl;
 
-  static Future<void> show(BuildContext context) {
+  const PartySheet({
+    super.key,
+    this.initialCode,
+    this.initialServerUrl,
+  });
+
+  static Future<void> show(
+    BuildContext context, {
+    String? initialCode,
+    String? initialServerUrl,
+  }) {
     return PulsrAdaptiveSheet.show<void>(
       context: context,
-      builder: (_) => const PartySheet(),
+      builder: (_) => PartySheet(
+        initialCode: initialCode,
+        initialServerUrl: initialServerUrl,
+      ),
     );
   }
 
@@ -47,10 +61,22 @@ class _PartySheetState extends State<PartySheet> {
   @override
   void initState() {
     super.initState();
+    final initialCode = widget.initialCode?.trim();
+    if (initialCode != null && initialCode.isNotEmpty) {
+      _codeController.text = initialCode.toUpperCase();
+    }
     _loadSettings();
   }
 
   Future<void> _loadSettings() async {
+    final initialServer = widget.initialServerUrl?.trim();
+    if (initialServer != null && initialServer.isNotEmpty) {
+      try {
+        await _partyService.setCustomServerUrl(initialServer);
+      } on ArgumentError {
+        // Ignore disallowed deep-link server override and fall back to saved/default.
+      }
+    }
     final server = await _partyService.getServerUrl();
     if (mounted) {
       _serverController.text = server;
@@ -278,13 +304,7 @@ class _PartySheetState extends State<PartySheet> {
       setState(() => _serverUrlError = context.l10n.partyServerUrlEmpty);
       return false;
     }
-    final uri = Uri.tryParse(text);
-    final scheme = uri?.scheme.toLowerCase();
-    final validScheme = scheme == 'http' ||
-        scheme == 'https' ||
-        scheme == 'ws' ||
-        scheme == 'wss';
-    if (uri == null || !validScheme || uri.host.isEmpty) {
+    if (!ListenTogetherService.isValidServerUrl(text)) {
       setState(() => _serverUrlError = context.l10n.partyServerUrlInvalid);
       return false;
     }
@@ -344,12 +364,22 @@ class _PartySheetState extends State<PartySheet> {
               onPressed: () async {
                 final trimmed = _serverController.text.trim();
                 if (!_validateServerUrl(trimmed)) return;
-                await _partyService.setCustomServerUrl(trimmed);
-                if (mounted) {
-                  setState(() {
-                    _showSettings = false;
-                    _serverUrlError = null;
-                  });
+                try {
+                  await _partyService.setCustomServerUrl(trimmed);
+                  final saved = await _partyService.getServerUrl();
+                  if (mounted) {
+                    _serverController.text = saved;
+                    setState(() {
+                      _showSettings = false;
+                      _serverUrlError = null;
+                    });
+                  }
+                } on ArgumentError {
+                  if (mounted) {
+                    setState(() {
+                      _serverUrlError = context.l10n.partyServerUrlInvalid;
+                    });
+                  }
                 }
               },
               child: Text(context.l10n.save),
@@ -706,12 +736,89 @@ class _PartySheetState extends State<PartySheet> {
                           color: p.accent,
                         ),
                       ),
+                    )
+                  else if (isHost && !isMe)
+                    IconButton(
+                      key: ValueKey<String>('party_kick_${member.memberId}'),
+                      constraints: const BoxConstraints(
+                        minWidth: AppSpacing.minTouchTarget,
+                        minHeight: AppSpacing.minTouchTarget,
+                      ),
+                      icon: Icon(
+                        Icons.person_remove_rounded,
+                        size: 18,
+                        color: p.error,
+                      ),
+                      tooltip: context.l10n.remove,
+                      onPressed: () {
+                        PulsrHaptics.lightImpact();
+                        _partyService.sendKick(member.memberId);
+                      },
                     ),
                 ],
               ),
             ),
           );
         }),
+
+        // Host-only control lock toggle (host) or lock indicator (guest)
+        if (isHost) ...[
+          const SizedBox(height: AppSpacing.sm),
+          Material(
+            color: p.surfaceContainer.withValues(alpha: 0.65),
+            shape: RoundedRectangleBorder(
+              borderRadius: AppRadii.r12All,
+              side: BorderSide(color: p.hairline),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: SwitchListTile.adaptive(
+              key: const ValueKey<String>('party_host_only_switch'),
+              contentPadding: const EdgeInsetsDirectional.symmetric(
+                horizontal: AppSpacing.sm,
+              ),
+              secondary: Icon(
+                snap.hostOnlyControl
+                    ? Icons.lock_rounded
+                    : Icons.lock_open_rounded,
+                size: 20,
+                color: snap.hostOnlyControl ? p.accent : p.textSecondary,
+              ),
+              title: Text(
+                context.l10n.partyHostMember,
+                style: TextStyle(
+                  fontSize: AppFontSize.bodySmall,
+                  fontWeight: FontWeight.w700,
+                  color: p.textPrimary,
+                ),
+              ),
+              value: snap.hostOnlyControl,
+              onChanged: (enabled) {
+                PulsrHaptics.selectionClick();
+                _partyService.sendSetHostOnlyControl(enabled);
+              },
+            ),
+          ),
+        ] else if (snap.hostOnlyControl) ...[
+          const SizedBox(height: AppSpacing.sm),
+          Row(
+            children: [
+              Icon(Icons.lock_rounded, size: 16, color: p.textSecondary),
+              const SizedBox(width: AppSpacing.xs),
+              Text(
+                context.l10n.partyHostMember,
+                style: TextStyle(
+                  fontSize: AppFontSize.caption,
+                  fontWeight: FontWeight.w600,
+                  color: p.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ],
+
+        // Shared Queue (Up Next)
+        const SizedBox(height: AppSpacing.md),
+        _buildSharedQueueSection(p, snap, isHost: isHost),
 
         const SizedBox(height: AppSpacing.lg),
 
@@ -731,6 +838,107 @@ class _PartySheetState extends State<PartySheet> {
           ),
           onPressed: _handleLeave,
         ),
+      ],
+    );
+  }
+
+  Widget _buildSharedQueueSection(
+    PulsrPalette p,
+    PartySnapshot snap, {
+    required bool isHost,
+  }) {
+    final startIdx = snap.queue.index >= 0 ? snap.queue.index + 1 : 0;
+    final upcoming = startIdx < snap.queue.items.length
+        ? snap.queue.items.sublist(startIdx)
+        : const <PartyTrack>[];
+    final canControlQueue = isHost || !snap.hostOnlyControl;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Semantics(
+          header: true,
+          child: Text(
+            context.l10n.queue,
+            style: TextStyle(
+              fontSize: AppFontSize.body,
+              fontWeight: FontWeight.w700,
+              color: p.textPrimary,
+            ),
+          ),
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        if (upcoming.isEmpty)
+          Text(
+            context.l10n.queueEmpty,
+            style: TextStyle(
+              fontSize: AppFontSize.caption,
+              color: p.textSecondary,
+            ),
+          )
+        else
+          ...upcoming.map((track) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 2),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.music_note_rounded,
+                    size: 18,
+                    color: p.textSecondary,
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          track.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: AppFontSize.bodySmall,
+                            fontWeight: FontWeight.w600,
+                            color: p.textPrimary,
+                          ),
+                        ),
+                        if (track.artist.isNotEmpty)
+                          Text(
+                            track.artist,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: AppFontSize.caption,
+                              color: p.textSecondary,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  if (canControlQueue)
+                    IconButton(
+                      key: ValueKey<String>(
+                        'party_queue_remove_${track.videoId}',
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: AppSpacing.minTouchTarget,
+                        minHeight: AppSpacing.minTouchTarget,
+                      ),
+                      icon: Icon(
+                        Icons.close_rounded,
+                        size: 18,
+                        color: p.textSecondary,
+                      ),
+                      tooltip: context.l10n.remove,
+                      onPressed: () {
+                        PulsrHaptics.lightImpact();
+                        _partyService.sendQueueRemove(track.videoId);
+                      },
+                    ),
+                ],
+              ),
+            );
+          }),
       ],
     );
   }

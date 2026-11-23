@@ -64,6 +64,7 @@ void main() {
         '/genre/:name',
         '/year/:year',
         '/playlist/:id',
+        '/party/:code',
       };
 
       final orphans = routes

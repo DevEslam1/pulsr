@@ -58,7 +58,7 @@ class FolderDetailScreen extends StatefulWidget {
 }
 
 class _FolderDetailScreenState extends State<FolderDetailScreen> {
-  late final FolderUseCases _useCase;
+  late FolderUseCases _useCase;
   late final ScrollController _scrollController;
   late Stream<Result<List<SongsTableData>>> _songsStream;
   late bool _isExcluded;
@@ -74,6 +74,24 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
     _updateStream();
     _isExcluded = widget.folder.isExcluded;
     _scrollController = ScrollController()..addListener(_onScroll);
+  }
+
+  @override
+  void didUpdateWidget(FolderDetailScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final pathChanged = oldWidget.folder.path != widget.folder.path;
+    final useCaseChanged = oldWidget.folderUseCases != widget.folderUseCases;
+    final excludedChanged =
+        oldWidget.folder.isExcluded != widget.folder.isExcluded;
+    if (pathChanged || useCaseChanged || excludedChanged) {
+      _useCase = widget.folderUseCases ?? getIt<FolderUseCases>();
+      setState(() {
+        _isExcluded = widget.folder.isExcluded;
+        if (pathChanged || useCaseChanged) {
+          _updateStream();
+        }
+      });
+    }
   }
 
   void _updateStream() {

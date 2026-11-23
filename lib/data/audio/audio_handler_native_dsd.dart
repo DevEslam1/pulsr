@@ -10,7 +10,7 @@ part of 'audio_handler.dart';
 mixin PulsrAudioNativeDsd on BaseAudioHandler {
   NativeDsdSession? _nativeDsdSession;
   bool _nativeDsdActive = false;
-  bool _nativeDsdPreparing = false;
+  int _nativeDsdPrepareGeneration = 0;
   bool _nativeDsdPlaying = false;
   final Set<int> _nativeDsdFallbackAttempted = <int>{};
   StreamSubscription<PlaybackState>? _nativeDsdStateSub;
@@ -147,11 +147,14 @@ mixin PulsrAudioNativeDsd on BaseAudioHandler {
     required bool autoPlay,
     required int generation,
   }) async {
-    if (_nativeDsdPreparing) return false;
-    _nativeDsdPreparing = true;
+    final prepareGen = ++_nativeDsdPrepareGeneration;
     NativeDsdSession? session;
     try {
       await stopNativeDsd(clearStatus: false);
+      if (prepareGen != _nativeDsdPrepareGeneration ||
+          generation != _playGeneration) {
+        return true;
+      }
       unawaited(() async {
         try {
           final session = await AudioSession.instance;
@@ -201,7 +204,9 @@ mixin PulsrAudioNativeDsd on BaseAudioHandler {
         autoPlay: autoPlay,
       );
 
-      if (generation != _playGeneration || _nativeDsdSession != session) {
+      if (prepareGen != _nativeDsdPrepareGeneration ||
+          generation != _playGeneration ||
+          _nativeDsdSession != session) {
         if (identical(_nativeDsdSession, session)) {
           await stopNativeDsd(clearStatus: true);
         } else {
@@ -227,6 +232,13 @@ mixin PulsrAudioNativeDsd on BaseAudioHandler {
       _saveCurrentPosition();
       return true;
     } on DsdFallbackRequiredException catch (e) {
+      if (prepareGen != _nativeDsdPrepareGeneration ||
+          generation != _playGeneration) {
+        if (!identical(_nativeDsdSession, session)) {
+          await session?.dispose();
+        }
+        return true;
+      }
       ErrorLogger.log(
           'Native DSD unavailable for "${song.title}": ${e.message}; '
           'falling back to DoP/PCM',
@@ -239,6 +251,13 @@ mixin PulsrAudioNativeDsd on BaseAudioHandler {
       }
       return false;
     } catch (e, st) {
+      if (prepareGen != _nativeDsdPrepareGeneration ||
+          generation != _playGeneration) {
+        if (!identical(_nativeDsdSession, session)) {
+          await session?.dispose();
+        }
+        return true;
+      }
       ErrorLogger.log('Native DSD session failed for "${song.title}"',
           error: e, stackTrace: st, category: 'AudioHandler');
       _nativeDsdFallbackAttempted.add(song.id);
@@ -248,8 +267,6 @@ mixin PulsrAudioNativeDsd on BaseAudioHandler {
         await session?.dispose();
       }
       return false;
-    } finally {
-      _nativeDsdPreparing = false;
     }
   }
 

@@ -73,6 +73,7 @@ inline int ioctl(int, unsigned long, ...) { return -1; }
 #include <cstring>
 #include <limits>
 #include <new>
+#include <type_traits>
 
 // Abandon() and the destructor deliberately leak the URB header storage and
 // packet payloads the kernel may still be writing to. Those allocations are
@@ -517,6 +518,8 @@ UsbStreamResult UsbAudioSink::Open(int fd, int endpointAddress, int interfaceNum
     // its first live block, so idle/preload sinks never count spurious underruns.
     paused_.store(true, std::memory_order_release);
     prefillResetRequested_.store(false, std::memory_order_release);
+    pullReconfiguring_.store(false, std::memory_order_release);
+    pullReaders_.store(0, std::memory_order_release);
     pullRenderer_.setPaused(true);
     running_.store(true, std::memory_order_release);
     active_.store(true, std::memory_order_release);
@@ -1241,8 +1244,9 @@ void UsbAudioSink::workerLoop() {
     // waiting for prefill, OUT URBs carry clean silence (or DoP silence)
     // without incrementing underrunCount_.
     const bool pullMode = IsReservoirMode(renderMode_);
-    bool prefillDone = pullMode ? pullRenderer_.prefillSatisfied()
-                                : (prefillFrames_ == 0);
+    // Open() configures pullRenderer_ empty, so pullMode always starts gated
+    // until prefillSatisfied() latches inside the PullReaderLease below.
+    bool prefillDone = !pullMode && (prefillFrames_ == 0);
     bool producerSeen = false;
     auto prefillDeadline = std::chrono::steady_clock::time_point{};
     int repeatedReadyPolls = 0;
@@ -1352,18 +1356,28 @@ void UsbAudioSink::workerLoop() {
         // to maxFramesPerPacket_ so the preallocated buffer can never overflow.
         uint8_t* buf = reinterpret_cast<uint8_t*>(urb->buffer);
         const size_t ringFrames = ringRawDepth_.size();
-        size_t readFrame = ringRead_.load(std::memory_order_relaxed);
+        size_t readFrame = ringRead_.load(std::memory_order_acquire);
+        size_t initialReadFrame = readFrame;
         uint8_t* dst = buf;
         int urbTotalBytes = 0;
+        // Acquire a lock-free pull-reader lease so StartPcmFile() cannot
+        // reconfigure/free pullRenderer_.ring_ while this URB reads from it.
+        const PullReaderLease pullLease(pullReconfiguring_, pullReaders_);
+        const bool pullBusy = pullMode && pullLease.active;
+
         if (prefillResetRequested_.exchange(false, std::memory_order_acq_rel)) {
-            prefillDone = pullMode ? pullRenderer_.prefillSatisfied()
-                                   : (prefillFrames_ == 0);
+            prefillDone = pullBusy
+                ? pullRenderer_.prefillSatisfied()
+                : (!pullMode && prefillFrames_ == 0);
             producerSeen = false;
             gapFader_.reset();
+            readFrame = ringRead_.load(std::memory_order_acquire);
+            initialReadFrame = readFrame;
         }
-        const bool isPaused = paused_.load(std::memory_order_acquire);
+        const bool isPaused = paused_.load(std::memory_order_acquire) ||
+                              (pullMode && !pullBusy);
         const size_t wNow = ringWrite_.load(std::memory_order_acquire);
-        const size_t availNow = wNow - readFrame;
+        const size_t availNow = wNow - readFrame;  // unsigned wrap is exact
         if (!isPaused) {
             if (pullMode) {
                 if (!prefillDone && pullRenderer_.prefillSatisfied()) {
@@ -1439,7 +1453,8 @@ void UsbAudioSink::workerLoop() {
             const int framesInPacket = NextPacketFrames(
                 frameAccumulator_, ratePerSec, serviceIntervalUs_, maxFramesPerPacket_);
             size_t pktLen = 0;
-            if (!prefillDone || isPaused) {
+            if (!prefillDone || isPaused ||
+                prefillResetRequested_.load(std::memory_order_acquire)) {
                 pktLen = static_cast<size_t>(framesInPacket) * frameBytes;
                 if (pktLen > 0) {
                     if (dsdStream) {
@@ -1479,7 +1494,19 @@ void UsbAudioSink::workerLoop() {
         urb->error_count = 0;
         urbRawDepth_[urbIndex] = std::max(rawDepth, 0);
         urbDeliveryEpoch_[urbIndex] = deliveryEpoch;
-        if (!pullMode && !isPaused) ringRead_.store(readFrame, std::memory_order_release);
+        if (!pullMode && !isPaused) {
+            // Never overwrite a concurrent FlushStream() advance (ringRead_ = w)
+            // with a stale local readFrame from before the flush.
+            using SignedSize = std::make_signed_t<size_t>;
+            size_t expectedRead = initialReadFrame;
+            while (static_cast<SignedSize>(readFrame - expectedRead) > 0) {
+                if (ringRead_.compare_exchange_weak(
+                        expectedRead, readFrame, std::memory_order_release,
+                        std::memory_order_acquire)) {
+                    break;
+                }
+            }
+        }
 
         if (!submitUrb(urb, false, urbIndex)) {
             ReportWriteError(errno);
@@ -1500,14 +1527,20 @@ void UsbAudioSink::ReportWriteError(int error) {
 }
 
 bool UsbAudioSink::beginWrite(int64_t producerId) {
+    if (pullReconfiguring_.load(std::memory_order_acquire)) {
+        ReportWriteError(EBUSY);
+        return false;
+    }
     uint32_t expectedGate = 0;
     if (!writerGate_.compare_exchange_strong(expectedGate, kWriterBusy,
-            std::memory_order_acquire, std::memory_order_relaxed)) {
+            std::memory_order_seq_cst, std::memory_order_relaxed)) {
         ReportWriteError((expectedGate & kWriterClosed) ? ENODEV : EBUSY);
         return false;
     }
-    if (!active_.load(std::memory_order_acquire) || producerId == 0) {
-        ReportWriteError(producerId == 0 ? EINVAL : ENODEV);
+    if (pullReconfiguring_.load(std::memory_order_seq_cst) ||
+        !active_.load(std::memory_order_acquire) || producerId == 0) {
+        ReportWriteError(producerId == 0 ? EINVAL :
+                         (pullReconfiguring_.load(std::memory_order_relaxed) ? EBUSY : ENODEV));
         endWrite();
         return false;
     }
@@ -1543,7 +1576,10 @@ void UsbAudioSink::SetPaused(int64_t producerId, bool paused) {
         }
     }
     paused_.store(paused, std::memory_order_release);
-    pullRenderer_.setPaused(paused);
+    const PullReaderLease pullLease(pullReconfiguring_, pullReaders_);
+    if (pullLease.active) {
+        pullRenderer_.setPaused(paused);
+    }
 }
 
 void UsbAudioSink::FlushStream(int64_t producerId) {
@@ -1559,10 +1595,20 @@ void UsbAudioSink::FlushStream(int64_t producerId) {
         if ((writerGate_.load(std::memory_order_acquire) & kWriterBusy) == 0) break;
         std::this_thread::yield();
     }
+    using SignedSize = std::make_signed_t<size_t>;
     const size_t w = ringWrite_.load(std::memory_order_acquire);
-    ringRead_.store(w, std::memory_order_release);
+    size_t r = ringRead_.load(std::memory_order_acquire);
+    while (static_cast<SignedSize>(w - r) > 0) {
+        if (ringRead_.compare_exchange_weak(r, w, std::memory_order_release,
+                                            std::memory_order_acquire)) {
+            break;
+        }
+    }
     if (IsReservoirMode(renderMode_)) {
-        pullRenderer_.flush();
+        const PullReaderLease pullLease(pullReconfiguring_, pullReaders_);
+        if (pullLease.active) {
+            pullRenderer_.flush();
+        }
     }
     prefillResetRequested_.store(true, std::memory_order_release);
     deliveryEpoch_.fetch_add(1, std::memory_order_acq_rel);
@@ -1855,6 +1901,15 @@ size_t UsbAudioSink::fillPullPacket(uint8_t* dst, int framesInPacket, int& rawDe
         static_cast<size_t>(channels_) * static_cast<size_t>(bytesPerSample_);
     const int got = pullRenderer_.pullExact(dst, framesInPacket);
     if (got < framesInPacket) {
+        if (!pullRenderer_.prefillSatisfied() || pullRenderer_.paused()) {
+            // Concurrent seek/flush or pause mid-URB: emit silence without
+            // counting a spurious underrun or disqualifying bit-perfect.
+            if (got == 0 && framesInPacket > 0) {
+                std::memset(dst, 0, static_cast<size_t>(framesInPacket) * frameBytes);
+            }
+            rawDepth = 0;
+            return static_cast<size_t>(framesInPacket) * frameBytes;
+        }
         // pullExact zero-fills the remainder. A gap means the wire stream is no
         // longer a byte-for-byte copy of the source, so the session loses its
         // bit-perfect eligibility even if it recovers.
@@ -1942,11 +1997,13 @@ double UsbAudioSink::GetBufferedMs() {
 double UsbAudioSink::GetBufferedMsFast() const {
     if (!active_.load(std::memory_order_acquire)) return 0.0;
     if (IsReservoirMode(renderMode_)) {
+        const PullReaderLease pullLease(pullReconfiguring_, pullReaders_);
+        if (!pullLease.active) return 0.0;
         return static_cast<double>(pullRenderer_.fillMs());
     }
     const size_t w = ringWrite_.load(std::memory_order_acquire);
     const size_t r = ringRead_.load(std::memory_order_acquire);
-    const size_t countFrames = w - r;
+    const size_t countFrames = w - r;  // unsigned wrap is exact
     const double ringMs = sampleRate_ > 0
         ? static_cast<double>(countFrames) * 1000.0 / static_cast<double>(sampleRate_)
         : 0.0;
@@ -1976,6 +2033,31 @@ bool UsbAudioSink::StartPcmFile(const std::string& path) {
         pcmProducer_->stop();
         pcmProducer_.reset();
     }
+    // Quiesce external writers (WaitForWriteSpace / writeBlock) AND every
+    // lock-free pullRenderer_ reader (workerLoop, FlushStream, SetPaused,
+    // GetBufferedMsFast, NeedsPrefillCushion) before reconfiguring
+    // pullRenderer_, so ring_.swap() and capacity/index updates in Configure()
+    // never race a live thread (BUG-P0-1).
+    pullReconfiguring_.store(true, std::memory_order_seq_cst);
+    while (pullReaders_.load(std::memory_order_seq_cst) > 0 ||
+           (writerGate_.load(std::memory_order_seq_cst) & kWriterBusy) != 0) {
+        std::this_thread::yield();
+    }
+    bool reconfigured = false;
+    struct ReconfigureExit {
+        UsbAudioSink* self;
+        bool& reconfigured;
+        ~ReconfigureExit() {
+            // Sync pullRenderer_ pause state with the live paused_ flag before
+            // releasing the reconfigure barrier.
+            self->pullRenderer_.setPaused(self->paused_.load(std::memory_order_acquire));
+            if (reconfigured) {
+                self->prefillResetRequested_.store(true, std::memory_order_release);
+            }
+            self->pullReconfiguring_.store(false, std::memory_order_release);
+        }
+    } reconfigExit{this, reconfigured};
+
     auto producer = std::make_unique<UsbPcmProducer>();
     const UsbPcmFormat target{sampleRate_, channels_, bytesPerSample_, validBitDepth_};
     const int reservoirMs = tunedBufferMs_ > 0 ? tunedBufferMs_ : 3000;
@@ -1984,6 +2066,7 @@ bool UsbAudioSink::StartPcmFile(const std::string& path) {
         ReportWriteError(EINVAL);
         return false;
     }
+    reconfigured = true;
     producer->start();
     pcmProducer_ = std::move(producer);
     return true;
@@ -2084,7 +2167,9 @@ UsbClockStatus UsbAudioSink::GetClockStatus() const {
 
     status.feedbackPresent = feedbackEndpoint_ != 0;
     if (IsReservoirMode(renderMode_)) {
-        status.ringFillMs = pullRenderer_.fillMs();
+        status.ringFillMs = pullReconfiguring_.load(std::memory_order_acquire)
+            ? 0
+            : pullRenderer_.fillMs();
     } else {
         const size_t written = ringWrite_.load(std::memory_order_acquire);
         const size_t read = ringRead_.load(std::memory_order_acquire);
@@ -2107,15 +2192,18 @@ UsbClockStatus UsbAudioSink::GetClockStatus() const {
 int UsbAudioSink::WaitForWriteSpace(int frames, int maxWaitMs) {
     if (frames <= 0) return -1;
     const auto checkOnce = [this, frames]() -> int {
+        if (pullReconfiguring_.load(std::memory_order_acquire)) return 1;
         uint32_t gate = 0;
         if (!writerGate_.compare_exchange_strong(
                 gate, kWriterBusy,
-                std::memory_order_acq_rel, std::memory_order_acquire)) {
+                std::memory_order_seq_cst, std::memory_order_acquire)) {
             return -1;
         }
         int status = -1;
-        if (exclusive_.load(std::memory_order_acquire) &&
-            active_.load(std::memory_order_acquire)) {
+        if (pullReconfiguring_.load(std::memory_order_seq_cst)) {
+            status = 1;
+        } else if (exclusive_.load(std::memory_order_acquire) &&
+                   active_.load(std::memory_order_acquire)) {
             const size_t neededFrames = static_cast<size_t>(frames);
             if (IsReservoirMode(renderMode_)) {
                 // Pull modes answer from their own reservoir, not ring_: the
@@ -2146,7 +2234,7 @@ int UsbAudioSink::WaitForWriteSpace(int frames, int maxWaitMs) {
                         : (capFrames - 1);
                     const size_t w = ringWrite_.load(std::memory_order_relaxed);
                     const size_t r = ringRead_.load(std::memory_order_acquire);
-                    const size_t occupiedFrames = w - r;
+                    const size_t occupiedFrames = w - r;  // unsigned wrap is exact
                     const size_t freeFrames =
                         targetCap > occupiedFrames ? targetCap - occupiedFrames : 0;
                     status = (neededFrames <= freeFrames) ? 0 : 1;
@@ -2174,6 +2262,8 @@ bool UsbAudioSink::NeedsPrefillCushion() const {
         return false;
     }
     if (IsReservoirMode(renderMode_)) {
+        const PullReaderLease pullLease(pullReconfiguring_, pullReaders_);
+        if (!pullLease.active) return true;
         if (!pullRenderer_.prefillSatisfied()) return true;
         const size_t configured = pullRenderer_.configuredFrames();
         return configured > 0 && pullRenderer_.availableFrames() < (configured / 2);

@@ -308,4 +308,41 @@ void main() {
     expect(WebDavFsProvider.rangeHeader(0, null), 'bytes=0-');
     expect(WebDavFsProvider.rangeHeader(10, 20), 'bytes=10-20');
   });
+
+  test('does not follow HTTP 302 redirects (SSRF protection)', () async {
+    var targetHits = 0;
+    final targetServer = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    targetServer.listen((request) async {
+      targetHits++;
+      await request.drain<void>();
+      request.response.statusCode = 200;
+      request.response.write('secret');
+      await request.response.close();
+    });
+
+    final redirectServer =
+        await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    redirectServer.listen((request) async {
+      await request.drain<void>();
+      request.response.statusCode = HttpStatus.found;
+      request.response.headers.set(
+        HttpHeaders.locationHeader,
+        'http://127.0.0.1:${targetServer.port}/internal',
+      );
+      await request.response.close();
+    });
+
+    final provider = WebDavFsProvider(_sourceFor(redirectServer.port));
+    try {
+      await expectLater(
+        provider.list(''),
+        throwsA(isA<RemoteProtocolError>()),
+      );
+      expect(targetHits, 0);
+    } finally {
+      await provider.close();
+      await redirectServer.close(force: true);
+      await targetServer.close(force: true);
+    }
+  });
 }

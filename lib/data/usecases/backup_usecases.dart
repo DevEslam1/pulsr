@@ -513,7 +513,7 @@ class ImportBackupUseCase {
 
     List<({SongsTableData song, List<String> segments})> getSongSegments() {
       return lazySongSegments ??= allSongs.map((s) {
-        return (song: s, segments: s.path.replaceAll(r'\\', '/').split('/'));
+        return (song: s, segments: s.path.replaceAll('\\', '/').split('/'));
       }).toList();
     }
 
@@ -523,7 +523,9 @@ class ImportBackupUseCase {
           ? rawRef
           : _composeSongRef(parsedRef.path, parsedRef.cueStartMs);
       // 1. Exact or normalized path/chapter-ref match
-      final direct = pathMap[ref] ?? pathMap[ref.toLowerCase()];
+      final direct = pathMap[ref] ??
+          pathMap[ref.replaceAll('\\', '/').toLowerCase()] ??
+          pathMap[ref.toLowerCase()];
       if (direct != null) return direct;
       final path = parsedRef.path;
 
@@ -534,7 +536,7 @@ class ImportBackupUseCase {
         if (remoteMatch != null) return remoteMatch;
       }
 
-      final normPath = path.replaceAll(r'\\', '/').toLowerCase();
+      final normPath = path.replaceAll('\\', '/').toLowerCase();
       final segments = normPath.split('/');
 
       // 3. Parent + Filename fallback (lazy init, keyed by (parent/filename, cueStartMs))
@@ -622,6 +624,22 @@ class ImportBackupUseCase {
     await _db.transaction(() async {
       // 0. Seed online / YTM tracks
       if (onlineSeedList.isNotEmpty) {
+        final usedSongIds = <int>{for (final s in allSongs) s.id};
+        int allocateNegativeYtmId(String videoId) {
+          var hash = 0xcbf29ce484222325;
+          for (final unit in videoId.codeUnits) {
+            hash ^= unit;
+            hash *= 0x100000001b3;
+          }
+          final magnitude = hash & 0x3FFFFFFFFFFFFFFF;
+          var candidate = -(magnitude == 0 ? 1 : magnitude);
+          while (candidate >= 0 || usedSongIds.contains(candidate)) {
+            candidate = candidate >= 0 ? -1 : candidate - 1;
+          }
+          usedSongIds.add(candidate);
+          return candidate;
+        }
+
         for (final meta in onlineSeedList) {
           final rawRemoteId = meta['remoteId'];
           final remoteId = rawRemoteId is String ? rawRemoteId.trim() : null;
@@ -646,8 +664,10 @@ class ImportBackupUseCase {
               rawArtworkUrl is String ? rawArtworkUrl.trim() : null;
           final rawDurationMs = meta['durationMs'];
           final durationMs = rawDurationMs is num ? rawDurationMs.toInt() : 0;
-          final insertedId = await _db.into(_db.songsTable).insert(
+          final seededId = allocateNegativeYtmId(videoId);
+          await _db.into(_db.songsTable).insert(
                 SongsTableCompanion.insert(
+                  id: Value(seededId),
                   title: (title != null && title.isNotEmpty)
                       ? title
                       : 'Unknown Track',
@@ -665,19 +685,17 @@ class ImportBackupUseCase {
                 ),
                 mode: InsertMode.insertOrIgnore,
               );
-          if (insertedId > 0) {
-            final row = await (_db.select(_db.songsTable)
-                  ..where((t) => t.id.equals(insertedId)))
-                .getSingleOrNull();
-            if (row != null) {
-              allSongs.add(row);
-              pathMap[row.path] = row;
-              pathMap[row.path.toLowerCase()] = row;
-              remoteIdMap[videoId] = row;
-              lazySongSegments = null;
-              lazyParentFilenameMap = null;
-              lazyUniqueFilenameMap = null;
-            }
+          final row = await (_db.select(_db.songsTable)
+                ..where((t) => t.id.equals(seededId)))
+              .getSingleOrNull();
+          if (row != null) {
+            allSongs.add(row);
+            pathMap[row.path] = row;
+            pathMap[row.path.toLowerCase()] = row;
+            remoteIdMap[videoId] = row;
+            lazySongSegments = null;
+            lazyParentFilenameMap = null;
+            lazyUniqueFilenameMap = null;
           }
         }
       }

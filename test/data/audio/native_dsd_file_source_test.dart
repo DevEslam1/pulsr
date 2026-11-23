@@ -170,4 +170,13 @@ void main() {
       throwsA(isA<FormatException>()),
     );
   });
+
+  test('BUG-P1-4: readChunk after close returns null without throwing', () async {
+    final path = '${tempDir.path}${Platform.pathSeparator}closed.dsf';
+    await File(path).writeAsBytes(_dsfFixture(blockSize: 4, blocks: 2));
+    final source = await NativeDsdFileSource.open(path);
+    await source.close();
+    expect(source.isClosed, isTrue);
+    expect(await source.readChunk(4), isNull);
+  });
 }

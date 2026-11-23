@@ -230,19 +230,25 @@ class _ArbitraryEqSheetState extends State<ArbitraryEqSheet> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(
-                      children: [
-                        Icon(Icons.graphic_eq_rounded, color: p.primary),
-                        const SizedBox(width: AppSpacing.s10),
-                        Text(
-                          context.l10n.arbitraryResponseEq,
-                          style: TextStyle(
-                            color: p.textPrimary,
-                            fontSize: AppFontSize.title,
-                            fontWeight: FontWeight.w700,
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Icon(Icons.graphic_eq_rounded, color: p.primary),
+                          const SizedBox(width: AppSpacing.s10),
+                          Expanded(
+                            child: Text(
+                              context.l10n.arbitraryResponseEq,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: p.textPrimary,
+                                fontSize: AppFontSize.title,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                     Switch.adaptive(
                       value: state.isArbitraryEqEnabled,

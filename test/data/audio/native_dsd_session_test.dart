@@ -370,5 +370,20 @@ void main() {
       expect(mockUsb.isStreamingStopped, isTrue);
       expect(session.isPrepared, isFalse);
     });
+
+    test('BUG-P1-3: dispose mid-prepare closes file/USB without StateError on closed controllers', () async {
+      final probeGate = Completer<DsdDacCapabilities>();
+      final midSession = NativeDsdSession(
+        usb: mockUsb,
+        producer: producer,
+        capabilitiesProvider: () => probeGate.future,
+      );
+      final prepareFuture = midSession.preparePath(dsfPath, autoPlay: true);
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      await midSession.dispose();
+      probeGate.complete(_nativeCaps);
+      await expectLater(prepareFuture, completes);
+      expect(midSession.isPrepared, isFalse);
+    });
   });
 }

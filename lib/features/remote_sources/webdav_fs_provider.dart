@@ -262,6 +262,7 @@ class WebDavFsProvider implements RemoteFsProvider {
     } on SocketException catch (e, st) {
       throw _unreachable('Could not reach ${source.authority}.', e, st);
     }
+    request.followRedirects = false;
     final authorization = _authorizationHeader;
     if (authorization != null) {
       request.headers.set(HttpHeaders.authorizationHeader, authorization);

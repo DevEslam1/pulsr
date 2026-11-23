@@ -316,7 +316,14 @@ void main() {
       account.debugInnertubeClient = MockClient((_) async => _playerReject());
 
       final stopwatch = Stopwatch()..start();
-      final stream = await account.resolvePlayerStream('dQw4w9WgXcQ');
+      YtmStream? stream;
+      try {
+        stream = await account.resolvePlayerStream('dQw4w9WgXcQ');
+      } on YtmException catch (e) {
+        // BUG-P2-43: two consecutive LOGIN_REQUIRED answers short-circuit with
+        // BOT_CHALLENGE to arm cooldown; this test measures prep overlap only.
+        expect(e.code, equals('BOT_CHALLENGE'));
+      }
       stopwatch.stop();
 
       expect(stream, isNull,

@@ -279,7 +279,10 @@ class TrackAnnouncer {
 
   bool get _canAnnounce {
     if (!settings.enabled) return false;
-    if (!engine.isAvailable) return false;
+    final engineReady = engine.isAvailable ||
+        (engine is MethodChannelTtsEngine &&
+            (engine as MethodChannelTtsEngine).canRetryInit);
+    if (!engineReady) return false;
     // The toggles decide whether each gate applies; the callbacks report the
     // live state those gates describe (casting, bit-perfect output).
     if (settings.skipWhenCasting && _shouldSkip()) return false;

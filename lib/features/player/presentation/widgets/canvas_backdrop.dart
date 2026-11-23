@@ -54,7 +54,8 @@ class CanvasBackdrop extends StatefulWidget {
   State<CanvasBackdrop> createState() => _CanvasBackdropState();
 }
 
-class _CanvasBackdropState extends State<CanvasBackdrop> {
+class _CanvasBackdropState extends State<CanvasBackdrop>
+    with WidgetsBindingObserver {
   CanvasRepository get _repository =>
       widget.repository ?? CanvasRepository.instance;
 
@@ -65,10 +66,12 @@ class _CanvasBackdropState extends State<CanvasBackdrop> {
   int? _resolvedSongId;
   bool _canvasEnabled = true;
   int _loadGeneration = 0;
+  bool _isAppActive = true;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _canvasEnabled = _readCanvasEnabled();
     if (_canvasEnabled) {
       _resolveAndLoad(widget.song);
@@ -79,12 +82,28 @@ class _CanvasBackdropState extends State<CanvasBackdrop> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     final enabled = _readCanvasEnabled();
-    if (enabled == _canvasEnabled) return;
-    _canvasEnabled = enabled;
-    if (enabled) {
-      _resolveAndLoad(widget.song);
-    } else {
-      _stopCanvas();
+    if (enabled != _canvasEnabled) {
+      _canvasEnabled = enabled;
+      if (enabled) {
+        _resolveAndLoad(widget.song);
+      } else {
+        _stopCanvas();
+      }
+      return;
+    }
+    _syncPlayState();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _isAppActive = true;
+      _syncPlayState();
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.detached) {
+      _isAppActive = false;
+      _syncPlayState();
     }
   }
 
@@ -131,7 +150,9 @@ class _CanvasBackdropState extends State<CanvasBackdrop> {
     final controller = _controller;
     if (controller == null || !controller.value.isInitialized) return;
 
-    if (widget.isPlaying) {
+    final isVisible = mounted ? TickerMode.valuesOf(context).enabled : false;
+    final shouldPlay = widget.isPlaying && _isAppActive && isVisible;
+    if (shouldPlay) {
       if (!controller.value.isPlaying) controller.play();
     } else {
       if (controller.value.isPlaying) controller.pause();
@@ -202,7 +223,8 @@ class _CanvasBackdropState extends State<CanvasBackdrop> {
 
       _controller = controller;
 
-      if (widget.isPlaying) {
+      final isVisible = mounted ? TickerMode.valuesOf(context).enabled : false;
+      if (widget.isPlaying && _isAppActive && isVisible) {
         await controller.play();
       }
 
@@ -243,6 +265,7 @@ class _CanvasBackdropState extends State<CanvasBackdrop> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _disposeController();
     super.dispose();
   }
@@ -310,11 +333,33 @@ class _CanvasBackdropState extends State<CanvasBackdrop> {
                 child: LayoutBuilder(
                   builder: (context, constraints) {
                     const downscale = 6.0;
+                    final rawSigma = AppBlur.canBlur(context)
+                        ? AppBlur.clampSigma(widget.blurSigma)
+                        : AppBlur.none;
+                    final videoBox = FittedBox(
+                      fit: BoxFit.cover,
+                      clipBehavior: Clip.hardEdge,
+                      child: SizedBox(
+                        width: _controller!.value.size.width > 0
+                            ? _controller!.value.size.width
+                            : 720,
+                        height: _controller!.value.size.height > 0
+                            ? _controller!.value.size.height
+                            : 1280,
+                        child: VideoPlayer(_controller!),
+                      ),
+                    );
+                    if (rawSigma <= 0) {
+                      return SizedBox(
+                        width: constraints.maxWidth,
+                        height: constraints.maxHeight,
+                        child: videoBox,
+                      );
+                    }
                     final smallWidth = constraints.maxWidth / downscale;
                     final smallHeight = constraints.maxHeight / downscale;
-                    final effectiveSigma = AppBlur.canBlur(context)
-                        ? AppBlur.clampSigma(widget.blurSigma / downscale)
-                        : AppBlur.none;
+                    final effectiveSigma =
+                        AppBlur.clampSigma(widget.blurSigma / downscale);
                     return Transform.scale(
                       scale: downscale,
                       child: ImageFiltered(
@@ -325,19 +370,7 @@ class _CanvasBackdropState extends State<CanvasBackdrop> {
                         child: SizedBox(
                           width: smallWidth,
                           height: smallHeight,
-                          child: FittedBox(
-                            fit: BoxFit.cover,
-                            clipBehavior: Clip.hardEdge,
-                            child: SizedBox(
-                              width: _controller!.value.size.width > 0
-                                  ? _controller!.value.size.width
-                                  : 720,
-                              height: _controller!.value.size.height > 0
-                                  ? _controller!.value.size.height
-                                  : 1280,
-                              child: VideoPlayer(_controller!),
-                            ),
-                          ),
+                          child: videoBox,
                         ),
                       ),
                     );

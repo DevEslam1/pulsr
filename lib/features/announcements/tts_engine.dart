@@ -89,19 +89,49 @@ class MethodChannelTtsEngine implements TtsEngine {
   /// Creates the engine.
   ///
   /// [channel] is injectable for tests; production uses [channelName].
-  MethodChannelTtsEngine({MethodChannel? channel})
-      : _channel = channel ?? const MethodChannel(channelName);
+  MethodChannelTtsEngine({
+    MethodChannel? channel,
+    Duration retryCooldown = defaultRetryCooldown,
+    DateTime Function()? now,
+  })  : _channel = channel ?? const MethodChannel(channelName),
+        _retryCooldown = retryCooldown,
+        _now = now ?? DateTime.now;
 
   /// Method channel name shared with `TtsPlugin.kt`.
   static const String channelName = 'com.pulsr.music/tts';
 
+  /// Default cooldown before retrying initialization after a transient failure.
+  static const Duration defaultRetryCooldown = Duration(seconds: 10);
+
   final MethodChannel _channel;
+  final Duration _retryCooldown;
+  final DateTime Function() _now;
   bool _available = false;
   bool _disposed = false;
+  bool _permanentlyUnavailable = false;
+  int _consecutiveFailures = 0;
+  DateTime? _nextRetryAt;
 
   /// Whether [dispose] has been called on this engine.
   @visibleForTesting
   bool get isDisposed => _disposed;
+
+  /// Number of consecutive transient failures since last successful operation.
+  @visibleForTesting
+  int get consecutiveFailures => _consecutiveFailures;
+
+  /// Earliest timestamp at which a transient failure may retry initialization.
+  @visibleForTesting
+  DateTime? get nextRetryAt => _nextRetryAt;
+
+  /// True when the engine is currently unavailable due to a transient failure
+  /// and the retry cooldown has elapsed.
+  bool get canRetryInit =>
+      !_disposed &&
+      !_available &&
+      !_permanentlyUnavailable &&
+      _nextRetryAt != null &&
+      !_now().isBefore(_nextRetryAt!);
 
   /// Voice id applied to the next [speak] call; empty keeps the system voice.
   String voiceId = '';
@@ -121,13 +151,20 @@ class MethodChannelTtsEngine implements TtsEngine {
 
   @override
   Future<bool> init() async {
-    if (_disposed) return false;
+    if (_disposed || _permanentlyUnavailable) return false;
     try {
       final ready = await _channel
               .invokeMethod<bool>('init')
               .timeout(const Duration(seconds: 12)) ??
           false;
       if (_disposed) return false;
+      if (ready) {
+        _consecutiveFailures = 0;
+        _nextRetryAt = null;
+      } else {
+        _consecutiveFailures++;
+        _nextRetryAt = _now().add(_retryCooldown);
+      }
       _setAvailable(ready);
       return ready;
     } on Exception catch (error, stackTrace) {
@@ -144,7 +181,15 @@ class MethodChannelTtsEngine implements TtsEngine {
     double volume = 1.0,
     bool duckAudio = false,
   }) async {
-    if (_disposed || !_available || text.isEmpty) return;
+    if (_disposed || text.isEmpty) return;
+    if (!_available) {
+      if (canRetryInit) {
+        final recovered = await init();
+        if (!recovered) return;
+      } else {
+        return;
+      }
+    }
     final arguments = <String, Object?>{
       'text': text,
       'volume': volume.clamp(0.0, 1.0),
@@ -156,6 +201,8 @@ class MethodChannelTtsEngine implements TtsEngine {
       await _channel
           .invokeMethod<void>('speak', arguments)
           .timeout(const Duration(seconds: 15));
+      _consecutiveFailures = 0;
+      _nextRetryAt = null;
     } on Exception catch (error, stackTrace) {
       if (!_disposed) {
         _handleFailure(error, stackTrace, 'speak');
@@ -179,7 +226,15 @@ class MethodChannelTtsEngine implements TtsEngine {
 
   @override
   Future<List<TtsVoice>> voices() async {
-    if (_disposed || !_available) return const <TtsVoice>[];
+    if (_disposed) return const <TtsVoice>[];
+    if (!_available) {
+      if (canRetryInit) {
+        final recovered = await init();
+        if (!recovered) return const <TtsVoice>[];
+      } else {
+        return const <TtsVoice>[];
+      }
+    }
     try {
       final raw = await _channel
           .invokeListMethod<dynamic>('voices')
@@ -257,9 +312,16 @@ class MethodChannelTtsEngine implements TtsEngine {
   }
 
   void _handleFailure(Object error, StackTrace stackTrace, String action) {
-    _setAvailable(false);
     final isMissingPlugin = error is MissingPluginException;
     final isTimeout = error is TimeoutException;
+    if (isMissingPlugin) {
+      _permanentlyUnavailable = true;
+      _nextRetryAt = null;
+    } else {
+      _consecutiveFailures++;
+      _nextRetryAt = _now().add(_retryCooldown);
+    }
+    _setAvailable(false);
     ErrorLogger.log(
       isMissingPlugin
           ? 'TTS channel $channelName has no native handler ($action)'

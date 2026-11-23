@@ -117,7 +117,7 @@ class _TagEditorViewState extends State<_TagEditorView> {
   Future<void> _dismissInterruptedBatch() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(TagEditorCubit.batchCheckpointKey);
+      await TagEditorCubit.clearBatchCheckpoint(prefs);
     } catch (_) {}
   }
 
@@ -162,6 +162,8 @@ class _TagEditorViewState extends State<_TagEditorView> {
       metadataSearchService: getIt<MetadataSearchService>(),
     );
     try {
+      final prefs = await SharedPreferences.getInstance();
+      await cubit.restoreBatchCheckpoint(prefs);
       final loaded = await _awaitInitialLoad(cubit);
       if (!loaded) {
         if (!mounted) return;
@@ -172,6 +174,7 @@ class _TagEditorViewState extends State<_TagEditorView> {
         ));
         return;
       }
+      await cubit.restoreBatchCheckpoint(prefs);
       await cubit.saveTags();
       if (!mounted) return;
       final state = cubit.state;
@@ -341,7 +344,12 @@ class _TagEditorAppBar extends StatelessWidget implements PreferredSizeWidget {
               a.genre != b.genre ||
               a.year != b.year ||
               a.trackNumber != b.trackNumber ||
-              a.discNumber != b.discNumber,
+              a.discNumber != b.discNumber ||
+              a.comment != b.comment ||
+              a.lyrics != b.lyrics ||
+              a.status != b.status ||
+              a.newArtworkPath != b.newArtworkPath ||
+              a.removeArtwork != b.removeArtwork,
           builder: (context, _) {
             final canUndo = context.read<TagEditorCubit>().canUndo;
             return IconButton(

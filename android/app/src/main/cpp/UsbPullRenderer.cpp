@@ -8,6 +8,7 @@
 #include <cmath>
 #include <cstring>
 #include <limits>
+#include <thread>
 
 namespace pulsr {
 namespace {
@@ -69,6 +70,8 @@ bool UsbPullRenderer::Configure(int sampleRate, int channels, int bytesPerSample
     overrunEvents_.store(0, std::memory_order_relaxed);
     underrunEvents_.store(0, std::memory_order_relaxed);
     framesPulled_.store(0, std::memory_order_relaxed);
+    consumerPin_.store(UINT64_MAX, std::memory_order_relaxed);
+    flushWatermark_.store(0, std::memory_order_relaxed);
     paused_.store(false, std::memory_order_relaxed);
     prefillSatisfied_.store(false, std::memory_order_relaxed);
     return true;
@@ -82,17 +85,51 @@ void UsbPullRenderer::reset() {
     overrunEvents_.store(0, std::memory_order_relaxed);
     underrunEvents_.store(0, std::memory_order_relaxed);
     framesPulled_.store(0, std::memory_order_relaxed);
+    consumerPin_.store(UINT64_MAX, std::memory_order_relaxed);
+    flushWatermark_.store(0, std::memory_order_relaxed);
     paused_.store(false, std::memory_order_relaxed);
     prefillSatisfied_.store(false, std::memory_order_release);
+}
+
+uint64_t UsbPullRenderer::advanceReadIndexAtLeast(uint64_t target) const {
+    uint64_t r = readIndex_.load(std::memory_order_acquire);
+    while (r < target) {
+        if (readIndex_.compare_exchange_weak(r, target, std::memory_order_release,
+                                             std::memory_order_acquire)) {
+            return target;
+        }
+    }
+    return r;
 }
 
 void UsbPullRenderer::flush() {
     // Seek: the buffered audio is no longer the audio the user is listening
     // to, so it is dropped rather than played. This is not an underrun and not
     // an overrun, so neither counter moves.
-    writeIndex_.store(0, std::memory_order_relaxed);
-    readIndex_.store(0, std::memory_order_relaxed);
+    // Never reset writeIndex_ or readIndex_ to 0: zeroing writeIndex_ while a
+    // consumer is in copyOut() causes unsigned wrap (w - r -> UINT64_MAX - ...)
+    // and wedges every future write() with ENOSPC. Instead, re-arm prefill,
+    // advance the monotonic flushWatermark_ and readIndex_ to the current
+    // writeIndex_, and wait out any in-flight consumer memcpy before returning
+    // (copyOut() is strictly wait-free, so this finishes in nanoseconds and
+    // preserves any post-seek writes >= target with zero data race).
     prefillSatisfied_.store(false, std::memory_order_release);
+    const uint64_t target = writeIndex_.load(std::memory_order_acquire);
+    uint64_t prev = flushWatermark_.load(std::memory_order_acquire);
+    while (target > prev) {
+        if (flushWatermark_.compare_exchange_weak(
+                prev, target, std::memory_order_seq_cst,
+                std::memory_order_acquire)) {
+            break;
+        }
+    }
+    advanceReadIndexAtLeast(target);
+    // Ensure any consumer copyOut() that began before flushWatermark_ reached
+    // `target` has finished reading pre-seek ring slots before write() can
+    // reuse them.
+    while (consumerPin_.load(std::memory_order_seq_cst) < target) {
+        std::this_thread::yield();
+    }
 }
 
 void UsbPullRenderer::setPaused(bool paused) {
@@ -106,9 +143,11 @@ bool UsbPullRenderer::write(const void* src, int frames) {
 
     const uint64_t w = writeIndex_.load(std::memory_order_relaxed);
     const uint64_t r = readIndex_.load(std::memory_order_acquire);
-    const uint64_t used = w - r;  // unsigned wrap is exact here
+    const uint64_t pin = consumerPin_.load(std::memory_order_seq_cst);
+    const uint64_t safeRead = (pin < r) ? pin : r;
+    const uint64_t usedForCapacity = (w > safeRead) ? (w - safeRead) : 0;
     const size_t n = static_cast<size_t>(frames);
-    if (n > capacityFrames_ || used + n > capacityFrames_) {
+    if (n > capacityFrames_ || usedForCapacity + n > capacityFrames_) {
         // All-or-nothing: a partially published block would let the consumer
         // hand a torn packet to the DAC.
         overrunEvents_.fetch_add(1, std::memory_order_relaxed);
@@ -123,20 +162,46 @@ bool UsbPullRenderer::write(const void* src, int frames) {
     if (first < n) {
         std::memcpy(ring_.data(), in + first * fb, (n - first) * fb);
     }
-    writeIndex_.store(w + n, std::memory_order_release);
+    const uint64_t newW = w + n;
+    writeIndex_.store(newW, std::memory_order_release);
 
-    // Prefill latch. Only the producer can raise it; flush()/reset() clear it
-    // from the control thread while the stream is quiesced.
-    if (!prefillSatisfied_.load(std::memory_order_relaxed) &&
-        used + n >= static_cast<uint64_t>(prefillFrames_)) {
+    // Prefill latch uses logical post-flush occupancy (excluding any stale
+    // pre-seek frames still pinned by a finishing copyOut()).
+    const uint64_t wm = flushWatermark_.load(std::memory_order_acquire);
+    const uint64_t logicalRead = (wm > r) ? wm : r;
+    if (newW > logicalRead &&
+        (newW - logicalRead) >= static_cast<uint64_t>(prefillFrames_) &&
+        !prefillSatisfied_.load(std::memory_order_relaxed)) {
         prefillSatisfied_.store(true, std::memory_order_release);
     }
     return true;
 }
 
-size_t UsbPullRenderer::copyOut(uint8_t* dst, size_t frames) {
-    const uint64_t r = readIndex_.load(std::memory_order_relaxed);
+size_t UsbPullRenderer::copyOut(uint8_t* dst, size_t frames, bool* flushed) {
+    if (flushed) *flushed = false;
+    uint64_t wm = flushWatermark_.load(std::memory_order_acquire);
+    uint64_t r = advanceReadIndexAtLeast(wm);
+
+    // Publish hazard pin BEFORE re-checking flushWatermark_ (StoreLoad order):
+    // either we observe a newer flushWatermark_ below, or flush()/write()
+    // observes our consumerPin_ == r and never overwrites our ring slots.
+    consumerPin_.store(r, std::memory_order_seq_cst);
+    struct PinGuard {
+        const UsbPullRenderer* self;
+        ~PinGuard() {
+            self->consumerPin_.store(UINT64_MAX, std::memory_order_release);
+        }
+    } pinGuard{this};
+
+    wm = flushWatermark_.load(std::memory_order_seq_cst);
+    if (wm > r) {
+        advanceReadIndexAtLeast(wm);
+        if (flushed) *flushed = true;
+        return 0;
+    }
+
     const uint64_t w = writeIndex_.load(std::memory_order_acquire);
+    if (w <= r) return 0;
     const uint64_t used = w - r;
     const size_t n = std::min(frames, static_cast<size_t>(used));
     if (n == 0) return 0;
@@ -148,7 +213,18 @@ size_t UsbPullRenderer::copyOut(uint8_t* dst, size_t frames) {
     if (first < n) {
         std::memcpy(dst + first * fb, ring_.data(), (n - first) * fb);
     }
-    readIndex_.store(r + n, std::memory_order_release);
+
+    // Advance readIndex_ monotonically without overwriting a higher flush().
+    advanceReadIndexAtLeast(r + n);
+
+    // If flush() raised flushWatermark_ past r while we were copying, discard
+    // the pre-seek bytes we copied instead of returning them.
+    wm = flushWatermark_.load(std::memory_order_acquire);
+    if (wm > r) {
+        advanceReadIndexAtLeast(wm);
+        if (flushed) *flushed = true;
+        return 0;
+    }
     return n;
 }
 
@@ -170,7 +246,14 @@ int UsbPullRenderer::pullExact(void* dst, int frames) {
 
     auto* out = static_cast<uint8_t*>(dst);
     const size_t want = static_cast<size_t>(frames);
-    const size_t got = copyOut(out, want);
+    bool flushed = false;
+    const size_t got = copyOut(out, want, &flushed);
+    if (flushed) {
+        // Concurrent seek/flush: emit silence without counting an underrun.
+        const size_t fb = static_cast<size_t>(frameBytes_);
+        std::memset(out, 0, want * fb);
+        return 0;
+    }
     if (got < want) {
         const size_t fb = static_cast<size_t>(frameBytes_);
         std::memset(out + got * fb, 0, (want - got) * fb);
@@ -183,8 +266,11 @@ int UsbPullRenderer::pullExact(void* dst, int frames) {
 size_t UsbPullRenderer::availableFrames() const {
     if (!configured_) return 0;
     const uint64_t r = readIndex_.load(std::memory_order_acquire);
+    const uint64_t wm = flushWatermark_.load(std::memory_order_acquire);
+    const uint64_t effectiveRead = (wm > r) ? wm : r;
     const uint64_t w = writeIndex_.load(std::memory_order_acquire);
-    const uint64_t used = w - r;
+    if (w <= effectiveRead) return 0;
+    const uint64_t used = w - effectiveRead;
     return static_cast<size_t>(std::min<uint64_t>(used, capacityFrames_));
 }
 

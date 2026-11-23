@@ -437,9 +437,14 @@ void main() {
       final service = await loggedIn(dataSyncId: 'dsid||');
       handler = (request) async => _playability('LOGIN_REQUIRED');
 
-      final stream = await service.resolvePlayerStream('dQw4w9WgXcQ');
-
-      expect(stream, isNull);
+      await expectLater(
+        service.resolvePlayerStream('dQw4w9WgXcQ'),
+        throwsA(
+          isA<YtmException>()
+              .having((e) => e.code, 'code', 'BOT_CHALLENGE')
+              .having((e) => e.isBotBlocked, 'isBotBlocked', isTrue),
+        ),
+      );
       final playerRequests =
           requests.where((r) => r.url.path.contains('/player')).toList();
       expect(playerRequests, hasLength(3),
@@ -472,9 +477,14 @@ void main() {
       handler = (request) async => _playability('UNPLAYABLE',
           reason: 'Sign in to confirm you are not a bot');
 
-      final stream = await service.resolvePlayerStream('dQw4w9WgXcQ');
-
-      expect(stream, isNull);
+      await expectLater(
+        service.resolvePlayerStream('dQw4w9WgXcQ'),
+        throwsA(
+          isA<YtmException>()
+              .having((e) => e.code, 'code', 'BOT_CHALLENGE')
+              .having((e) => e.isBotBlocked, 'isBotBlocked', isTrue),
+        ),
+      );
       expect(
           requests.where((r) => r.url.path.contains('/player')), hasLength(2));
     });
@@ -487,9 +497,14 @@ void main() {
         return _json(call == 1 ? 429 : 403, const {});
       };
 
-      final stream = await service.resolvePlayerStream('dQw4w9WgXcQ');
-
-      expect(stream, isNull);
+      await expectLater(
+        service.resolvePlayerStream('dQw4w9WgXcQ'),
+        throwsA(
+          isA<YtmException>()
+              .having((e) => e.code, 'code', 'BOT_CHALLENGE')
+              .having((e) => e.isBotBlocked, 'isBotBlocked', isTrue),
+        ),
+      );
       expect(
           requests.where((r) => r.url.path.contains('/player')), hasLength(2));
     });

@@ -1,7 +1,6 @@
 // lib/features/player/presentation/widgets/visualizer/milkdrop_renderer.dart
 import 'dart:math' as math;
 import 'dart:ui' as ui;
-import 'package:flutter/foundation.dart' show listEquals;
 import 'package:material_ui/material_ui.dart';
 import '../../../../../core/performance/gpu_budget.dart';
 import '../../../../../domain/models/milkdrop_preset.dart';
@@ -18,6 +17,8 @@ class MilkdropRenderer extends StatelessWidget {
   final bool forceCanvasFallback;
   final bool transparentBackground;
 
+  final int generation;
+
   const MilkdropRenderer({
     super.key,
     this.shader,
@@ -26,6 +27,7 @@ class MilkdropRenderer extends StatelessWidget {
     required this.preset,
     this.forceCanvasFallback = false,
     this.transparentBackground = false,
+    this.generation = 0,
   });
 
   bool get isFallback =>
@@ -33,26 +35,39 @@ class MilkdropRenderer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return RepaintBoundary(
-      child: CustomPaint(
-        size: Size.infinite,
-        painter: (!isFallback && shader != null)
-            ? MilkdropGpuPainter(
-                shader: shader!,
-                data: data,
-                color: color,
-                preset: preset,
-                transparentBackground: transparentBackground,
-              )
-            : MilkdropCanvasPainter(
-                data: data,
-                color: color,
-                preset: preset,
-                transparentBackground: transparentBackground,
-              ),
-      ),
+    return ValueListenableBuilder<bool>(
+      valueListenable: GpuBudget.enabled,
+      builder: (context, isGpuSaver, _) {
+        final useFallback = forceCanvasFallback || shader == null || isGpuSaver;
+        return RepaintBoundary(
+          child: CustomPaint(
+            size: Size.infinite,
+            painter: (!useFallback && shader != null)
+                ? MilkdropGpuPainter(
+                    shader: shader!,
+                    data: data,
+                    color: color,
+                    preset: preset,
+                    transparentBackground: transparentBackground,
+                    generation: generation,
+                  )
+                : MilkdropCanvasPainter(
+                    data: data,
+                    color: color,
+                    preset: preset,
+                    transparentBackground: transparentBackground,
+                    generation: generation,
+                  ),
+          ),
+        );
+      },
     );
   }
+}
+
+double _sanitizeScalar(double value, double fallback, double min, double max) {
+  if (!value.isFinite) return fallback;
+  return value.clamp(min, max);
 }
 
 /// GPU shader painter for MilkDrop effects using `shaders/milkdrop.frag`.
@@ -62,6 +77,7 @@ class MilkdropGpuPainter extends CustomPainter {
   final Color color;
   final MilkdropPreset preset;
   final bool transparentBackground;
+  final int generation;
 
   MilkdropGpuPainter({
     required this.shader,
@@ -69,6 +85,7 @@ class MilkdropGpuPainter extends CustomPainter {
     required this.color,
     required this.preset,
     this.transparentBackground = false,
+    this.generation = 0,
   });
 
   double _avg(int a, int b) {
@@ -78,7 +95,8 @@ class MilkdropGpuPainter extends CustomPainter {
     if (hi <= lo) return 0.0;
     var sum = 0.0;
     for (var i = lo; i < hi; i++) {
-      sum += data[i];
+      final v = data[i];
+      if (v.isFinite) sum += v;
     }
     return sum / (hi - lo);
   }
@@ -96,24 +114,19 @@ class MilkdropGpuPainter extends CustomPainter {
     shader.setFloat(6, color.r);
     shader.setFloat(7, color.g);
     shader.setFloat(8, color.b);
-    shader.setFloat(9, preset.waveR.clamp(0.0, 1.0));
-    shader.setFloat(10, preset.waveG.clamp(0.0, 1.0));
-    shader.setFloat(11, preset.waveB.clamp(0.0, 1.0));
-    shader.setFloat(12, preset.zoom);
-    shader.setFloat(13, preset.rot);
-    shader.setFloat(14, preset.warp);
-    shader.setFloat(15, preset.decay.clamp(0.0, 1.0));
+    shader.setFloat(9, _sanitizeScalar(preset.waveR, 1.0, 0.0, 1.0));
+    shader.setFloat(10, _sanitizeScalar(preset.waveG, 1.0, 0.0, 1.0));
+    shader.setFloat(11, _sanitizeScalar(preset.waveB, 1.0, 0.0, 1.0));
+    shader.setFloat(12, _sanitizeScalar(preset.zoom, 1.0, 0.2, 5.0));
+    shader.setFloat(13, _sanitizeScalar(preset.rot, 0.0, -6.283185, 6.283185));
+    shader.setFloat(14, _sanitizeScalar(preset.warp, 1.0, 0.05, 4.0));
+    shader.setFloat(15, _sanitizeScalar(preset.decay, 0.95, 0.0, 1.0));
     shader.setFloat(16, transparentBackground ? 1.0 : 0.0);
     canvas.drawRect(Offset.zero & size, Paint()..shader = shader);
   }
 
   @override
-  bool shouldRepaint(covariant MilkdropGpuPainter oldDelegate) =>
-      oldDelegate.shader != shader ||
-      oldDelegate.color != color ||
-      oldDelegate.preset != preset ||
-      oldDelegate.transparentBackground != transparentBackground ||
-      !listEquals(oldDelegate.data, data);
+  bool shouldRepaint(covariant MilkdropGpuPainter oldDelegate) => true;
 }
 
 /// Parameter-driven Canvas fallback approximation for MilkDrop presets.
@@ -122,12 +135,14 @@ class MilkdropCanvasPainter extends CustomPainter {
   final Color color;
   final MilkdropPreset preset;
   final bool transparentBackground;
+  final int generation;
 
   MilkdropCanvasPainter({
     required this.data,
     required this.color,
     required this.preset,
     this.transparentBackground = false,
+    this.generation = 0,
   });
 
   double _avg(int a, int b) {
@@ -137,7 +152,8 @@ class MilkdropCanvasPainter extends CustomPainter {
     if (hi <= lo) return 0.0;
     var sum = 0.0;
     for (var i = lo; i < hi; i++) {
-      sum += data[i];
+      final v = data[i];
+      if (v.isFinite) sum += v;
     }
     return sum / (hi - lo);
   }
@@ -151,14 +167,22 @@ class MilkdropCanvasPainter extends CustomPainter {
     final treb = _avg(22, 32);
     final center = Offset(size.width / 2, size.height / 2);
 
+    final safeWaveR = _sanitizeScalar(preset.waveR, 1.0, 0.0, 1.0);
+    final safeWaveG = _sanitizeScalar(preset.waveG, 1.0, 0.0, 1.0);
+    final safeWaveB = _sanitizeScalar(preset.waveB, 1.0, 0.0, 1.0);
+    final safeZoom = _sanitizeScalar(preset.zoom, 1.0, 0.2, 5.0);
+    final safeRot = _sanitizeScalar(preset.rot, 0.0, -6.283185, 6.283185);
+    final safeWarp = _sanitizeScalar(preset.warp, 1.0, 0.05, 4.0);
+    final safeDecay = _sanitizeScalar(preset.decay, 0.95, 0.0, 1.0);
+
     final isWhiteTransparent = transparentBackground || color == Colors.white;
     final waveColor = isWhiteTransparent
         ? Colors.white
         : Color.fromARGB(
             255,
-            (preset.waveR.clamp(0.0, 1.0) * 255).round(),
-            (preset.waveG.clamp(0.0, 1.0) * 255).round(),
-            (preset.waveB.clamp(0.0, 1.0) * 255).round(),
+            (safeWaveR * 255).round(),
+            (safeWaveG * 255).round(),
+            (safeWaveB * 255).round(),
           );
     final tint =
         isWhiteTransparent ? Colors.white : Color.lerp(color, waveColor, 0.55)!;
@@ -181,12 +205,12 @@ class MilkdropCanvasPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;
     const rings = 12;
-    final speed = (0.35 + bass * 1.1) * (0.6 + preset.decay);
-    final baseRot = preset.rot * t * 6.28318 + (mid - 0.35) * 0.6;
+    final speed = (0.35 + bass * 1.1) * (0.6 + safeDecay);
+    final baseRot = safeRot * t * 6.28318 + (mid - 0.35) * 0.6;
     for (var r = 0; r < rings; r++) {
       final phase = ((t * speed) + r / rings) % 1.0;
       final depth = math.pow(phase, 1.5).toDouble();
-      final radius = size.shortestSide * 0.52 * depth * preset.zoom;
+      final radius = size.shortestSide * 0.52 * depth * safeZoom;
       if (radius < 2) continue;
       final rawAlpha = ((1.0 - phase) * (0.35 + bass * 0.65)).clamp(0.02, 0.9);
       final alpha =
@@ -197,7 +221,9 @@ class MilkdropCanvasPainter extends CustomPainter {
       canvas.save();
       canvas.translate(center.dx, center.dy);
       canvas.rotate(baseRot + r * 0.18);
-      final warpX = 1.0 + (preset.warp - 1.0) * depth * 0.35;
+      final rawWarpX = 1.0 + (safeWarp - 1.0) * depth * 0.35;
+      final warpX =
+          rawWarpX.isFinite ? rawWarpX.clamp(0.05, 4.0) : 1.0;
       canvas.scale(warpX, 1.0 / warpX);
       canvas.drawOval(
         Rect.fromCenter(
@@ -223,7 +249,8 @@ class MilkdropCanvasPainter extends CustomPainter {
       for (var i = 0; i < n; i++) {
         final x = size.width * (i / (n - 1));
         final amp = size.height * (0.30 + bass * 0.18);
-        final y = center.dy + (data[i] - 0.5) * amp * (1.0 + treb * 0.8);
+        final sample = data[i].isFinite ? data[i] : 0.5;
+        final y = center.dy + (sample - 0.5) * amp * (1.0 + treb * 0.8);
         if (i == 0) {
           path.moveTo(x, y);
         } else {
@@ -235,7 +262,8 @@ class MilkdropCanvasPainter extends CustomPainter {
 
     final particlePaint = Paint()..style = PaintingStyle.fill;
     for (var i = 0; i < data.length; i += 2) {
-      final m = data[i].clamp(0.02, 1.0);
+      final sample = data[i].isFinite ? data[i] : 0.02;
+      final m = sample.clamp(0.02, 1.0);
       final angle = (i / data.length) * 6.28318 + t * 0.4;
       final dist = size.shortestSide * 0.5 * math.pow(m, 1.3).toDouble();
       final x = center.dx + dist * math.cos(angle);
@@ -249,9 +277,5 @@ class MilkdropCanvasPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant MilkdropCanvasPainter oldDelegate) =>
-      oldDelegate.color != color ||
-      oldDelegate.preset != preset ||
-      oldDelegate.transparentBackground != transparentBackground ||
-      !listEquals(oldDelegate.data, data);
+  bool shouldRepaint(covariant MilkdropCanvasPainter oldDelegate) => true;
 }

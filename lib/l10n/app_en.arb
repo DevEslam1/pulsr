@@ -9151,5 +9151,1803 @@
   "spotifyImportComplete": "Import Complete",
   "@spotifyImportComplete": {
     "description": "Title of the Spotify import dialog when the import finished"
+  },
+  "assistantFavoritesTitle": "Favorites",
+  "@assistantFavoritesTitle": {
+    "description": "Now-playing title when the favorites request resolves"
+  },
+  "assistantLastAlbumTitle": "Last album",
+  "@assistantLastAlbumTitle": {
+    "description": "Now-playing title when the last album resumes"
+  },
+  "assistantArtistRadioGeneric": "Artist radio",
+  "@assistantArtistRadioGeneric": {
+    "description": "Fallback now-playing title for an artist radio request"
+  },
+  "assistantArtistRadioNamed": "{artist} radio",
+  "@assistantArtistRadioNamed": {
+    "description": "Now-playing title for a named artist radio request",
+    "placeholders": {
+      "artist": {
+        "type": "String"
+      }
+    }
+  },
+  "assistantNothingMatchedGeneric": "Nothing in your library matched that request.",
+  "@assistantNothingMatchedGeneric": {
+    "description": "Message when a lookup found nothing without a search term"
+  },
+  "assistantNothingMatchedTerm": "Nothing in your library matched \"{term}\".",
+  "@assistantNothingMatchedTerm": {
+    "description": "Message when a lookup found nothing for a search term",
+    "placeholders": {
+      "term": {
+        "type": "String"
+      }
+    }
+  },
+  "assistantNoFavorites": "No favorite tracks yet.",
+  "@assistantNoFavorites": {
+    "description": "Message shown when the favorites list is empty"
+  },
+  "assistantNoLastAlbum": "No recent album to resume.",
+  "@assistantNoLastAlbum": {
+    "description": "Message shown when there is no recent album to resume"
+  },
+  "assistantLibraryUnavailable": "Could not read your library. Try again.",
+  "@assistantLibraryUnavailable": {
+    "description": "Message shown when a library callback failed"
+  },
+  "assistantSettingsTitle": "Assistant & search",
+  "@assistantSettingsTitle": {
+    "description": "Assistant settings screen title"
+  },
+  "assistantSuggestionsTitle": "Search suggestions",
+  "@assistantSuggestionsTitle": {
+    "description": "Search suggestions toggle title"
+  },
+  "assistantSuggestionsSubtitle": "Show recent library tracks in the system search box. Off by default: the cache is readable by the privileged search UI.",
+  "@assistantSuggestionsSubtitle": {
+    "description": "Search suggestions toggle subtitle"
+  },
+  "assistantSuggestionsSection": "System search",
+  "@assistantSuggestionsSection": {
+    "description": "Section label above the search suggestions toggle"
+  },
+  "assistantSuggestionsOffNotice": "Suggestions are off. Any cached rows were cleared.",
+  "@assistantSuggestionsOffNotice": {
+    "description": "Notice shown when suggestions are disabled and cache cleared"
+  },
+  "annScreenTitle": "Announcements",
+  "@annScreenTitle": {
+    "description": "App bar title of the announcements screen"
+  },
+  "annSectionAnnouncements": "Announcements",
+  "@annSectionAnnouncements": {
+    "description": "Section header for the announcements master switch"
+  },
+  "annMasterTitle": "Speak track details",
+  "@annMasterTitle": {
+    "description": "Master switch label for track announcements"
+  },
+  "annMasterSubtitle": "Read the selected details aloud when a track starts.",
+  "@annMasterSubtitle": {
+    "description": "Master switch explanation for track announcements"
+  },
+  "annSectionElements": "What to announce",
+  "@annSectionElements": {
+    "description": "Section header for announcement element toggles"
+  },
+  "annElementsSubtitle": "Items are spoken in the order they are listed.",
+  "@annElementsSubtitle": {
+    "description": "Section subtitle for announcement element toggles"
+  },
+  "annSectionTiming": "Timing and volume",
+  "@annSectionTiming": {
+    "description": "Section header for delay, volume and ducking"
+  },
+  "annSectionTimingSubtitle": "Applied to every announcement on this device.",
+  "@annSectionTimingSubtitle": {
+    "description": "Section subtitle for timing and volume"
+  },
+  "annDelayLabel": "Delay before speaking",
+  "@annDelayLabel": {
+    "description": "Delay slider label"
+  },
+  "annDelaySubtitle": "Waits briefly so the track is playing before the voice starts.",
+  "@annDelaySubtitle": {
+    "description": "Delay slider explanation"
+  },
+  "annVolumeLabel": "Announcement volume",
+  "@annVolumeLabel": {
+    "description": "Announcement volume slider label"
+  },
+  "annVolumeSubtitle": "Separate from the music volume.",
+  "@annVolumeSubtitle": {
+    "description": "Announcement volume slider explanation"
+  },
+  "annMaxLengthLabel": "Maximum length",
+  "@annMaxLengthLabel": {
+    "description": "Maximum announcement length slider label"
+  },
+  "annMaxLengthSubtitle": "Longer details are shortened to this many characters.",
+  "@annMaxLengthSubtitle": {
+    "description": "Maximum announcement length slider explanation"
+  },
+  "annDuckAudioTitle": "Duck the music while speaking",
+  "@annDuckAudioTitle": {
+    "description": "Ducking switch label"
+  },
+  "annDuckAudioSubtitle": "Lowers the music so the voice stays intelligible.",
+  "@annDuckAudioSubtitle": {
+    "description": "Ducking switch explanation"
+  },
+  "annSectionSkip": "Skip announcements",
+  "@annSectionSkip": {
+    "description": "Section header for skip rules"
+  },
+  "annSectionSkipSubtitle": "Some outputs should never be interrupted by a voice.",
+  "@annSectionSkipSubtitle": {
+    "description": "Section subtitle for skip rules"
+  },
+  "annSkipCastingTitle": "While casting",
+  "@annSkipCastingTitle": {
+    "description": "Skip while casting switch label"
+  },
+  "annSkipCastingSubtitle": "Cast receivers already show the track details on screen.",
+  "@annSkipCastingSubtitle": {
+    "description": "Skip while casting switch explanation"
+  },
+  "annSkipBitPerfectTitle": "During bit-perfect playback",
+  "@annSkipBitPerfectTitle": {
+    "description": "Skip during bit-perfect switch label"
+  },
+  "annSkipBitPerfectSubtitle": "Keeps the exclusive output free of system audio.",
+  "@annSkipBitPerfectSubtitle": {
+    "description": "Skip during bit-perfect switch explanation"
+  },
+  "annSectionVoice": "Voice",
+  "@annSectionVoice": {
+    "description": "Section header for voice selection"
+  },
+  "annSectionVoiceSubtitle": "Voices are provided by the platform speech engine.",
+  "@annSectionVoiceSubtitle": {
+    "description": "Section subtitle for voice selection"
+  },
+  "annVoiceLabel": "System voice",
+  "@annVoiceLabel": {
+    "description": "Voice picker row label"
+  },
+  "annVoiceSystemDefault": "System default",
+  "@annVoiceSystemDefault": {
+    "description": "Dropdown entry keeping the platform default voice"
+  },
+  "annVoiceLoading": "Loading installed voices…",
+  "@annVoiceLoading": {
+    "description": "Shown while installed voices are loading"
+  },
+  "annVoiceNoneInstalled": "No additional voices installed.",
+  "@annVoiceNoneInstalled": {
+    "description": "Shown when no extra voices are installed"
+  },
+  "annTestTitle": "Test announcement",
+  "@annTestTitle": {
+    "description": "Test announcement row label"
+  },
+  "annTestSubtitle": "Speaks the current selection with the saved volume.",
+  "@annTestSubtitle": {
+    "description": "Test announcement row explanation"
+  },
+  "annTestButton": "Speak test",
+  "@annTestButton": {
+    "description": "Test announcement button label"
+  },
+  "annPreviewTrackTitle": "Pulsr Music",
+  "@annPreviewTrackTitle": {
+    "description": "Sample track title read out by the test button"
+  },
+  "annPreviewTrackArtist": "Announcement test",
+  "@annPreviewTrackArtist": {
+    "description": "Sample artist read out by the test button"
+  },
+  "annEmptySelection": "Select at least one item to announce.",
+  "@annEmptySelection": {
+    "description": "Shown when no element is selected to announce"
+  },
+  "annUnavailableTitle": "Not available on this platform",
+  "@annUnavailableTitle": {
+    "description": "Status title when TTS is unavailable on this platform"
+  },
+  "annUnavailableBody": "Spoken announcements need the Android text-to-speech engine. Every other setting keeps working.",
+  "@annUnavailableBody": {
+    "description": "Status body when TTS is unavailable on this platform"
+  },
+  "annElementTitle": "Title",
+  "@annElementTitle": {
+    "description": "Announcement element label: Title"
+  },
+  "annElementArtist": "Artist",
+  "@annElementArtist": {
+    "description": "Announcement element label: Artist"
+  },
+  "annElementAlbum": "Album",
+  "@annElementAlbum": {
+    "description": "Announcement element label: Album"
+  },
+  "annElementYear": "Year",
+  "@annElementYear": {
+    "description": "Announcement element label: Year"
+  },
+  "annElementTrackNumber": "Track number",
+  "@annElementTrackNumber": {
+    "description": "Announcement element label: Track number"
+  },
+  "annElementSubtitleTitle": "“Blue in Green”",
+  "@annElementSubtitleTitle": {
+    "description": "Example subtitle for Title announcement element"
+  },
+  "annElementSubtitleArtist": "“Miles Davis”",
+  "@annElementSubtitleArtist": {
+    "description": "Example subtitle for Artist announcement element"
+  },
+  "annElementSubtitleAlbum": "“Kind of Blue”",
+  "@annElementSubtitleAlbum": {
+    "description": "Example subtitle for Album announcement element"
+  },
+  "annElementSubtitleYear": "Spoken as “from 1959”.",
+  "@annElementSubtitleYear": {
+    "description": "Example subtitle for Year announcement element"
+  },
+  "annElementSubtitleTrackNumber": "Spoken as “track 4”.",
+  "@annElementSubtitleTrackNumber": {
+    "description": "Example subtitle for Track number announcement element"
+  },
+  "annDelayOff": "Off",
+  "@annDelayOff": {
+    "description": "Delay value when set to zero"
+  },
+  "annDelaySeconds": "{seconds} s",
+  "@annDelaySeconds": {
+    "description": "Delay value formatted in seconds",
+    "placeholders": {
+      "seconds": {
+        "type": "String"
+      }
+    }
+  },
+  "annMaxLengthValue": "{characters} characters",
+  "@annMaxLengthValue": {
+    "description": "Maximum announcement length in characters",
+    "placeholders": {
+      "characters": {
+        "type": "int"
+      }
+    }
+  },
+  "annVoiceRefresh": "Refresh voices",
+  "@annVoiceRefresh": {
+    "description": "Refresh action tooltip for installed voices"
+  },
+  "sysBehavScreenTitle": "System behaviour",
+  "@sysBehavScreenTitle": {
+    "description": "System behaviour screen title"
+  },
+  "sysBehavSectionFocus": "Audio focus",
+  "@sysBehavSectionFocus": {
+    "description": "Audio focus section header"
+  },
+  "sysBehavSectionUsb": "USB output",
+  "@sysBehavSectionUsb": {
+    "description": "USB output section header"
+  },
+  "sysBehavSectionVolume": "Volume",
+  "@sysBehavSectionVolume": {
+    "description": "Volume section header"
+  },
+  "sysBehavSectionLifecycle": "Fade and lifecycle",
+  "@sysBehavSectionLifecycle": {
+    "description": "Fade and lifecycle section header"
+  },
+  "sysBehavPauseOnNotifTitle": "Pause for notification sounds",
+  "@sysBehavPauseOnNotifTitle": {
+    "description": "Pause on notification sound switch title"
+  },
+  "sysBehavPauseOnNotifSubtitle": "Pauses instead of ducking when a system alert or navigation prompt plays. Turn this off to keep the music at a reduced level.",
+  "@sysBehavPauseOnNotifSubtitle": {
+    "description": "Pause on notification sound switch subtitle"
+  },
+  "sysBehavResumeAfterCallTitle": "Resume after calls",
+  "@sysBehavResumeAfterCallTitle": {
+    "description": "Resume after calls switch title"
+  },
+  "sysBehavResumeAfterCallSubtitle": "Continues playback when a phone call or another interruption ends, as long as nothing else took audio focus in the meantime.",
+  "@sysBehavResumeAfterCallSubtitle": {
+    "description": "Resume after calls switch subtitle"
+  },
+  "sysBehavUsbReleaseTitle": "USB release on focus loss",
+  "@sysBehavUsbReleaseTitle": {
+    "description": "USB release on focus loss title"
+  },
+  "sysBehavUsbReleaseSubtitle": "Drops the exclusive USB claim when another app or a call takes audio focus, so the DAC can be claimed again afterwards.",
+  "@sysBehavUsbReleaseSubtitle": {
+    "description": "USB release on focus loss subtitle"
+  },
+  "sysBehavUsbReleaseNever": "Never",
+  "@sysBehavUsbReleaseNever": {
+    "description": "USB release option: Never"
+  },
+  "sysBehavUsbReleasePermanent": "Permanent",
+  "@sysBehavUsbReleasePermanent": {
+    "description": "USB release option: Permanent"
+  },
+  "sysBehavUsbReleaseTransient": "Transient",
+  "@sysBehavUsbReleaseTransient": {
+    "description": "USB release option: Transient"
+  },
+  "sysBehavUsbReleaseNeverIconLabel": "Keep USB on every focus loss",
+  "@sysBehavUsbReleaseNeverIconLabel": {
+    "description": "Accessibility label for Never USB release option"
+  },
+  "sysBehavUsbReleasePermanentIconLabel": "Release USB on permanent focus loss",
+  "@sysBehavUsbReleasePermanentIconLabel": {
+    "description": "Accessibility label for Permanent USB release option"
+  },
+  "sysBehavUsbReleaseTransientIconLabel": "Release USB on any focus loss",
+  "@sysBehavUsbReleaseTransientIconLabel": {
+    "description": "Accessibility label for Transient USB release option"
+  },
+  "sysBehavCloseUsbBgTitle": "Close USB in background",
+  "@sysBehavCloseUsbBgTitle": {
+    "description": "Close USB in background switch title"
+  },
+  "sysBehavCloseUsbBgSubtitle": "Releases the exclusive claim when the app leaves the foreground, so another app on the device can use the DAC.",
+  "@sysBehavCloseUsbBgSubtitle": {
+    "description": "Close USB in background switch subtitle"
+  },
+  "sysBehavVolumeRockerTitle": "Double-press volume to skip",
+  "@sysBehavVolumeRockerTitle": {
+    "description": "Volume rocker track switch title"
+  },
+  "sysBehavVolumeRockerSubtitle": "A double press of the hardware volume rocker skips to the next track instead of changing the volume twice.",
+  "@sysBehavVolumeRockerSubtitle": {
+    "description": "Volume rocker track switch subtitle"
+  },
+  "sysBehavVolumeCurveTitle": "Volume curve",
+  "@sysBehavVolumeCurveTitle": {
+    "description": "Software volume curve title"
+  },
+  "sysBehavVolumeCurveSubtitle": "Linear moves the same amount of gain per step. Logarithmic moves the same amount of perceived loudness, which keeps the first steps quiet and the last steps usable.",
+  "@sysBehavVolumeCurveSubtitle": {
+    "description": "Software volume curve subtitle"
+  },
+  "sysBehavCurveLinear": "Linear",
+  "@sysBehavCurveLinear": {
+    "description": "Linear volume curve label"
+  },
+  "sysBehavCurveLogarithmic": "Logarithmic",
+  "@sysBehavCurveLogarithmic": {
+    "description": "Logarithmic volume curve label"
+  },
+  "sysBehavCurveLinearIconLabel": "Use a linear volume curve",
+  "@sysBehavCurveLinearIconLabel": {
+    "description": "Accessibility label for linear volume curve"
+  },
+  "sysBehavCurveLogarithmicIconLabel": "Use a logarithmic volume curve",
+  "@sysBehavCurveLogarithmicIconLabel": {
+    "description": "Accessibility label for logarithmic volume curve"
+  },
+  "sysBehavVolumeStepTitle": "Volume step",
+  "@sysBehavVolumeStepTitle": {
+    "description": "Volume step percent slider title"
+  },
+  "sysBehavVolumeStepSubtitle": "How far one volume step moves, as a percentage of the full scale.",
+  "@sysBehavVolumeStepSubtitle": {
+    "description": "Volume step percent slider subtitle"
+  },
+  "sysBehavFadeOutPauseTitle": "Fade out before pause",
+  "@sysBehavFadeOutPauseTitle": {
+    "description": "Fade out on pause slider title"
+  },
+  "sysBehavFadeOutPauseSubtitle": "Ramps the volume to zero before pausing, so an interruption does not cut the music off. Set to 0 to pause immediately.",
+  "@sysBehavFadeOutPauseSubtitle": {
+    "description": "Fade out on pause slider subtitle"
+  },
+  "sysBehavFadeOffValue": "Off",
+  "@sysBehavFadeOffValue": {
+    "description": "Fade out value when set to zero"
+  },
+  "sysBehavStopTaskRemovedTitle": "Stop when swiped away",
+  "@sysBehavStopTaskRemovedTitle": {
+    "description": "Stop when task removed switch title"
+  },
+  "sysBehavStopTaskRemovedSubtitle": "Stops playback when the app is removed from the recent apps list instead of pausing and keeping the queue.",
+  "@sysBehavStopTaskRemovedSubtitle": {
+    "description": "Stop when task removed switch subtitle"
+  },
+  "sysBehavAndroidOnlyLimit": "Android-only: this platform gives the app no task-removal callback, so the setting cannot take effect here.",
+  "@sysBehavAndroidOnlyLimit": {
+    "description": "Platform limitation note for stop-when-task-removed"
+  },
+  "sysBehavUsbOnlyLimit": "Android-only: exclusive USB output does not exist on this platform, so the setting cannot take effect here.",
+  "@sysBehavUsbOnlyLimit": {
+    "description": "Platform limitation note for USB output settings"
+  },
+  "sysBehavVolumeRockerLimit": "Android-only: hardware volume keys are not delivered to the app on this platform, so the setting cannot take effect here.",
+  "@sysBehavVolumeRockerLimit": {
+    "description": "Platform limitation note for volume rocker track switch"
+  },
+  "sysBehavFadeValueMs": "{milliseconds} ms",
+  "@sysBehavFadeValueMs": {
+    "description": "Fade length shown next to the slider in milliseconds",
+    "placeholders": {
+      "milliseconds": {
+        "type": "int"
+      }
+    }
+  },
+  "sysBehavVolumeStepValue": "{percent} %",
+  "@sysBehavVolumeStepValue": {
+    "description": "Volume step percentage shown next to the slider",
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "dlnaTitle": "DLNA Renderers",
+  "@dlnaTitle": {
+    "description": "DLNA screen title"
+  },
+  "dlnaSubtitle": "Play on a TV or speaker on your Wi-Fi network.",
+  "@dlnaSubtitle": {
+    "description": "DLNA screen subtitle"
+  },
+  "dlnaScan": "Scan for devices",
+  "@dlnaScan": {
+    "description": "DLNA scan button label"
+  },
+  "dlnaCastFile": "Cast file",
+  "@dlnaCastFile": {
+    "description": "Cast local file button label"
+  },
+  "dlnaCastCurrentTrack": "Cast current track",
+  "@dlnaCastCurrentTrack": {
+    "description": "Cast current track button label"
+  },
+  "dlnaCastFileSemantics": "Choose a local audio file to cast to the renderer",
+  "@dlnaCastFileSemantics": {
+    "description": "Semantics label for cast file action"
+  },
+  "dlnaCastCurrentSemantics": "Cast the track currently playing on this device to the renderer",
+  "@dlnaCastCurrentSemantics": {
+    "description": "Semantics label for cast current track action"
+  },
+  "dlnaScanning": "Searching for renderers",
+  "@dlnaScanning": {
+    "description": "Label shown while DLNA discovery runs"
+  },
+  "dlnaNoDevices": "No DLNA renderers found. Check that your TV or speaker is on the same network and that media sharing is enabled.",
+  "@dlnaNoDevices": {
+    "description": "Empty-state message when no DLNA renderers are found"
+  },
+  "dlnaConnect": "Connect",
+  "@dlnaConnect": {
+    "description": "Connect to DLNA device button label"
+  },
+  "dlnaConnected": "Connected",
+  "@dlnaConnected": {
+    "description": "Badge shown for connected DLNA device"
+  },
+  "dlnaNothingPlaying": "Nothing playing",
+  "@dlnaNothingPlaying": {
+    "description": "Placeholder when nothing is playing on DLNA renderer"
+  },
+  "dlnaPause": "Pause",
+  "@dlnaPause": {
+    "description": "DLNA pause control label"
+  },
+  "dlnaPrevious": "Previous",
+  "@dlnaPrevious": {
+    "description": "DLNA previous control label"
+  },
+  "dlnaNext": "Next",
+  "@dlnaNext": {
+    "description": "DLNA next control label"
+  },
+  "dlnaResume": "Resume",
+  "@dlnaResume": {
+    "description": "DLNA resume control label"
+  },
+  "dlnaStop": "Stop",
+  "@dlnaStop": {
+    "description": "DLNA stop control label"
+  },
+  "dlnaSeek": "Seek",
+  "@dlnaSeek": {
+    "description": "DLNA seek slider label"
+  },
+  "dlnaNowPlaying": "Now playing",
+  "@dlnaNowPlaying": {
+    "description": "DLNA now-playing card heading"
+  },
+  "dlnaRetry": "Retry",
+  "@dlnaRetry": {
+    "description": "DLNA error banner retry button"
+  },
+  "dlnaErrorTitle": "Could not reach the device",
+  "@dlnaErrorTitle": {
+    "description": "DLNA error banner title"
+  },
+  "dlnaPollLost": "Lost contact with the renderer. The state shown may be out of date; retry to reconnect the poll.",
+  "@dlnaPollLost": {
+    "description": "Banner message after repeated DLNA position-poll failures"
+  },
+  "dlnaScanSemantics": "Scan the network for DLNA renderers",
+  "@dlnaScanSemantics": {
+    "description": "Semantics label for DLNA scan button"
+  },
+  "dlnaConnectTo": "Connect to {deviceName}",
+  "@dlnaConnectTo": {
+    "description": "Semantics label for connecting to a named DLNA device",
+    "placeholders": {
+      "deviceName": {
+        "type": "String"
+      }
+    }
+  },
+  "dlnaStateStale": "Connection lost",
+  "@dlnaStateStale": {
+    "description": "Transport label while DLNA position poll is lost"
+  },
+  "dlnaStateReady": "Ready",
+  "@dlnaStateReady": {
+    "description": "DLNA transport state: idle/ready"
+  },
+  "dlnaStateScanning": "Scanning",
+  "@dlnaStateScanning": {
+    "description": "DLNA transport state: discovering"
+  },
+  "dlnaStateConnecting": "Connecting",
+  "@dlnaStateConnecting": {
+    "description": "DLNA transport state: connecting"
+  },
+  "dlnaStatePlaying": "Playing",
+  "@dlnaStatePlaying": {
+    "description": "DLNA transport state: playing"
+  },
+  "dlnaStatePaused": "Paused",
+  "@dlnaStatePaused": {
+    "description": "DLNA transport state: paused"
+  },
+  "dlnaStateStopped": "Stopped",
+  "@dlnaStateStopped": {
+    "description": "DLNA transport state: stopped"
+  },
+  "dlnaStateError": "Error",
+  "@dlnaStateError": {
+    "description": "DLNA transport state: error"
+  },
+  "remoteSrcTitle": "Remote sources",
+  "@remoteSrcTitle": {
+    "description": "Remote sources screen title"
+  },
+  "remoteSrcIntro": "Play music stored on a NAS, a WebDAV server or an FTP host.",
+  "@remoteSrcIntro": {
+    "description": "Remote sources intro text"
+  },
+  "remoteSrcAddSource": "Add source",
+  "@remoteSrcAddSource": {
+    "description": "Add remote source button label"
+  },
+  "remoteSrcAddSourceTooltip": "Add a remote source",
+  "@remoteSrcAddSourceTooltip": {
+    "description": "Add remote source button tooltip"
+  },
+  "remoteSrcEmptyTitle": "No remote sources yet",
+  "@remoteSrcEmptyTitle": {
+    "description": "Empty state title for remote sources"
+  },
+  "remoteSrcEmptyBody": "Add a WebDAV, FTP or SMB library to browse it from here.",
+  "@remoteSrcEmptyBody": {
+    "description": "Empty state body for remote sources"
+  },
+  "remoteSrcLoadFailed": "The saved sources could not be read. They were kept on disk.",
+  "@remoteSrcLoadFailed": {
+    "description": "Error when saved remote sources could not be read"
+  },
+  "remoteSrcRetry": "Retry",
+  "@remoteSrcRetry": {
+    "description": "Retry button label in remote sources"
+  },
+  "remoteSrcLoadMore": "Load more",
+  "@remoteSrcLoadMore": {
+    "description": "Load more button label in remote browser"
+  },
+  "remoteSrcActionsTooltip": "Source actions",
+  "@remoteSrcActionsTooltip": {
+    "description": "Tooltip for source row actions menu"
+  },
+  "remoteSrcEditSource": "Edit",
+  "@remoteSrcEditSource": {
+    "description": "Edit remote source menu item"
+  },
+  "remoteSrcDeleteSource": "Delete",
+  "@remoteSrcDeleteSource": {
+    "description": "Delete remote source menu item"
+  },
+  "remoteSrcTestConnection": "Test connection",
+  "@remoteSrcTestConnection": {
+    "description": "Test remote source connection action"
+  },
+  "remoteSrcTestConnectionTooltip": "Test this connection",
+  "@remoteSrcTestConnectionTooltip": {
+    "description": "Tooltip for test connection action"
+  },
+  "remoteSrcTesting": "Testing…",
+  "@remoteSrcTesting": {
+    "description": "Status while testing a remote connection"
+  },
+  "remoteSrcBrowse": "Browse",
+  "@remoteSrcBrowse": {
+    "description": "Browse remote source button label"
+  },
+  "remoteSrcEditorAddTitle": "Add a remote source",
+  "@remoteSrcEditorAddTitle": {
+    "description": "Remote source editor title when adding"
+  },
+  "remoteSrcEditorEditTitle": "Edit remote source",
+  "@remoteSrcEditorEditTitle": {
+    "description": "Remote source editor title when editing"
+  },
+  "remoteSrcKindLabel": "Type",
+  "@remoteSrcKindLabel": {
+    "description": "Remote source type field label"
+  },
+  "remoteSrcNameLabel": "Name",
+  "@remoteSrcNameLabel": {
+    "description": "Remote source name field label"
+  },
+  "remoteSrcNameHint": "Living room NAS",
+  "@remoteSrcNameHint": {
+    "description": "Remote source name field hint"
+  },
+  "remoteSrcHostLabel": "Host",
+  "@remoteSrcHostLabel": {
+    "description": "Remote source host field label"
+  },
+  "remoteSrcHostHint": "192.168.1.10 or nas.local",
+  "@remoteSrcHostHint": {
+    "description": "Remote source host field hint"
+  },
+  "remoteSrcPortLabel": "Port",
+  "@remoteSrcPortLabel": {
+    "description": "Remote source port field label"
+  },
+  "remoteSrcTlsLabel": "Use HTTPS",
+  "@remoteSrcTlsLabel": {
+    "description": "Use HTTPS toggle label"
+  },
+  "remoteSrcCleartextWarning": "HTTPS is off: your password and library traffic will be sent unencrypted. Enable it unless the server has no TLS support.",
+  "@remoteSrcCleartextWarning": {
+    "description": "Warning when HTTPS is disabled"
+  },
+  "remoteSrcRootLabel": "Root folder",
+  "@remoteSrcRootLabel": {
+    "description": "Remote source root folder field label"
+  },
+  "remoteSrcRootHint": "/Music",
+  "@remoteSrcRootHint": {
+    "description": "Root folder hint for WebDAV/FTP"
+  },
+  "remoteSrcRootHintShare": "/Share/Folder",
+  "@remoteSrcRootHintShare": {
+    "description": "Root folder hint for SMB shares"
+  },
+  "remoteSrcUsernameLabel": "Username",
+  "@remoteSrcUsernameLabel": {
+    "description": "Remote source username field label"
+  },
+  "remoteSrcPasswordLabel": "Password",
+  "@remoteSrcPasswordLabel": {
+    "description": "Remote source password field label"
+  },
+  "remoteSrcPasswordKeepHint": "Leave empty to keep the saved one",
+  "@remoteSrcPasswordKeepHint": {
+    "description": "Hint when editing password of existing remote source"
+  },
+  "remoteSrcSubsonicUrlLabel": "Server URL",
+  "@remoteSrcSubsonicUrlLabel": {
+    "description": "Subsonic server URL field label"
+  },
+  "remoteSrcSubsonicUrlHint": "https://music.example.com",
+  "@remoteSrcSubsonicUrlHint": {
+    "description": "Subsonic server URL field hint"
+  },
+  "remoteSrcSubsonicUrlInvalid": "Enter the full server URL, for example https://music.example.com.",
+  "@remoteSrcSubsonicUrlInvalid": {
+    "description": "Validation error for invalid Subsonic server URL"
+  },
+  "remoteSrcCancel": "Cancel",
+  "@remoteSrcCancel": {
+    "description": "Cancel button label in remote sources"
+  },
+  "remoteSrcSave": "Save",
+  "@remoteSrcSave": {
+    "description": "Save button label in remote sources"
+  },
+  "remoteSrcSaveFailed": "The source could not be saved.",
+  "@remoteSrcSaveFailed": {
+    "description": "Error when saving a remote source fails"
+  },
+  "remoteSrcCredentialsFailed": "The source was saved, but the password could not be stored securely.",
+  "@remoteSrcCredentialsFailed": {
+    "description": "Error when secure credential storage fails"
+  },
+  "remoteSrcHostRequired": "Host is required.",
+  "@remoteSrcHostRequired": {
+    "description": "Validation error when host is empty"
+  },
+  "remoteSrcPortRange": "Port must be between 1 and 65535.",
+  "@remoteSrcPortRange": {
+    "description": "Validation error when port is out of range"
+  },
+  "remoteSrcNameRequired": "Name is required.",
+  "@remoteSrcNameRequired": {
+    "description": "Validation error when name is empty"
+  },
+  "remoteSrcRootRequired": "Set a root, for example /Music.",
+  "@remoteSrcRootRequired": {
+    "description": "Validation error when root folder is empty"
+  },
+  "remoteSrcShareRequired": "SMB needs a share in the root, for example /Music.",
+  "@remoteSrcShareRequired": {
+    "description": "Validation error when SMB share is missing"
+  },
+  "remoteSrcConnectedIn": "Connected in",
+  "@remoteSrcConnectedIn": {
+    "description": "Prefix for connection latency status"
+  },
+  "remoteSrcNotTested": "Not tested yet",
+  "@remoteSrcNotTested": {
+    "description": "Status when connection has not been tested"
+  },
+  "remoteSrcAnonymous": "Anonymous",
+  "@remoteSrcAnonymous": {
+    "description": "Label for anonymous remote source connection"
+  },
+  "remoteSrcBrowserTitle": "Browse",
+  "@remoteSrcBrowserTitle": {
+    "description": "Remote folder browser title"
+  },
+  "remoteSrcRootCrumb": "Root",
+  "@remoteSrcRootCrumb": {
+    "description": "Root breadcrumb label in remote browser"
+  },
+  "remoteSrcEmptyFolder": "This folder is empty.",
+  "@remoteSrcEmptyFolder": {
+    "description": "Empty folder message in remote browser"
+  },
+  "remoteSrcFolderLoadFailed": "This folder could not be read.",
+  "@remoteSrcFolderLoadFailed": {
+    "description": "Error when reading a remote folder fails"
+  },
+  "remoteSrcClose": "Close",
+  "@remoteSrcClose": {
+    "description": "Close button label in remote browser"
+  },
+  "remoteSrcFileNameUnknown": "File",
+  "@remoteSrcFileNameUnknown": {
+    "description": "Fallback label for a remote file with unknown name"
+  },
+  "remoteSrcFolderLabel": "Folder",
+  "@remoteSrcFolderLabel": {
+    "description": "Semantics/type label for a remote folder"
+  },
+  "remoteSrcSearchLibrary": "Search library",
+  "@remoteSrcSearchLibrary": {
+    "description": "Search remote library tooltip/title"
+  },
+  "remoteSrcSearchHint": "Search artists, albums, songs…",
+  "@remoteSrcSearchHint": {
+    "description": "Search input hint in remote library"
+  },
+  "remoteSrcSearchClear": "Clear search",
+  "@remoteSrcSearchClear": {
+    "description": "Clear search button tooltip"
+  },
+  "remoteSrcNoSearchResults": "No results found.",
+  "@remoteSrcNoSearchResults": {
+    "description": "Empty search results message"
+  },
+  "remoteSrcArtistsHeader": "Artists",
+  "@remoteSrcArtistsHeader": {
+    "description": "Artists section header in remote search"
+  },
+  "remoteSrcAlbumsHeader": "Albums",
+  "@remoteSrcAlbumsHeader": {
+    "description": "Albums section header in remote search"
+  },
+  "remoteSrcSongsHeader": "Songs",
+  "@remoteSrcSongsHeader": {
+    "description": "Songs section header in remote search"
+  },
+  "remoteSrcCacheTitle": "Cached audio",
+  "@remoteSrcCacheTitle": {
+    "description": "Remote audio cache section title"
+  },
+  "remoteSrcCacheBody": "Files you played are kept for fast seeking.",
+  "@remoteSrcCacheBody": {
+    "description": "Remote audio cache explanation"
+  },
+  "remoteSrcClearCache": "Clear cache",
+  "@remoteSrcClearCache": {
+    "description": "Clear remote cache button label"
+  },
+  "remoteSrcClearCacheTooltip": "Delete cached audio",
+  "@remoteSrcClearCacheTooltip": {
+    "description": "Clear remote cache button tooltip"
+  },
+  "remoteSrcCacheCleared": "Cached audio deleted.",
+  "@remoteSrcCacheCleared": {
+    "description": "Confirmation snackbar after clearing remote cache"
+  },
+  "remoteSrcCalculating": "Calculating…",
+  "@remoteSrcCalculating": {
+    "description": "Shown while calculating cache size"
+  },
+  "remoteSrcUpnpTitle": "UPnP media servers",
+  "@remoteSrcUpnpTitle": {
+    "description": "UPnP server picker title"
+  },
+  "remoteSrcUpnpIntro": "Find a DLNA media server on this network and browse it here.",
+  "@remoteSrcUpnpIntro": {
+    "description": "UPnP server picker intro text"
+  },
+  "remoteSrcUpnpSearch": "Search for servers",
+  "@remoteSrcUpnpSearch": {
+    "description": "UPnP search button label"
+  },
+  "remoteSrcUpnpSearching": "Searching for media servers…",
+  "@remoteSrcUpnpSearching": {
+    "description": "UPnP searching status text"
+  },
+  "remoteSrcUpnpNone": "No media server found",
+  "@remoteSrcUpnpNone": {
+    "description": "UPnP empty result text"
+  },
+  "remoteSrcUpnpUse": "Use this server",
+  "@remoteSrcUpnpUse": {
+    "description": "UPnP select server button label"
+  },
+  "remoteSrcUpnpFailed": "Media servers could not be discovered. Check that this device is on the same network.",
+  "@remoteSrcUpnpFailed": {
+    "description": "UPnP discovery error message"
+  },
+  "remoteSrcDeleteTitle": "Delete this source?",
+  "@remoteSrcDeleteTitle": {
+    "description": "Generic delete source dialog title"
+  },
+  "remoteSrcDeleteBody": "Its saved password and cached audio are removed too.",
+  "@remoteSrcDeleteBody": {
+    "description": "Delete source dialog confirmation body"
+  },
+  "remoteSrcKindWebdavDesc": "Nextcloud, ownCloud, Apache mod_dav",
+  "@remoteSrcKindWebdavDesc": {
+    "description": "Description for WebDAV source type"
+  },
+  "remoteSrcKindFtpDesc": "Plain FTP servers and routers",
+  "@remoteSrcKindFtpDesc": {
+    "description": "Description for FTP source type"
+  },
+  "remoteSrcKindSmbDesc": "Windows shares and Samba (Android only)",
+  "@remoteSrcKindSmbDesc": {
+    "description": "Description for SMB source type"
+  },
+  "remoteSrcKindSubsonicDesc": "Navidrome, Airsonic, Gonic and other Subsonic servers",
+  "@remoteSrcKindSubsonicDesc": {
+    "description": "Description for Subsonic source type"
+  },
+  "remoteSrcKindUpnpDesc": "DLNA media servers discovered on your network",
+  "@remoteSrcKindUpnpDesc": {
+    "description": "Description for UPnP source type"
+  },
+  "remoteSrcConnectedInMs": "Connected in {milliseconds} ms",
+  "@remoteSrcConnectedInMs": {
+    "description": "Connection test latency readout",
+    "placeholders": {
+      "milliseconds": {
+        "type": "int"
+      }
+    }
+  },
+  "remoteSrcDeleteConfirmTitle": "Delete \"{name}\"?",
+  "@remoteSrcDeleteConfirmTitle": {
+    "description": "Confirmation title for deleting a named remote source",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "audioProfScreenTitle": "Audio profiles",
+  "@audioProfScreenTitle": {
+    "description": "Audio profiles screen title"
+  },
+  "audioProfCaptureAction": "Capture current setup",
+  "@audioProfCaptureAction": {
+    "description": "Capture current audio setup action"
+  },
+  "audioProfImportAction": "Import",
+  "@audioProfImportAction": {
+    "description": "Import audio profile action"
+  },
+  "audioProfRefreshTooltip": "Reload profiles",
+  "@audioProfRefreshTooltip": {
+    "description": "Reload audio profiles tooltip"
+  },
+  "audioProfDeviceLabelPrefix": "Current device",
+  "@audioProfDeviceLabelPrefix": {
+    "description": "Prefix label for current output device"
+  },
+  "audioProfDeviceUnknown": "No output device detected",
+  "@audioProfDeviceUnknown": {
+    "description": "Shown when no audio output device is detected"
+  },
+  "audioProfCaptureDialogTitle": "Name this profile",
+  "@audioProfCaptureDialogTitle": {
+    "description": "Capture profile dialog title"
+  },
+  "audioProfCaptureDialogMessage": "Saves the current EQ, DSP, output and bit-perfect settings as one file you can share.",
+  "@audioProfCaptureDialogMessage": {
+    "description": "Capture profile dialog description"
+  },
+  "audioProfCaptureDialogHint": "e.g. USB DAC - neutral",
+  "@audioProfCaptureDialogHint": {
+    "description": "Capture profile name field hint"
+  },
+  "audioProfCaptureConfirm": "Save",
+  "@audioProfCaptureConfirm": {
+    "description": "Capture profile confirm button"
+  },
+  "audioProfNameRequired": "Enter a name for the profile.",
+  "@audioProfNameRequired": {
+    "description": "Validation error when profile name is empty"
+  },
+  "audioProfCaptureSaved": "Profile saved.",
+  "@audioProfCaptureSaved": {
+    "description": "Snackbar after saving an audio profile"
+  },
+  "audioProfCaptureFailed": "Saving the profile failed.",
+  "@audioProfCaptureFailed": {
+    "description": "Error when saving an audio profile fails"
+  },
+  "audioProfImportSaved": "Profile imported.",
+  "@audioProfImportSaved": {
+    "description": "Snackbar after importing an audio profile"
+  },
+  "audioProfImportFailed": "Could not import that profile file.",
+  "@audioProfImportFailed": {
+    "description": "Error when importing a profile file fails"
+  },
+  "audioProfImportMissing": "That file no longer exists.",
+  "@audioProfImportMissing": {
+    "description": "Error when selected profile file does not exist"
+  },
+  "audioProfApplyConfirm": "Apply",
+  "@audioProfApplyConfirm": {
+    "description": "Apply profile confirm button"
+  },
+  "audioProfApplyDialogTitle": "Apply profile?",
+  "@audioProfApplyDialogTitle": {
+    "description": "Apply profile confirmation dialog title"
+  },
+  "audioProfApplyFailed": "Applying the profile failed.",
+  "@audioProfApplyFailed": {
+    "description": "Error when applying an audio profile fails"
+  },
+  "audioProfApplyTooltip": "Apply profile",
+  "@audioProfApplyTooltip": {
+    "description": "Apply profile icon tooltip"
+  },
+  "audioProfShareTooltip": "Share profile",
+  "@audioProfShareTooltip": {
+    "description": "Share profile icon tooltip"
+  },
+  "audioProfDeleteTooltip": "Delete profile",
+  "@audioProfDeleteTooltip": {
+    "description": "Delete profile icon tooltip"
+  },
+  "audioProfDefaultTooltip": "Default profile",
+  "@audioProfDefaultTooltip": {
+    "description": "Default profile action tooltip"
+  },
+  "audioProfDefaultDialogTitle": "Default profile",
+  "@audioProfDefaultDialogTitle": {
+    "description": "Default profile picker dialog title"
+  },
+  "audioProfDefaultDialogMessage": "Pick the profile marked as this device's default. Clearing it keeps your current settings untouched.",
+  "@audioProfDefaultDialogMessage": {
+    "description": "Default profile picker dialog message"
+  },
+  "audioProfDefaultNone": "No default",
+  "@audioProfDefaultNone": {
+    "description": "Option to clear default profile"
+  },
+  "audioProfDefaultSaved": "Default profile saved.",
+  "@audioProfDefaultSaved": {
+    "description": "Snackbar when default profile is saved"
+  },
+  "audioProfDefaultCleared": "Default profile cleared.",
+  "@audioProfDefaultCleared": {
+    "description": "Snackbar when default profile is cleared"
+  },
+  "audioProfDefaultMissing": "That profile is no longer available on this device.",
+  "@audioProfDefaultMissing": {
+    "description": "Error when default profile no longer exists"
+  },
+  "audioProfDefaultBadge": "Default profile",
+  "@audioProfDefaultBadge": {
+    "description": "Badge shown on the default profile"
+  },
+  "audioProfCancelAction": "Cancel",
+  "@audioProfCancelAction": {
+    "description": "Cancel button in audio profiles dialogs"
+  },
+  "audioProfDeleteConfirm": "Delete",
+  "@audioProfDeleteConfirm": {
+    "description": "Delete confirm button in audio profiles"
+  },
+  "audioProfDeleteDialogTitle": "Delete profile?",
+  "@audioProfDeleteDialogTitle": {
+    "description": "Delete profile dialog title"
+  },
+  "audioProfDeleted": "Profile deleted.",
+  "@audioProfDeleted": {
+    "description": "Snackbar after deleting a profile"
+  },
+  "audioProfDeleteFailed": "Deleting the profile failed.",
+  "@audioProfDeleteFailed": {
+    "description": "Error when deleting a profile fails"
+  },
+  "audioProfShareFailed": "Sharing the profile failed.",
+  "@audioProfShareFailed": {
+    "description": "Error when sharing a profile fails"
+  },
+  "audioProfEmptyTitle": "No audio profiles yet",
+  "@audioProfEmptyTitle": {
+    "description": "Empty state title for audio profiles"
+  },
+  "audioProfEmptySubtitle": "Capture your current setup to reuse it on another device or headphone.",
+  "@audioProfEmptySubtitle": {
+    "description": "Empty state subtitle for audio profiles"
+  },
+  "audioProfErrorTitle": "Profiles could not be loaded",
+  "@audioProfErrorTitle": {
+    "description": "Error state title for audio profiles"
+  },
+  "audioProfErrorSubtitle": "App storage may be unavailable. Try again in a moment.",
+  "@audioProfErrorSubtitle": {
+    "description": "Error state subtitle for audio profiles"
+  },
+  "audioProfRetry": "Retry",
+  "@audioProfRetry": {
+    "description": "Retry button label in audio profiles"
+  },
+  "audioProfFormatCorrupt": "This file is not a valid Pulsr audio profile.",
+  "@audioProfFormatCorrupt": {
+    "description": "Validation error for corrupt audio profile file"
+  },
+  "audioProfFormatMissingVersion": "The profile is missing its format version.",
+  "@audioProfFormatMissingVersion": {
+    "description": "Validation error for missing profile format version"
+  },
+  "audioProfFormatTooLarge": "The profile file is larger than the 512 KB limit.",
+  "@audioProfFormatTooLarge": {
+    "description": "Validation error for oversized profile file"
+  },
+  "audioProfFormatTooManyValues": "The profile contains more than 200 settings.",
+  "@audioProfFormatTooManyValues": {
+    "description": "Validation error for too many settings in profile"
+  },
+  "audioProfFormatEmptyKey": "The profile contains an empty setting name.",
+  "@audioProfFormatEmptyKey": {
+    "description": "Validation error for empty setting key in profile"
+  },
+  "audioProfFormatInvalidId": "The profile identifier is invalid.",
+  "@audioProfFormatInvalidId": {
+    "description": "Validation error for invalid profile ID"
+  },
+  "audioProfStoreFailed": "The profile could not be saved.",
+  "@audioProfStoreFailed": {
+    "description": "Error when storing a profile fails"
+  },
+  "audioProfApplyDialogBody": "This replaces your current audio settings with \"{name}\". A backup of the current setup is saved automatically first, so a partial failure can be rolled back.",
+  "@audioProfApplyDialogBody": {
+    "description": "Apply profile confirmation body",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "audioProfApplyDoneOne": "Applied 1 setting.",
+  "@audioProfApplyDoneOne": {
+    "description": "Success message after applying 1 setting"
+  },
+  "audioProfApplyDoneMany": "Applied {count} settings.",
+  "@audioProfApplyDoneMany": {
+    "description": "Success message after applying multiple settings",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "audioProfApplyDoneWithSkippedOne": "{appliedMessage} Skipped 1 unsupported setting.",
+  "@audioProfApplyDoneWithSkippedOne": {
+    "description": "Success message when 1 setting was skipped",
+    "placeholders": {
+      "appliedMessage": {
+        "type": "String"
+      }
+    }
+  },
+  "audioProfApplyDoneWithSkippedMany": "{appliedMessage} Skipped {skipped} unsupported settings.",
+  "@audioProfApplyDoneWithSkippedMany": {
+    "description": "Success message when multiple settings were skipped",
+    "placeholders": {
+      "appliedMessage": {
+        "type": "String"
+      },
+      "skipped": {
+        "type": "int"
+      }
+    }
+  },
+  "audioProfApplyFailedRolledBackOne": "One setting could not be written; your previous settings were restored.",
+  "@audioProfApplyFailedRolledBackOne": {
+    "description": "Rollback message when 1 setting failed"
+  },
+  "audioProfApplyFailedRolledBackMany": "{failed} settings could not be written; your previous settings were restored.",
+  "@audioProfApplyFailedRolledBackMany": {
+    "description": "Rollback message when multiple settings failed",
+    "placeholders": {
+      "failed": {
+        "type": "int"
+      }
+    }
+  },
+  "audioProfApplyFailedRollbackIncompleteOne": "One setting could not be written and the previous settings could not be fully restored.",
+  "@audioProfApplyFailedRollbackIncompleteOne": {
+    "description": "Incomplete rollback message when 1 setting failed"
+  },
+  "audioProfApplyFailedRollbackIncompleteMany": "{failed} settings could not be written and the previous settings could not be fully restored.",
+  "@audioProfApplyFailedRollbackIncompleteMany": {
+    "description": "Incomplete rollback message when multiple settings failed",
+    "placeholders": {
+      "failed": {
+        "type": "int"
+      }
+    }
+  },
+  "audioProfImportSavedSkippedOne": "Profile imported. Skipped 1 unsupported setting.",
+  "@audioProfImportSavedSkippedOne": {
+    "description": "Import message when 1 setting was skipped"
+  },
+  "audioProfImportSavedSkippedMany": "Profile imported. Skipped {skipped} unsupported settings.",
+  "@audioProfImportSavedSkippedMany": {
+    "description": "Import message when multiple settings were skipped",
+    "placeholders": {
+      "skipped": {
+        "type": "int"
+      }
+    }
+  },
+  "audioProfDeleteDialogBody": "\"{name}\" will be removed from this device. This cannot be undone.",
+  "@audioProfDeleteDialogBody": {
+    "description": "Confirmation body for deleting a named profile",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "audioProfShareText": "Pulsr audio profile: {name}",
+  "@audioProfShareText": {
+    "description": "Share-sheet text for a profile",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "audioProfSummaryOne": "1 setting",
+  "@audioProfSummaryOne": {
+    "description": "Profile summary subtitle for 1 setting"
+  },
+  "audioProfSummaryMany": "{settings} settings",
+  "@audioProfSummaryMany": {
+    "description": "Profile summary subtitle for multiple settings",
+    "placeholders": {
+      "settings": {
+        "type": "int"
+      }
+    }
+  },
+  "audioProfBackupOf": "Before {name}",
+  "@audioProfBackupOf": {
+    "description": "Name of automatic pre-apply backup profile",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "audioProfFormatNewerVersion": "This profile uses format {version}, which is newer than this build supports. Update Pulsr to import it.",
+  "@audioProfFormatNewerVersion": {
+    "description": "Error for a profile from a newer format version",
+    "placeholders": {
+      "version": {
+        "type": "int"
+      }
+    }
+  },
+  "audioProfFormatInvalidVersionNumber": "Format {version} is not a supported profile version.",
+  "@audioProfFormatInvalidVersionNumber": {
+    "description": "Error for an unsupported numeric profile version",
+    "placeholders": {
+      "version": {
+        "type": "int"
+      }
+    }
+  },
+  "audioProfFormatInvalidValue": "The setting \"{key}\" has a value this build cannot read.",
+  "@audioProfFormatInvalidValue": {
+    "description": "Error for a setting with an unsupported value type",
+    "placeholders": {
+      "key": {
+        "type": "String"
+      }
+    }
+  },
+  "usbErgoScreenTitle": "USB ergonomics",
+  "@usbErgoScreenTitle": {
+    "description": "USB ergonomics screen title"
+  },
+  "usbErgoSectionDevice": "Attached DAC",
+  "@usbErgoSectionDevice": {
+    "description": "Attached DAC section header"
+  },
+  "usbErgoSectionQuirks": "Device quirks",
+  "@usbErgoSectionQuirks": {
+    "description": "Device quirks section header"
+  },
+  "usbErgoSectionDiagnostics": "Diagnostics",
+  "@usbErgoSectionDiagnostics": {
+    "description": "USB ergonomics diagnostics section header"
+  },
+  "usbErgoSectionJson": "Profile JSON",
+  "@usbErgoSectionJson": {
+    "description": "Profile JSON preview section header"
+  },
+  "usbErgoJsonHint": "Copy or share this to reproduce the setup on another device.",
+  "@usbErgoJsonHint": {
+    "description": "Subtitle under the profile JSON preview"
+  },
+  "usbErgoNoDeviceTitle": "No USB DAC attached",
+  "@usbErgoNoDeviceTitle": {
+    "description": "Empty state title when no USB DAC is attached"
+  },
+  "usbErgoNoDeviceSubtitle": "Connect a USB audio device to edit its quirks.",
+  "@usbErgoNoDeviceSubtitle": {
+    "description": "Empty state subtitle when no USB DAC is attached"
+  },
+  "usbErgoRefreshAction": "Check again",
+  "@usbErgoRefreshAction": {
+    "description": "Retry checking for attached USB DAC"
+  },
+  "usbErgoUnknownDevice": "USB DAC",
+  "@usbErgoUnknownDevice": {
+    "description": "Fallback label when DAC reports no name"
+  },
+  "usbErgoHidTitle": "HID media keys",
+  "@usbErgoHidTitle": {
+    "description": "HID media keys switch title"
+  },
+  "usbErgoHidHint": "Reads play/pause, skip and volume from the DAC buttons.",
+  "@usbErgoHidHint": {
+    "description": "HID media keys switch hint"
+  },
+  "usbErgoAudioSectionTitle": "Audio transport quirks",
+  "@usbErgoAudioSectionTitle": {
+    "description": "Audio transport quirks section header"
+  },
+  "usbErgoAudioSectionHint": "Applied only to the direct USB path. Values that change bit-perfect semantics are reported in the stream status.",
+  "@usbErgoAudioSectionHint": {
+    "description": "Audio transport quirks section hint"
+  },
+  "usbErgoForce16Title": "Force 16-bit output",
+  "@usbErgoForce16Title": {
+    "description": "Force 16-bit output switch title"
+  },
+  "usbErgoForce16Hint": "Truncates wider sources; the stream can no longer claim bit-perfect.",
+  "@usbErgoForce16Hint": {
+    "description": "Force 16-bit output switch hint"
+  },
+  "usbErgoAltResetTitle": "Reset alt setting on stop",
+  "@usbErgoAltResetTitle": {
+    "description": "Reset alt setting on stop switch title"
+  },
+  "usbErgoAltResetHint": "Returns the DAC to alt 0 before releasing the interface.",
+  "@usbErgoAltResetHint": {
+    "description": "Reset alt setting on stop switch hint"
+  },
+  "usbErgoDisableFeedbackTitle": "Ignore feedback endpoint",
+  "@usbErgoDisableFeedbackTitle": {
+    "description": "Ignore feedback endpoint switch title"
+  },
+  "usbErgoDisableFeedbackHint": "For DACs whose feedback stream is broken; drift is then steered.",
+  "@usbErgoDisableFeedbackHint": {
+    "description": "Ignore feedback endpoint switch hint"
+  },
+  "usbErgoUac1ReassertTitle": "Re-assert UAC1 rate",
+  "@usbErgoUac1ReassertTitle": {
+    "description": "Re-assert UAC1 rate switch title"
+  },
+  "usbErgoUac1ReassertHint": "Writes the sample rate again after selecting the alt setting.",
+  "@usbErgoUac1ReassertHint": {
+    "description": "Re-assert UAC1 rate switch hint"
+  },
+  "usbErgoDisableClockSwitchTitle": "Do not program UAC2 clock",
+  "@usbErgoDisableClockSwitchTitle": {
+    "description": "Do not program UAC2 clock switch title"
+  },
+  "usbErgoDisableClockSwitchHint": "The DAC keeps its own clock; bit-perfect cannot be verified.",
+  "@usbErgoDisableClockSwitchHint": {
+    "description": "Do not program UAC2 clock switch hint"
+  },
+  "usbErgoSilenceLabel": "Silence before start (ms)",
+  "@usbErgoSilenceLabel": {
+    "description": "Pre-open silence field label"
+  },
+  "usbErgoTransferSizeLabel": "Transfer size (bytes, 0 = auto)",
+  "@usbErgoTransferSizeLabel": {
+    "description": "Transfer size field label"
+  },
+  "usbErgoBufferLabel": "Buffer target (ms, 0 = auto)",
+  "@usbErgoBufferLabel": {
+    "description": "Buffer target field label"
+  },
+  "usbErgoSelectorPinLabel": "Clock selector pin (blank = auto)",
+  "@usbErgoSelectorPinLabel": {
+    "description": "Clock selector pin field label"
+  },
+  "usbErgoVolumeCalibrationLabel": "Volume calibration (dB, -24.0 to +24.0)",
+  "@usbErgoVolumeCalibrationLabel": {
+    "description": "Volume calibration field label"
+  },
+  "usbErgoNumberInvalid": "Enter a number in the allowed range.",
+  "@usbErgoNumberInvalid": {
+    "description": "Validation error for numeric USB quirk field"
+  },
+  "usbErgoProbeAction": "Probe bus speed",
+  "@usbErgoProbeAction": {
+    "description": "Probe USB bus speed action"
+  },
+  "usbErgoProbeTooltip": "Measure USB bus speed",
+  "@usbErgoProbeTooltip": {
+    "description": "Probe USB bus speed tooltip"
+  },
+  "usbErgoBusSpeedUnknown": "Not measured",
+  "@usbErgoBusSpeedUnknown": {
+    "description": "Bus speed before measurement"
+  },
+  "usbErgoHidStatusLabel": "HID status",
+  "@usbErgoHidStatusLabel": {
+    "description": "HID status row label"
+  },
+  "usbErgoHidNotClaimed": "Not claimed",
+  "@usbErgoHidNotClaimed": {
+    "description": "HID status when not claimed"
+  },
+  "usbErgoHidClaimed": "Claimed, consumer controls ready",
+  "@usbErgoHidClaimed": {
+    "description": "HID status when claimed with consumer controls"
+  },
+  "usbErgoHidClaimedNoConsumer": "Claimed, no consumer report",
+  "@usbErgoHidClaimedNoConsumer": {
+    "description": "HID status when claimed without consumer report"
+  },
+  "usbErgoResetAltAction": "Reset alt setting",
+  "@usbErgoResetAltAction": {
+    "description": "Reset alt setting action label"
+  },
+  "usbErgoResetAltTooltip": "Return the DAC to alt setting 0",
+  "@usbErgoResetAltTooltip": {
+    "description": "Reset alt setting tooltip"
+  },
+  "usbErgoSaveAction": "Save profile",
+  "@usbErgoSaveAction": {
+    "description": "Save USB ergonomics profile action"
+  },
+  "usbErgoSaveTooltip": "Save this device profile",
+  "@usbErgoSaveTooltip": {
+    "description": "Save USB ergonomics profile tooltip"
+  },
+  "usbErgoDeleteAction": "Delete profile",
+  "@usbErgoDeleteAction": {
+    "description": "Delete USB ergonomics profile action"
+  },
+  "usbErgoDeleteTooltip": "Delete this device profile",
+  "@usbErgoDeleteTooltip": {
+    "description": "Delete USB ergonomics profile tooltip"
+  },
+  "usbErgoExportTooltip": "Export JSON",
+  "@usbErgoExportTooltip": {
+    "description": "Export profile JSON tooltip"
+  },
+  "usbErgoCopyTooltip": "Copy JSON",
+  "@usbErgoCopyTooltip": {
+    "description": "Copy profile JSON tooltip"
+  },
+  "usbErgoCopied": "Profile JSON copied",
+  "@usbErgoCopied": {
+    "description": "Snackbar after copying profile JSON"
+  },
+  "usbErgoSaved": "Profile saved and applied",
+  "@usbErgoSaved": {
+    "description": "Snackbar after saving USB profile"
+  },
+  "usbErgoDeleted": "Profile deleted, using defaults",
+  "@usbErgoDeleted": {
+    "description": "Snackbar after deleting USB profile"
+  },
+  "usbErgoActiveProfileLabel": "Active profile",
+  "@usbErgoActiveProfileLabel": {
+    "description": "Active USB profile diagnostics row label"
+  },
+  "usbErgoNoProfileStored": "Defaults (nothing stored)",
+  "@usbErgoNoProfileStored": {
+    "description": "Shown when no custom USB profile is stored"
+  },
+  "usbErgoSaveFailed": "Could not save the profile.",
+  "@usbErgoSaveFailed": {
+    "description": "Error when saving USB profile fails"
+  },
+  "usbErgoDeleteFailed": "Could not delete the profile.",
+  "@usbErgoDeleteFailed": {
+    "description": "Error when deleting USB profile fails"
+  },
+  "usbErgoNoDeviceId": "The DAC reports no USB ids, so no profile can be stored.",
+  "@usbErgoNoDeviceId": {
+    "description": "Error when DAC has no USB VID/PID"
+  },
+  "usbErgoApplyFailed": "The native USB ergonomics call failed.",
+  "@usbErgoApplyFailed": {
+    "description": "Error when native USB ergonomics apply fails"
+  },
+  "usbErgoBusSpeedUnavailable": "Bus speed is not reported by this device.",
+  "@usbErgoBusSpeedUnavailable": {
+    "description": "Error when bus speed is unavailable"
+  },
+  "usbErgoResetAltFailed": "Resetting the alternate setting failed.",
+  "@usbErgoResetAltFailed": {
+    "description": "Error when resetting alt setting fails"
+  },
+  "usbErgoExportUnavailable": "Export is not available on this screen.",
+  "@usbErgoExportUnavailable": {
+    "description": "Snackbar when export callback is unavailable"
+  },
+  "diagScreenTitle": "Diagnostics",
+  "@diagScreenTitle": {
+    "description": "Diagnostics screen title"
+  },
+  "diagRefreshTooltip": "Refresh diagnostics",
+  "@diagRefreshTooltip": {
+    "description": "Refresh diagnostics button tooltip"
+  },
+  "diagRetry": "Retry",
+  "@diagRetry": {
+    "description": "Retry button label in diagnostics"
+  },
+  "diagBuildModeDebug": "debug",
+  "@diagBuildModeDebug": {
+    "description": "Build mode label: debug"
+  },
+  "diagBuildModeProfile": "profile",
+  "@diagBuildModeProfile": {
+    "description": "Build mode label: profile"
+  },
+  "diagBuildModeRelease": "release",
+  "@diagBuildModeRelease": {
+    "description": "Build mode label: release"
+  },
+  "diagDeviceTitle": "Output device",
+  "@diagDeviceTitle": {
+    "description": "Output device section title"
+  },
+  "diagDeviceUnknown": "Unknown output device",
+  "@diagDeviceUnknown": {
+    "description": "Fallback when output device is unknown"
+  },
+  "diagUsbUnavailable": "USB diagnostics unavailable",
+  "@diagUsbUnavailable": {
+    "description": "Shown when USB diagnostics are unavailable"
+  },
+  "diagPathsTitle": "Output paths",
+  "@diagPathsTitle": {
+    "description": "Output paths section title"
+  },
+  "diagPathsNativeNotReported": "native-not-reported",
+  "@diagPathsNativeNotReported": {
+    "description": "Status tag when native engine does not report counters"
+  },
+  "diagPathsUnavailable": "The native engine on this build does not report xrun counters. Zeros below mean \"not measured\", not \"no glitches\".",
+  "@diagPathsUnavailable": {
+    "description": "Explanation when native engine does not report xrun counters"
+  },
+  "diagDspTitle": "DSP stages",
+  "@diagDspTitle": {
+    "description": "DSP stages section title"
+  },
+  "diagDspNone": "No DSP stages are enabled",
+  "@diagDspNone": {
+    "description": "Shown when no DSP stages are enabled"
+  },
+  "diagSafeModeTitle": "Safe mode",
+  "@diagSafeModeTitle": {
+    "description": "Safe mode section title"
+  },
+  "diagSafeModeOn": "Safe mode is active",
+  "@diagSafeModeOn": {
+    "description": "Safe mode active status"
+  },
+  "diagSafeModeOff": "Safe mode is off",
+  "@diagSafeModeOff": {
+    "description": "Safe mode inactive status"
+  },
+  "diagSafeModeReset": "Reset safe mode",
+  "@diagSafeModeReset": {
+    "description": "Reset safe mode button label"
+  },
+  "diagSafeModeEnter": "Enter safe mode",
+  "@diagSafeModeEnter": {
+    "description": "Enter safe mode button label"
+  },
+  "diagSafeModeExit": "Exit safe mode",
+  "@diagSafeModeExit": {
+    "description": "Exit safe mode button label"
+  },
+  "diagSafeModeEntered": "Safe mode is on. AAudio, USB volume and strict bit-perfect are off.",
+  "@diagSafeModeEntered": {
+    "description": "Snackbar after entering safe mode"
+  },
+  "diagSafeModeExited": "Safe mode is off. Your previous output settings were restored.",
+  "@diagSafeModeExited": {
+    "description": "Snackbar after exiting safe mode"
+  },
+  "diagSafeModeResetDone": "Safe mode was reset.",
+  "@diagSafeModeResetDone": {
+    "description": "Snackbar after resetting safe mode"
+  },
+  "diagSafeModeResetFailed": "Resetting safe mode failed.",
+  "@diagSafeModeResetFailed": {
+    "description": "Error when resetting safe mode fails"
+  },
+  "diagSafeModePersistFailed": "The safe-mode state could not be saved.",
+  "@diagSafeModePersistFailed": {
+    "description": "Error when persisting safe-mode state fails"
+  },
+  "diagLogsTitle": "Recent log",
+  "@diagLogsTitle": {
+    "description": "Recent log section title"
+  },
+  "diagLogsEmpty": "No log entries are buffered yet.",
+  "@diagLogsEmpty": {
+    "description": "Shown when diagnostic log buffer is empty"
+  },
+  "diagExportAction": "Export bundle",
+  "@diagExportAction": {
+    "description": "Export diagnostics bundle button label"
+  },
+  "diagExportFailed": "Exporting the diagnostics bundle failed.",
+  "@diagExportFailed": {
+    "description": "Error when exporting diagnostics bundle fails"
+  },
+  "diagShareText": "Pulsr diagnostics bundle",
+  "@diagShareText": {
+    "description": "Share-sheet text for diagnostics bundle"
+  },
+  "diagSelfTestAction": "Re-run self test",
+  "@diagSelfTestAction": {
+    "description": "Re-run diagnostics self-test action"
+  },
+  "diagSelfTestRunning": "Running the self test...",
+  "@diagSelfTestRunning": {
+    "description": "Status while self-test is running"
+  },
+  "diagErrorTitle": "Diagnostics unavailable",
+  "@diagErrorTitle": {
+    "description": "Error title when diagnostics bundle fails to build"
+  },
+  "diagErrorSubtitle": "The bundle could not be built. Retry in a moment.",
+  "@diagErrorSubtitle": {
+    "description": "Error subtitle when diagnostics bundle fails to build"
+  },
+  "diagAppSummary": "Pulsr {version} - {platform} - {mode} build",
+  "@diagAppSummary": {
+    "description": "App/version summary shown at the top of diagnostics",
+    "placeholders": {
+      "version": {
+        "type": "String"
+      },
+      "platform": {
+        "type": "String"
+      },
+      "mode": {
+        "type": "String"
+      }
+    }
+  },
+  "diagCounterSummary": "xruns {xruns} - underruns {underruns}",
+  "@diagCounterSummary": {
+    "description": "Output path counter summary",
+    "placeholders": {
+      "xruns": {
+        "type": "int"
+      },
+      "underruns": {
+        "type": "int"
+      }
+    }
+  },
+  "diagCountersReported": "Reported by the native engine",
+  "@diagCountersReported": {
+    "description": "Shown when xrun counters are reported by native engine"
+  },
+  "diagCountersNotReported": "Not reported by the native engine",
+  "@diagCountersNotReported": {
+    "description": "Shown when xrun counters are not reported by native engine"
+  },
+  "diagDspSummary": "{enabled} of {total} stages enabled",
+  "@diagDspSummary": {
+    "description": "Summary of enabled DSP stages",
+    "placeholders": {
+      "enabled": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "diagSafeModeFailuresOne": "1 consecutive output failure",
+  "@diagSafeModeFailuresOne": {
+    "description": "Single consecutive output failure count"
+  },
+  "diagSafeModeFailuresMany": "{count} consecutive output failures",
+  "@diagSafeModeFailuresMany": {
+    "description": "Multiple consecutive output failures count",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "diagSafeModeThreshold": "Falls back after {threshold} consecutive failures.",
+  "@diagSafeModeThreshold": {
+    "description": "Safe-mode fallback threshold explanation",
+    "placeholders": {
+      "threshold": {
+        "type": "int"
+      }
+    }
+  },
+  "diagSafeModeFallbackDescription": "Turned off AAudio direct output, USB hardware volume and strict bit-perfect, and switched DSD to PCM for {device} after {failures} consecutive output failures.",
+  "@diagSafeModeFallbackDescription": {
+    "description": "Human description returned by safe-mode fallback",
+    "placeholders": {
+      "device": {
+        "type": "String"
+      },
+      "failures": {
+        "type": "int"
+      }
+    }
+  },
+  "diagSelfTestPassed": "Self test passed: {sections} sections collected in {elapsedMs} ms.",
+  "@diagSelfTestPassed": {
+    "description": "Self-test success line",
+    "placeholders": {
+      "sections": {
+        "type": "int"
+      },
+      "elapsedMs": {
+        "type": "int"
+      }
+    }
+  },
+  "diagSelfTestFailed": "Self test failed: {message}",
+  "@diagSelfTestFailed": {
+    "description": "Self-test failure line",
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
+  "onboardingStartListening": "Start Listening",
+  "@onboardingStartListening": {
+    "description": "Primary CTA button on the final onboarding step"
+  },
+  "quranAyahsCount": "{count} Ayahs",
+  "@quranAyahsCount": {
+    "description": "Surah ayah count shown in the surah picker list",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "quranAyahProgress": "Ayah {current} / {total}",
+  "@quranAyahProgress": {
+    "description": "Active ayah progress badge in Quran Mushaf view",
+    "placeholders": {
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "quranVersesCount": "{count} Verses",
+  "@quranVersesCount": {
+    "description": "Total verses label in Quran Mushaf header",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "dspTools": "DSP Tools",
+  "@dspTools": {
+    "description": "Chip label to open DSP tools in the parametric EQ tab"
+  },
+  "syncPipelineFramesDetail": "{frames} frames @ {khz} kHz",
+  "@syncPipelineFramesDetail": {
+    "description": "DSP pipeline latency detail in sync diagnostics sheet",
+    "placeholders": {
+      "frames": {
+        "type": "int"
+      },
+      "khz": {
+        "type": "String"
+      }
+    }
+  },
+  "syncUsbUnderrunsOverrunsDetail": "Underruns: {underruns} | Overruns: {overruns}",
+  "@syncUsbUnderrunsOverrunsDetail": {
+    "description": "USB buffer underrun/overrun counters in sync diagnostics sheet",
+    "placeholders": {
+      "underruns": {
+        "type": "int"
+      },
+      "overruns": {
+        "type": "int"
+      }
+    }
+  },
+  "vdcInvalidFile": "Invalid or inaccessible file",
+  "@vdcInvalidFile": {
+    "description": "Error when selected ViPER-DDC file cannot be accessed"
+  },
+  "vdcInvalidFileSize": "Invalid file size (must be > 0 and < 2MB)",
+  "@vdcInvalidFileSize": {
+    "description": "Error when selected ViPER-DDC file size is out of range"
+  },
+  "lyricsSourceExternalLrc": "LRC File",
+  "@lyricsSourceExternalLrc": {
+    "description": "Badge label for external LRC lyrics file source"
   }
 }

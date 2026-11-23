@@ -25,6 +25,7 @@ class PlaybackQueueStateMachine {
   // preload scheduler warm exactly the track the next advance will play.
   // Invalidated on any queue/navigation change and consumed by a real advance.
   int? _pendingShuffleNext;
+  int? _pendingShuffleSecondNext;
   bool _queueDirty = false;
   int _savedQueueIndex = -1;
   final math.Random _random;
@@ -90,6 +91,7 @@ class PlaybackQueueStateMachine {
         _songs.isEmpty ? 0 : initialIndex.clamp(0, _songs.length - 1);
     _shuffleHistory.clear();
     _pendingShuffleNext = null;
+    _pendingShuffleSecondNext = null;
     _queueDirty = true;
   }
 
@@ -99,6 +101,7 @@ class PlaybackQueueStateMachine {
     // any pre-committed shuffle pick: it was computed relative to the old
     // current, so the next peek/advance must recompute from the new position.
     _pendingShuffleNext = null;
+    _pendingShuffleSecondNext = null;
     if (_songs.isEmpty) {
       _currentIndex = 0;
       return;
@@ -148,6 +151,7 @@ class PlaybackQueueStateMachine {
       }
     }
     _pendingShuffleNext = null;
+    _pendingShuffleSecondNext = null;
     _queueDirty = true;
   }
 
@@ -157,6 +161,7 @@ class PlaybackQueueStateMachine {
     final removed = _songs.removeAt(index);
     _shuffleHistory.removeWhere((i) => i == index);
     _pendingShuffleNext = null;
+    _pendingShuffleSecondNext = null;
     for (int i = 0; i < _shuffleHistory.length; i++) {
       if (_shuffleHistory[i] > index) {
         _shuffleHistory[i]--;
@@ -192,6 +197,7 @@ class PlaybackQueueStateMachine {
           calculateReorderedIndex(oldIndex, newIndex, _shuffleHistory[i]);
     }
     _pendingShuffleNext = null;
+    _pendingShuffleSecondNext = null;
     _queueDirty = true;
     return true;
   }
@@ -209,6 +215,7 @@ class PlaybackQueueStateMachine {
     _currentIndex = 0;
     _shuffleHistory.clear();
     _pendingShuffleNext = null;
+    _pendingShuffleSecondNext = null;
     _queueDirty = true;
     _savedQueueIndex = -1;
   }
@@ -217,6 +224,7 @@ class PlaybackQueueStateMachine {
   void clearShuffleHistory() {
     _shuffleHistory.clear();
     _pendingShuffleNext = null;
+    _pendingShuffleSecondNext = null;
   }
 
   /// Computes the next track index given playback configuration.
@@ -245,7 +253,10 @@ class PlaybackQueueStateMachine {
       if (_songs.length == 2) {
         // In a 2-song queue with shuffle enabled, alternate to the other song.
         // Already deterministic, so no pre-commit is needed here.
-        return _currentIndex == 0 ? 1 : 0;
+        return offset.isOdd ? (_currentIndex == 0 ? 1 : 0) : _currentIndex;
+      }
+      if (offset >= 2) {
+        return _shufflePendingSecondNext();
       }
       // _songs.length > 2: return the PRE-COMMITTED shuffle pick so that a peek
       // ([peekNextIndex]) and the subsequent real advance resolve to the SAME
@@ -255,7 +266,8 @@ class PlaybackQueueStateMachine {
       // advance draws a fresh pick, preserving shuffle variety.
       final next = _shufflePendingNext();
       if (offset == 1 && !peek) {
-        _pendingShuffleNext = null;
+        _pendingShuffleNext = _pendingShuffleSecondNext;
+        _pendingShuffleSecondNext = null;
       }
       return next;
     }
@@ -302,10 +314,25 @@ class PlaybackQueueStateMachine {
     return next;
   }
 
+  int _shufflePendingSecondNext() {
+    final first = _shufflePendingNext();
+    final cached = _pendingShuffleSecondNext;
+    if (cached != null &&
+        cached >= 0 &&
+        cached < _songs.length &&
+        cached != _currentIndex &&
+        cached != first) {
+      return cached;
+    }
+    final second = _computeShuffleNext(excludeExtra: first);
+    _pendingShuffleSecondNext = second;
+    return second;
+  }
+
   /// The recent-window-avoiding random shuffle pick, extracted so the peek and
   /// the real advance share identical selection logic. Caller guarantees
   /// `_songs.length > 2`.
-  int _computeShuffleNext() {
+  int _computeShuffleNext({int? excludeExtra}) {
     final recentWindow = math.min(_songs.length - 1, 10);
     final recent = _shuffleHistory.length >= recentWindow
         ? _shuffleHistory.sublist(_shuffleHistory.length - recentWindow)
@@ -314,18 +341,22 @@ class PlaybackQueueStateMachine {
     int next = _random.nextInt(_songs.length);
     int attempts = 0;
     final maxAttempts = _songs.length * 2;
-    while ((next == _currentIndex || recent.contains(next)) &&
+    while ((next == _currentIndex ||
+            next == excludeExtra ||
+            recent.contains(next)) &&
         attempts < maxAttempts &&
         _songs.length > 1) {
       next = _random.nextInt(_songs.length);
       attempts++;
     }
-    if (next == _currentIndex && _songs.length > 1) {
+    if ((next == _currentIndex || next == excludeExtra) && _songs.length > 1) {
       final candidates = [
         for (int i = 0; i < _songs.length; i++)
-          if (i != _currentIndex) i
+          if (i != _currentIndex && i != excludeExtra) i
       ];
-      next = candidates[_random.nextInt(candidates.length)];
+      if (candidates.isNotEmpty) {
+        next = candidates[_random.nextInt(candidates.length)];
+      }
     }
     return next;
   }

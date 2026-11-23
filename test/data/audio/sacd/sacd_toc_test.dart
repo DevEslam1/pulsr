@@ -245,5 +245,61 @@ void main() {
       expect(SacdLayout.isAreaTocFileName('SACD_2CH.TOC'), isTrue);
       expect(SacdLayout.isAreaTocFileName('SACD_2CH.TOC.bak'), isFalse);
     });
+
+    test('BUG-P1-6: parses Scarlet Book TWOCHTOC with SACDTRL1 and rejects DST frame_format == 0', () {
+      final buf = Uint8List(4096);
+      final view = ByteData.sublistView(buf);
+      void writeAscii(int off, String s) {
+        for (var i = 0; i < s.length; i++) {
+          buf[off + i] = s.codeUnitAt(i);
+        }
+      }
+
+      writeAscii(0, 'TWOCHTOC');
+      view.setUint8(0x08, 1); // versionMajor
+      view.setUint8(0x09, 20); // versionMinor
+      view.setUint16(0x14, 4, Endian.big); // 64x fs
+      view.setUint8(0x16, 2); // frame_format = 2 (uncompressed DSD)
+      view.setUint8(0x20, 2); // 2 channels
+      view.setUint8(0x46, 2); // 2 tracks
+
+      writeAscii(2048, 'SACDTRL1');
+      view.setUint32(2048 + 8 + 0, 600, Endian.big);
+      view.setUint32(2048 + 8 + 4, 610, Endian.big);
+      view.setUint32(2048 + 8 + 255 * 4 + 0, 10, Endian.big);
+      view.setUint32(2048 + 8 + 255 * 4 + 4, 15, Endian.big);
+
+      final toc = SacdToc.parse(buf, fileName: 'TWOCHTOC.TOC', imageLengthSectors: 1000);
+      expect(toc.area, SacdAreaKind.twoChannel);
+      expect(toc.channels, 2);
+      expect(toc.tracks, hasLength(2));
+      expect(toc.tracks[0].startSector, 600);
+      expect(toc.tracks[0].lengthSectors, 10);
+      expect(toc.tracks[1].startSector, 610);
+      expect(toc.tracks[1].lengthSectors, 15);
+
+      // frame_format == 0 (DST) throws SacdDstTocError
+      view.setUint8(0x16, 0);
+      expect(
+        () => SacdToc.parse(buf, fileName: 'TWOCHTOC.TOC'),
+        throwsA(isA<SacdDstTocError>()),
+      );
+    });
+
+    test('BUG-P1-6: parses Scarlet Book SACDMTOC at LBA 510', () {
+      final masterBytes = Uint8List(2048);
+      final view = ByteData.sublistView(masterBytes);
+      for (var i = 0; i < 'SACDMTOC'.length; i++) {
+        masterBytes[i] = 'SACDMTOC'.codeUnitAt(i);
+      }
+      view.setUint8(0x08, 1);
+      view.setUint8(0x09, 20);
+      view.setUint32(0x40, 520, Endian.big);
+      view.setUint16(0x48, 2, Endian.big);
+
+      final master = SacdMasterToc.parse(masterBytes, imageLengthSectors: 1000);
+      expect(master.area1Toc1Start, 520);
+      expect(master.area1TocSizeSectors, 2);
+    });
   });
 }

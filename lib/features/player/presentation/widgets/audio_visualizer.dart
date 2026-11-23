@@ -120,6 +120,20 @@ class AudioVisualizerState extends State<AudioVisualizer>
   static int _nativeSessionRefs = 0;
   bool _claimedNativeSession = false;
 
+  /// Acquires one reference on the process-global native visualizer session.
+  static void acquireNativeVisualizerSession() {
+    _nativeSessionRefs++;
+  }
+
+  /// Releases one reference on the process-global native visualizer session
+  /// and tears down the native visualizer tap when the last claimant exits.
+  static void releaseNativeVisualizerSession({required bool isAndroid}) {
+    _nativeSessionRefs = math.max(0, _nativeSessionRefs - 1);
+    if (_nativeSessionRefs == 0 && isAndroid) {
+      _methodChannel.invokeMethod('releaseVisualizer').catchError((_) {});
+    }
+  }
+
   static const MethodChannel _methodChannel =
       MethodChannel(PulsrChannels.visualizer);
   static const EventChannel _eventChannel =
@@ -140,6 +154,7 @@ class AudioVisualizerState extends State<AudioVisualizer>
   // Snapshot recycled for the next notification: emitting the previously
   // dropped snapshot avoids a `List.from` allocation on every tick.
   List<double> _spareDataSnapshot = List.filled(_numBands, 0.0);
+  int _snapshotGeneration = 0;
   late final ValueNotifier<List<double>> _dataNotifier;
   DateTime _lastNativeDataTime = DateTime.fromMillisecondsSinceEpoch(0);
   // Monotonic phase clock for the simulated visualizer. A wall-clock jump
@@ -311,7 +326,6 @@ class AudioVisualizerState extends State<AudioVisualizer>
         oldWidget.style != widget.style) {
       if (widget.isPlaying && widget.style != VisualizerStyle.off) {
         _startAnimation();
-        _initVisualizer();
         _restartNativeStream();
       } else {
         _stopNativeStream();
@@ -338,6 +352,7 @@ class AudioVisualizerState extends State<AudioVisualizer>
       _currentData[i] = 0.0;
       _targetData[i] = 0.0;
     }
+    _snapshotGeneration++;
     _dataNotifier.value = List.from(_currentData);
   }
 
@@ -353,12 +368,21 @@ class AudioVisualizerState extends State<AudioVisualizer>
 
   void _subscribeToStream() {
     _subscription?.cancel();
+    _subscription = null;
     if (widget.preferSimulated) {
+      if (_claimedNativeSession) {
+        _claimedNativeSession = false;
+        releaseNativeVisualizerSession(isAndroid: _isAndroid);
+      }
       if (mounted) setState(() => _hasActiveSession = false);
       return;
     }
     final sessionId = widget.audioSessionId ?? 0;
     if (sessionId <= 0) {
+      if (_claimedNativeSession) {
+        _claimedNativeSession = false;
+        releaseNativeVisualizerSession(isAndroid: _isAndroid);
+      }
       if (mounted) setState(() => _hasActiveSession = false);
       return;
     }
@@ -371,7 +395,7 @@ class AudioVisualizerState extends State<AudioVisualizer>
 
     if (!_claimedNativeSession) {
       _claimedNativeSession = true;
-      _nativeSessionRefs++;
+      acquireNativeVisualizerSession();
     }
     _subscription = _eventChannel.receiveBroadcastStream().listen(
       (dynamic event) {
@@ -387,16 +411,14 @@ class AudioVisualizerState extends State<AudioVisualizer>
         }
       },
       onError: (dynamic error) {
-        _subscription?.cancel();
-        _subscription = null;
+        _stopNativeStream();
         if (mounted) setState(() => _hasActiveSession = false);
       },
     );
   }
 
   void _restartNativeStream() {
-    _subscription?.cancel();
-    _subscription = null;
+    _stopNativeStream();
     if (_isAndroid &&
         !widget.preferSimulated &&
         widget.style != VisualizerStyle.off &&
@@ -410,11 +432,7 @@ class AudioVisualizerState extends State<AudioVisualizer>
     _subscription = null;
     if (_claimedNativeSession) {
       _claimedNativeSession = false;
-      _nativeSessionRefs = math.max(0, _nativeSessionRefs - 1);
-      // Only the last claimant may tear down the process-global tap.
-      if (_nativeSessionRefs == 0 && _isAndroid) {
-        _methodChannel.invokeMethod('releaseVisualizer').catchError((_) {});
-      }
+      releaseNativeVisualizerSession(isAndroid: _isAndroid);
     }
   }
 
@@ -449,6 +467,7 @@ class AudioVisualizerState extends State<AudioVisualizer>
   @visibleForTesting
   void setBarDataForTesting(int index, double val) {
     _currentData[index] = val;
+    _snapshotGeneration++;
     _dataNotifier.value = List.from(_currentData);
   }
 
@@ -542,6 +561,7 @@ class AudioVisualizerState extends State<AudioVisualizer>
         emit[i] = _currentData[i];
       }
       _spareDataSnapshot = _dataNotifier.value;
+      _snapshotGeneration++;
       _dataNotifier.value = emit;
     }
 
@@ -566,156 +586,191 @@ class AudioVisualizerState extends State<AudioVisualizer>
     if (widget.style == VisualizerStyle.off) {
       return const SizedBox.shrink();
     }
-    // GPU budget mode: heavy GPU styles fall back to cheap bars.
-    final effectiveStyle = GpuBudget.isEnabled &&
-            (widget.style == VisualizerStyle.milkdrop ||
-                widget.style == VisualizerStyle.terrain3D ||
-                widget.style == VisualizerStyle.particles ||
-                widget.style == VisualizerStyle.albumArtReactive)
-        ? VisualizerStyle.bar
-        : widget.style;
 
     final p = context.palette;
     final activeColor = widget.color ?? p.accent;
 
     return ExcludeSemantics(
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          // Resolve finite extents so an unbounded parent (e.g. a list item)
-          // never leaves the ClipRect/CustomPaint without a size.
-          final double resolvedWidth = widget.width.isFinite
-              ? widget.width
-              : (constraints.maxWidth.isFinite ? constraints.maxWidth : 300.0);
-          final double resolvedHeight = widget.height.isFinite
-              ? widget.height
-              : (constraints.maxHeight.isFinite
-                  ? constraints.maxHeight
-                  : 160.0);
-          return Stack(
-            children: [
-              SizedBox(
-                width: resolvedWidth,
-                height: resolvedHeight,
-                child: ClipRect(
-                  child: ValueListenableBuilder<List<double>>(
-                    valueListenable: _dataNotifier,
-                    builder: (context, data, _) {
-                      return RepaintBoundary(
-                        child: CustomPaint(
-                          size: Size(resolvedWidth, resolvedHeight),
-                          painter: switch (effectiveStyle) {
-                            VisualizerStyle.bar => _BarVisualizerPainter(
-                                data: data, color: activeColor),
-                            VisualizerStyle.wave => _WaveVisualizerPainter(
-                                data: data, color: activeColor),
-                            VisualizerStyle.circular =>
-                              _CircularVisualizerPainter(
-                                  data: data, color: activeColor),
-                            VisualizerStyle.particles =>
-                              _ParticlesVisualizerPainter(
-                                  data: data, color: activeColor),
-                            VisualizerStyle.terrain3D =>
-                              _Terrain3DVisualizerPainter(
-                                  data: data, color: activeColor),
-                            VisualizerStyle.albumArtReactive =>
-                              _AlbumArtReactivePainter(
-                                  data: data, color: activeColor),
-                            VisualizerStyle.custom =>
-                              _CustomJsonVisualizerPainter(
-                                data: data,
-                                color: activeColor,
-                                preset: widget.customPreset ?? _customPreset,
-                              ),
-                            VisualizerStyle.milkdrop => (_milkShader != null)
-                                ? MilkdropGpuPainter(
-                                    shader: _milkShader!,
+      child: ValueListenableBuilder<bool>(
+        valueListenable: GpuBudget.enabled,
+        builder: (context, isGpuSaver, _) {
+          // GPU budget mode: heavy GPU styles fall back to cheap bars.
+          final effectiveStyle = isGpuSaver &&
+                  (widget.style == VisualizerStyle.milkdrop ||
+                      widget.style == VisualizerStyle.terrain3D ||
+                      widget.style == VisualizerStyle.particles ||
+                      widget.style == VisualizerStyle.albumArtReactive)
+              ? VisualizerStyle.bar
+              : widget.style;
+
+          return LayoutBuilder(
+            builder: (context, constraints) {
+              // Resolve finite extents so an unbounded parent (e.g. a list item)
+              // never leaves the ClipRect/CustomPaint without a size.
+              final double resolvedWidth = widget.width.isFinite
+                  ? widget.width
+                  : (constraints.maxWidth.isFinite
+                      ? constraints.maxWidth
+                      : 300.0);
+              final double resolvedHeight = widget.height.isFinite
+                  ? widget.height
+                  : (constraints.maxHeight.isFinite
+                      ? constraints.maxHeight
+                      : 160.0);
+              return Stack(
+                children: [
+                  SizedBox(
+                    width: resolvedWidth,
+                    height: resolvedHeight,
+                    child: ClipRect(
+                      child: ValueListenableBuilder<List<double>>(
+                        valueListenable: _dataNotifier,
+                        builder: (context, data, _) {
+                          final gen = _snapshotGeneration;
+                          return RepaintBoundary(
+                            child: CustomPaint(
+                              size: Size(resolvedWidth, resolvedHeight),
+                              painter: switch (effectiveStyle) {
+                                VisualizerStyle.bar => _BarVisualizerPainter(
                                     data: data,
                                     color: activeColor,
-                                    preset:
-                                        widget.milkdropPreset ?? _milkPreset,
-                                    transparentBackground:
-                                        widget.transparentBackground,
-                                  )
-                                : MilkdropCanvasPainter(
-                                    data: data,
-                                    color: activeColor,
-                                    preset:
-                                        widget.milkdropPreset ?? _milkPreset,
-                                    transparentBackground:
-                                        widget.transparentBackground,
+                                    generation: gen,
                                   ),
-                            VisualizerStyle.off => null,
-                          },
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ),
-              // Honest degradation (16-01): when the MilkDrop GPU shader failed to
-              // compile, the Canvas painter above is NOT MilkDrop — say so instead
-              // of letting the user believe they are seeing it.
-              if (widget.style == VisualizerStyle.milkdrop && isFallbackActive)
-                PositionedDirectional(
-                  top: 6,
-                  end: 6,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: p.surfaceContainer.withValues(alpha: 0.85),
-                      borderRadius: AppRadii.r8All,
-                      border: Border.all(
-                        color: p.warning.withValues(alpha: 0.45),
-                        width: 0.8,
-                      ),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
-                      child: Text(
-                        context.l10n.visualizerCpuFallbackBadge,
-                        style: TextStyle(
-                          color: p.warning,
-                          fontSize: AppFontSize.caption,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              if (widget.style != VisualizerStyle.off &&
-                  _isAndroid &&
-                  widget.isPlaying &&
-                  !widget.preferSimulated &&
-                  !_hasActiveSession &&
-                  (widget.audioSessionId == null ||
-                      widget.audioSessionId! <= 0))
-                PositionedDirectional(
-                  bottom: 6,
-                  start: 6,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: p.surfaceContainer.withValues(alpha: 0.85),
-                      borderRadius: AppRadii.r8All,
-                      border: Border.all(
-                        color: p.hairline,
-                        width: 0.8,
-                      ),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
-                      child: Text(
-                        context.l10n.visualizerSimulationNotice,
-                        style: TextStyle(
-                          color: p.textSecondary,
-                          fontSize: AppFontSize.caption,
-                          fontWeight: FontWeight.w600,
-                        ),
+                                VisualizerStyle.wave => _WaveVisualizerPainter(
+                                    data: data,
+                                    color: activeColor,
+                                    generation: gen,
+                                  ),
+                                VisualizerStyle.circular =>
+                                  _CircularVisualizerPainter(
+                                    data: data,
+                                    color: activeColor,
+                                    generation: gen,
+                                  ),
+                                VisualizerStyle.particles =>
+                                  _ParticlesVisualizerPainter(
+                                    data: data,
+                                    color: activeColor,
+                                    generation: gen,
+                                  ),
+                                VisualizerStyle.terrain3D =>
+                                  _Terrain3DVisualizerPainter(
+                                    data: data,
+                                    color: activeColor,
+                                    generation: gen,
+                                  ),
+                                VisualizerStyle.albumArtReactive =>
+                                  _AlbumArtReactivePainter(
+                                    data: data,
+                                    color: activeColor,
+                                    generation: gen,
+                                  ),
+                                VisualizerStyle.custom =>
+                                  _CustomJsonVisualizerPainter(
+                                    data: data,
+                                    color: activeColor,
+                                    preset:
+                                        widget.customPreset ?? _customPreset,
+                                    generation: gen,
+                                  ),
+                                VisualizerStyle.milkdrop =>
+                                  (_milkShader != null)
+                                      ? MilkdropGpuPainter(
+                                          shader: _milkShader!,
+                                          data: data,
+                                          color: activeColor,
+                                          preset: widget.milkdropPreset ??
+                                              _milkPreset,
+                                          transparentBackground:
+                                              widget.transparentBackground,
+                                          generation: gen,
+                                        )
+                                      : MilkdropCanvasPainter(
+                                          data: data,
+                                          color: activeColor,
+                                          preset: widget.milkdropPreset ??
+                                              _milkPreset,
+                                          transparentBackground:
+                                              widget.transparentBackground,
+                                          generation: gen,
+                                        ),
+                                VisualizerStyle.off => null,
+                              },
+                            ),
+                          );
+                        },
                       ),
                     ),
                   ),
-                ),
-            ],
+                  // Honest degradation (16-01): when the MilkDrop GPU shader failed to
+                  // compile, the Canvas painter above is NOT MilkDrop — say so instead
+                  // of letting the user believe they are seeing it.
+                  if (effectiveStyle == VisualizerStyle.milkdrop &&
+                      isFallbackActive)
+                    PositionedDirectional(
+                      top: 6,
+                      end: 6,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: p.surfaceContainer.withValues(alpha: 0.85),
+                          borderRadius: AppRadii.r8All,
+                          border: Border.all(
+                            color: p.warning.withValues(alpha: 0.45),
+                            width: 0.8,
+                          ),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.xs,
+                              vertical: AppSpacing.xxs),
+                          child: Text(
+                            context.l10n.visualizerCpuFallbackBadge,
+                            style: TextStyle(
+                              color: p.warning,
+                              fontSize: AppFontSize.caption,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  if (widget.style != VisualizerStyle.off &&
+                      _isAndroid &&
+                      widget.isPlaying &&
+                      !widget.preferSimulated &&
+                      !_hasActiveSession &&
+                      (widget.audioSessionId == null ||
+                          widget.audioSessionId! <= 0))
+                    PositionedDirectional(
+                      bottom: 6,
+                      start: 6,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: p.surfaceContainer.withValues(alpha: 0.85),
+                          borderRadius: AppRadii.r8All,
+                          border: Border.all(
+                            color: p.hairline,
+                            width: 0.8,
+                          ),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.xs,
+                              vertical: AppSpacing.xxs),
+                          child: Text(
+                            context.l10n.visualizerSimulationNotice,
+                            style: TextStyle(
+                              color: p.textSecondary,
+                              fontSize: AppFontSize.caption,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
           );
         },
       ),
@@ -730,8 +785,13 @@ class _BarVisualizerPainter extends CustomPainter {
 
   final List<double> data;
   final Color color;
+  final int generation;
 
-  _BarVisualizerPainter({required this.data, required this.color});
+  _BarVisualizerPainter({
+    required this.data,
+    required this.color,
+    this.generation = 0,
+  });
 
   static Paint _paintFor(Color color, Size size) {
     final key = Object.hash(color, size.width, size.height);
@@ -780,7 +840,9 @@ class _BarVisualizerPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _BarVisualizerPainter oldDelegate) =>
-      oldDelegate.color != color || !listEquals(oldDelegate.data, data);
+      oldDelegate.generation != generation ||
+      oldDelegate.color != color ||
+      !listEquals(oldDelegate.data, data);
 }
 
 // --- PAINTER 2: WAVE VISUALIZER ---
@@ -795,8 +857,13 @@ class _WaveVisualizerPainter extends CustomPainter {
 
   final List<double> data;
   final Color color;
+  final int generation;
 
-  _WaveVisualizerPainter({required this.data, required this.color});
+  _WaveVisualizerPainter({
+    required this.data,
+    required this.color,
+    this.generation = 0,
+  });
 
   static ({Paint fill, Paint line}) _paintsFor(Color color, Size size) {
     final key = Object.hash(color, size.width, size.height);
@@ -865,7 +932,9 @@ class _WaveVisualizerPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _WaveVisualizerPainter oldDelegate) =>
-      oldDelegate.color != color || !listEquals(oldDelegate.data, data);
+      oldDelegate.generation != generation ||
+      oldDelegate.color != color ||
+      !listEquals(oldDelegate.data, data);
 }
 
 // --- PAINTER 3: CIRCULAR VISUALIZER ---
@@ -881,8 +950,13 @@ class _CircularVisualizerPainter extends CustomPainter {
 
   final List<double> data;
   final Color color;
+  final int generation;
 
-  _CircularVisualizerPainter({required this.data, required this.color});
+  _CircularVisualizerPainter({
+    required this.data,
+    required this.color,
+    this.generation = 0,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -917,7 +991,9 @@ class _CircularVisualizerPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _CircularVisualizerPainter oldDelegate) =>
-      oldDelegate.color != color || !listEquals(oldDelegate.data, data);
+      oldDelegate.generation != generation ||
+      oldDelegate.color != color ||
+      !listEquals(oldDelegate.data, data);
 }
 
 // --- PAINTER 4: PARTICLES VISUALIZER ---
@@ -926,8 +1002,13 @@ class _ParticlesVisualizerPainter extends CustomPainter {
 
   final List<double> data;
   final Color color;
+  final int generation;
 
-  _ParticlesVisualizerPainter({required this.data, required this.color});
+  _ParticlesVisualizerPainter({
+    required this.data,
+    required this.color,
+    this.generation = 0,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -949,7 +1030,9 @@ class _ParticlesVisualizerPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _ParticlesVisualizerPainter oldDelegate) =>
-      oldDelegate.color != color || !listEquals(oldDelegate.data, data);
+      oldDelegate.generation != generation ||
+      oldDelegate.color != color ||
+      !listEquals(oldDelegate.data, data);
 }
 
 // --- PAINTER 5: 3D TERRAIN VISUALIZER ---
@@ -960,8 +1043,13 @@ class _Terrain3DVisualizerPainter extends CustomPainter {
 
   final List<double> data;
   final Color color;
+  final int generation;
 
-  _Terrain3DVisualizerPainter({required this.data, required this.color});
+  _Terrain3DVisualizerPainter({
+    required this.data,
+    required this.color,
+    this.generation = 0,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -991,7 +1079,9 @@ class _Terrain3DVisualizerPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _Terrain3DVisualizerPainter oldDelegate) =>
-      oldDelegate.color != color || !listEquals(oldDelegate.data, data);
+      oldDelegate.generation != generation ||
+      oldDelegate.color != color ||
+      !listEquals(oldDelegate.data, data);
 }
 
 // --- PAINTER 6: ALBUM ART REACTIVE ---
@@ -1001,8 +1091,13 @@ class _AlbumArtReactivePainter extends CustomPainter {
 
   final List<double> data;
   final Color color;
+  final int generation;
 
-  _AlbumArtReactivePainter({required this.data, required this.color});
+  _AlbumArtReactivePainter({
+    required this.data,
+    required this.color,
+    this.generation = 0,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1020,7 +1115,9 @@ class _AlbumArtReactivePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _AlbumArtReactivePainter oldDelegate) =>
-      oldDelegate.color != color || !listEquals(oldDelegate.data, data);
+      oldDelegate.generation != generation ||
+      oldDelegate.color != color ||
+      !listEquals(oldDelegate.data, data);
 }
 
 // --- PAINTER 7: CUSTOM JSON VISUALIZER ---
@@ -1032,11 +1129,13 @@ class _CustomJsonVisualizerPainter extends CustomPainter {
   final List<double> data;
   final Color color;
   final VisualizerPreset preset;
+  final int generation;
 
   _CustomJsonVisualizerPainter({
     required this.data,
     required this.color,
     required this.preset,
+    this.generation = 0,
   });
 
   double _sample(double t) {
@@ -1229,6 +1328,7 @@ class _CustomJsonVisualizerPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _CustomJsonVisualizerPainter oldDelegate) =>
+      oldDelegate.generation != generation ||
       oldDelegate.color != color ||
       oldDelegate.preset != preset ||
       !listEquals(oldDelegate.data, data);

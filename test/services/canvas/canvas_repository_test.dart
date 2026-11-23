@@ -1,5 +1,6 @@
 // test/services/canvas/canvas_repository_test.dart
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pulsr/data/db/app_database.dart';
 import 'package:pulsr/services/canvas/apple_music_canvas.dart';
 import 'package:pulsr/services/canvas/canvas_repository.dart';
 import 'package:pulsr/services/canvas/community_canvas.dart';
@@ -135,6 +136,45 @@ void main() {
       final result2 =
           await repo.canvasForTrack(title: 'Miss Track', artist: 'Artist');
       expect(result2, isNull);
+    });
+
+    test('BUG-P2-25: cached(song) normalizes noisy title and trimmed artist identically to canvasForTrack',
+        () async {
+      final repo = CanvasRepository(
+        cache: _FakeCache(),
+        communityCanvas: _FakeCommunity(
+          const CanvasArtwork(
+            videoUrl: 'https://community.cdn/song.mp4',
+            title: 'Starlight',
+            artist: 'Muse',
+            source: 'community',
+          ),
+        ),
+        appleMusicCanvas: _FakeApple(null),
+        tidalCanvas: _FakeTidal(null),
+      );
+
+      const song = SongsTableData(
+        id: 1,
+        title: 'Starlight (Official Video)',
+        artist: '  Muse  ',
+        album: 'Black Holes and Revelations',
+        durationMs: 240000,
+        path: '/music/starlight.flac',
+        isFavorite: false,
+        isMissing: false,
+        playCount: 0,
+        lastPositionMs: 0,
+        source: 'local',
+        isDownloaded: false,
+      );
+
+      final resolved = await repo.canvasFor(song);
+      expect(resolved, isNotNull);
+
+      final cachedHit = repo.cached(song);
+      expect(cachedHit, isNotNull);
+      expect(cachedHit!.videoUrl, equals('https://community.cdn/song.mp4'));
     });
   });
 }

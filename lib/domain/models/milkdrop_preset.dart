@@ -48,16 +48,45 @@ class MilkdropPreset {
     waveB: 1.0,
   );
 
-  static double _d(Map<String, String> m, String key, double fallback) {
+  static double _d(
+    Map<String, String> m,
+    String key,
+    double fallback, {
+    double? min,
+    double? max,
+  }) {
     final v = m[key];
-    if (v == null) return fallback;
-    return double.tryParse(v.trim()) ?? fallback;
+    double parsed = fallback;
+    if (v != null) {
+      final candidate = double.tryParse(v.trim());
+      if (candidate != null && candidate.isFinite) {
+        parsed = candidate;
+      }
+    }
+    if (!parsed.isFinite) parsed = fallback;
+    if (min != null && parsed < min) parsed = min;
+    if (max != null && parsed > max) parsed = max;
+    return parsed;
   }
 
-  static int _i(Map<String, String> m, String key, int fallback) {
+  static int _i(
+    Map<String, String> m,
+    String key,
+    int fallback, {
+    int? min,
+    int? max,
+  }) {
     final v = m[key];
-    if (v == null) return fallback;
-    return int.tryParse(v.trim().split('.').first) ?? fallback;
+    int parsed = fallback;
+    if (v != null) {
+      final candidate = int.tryParse(v.trim().split('.').first);
+      if (candidate != null) {
+        parsed = candidate;
+      }
+    }
+    if (min != null && parsed < min) parsed = min;
+    if (max != null && parsed > max) parsed = max;
+    return parsed;
   }
 
   /// Parses a Milkdrop `.milk` file. Malformed lines are ignored rather than
@@ -84,17 +113,17 @@ class MilkdropPreset {
     }
     return MilkdropPreset(
       name: name ?? values['name'] ?? values['presetName'] ?? 'Imported Preset',
-      zoom: _d(values, 'zoom', 1.0),
-      zoomExp: _d(values, 'zoomexp', 1.0),
-      rot: _d(values, 'rot', 0.0),
-      warp: _d(values, 'warp', 1.0),
-      decay: _d(values, 'decay', 0.95),
-      gammaAdj: _d(values, 'gammaadj', 1.0),
-      waveScale: _d(values, 'wavescale', 1.0),
-      waveR: _d(values, 'waver', 1.0),
-      waveG: _d(values, 'waveg', 1.0),
-      waveB: _d(values, 'waveb', 1.0),
-      waveMode: _i(values, 'wavemode', 0),
+      zoom: _d(values, 'zoom', 1.0, min: 0.2, max: 5.0),
+      zoomExp: _d(values, 'zoomexp', 1.0, min: 0.1, max: 10.0),
+      rot: _d(values, 'rot', 0.0, min: -6.283185, max: 6.283185),
+      warp: _d(values, 'warp', 1.0, min: 0.05, max: 4.0),
+      decay: _d(values, 'decay', 0.95, min: 0.0, max: 1.0),
+      gammaAdj: _d(values, 'gammaadj', 1.0, min: 0.1, max: 4.0),
+      waveScale: _d(values, 'wavescale', 1.0, min: 0.05, max: 10.0),
+      waveR: _d(values, 'waver', 1.0, min: 0.0, max: 1.0),
+      waveG: _d(values, 'waveg', 1.0, min: 0.0, max: 1.0),
+      waveB: _d(values, 'waveb', 1.0, min: 0.0, max: 1.0),
+      waveMode: _i(values, 'wavemode', 0, min: 0, max: 15),
       raw: values,
     );
   }

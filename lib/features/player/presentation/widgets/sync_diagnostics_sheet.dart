@@ -141,42 +141,47 @@ class _SyncDiagnosticsSheetState extends State<SyncDiagnosticsSheet>
           clipBehavior: Clip.antiAlias,
           child: SafeArea(
             top: false,
-            child: Padding(
-              padding: const EdgeInsetsDirectional.fromSTEB(
-                AppSpacing.s20,
-                AppSpacing.sm,
-                AppSpacing.s20,
-                AppSpacing.s28,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      margin: const EdgeInsets.only(bottom: AppSpacing.md),
-                      decoration: BoxDecoration(
-                        color: p.hairline,
-                        borderRadius: AppRadii.r2All,
-                      ),
-                    ),
-                  ),
-                  Row(
-                    children: [
-                      Icon(Icons.sync_rounded, color: p.accent, size: 22),
-                      const SizedBox(width: AppSpacing.sm),
-                      Text(
-                        context.l10n.latencySyncDiagnostics,
-                        style: TextStyle(
-                          fontSize: AppFontSize.bodyLarge,
-                          fontWeight: FontWeight.bold,
-                          color: p.textPrimary,
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsetsDirectional.fromSTEB(
+                  AppSpacing.s20,
+                  AppSpacing.sm,
+                  AppSpacing.s20,
+                  AppSpacing.s28,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        margin: const EdgeInsets.only(bottom: AppSpacing.md),
+                        decoration: BoxDecoration(
+                          color: p.hairline,
+                          borderRadius: AppRadii.r2All,
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                    Row(
+                      children: [
+                        Icon(Icons.sync_rounded, color: p.accent, size: 22),
+                        const SizedBox(width: AppSpacing.sm),
+                        Expanded(
+                          child: Text(
+                            context.l10n.latencySyncDiagnostics,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: AppFontSize.bodyLarge,
+                              fontWeight: FontWeight.bold,
+                              color: p.textPrimary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   const SizedBox(height: AppSpacing.sm),
                   Text(
                     context.l10n.latencySyncDiagnosticsDesc,
@@ -192,8 +197,10 @@ class _SyncDiagnosticsSheetState extends State<SyncDiagnosticsSheet>
                     title: context.l10n.dspPipelineDelay,
                     subtitle: context.l10n.dspPipelineDelayDesc,
                     value: '${dspMs.toStringAsFixed(2)} ms',
-                    detail:
-                        '$_pipelineLatencyFrames frames @ ${(sr / 1000.0).toStringAsFixed(1)} kHz',
+                    detail: context.l10n.syncPipelineFramesDetail(
+                      _pipelineLatencyFrames,
+                      (sr / 1000.0).toStringAsFixed(1),
+                    ),
                   ),
                   const SizedBox(height: AppSpacing.sm),
                   if (isUsbStreaming) ...[
@@ -203,8 +210,11 @@ class _SyncDiagnosticsSheetState extends State<SyncDiagnosticsSheet>
                       title: context.l10n.usbBufferedDelay,
                       subtitle: context.l10n.usbBufferedDelayDesc,
                       value: '${_usbBufferedMs.toStringAsFixed(1)} ms',
-                      detail:
-                          'Underruns: ${_usbDiagnostics['underrunCount'] ?? 0} | Overruns: ${_usbDiagnostics['overrunCount'] ?? 0}',
+                      detail: context.l10n.syncUsbUnderrunsOverrunsDetail(
+                        (_usbDiagnostics['underrunCount'] as num?)?.toInt() ??
+                            0,
+                        (_usbDiagnostics['overrunCount'] as num?)?.toInt() ?? 0,
+                      ),
                     ),
                     const SizedBox(height: AppSpacing.sm),
                   ],
@@ -219,7 +229,8 @@ class _SyncDiagnosticsSheetState extends State<SyncDiagnosticsSheet>
                         ? context.l10n.directUsbExclusivePath
                         : context.l10n.lowLatencyDirectOutput,
                   ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),

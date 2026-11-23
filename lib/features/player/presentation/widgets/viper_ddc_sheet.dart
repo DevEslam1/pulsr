@@ -324,6 +324,7 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
   }
 
   Future<void> _pickVdcFile(BuildContext context) async {
+    final l10n = context.l10n;
     try {
       final result = await FilePicker.pickFile(
         type: FileType.custom,
@@ -334,12 +335,12 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
         final file = SafeFilePath.validate(result.path,
             allowedExtensions: ['vdc', 'txt']);
         if (file == null) {
-          throw 'Invalid or inaccessible file';
+          throw l10n.vdcInvalidFile;
         }
         final length = await file.length();
         if (!mounted) return;
         if (length == 0 || length > 2 * 1024 * 1024) {
-          throw 'Invalid file size (must be > 0 and < 2MB)';
+          throw l10n.vdcInvalidFileSize;
         }
         final bytes = await file.readAsBytes();
         if (!mounted) return;

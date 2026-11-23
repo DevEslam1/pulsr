@@ -403,30 +403,24 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                             children: [
                               Positioned.fill(
                                 child: RepaintBoundary(
-                                  child: Semantics(
-                                    label: context.l10n.waveformSeekBar,
-                                    value:
-                                        '${Formatters.formatDuration(currentDuration)} / '
-                                        '${Formatters.formatDuration(widget.duration)}',
-                                    child: CustomPaint(
-                                      painter: _WaveformPainter(
-                                        samples: widget.samples,
-                                        progress: progressPercent,
-                                        activeColor: widget.activeColor,
-                                        inactiveColor: inactiveColor,
-                                        chapterMarkers: widget.chapterMarkers,
-                                        duration: widget.duration,
-                                        loopPointA: widget.loopPointA,
-                                        loopPointB: widget.loopPointB,
-                                        crossfadeDuration:
-                                            widget.crossfadeDuration,
-                                        zoomScale: _zoomScale,
-                                        visibleStart: window.startIndex,
-                                        visibleCount: window.visibleCount,
-                                        style: widget.style,
-                                        amplitudeScale:
-                                            _dragValue != null ? 1.35 : 1.0,
-                                      ),
+                                  child: CustomPaint(
+                                    painter: _WaveformPainter(
+                                      samples: widget.samples,
+                                      progress: progressPercent,
+                                      activeColor: widget.activeColor,
+                                      inactiveColor: inactiveColor,
+                                      chapterMarkers: widget.chapterMarkers,
+                                      duration: widget.duration,
+                                      loopPointA: widget.loopPointA,
+                                      loopPointB: widget.loopPointB,
+                                      crossfadeDuration:
+                                          widget.crossfadeDuration,
+                                      zoomScale: _zoomScale,
+                                      visibleStart: window.startIndex,
+                                      visibleCount: window.visibleCount,
+                                      style: widget.style,
+                                      amplitudeScale:
+                                          _dragValue != null ? 1.35 : 1.0,
                                     ),
                                   ),
                                 ),
@@ -440,10 +434,17 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                                   final deltaStr = deltaMs == 0
                                       ? '±0:00'
                                       : '${deltaMs > 0 ? '+' : '-'}${Formatters.formatDuration(Duration(milliseconds: deltaMs.abs()))}';
+                                  final visibleProgress = totalCount > 0 &&
+                                          window.visibleCount > 0
+                                      ? ((progressPercent * totalCount -
+                                                  window.startIndex) /
+                                              window.visibleCount)
+                                          .clamp(0.0, 1.0)
+                                      : progressPercent;
 
                                   return PositionedDirectional(
                                     top: -34,
-                                    start: (progressPercent * trackWidth - 48)
+                                    start: (visibleProgress * trackWidth - 48)
                                         .clamp(
                                             0.0,
                                             (trackWidth - 96)
@@ -525,6 +526,7 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                         Semantics(
                           button: true,
                           label: context.l10n.resetWaveformZoom,
+                          excludeSemantics: true,
                           child: GestureDetector(
                             onTap: () {
                               PulsrHaptics.selectionClick();

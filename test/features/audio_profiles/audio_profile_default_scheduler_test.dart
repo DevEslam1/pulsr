@@ -217,5 +217,39 @@ void main() {
       await waitForMarker(marker);
       expect(prefs.getBool(flagKey), isTrue);
     });
+
+    test('BUG-P2-9: detects DAC A -> DAC B hot-swap without intermediate detach',
+        () async {
+      final service = buildService();
+      final profile = await service.captureCurrent(
+        'DAC B Profile',
+        deviceVid: 0x152A,
+        devicePid: 0x8757,
+      );
+      expect(await service.setGlobalDefaults(profile.id), isTrue);
+      await prefs.setBool(flagKey, false);
+
+      const dacA = UsbExclusiveStatus(
+        attached: true,
+        permitted: true,
+        vendorId: 0x1111,
+        productId: 0x2222,
+      );
+      final usb = UsbExclusiveService();
+      final bootstrap =
+          AudioProfileBootstrap(service: service, usbExclusive: usb);
+      addTearDown(bootstrap.dispose);
+
+      await bootstrap.start();
+      usb.debugPublishStatus(dacA);
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+      expect(prefs.getBool(flagKey), isFalse);
+
+      // Hot-swap directly from dacA to matchingDac (attached stays true)
+      final marker = '${profile.id}@usb:5418:34647';
+      usb.debugPublishStatus(matchingDac);
+      await waitForMarker(marker);
+      expect(prefs.getBool(flagKey), isTrue);
+    });
   });
 }

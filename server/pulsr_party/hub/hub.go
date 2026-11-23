@@ -41,6 +41,12 @@ func (s *SafeConn) writePump() {
 				return
 			}
 			s.mu.Lock()
+			select {
+			case <-s.done:
+				s.mu.Unlock()
+				return
+			default:
+			}
 			_ = s.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			err := s.conn.WriteJSON(msg)
 			s.mu.Unlock()
@@ -71,10 +77,18 @@ func (s *SafeConn) WriteJSON(v interface{}) error {
 }
 
 func (s *SafeConn) Close() error {
+	return s.CloseWithJSON(nil)
+}
+
+func (s *SafeConn) CloseWithJSON(v interface{}) error {
 	var err error
 	s.closeOnce.Do(func() {
 		close(s.done)
 		s.mu.Lock()
+		if v != nil {
+			_ = s.conn.SetWriteDeadline(time.Now().Add(writeWait))
+			_ = s.conn.WriteJSON(v)
+		}
 		err = s.conn.Close()
 		s.mu.Unlock()
 	})
@@ -112,20 +126,23 @@ func (h *Hub) Attach(code, memberId string, conn *websocket.Conn) *SafeConn {
 	return sc
 }
 
-func (h *Hub) Detach(code, memberId string, sc *SafeConn) {
+func (h *Hub) Detach(code, memberId string, sc *SafeConn) bool {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
 	room, ok := h.sockets[code]
 	if !ok {
-		return
+		return false
 	}
+	detached := false
 	if room[memberId] == sc {
 		delete(room, memberId)
+		detached = true
 	}
 	if len(room) == 0 {
 		delete(h.sockets, code)
 	}
+	return detached
 }
 
 func (h *Hub) DropParty(code string) {
@@ -195,6 +212,10 @@ func (h *Hub) Send(code, memberId string, payload interface{}) {
 }
 
 func (h *Hub) CloseMember(code, memberId string) {
+	h.CloseMemberWithBye(code, memberId, nil)
+}
+
+func (h *Hub) CloseMemberWithBye(code, memberId string, byePayload interface{}) {
 	h.mu.RLock()
 	room := h.sockets[code]
 	var target *SafeConn
@@ -203,7 +224,7 @@ func (h *Hub) CloseMember(code, memberId string) {
 	}
 	h.mu.RUnlock()
 	if target != nil {
-		_ = target.Close()
+		_ = target.CloseWithJSON(byePayload)
 	}
 }
 

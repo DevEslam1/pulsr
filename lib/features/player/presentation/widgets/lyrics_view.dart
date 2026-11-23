@@ -434,7 +434,7 @@ class _LyricsViewState extends State<LyricsView> {
     final String label = switch (source) {
       LyricsSource.embedded =>
         synced ? context.l10n.dspEmbedded : context.l10n.dspEmbeddedUnsynced,
-      LyricsSource.externalLrc => 'LRC File',
+      LyricsSource.externalLrc => context.l10n.lyricsSourceExternalLrc,
       LyricsSource.lrclib => synced ? context.l10n.dspLrcLibSynced : 'LRCLIB',
       LyricsSource.ytmusic => 'YouTube Music',
       LyricsSource.none => '',

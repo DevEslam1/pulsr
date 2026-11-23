@@ -90,5 +90,73 @@ void main() {
 
       await dir.delete(recursive: true);
     });
+
+    test('BUG-P2-4: parseDsfBytes rejects DSF without data chunk and buildWavContainer handles odd float counts', () {
+      final noDataDsf = Uint8List(80);
+      final bd = ByteData.sublistView(noDataDsf);
+      for (var i = 0; i < 4; i++) {
+        noDataDsf[i] = 'DSD '.codeUnitAt(i);
+        noDataDsf[28 + i] = 'fmt '.codeUnitAt(i);
+      }
+      bd.setUint64(4, 28, Endian.little);
+      bd.setUint64(12, 80, Endian.little);
+      bd.setUint64(32, 52, Endian.little);
+      bd.setUint32(28 + 24, 2, Endian.little);
+      bd.setUint32(28 + 28, 2822400, Endian.little);
+      bd.setUint32(28 + 32, 1, Endian.little);
+      bd.setUint32(28 + 44, 4096, Endian.little);
+
+      expect(
+        () => DsdDecoderHelper.parseDsfBytes(noDataDsf),
+        throwsA(isA<FormatException>()),
+      );
+
+      // Odd number of stereo float samples must not throw RangeError
+      final wav = DsdDecoderHelper.buildWavContainer(
+        pcmFloatSamples: const <double>[0.1, -0.1, 0.2],
+        sampleRate: 176400,
+        channels: 2,
+      );
+      expect(wav.length, 44 + 6); // 1 complete stereo 24-bit frame (6 bytes)
+    });
+
+    test('BUG-P2-5: MQA unfold rejects truncated fmt chunk and non-PCM audioFormat', () async {
+      final dir = await Directory.systemTemp.createTemp('mqa_fmt');
+      final file = File('${dir.path}/float_mqa.wav');
+      final buf = Uint8List(64);
+      final bd = ByteData.sublistView(buf);
+      void ascii(int off, String s) {
+        for (var i = 0; i < s.length; i++) {
+          buf[off + i] = s.codeUnitAt(i);
+        }
+      }
+
+      ascii(0, 'RIFF');
+      bd.setUint32(4, 56, Endian.little);
+      ascii(8, 'WAVE');
+      ascii(12, 'fmt ');
+      bd.setUint32(16, 16, Endian.little);
+      bd.setUint16(20, 3, Endian.little); // audioFormat = 3 (IEEE float, not PCM 1)
+      bd.setUint16(22, 2, Endian.little);
+      bd.setUint32(24, 48000, Endian.little);
+      bd.setUint16(34, 24, Endian.little);
+      ascii(36, 'data');
+      bd.setUint32(40, 12, Endian.little);
+      // Embed MQA sync word in payload
+      buf[44] = 0xBE;
+      buf[45] = 0x04;
+      buf[46] = 0x98;
+      buf[47] = 0xC4;
+      await file.writeAsBytes(buf);
+
+      await expectLater(
+        MqaDecoderHelper.decodeMqaFile(
+          _song(file.path),
+          const MediaItem(id: '1', title: 'Track'),
+        ),
+        throwsA(isA<MqaUnsupportedException>()),
+      );
+      await dir.delete(recursive: true);
+    });
   });
 }

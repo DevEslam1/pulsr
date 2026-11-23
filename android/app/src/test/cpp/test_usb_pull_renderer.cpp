@@ -20,6 +20,7 @@
 #include <cstring>
 #include <iostream>
 #include <new>
+#include <thread>
 #include <vector>
 
 using pulsr::UsbPullRenderer;
@@ -204,6 +205,39 @@ void testFlush() {
     check(r.framesPulled() == static_cast<uint64_t>(got),
           "flush() keeps counters; framesPulled must only count post-seek frames");
     (void)produced;
+
+    // BUG-P0-2: Concurrent flush() during live pullExact() / write() must never
+    // underflow (w - r -> UINT64_MAX) or permanently wedge write() with ENOSPC.
+    {
+        UsbPullRenderer concurrent;
+        check(concurrent.Configure(48000, 2, 4, 50),
+              "Configure for concurrent flush test must succeed");
+        std::atomic<bool> stop{false};
+        std::atomic<bool> wedged{false};
+        std::thread consumer([&]() {
+            uint8_t pullBuf[kFrameBytes * 48];
+            while (!stop.load(std::memory_order_acquire)) {
+                (void)concurrent.pullExact(pullBuf, 48);
+            }
+        });
+        std::vector<uint8_t> writeChunk(256 * kFrameBytes, 0x5A);
+        for (int iter = 0; iter < 400; ++iter) {
+            for (int w = 0; w < 10; ++w) {
+                (void)concurrent.write(writeChunk.data(), 256);
+            }
+            concurrent.flush();
+            // After flush(), write() of a single chunk must immediately succeed
+            // (never wedged by unsigned wraparound of w - r).
+            if (!concurrent.write(writeChunk.data(), 256)) {
+                wedged.store(true, std::memory_order_release);
+                break;
+            }
+        }
+        stop.store(true, std::memory_order_release);
+        consumer.join();
+        check(!wedged.load(std::memory_order_acquire),
+              "concurrent flush() against live pullExact() must never wedge write() with ENOSPC");
+    }
 }
 
 // ---- pause / resume ------------------------------------------------------

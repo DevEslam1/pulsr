@@ -2,6 +2,7 @@
 import 'dart:async';
 
 import 'package:audio_service/audio_service.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/features/announcements/announcement_settings.dart';
 import 'package:pulsr/features/announcements/track_announcer.dart';
@@ -340,5 +341,62 @@ void main() {
     harness.items.add(_track('b'));
     await _wait();
     expect(harness.engine.duckRequests, [true, false]);
+  });
+
+  test('BUG-P2-28: MethodChannelTtsEngine retries init after cooldown on transient failure',
+      () async {
+    const channel = MethodChannel('test/tts_recovery');
+    var shouldFailInit = true;
+    final spoken = <String>[];
+    var now = DateTime(2026, 1, 1, 12, 0, 0);
+
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+      switch (call.method) {
+        case 'init':
+          if (shouldFailInit) {
+            throw PlatformException(code: 'TIMEOUT', message: 'Transient init timeout');
+          }
+          return true;
+        case 'speak':
+          final args = (call.arguments as Map).cast<String, dynamic>();
+          spoken.add(args['text'] as String);
+          return null;
+        case 'stop':
+          return null;
+        default:
+          return null;
+      }
+    });
+    addTearDown(() {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, null);
+    });
+
+    final engine = MethodChannelTtsEngine(
+      channel: channel,
+      retryCooldown: const Duration(seconds: 10),
+      now: () => now,
+    );
+    addTearDown(engine.dispose);
+
+    // 1. Initial init fails transiently
+    expect(await engine.init(), isFalse);
+    expect(engine.isAvailable, isFalse);
+    expect(engine.consecutiveFailures, equals(1));
+    expect(engine.canRetryInit, isFalse);
+
+    // 2. Speak during cooldown does not retry
+    shouldFailInit = false;
+    await engine.speak('Too early');
+    expect(spoken, isEmpty);
+
+    // 3. Advance clock past cooldown -> speak auto-reinitializes and speaks
+    now = now.add(const Duration(seconds: 11));
+    expect(engine.canRetryInit, isTrue);
+    await engine.speak('Recovered track');
+    expect(engine.isAvailable, isTrue);
+    expect(engine.consecutiveFailures, equals(0));
+    expect(spoken, equals(['Recovered track']));
   });
 }

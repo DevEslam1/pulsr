@@ -115,6 +115,7 @@ class NativeDsdSession implements PlaybackBackend {
   }) async {
     if (_disposed) throw const DsdFallbackRequiredException('Session disposed');
     await _reset();
+    if (_disposed) return;
 
     // File-backed: header once, then stream blocks. No 150 MB in-memory cap,
     // so full-length DSD64/128/256 tracks are playable.
@@ -129,10 +130,18 @@ class NativeDsdSession implements PlaybackBackend {
     } on FileSystemException catch (e) {
       throw DsdFallbackRequiredException('Cannot open DSD file: ${e.message}');
     }
+    if (_disposed) {
+      await source.close();
+      return;
+    }
 
     final dsdRate = source.dsdRate;
     final caps = await (capabilitiesProvider?.call() ??
         DsdDecoderHelper.probeDopCapabilities());
+    if (_disposed) {
+      await source.close();
+      return;
+    }
     final tuple = NativeDsdProducer.selectProbedTuple(caps, dsdRate);
     if (tuple == null) {
       await source.close();
@@ -149,6 +158,10 @@ class NativeDsdSession implements PlaybackBackend {
     );
 
     final opened = await producer.openStream(tuple, strict: true);
+    if (_disposed) {
+      await producer.stop();
+      return;
+    }
     if (!opened) {
       await producer.stop();
       throw const DsdFallbackRequiredException(
@@ -167,8 +180,12 @@ class NativeDsdSession implements PlaybackBackend {
     if (initialPosition != null && initialPosition > Duration.zero) {
       producer.seek(initialPosition);
     }
-    _durationController.add(producer.totalDuration);
-    _positionController.add(producer.currentPosition);
+    if (!_durationController.isClosed) {
+      _durationController.add(producer.totalDuration);
+    }
+    if (!_positionController.isClosed) {
+      _positionController.add(producer.currentPosition);
+    }
     _emitState(AudioProcessingState.ready, playing: false);
     _startTimers();
 
@@ -176,7 +193,7 @@ class NativeDsdSession implements PlaybackBackend {
     producer.onPumpEnded = _onPumpEnded;
     unawaited(producer.startPumping(startPaused: true));
 
-    if (autoPlay) await play();
+    if (autoPlay && !_disposed) await play();
   }
 
   @override

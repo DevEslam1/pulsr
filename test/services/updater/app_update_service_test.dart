@@ -1,4 +1,9 @@
+import 'dart:convert';
+import 'dart:io';
+import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:pulsr/services/updater/app_update_service.dart';
 
 void main() {
@@ -78,6 +83,110 @@ void main() {
       final info = UpdateInfo.fromGitHubJson(json);
       expect(info.version, '1.0.5');
       expect(info.apkUrl, isNull);
+    });
+  });
+
+  group('AppUpdateService security & integrity (BUG-P1-17)', () {
+    test('enforces HTTPS and GitHub release host allowlist on apkUrl', () {
+      expect(
+        AppUpdateService.isAllowedApkUrl(
+          'https://github.com/pulsr-audio/pulsr/releases/download/v1.0.0/pulsr.apk',
+        ),
+        isTrue,
+      );
+      expect(
+        AppUpdateService.isAllowedApkUrl(
+          'https://objects.githubusercontent.com/github-production-release-asset/pulsr.apk',
+        ),
+        isTrue,
+      );
+      expect(
+        AppUpdateService.isAllowedApkUrl(
+          'http://github.com/pulsr-audio/pulsr/releases/download/v1.0.0/pulsr.apk',
+        ),
+        isFalse,
+      );
+      expect(
+        AppUpdateService.isAllowedApkUrl(
+          'https://evil.example.com/pulsr.apk',
+        ),
+        isFalse,
+      );
+    });
+
+    test('sanitizes version before building APK filename', () {
+      expect(
+        AppUpdateService.sanitizeVersionForFilename('../../etc/passwd'),
+        isNot(contains('..')),
+      );
+      expect(
+        AppUpdateService.sanitizeVersionForFilename('../../etc/passwd'),
+        isNot(contains('/')),
+      );
+      expect(
+        AppUpdateService.sanitizeVersionForFilename('1.2.0-beta.1'),
+        equals('1.2.0-beta.1'),
+      );
+    });
+
+    test('verifies SHA-256 checksum and deletes partial APK on mismatch', () async {
+      final payload = utf8.encode('fake-apk-binary-payload');
+      final validSha = sha256.convert(payload).toString();
+      final tempDir = await Directory.systemTemp.createTemp('pulsr_updater_test_');
+      addTearDown(() async {
+        if (await tempDir.exists()) {
+          await tempDir.delete(recursive: true);
+        }
+      });
+
+      final client = MockClient.streaming((request, _) async {
+        return http.StreamedResponse(
+          Stream.fromIterable([payload]),
+          200,
+          contentLength: payload.length,
+        );
+      });
+      final service = AppUpdateService(client: client);
+      addTearDown(() => service.dispose());
+
+      // 1. Valid SHA-256 succeeds
+      final goodFile = await service.downloadApk(
+        UpdateInfo(
+          version: '1.2.0',
+          tagName: 'v1.2.0',
+          releaseUrl: 'https://github.com/pulsr-audio/pulsr/releases/tag/v1.2.0',
+          apkUrl:
+              'https://github.com/pulsr-audio/pulsr/releases/download/v1.2.0/pulsr.apk',
+          sha256: validSha,
+        ),
+        cacheDirectoryOverride: tempDir,
+      );
+      expect(goodFile, isNotNull);
+      expect(await goodFile!.exists(), isTrue);
+
+      // 2. Bad SHA-256 throws and deletes the corrupt file
+      await expectLater(
+        () => service.downloadApk(
+          UpdateInfo(
+            version: '1.2.1',
+            tagName: 'v1.2.1',
+            releaseUrl:
+                'https://github.com/pulsr-audio/pulsr/releases/tag/v1.2.1',
+            apkUrl:
+                'https://github.com/pulsr-audio/pulsr/releases/download/v1.2.1/pulsr.apk',
+            sha256: '0' * 64,
+          ),
+          cacheDirectoryOverride: tempDir,
+        ),
+        throwsStateError,
+      );
+      final updatesDir = Directory('${tempDir.path}/updates');
+      final remaining = updatesDir
+          .listSync()
+          .whereType<File>()
+          .where((f) => f.path.endsWith('.apk'))
+          .toList();
+      expect(remaining, isEmpty);
     });
   });
 }

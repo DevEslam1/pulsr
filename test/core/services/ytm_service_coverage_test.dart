@@ -515,6 +515,98 @@ void main() {
       expect(stream.bitrateKbps, 96);
     });
 
+    test('preferM4a false selects Opus/WebM over M4A and preferM4a true selects M4A',
+        () async {
+      channelHandler = (_) async => null;
+      final service = _newService();
+      service.debugHttpClient = MockClient((_) async => _json(_playerBody(
+            adaptive: [
+              _audioFormat(mimeType: 'audio/mp4; codecs="mp4a.40.2"', bitrate: 256000),
+              _audioFormat(mimeType: 'audio/webm; codecs="opus"', bitrate: 160000),
+            ],
+          )));
+      final opusStream =
+          await service.resolveStream('opuspref001', preferM4a: false);
+      expect(opusStream.container, 'webm');
+      expect(opusStream.bitrateKbps, 160);
+
+      final m4aStream =
+          await service.resolveStream('m4apref0001', preferM4a: true);
+      expect(m4aStream.container, 'm4a');
+      expect(m4aStream.bitrateKbps, 256);
+    });
+
+    test('prefers content-bound getPlayerPoToken over streamingPoToken',
+        () async {
+      channelHandler = (call) async {
+        if (call.method == 'getPoTokenState') {
+          return {
+            'streamingPoToken': 'visitor-stream-tok',
+            'visitorData': 'vd-1',
+          };
+        }
+        if (call.method == 'getPlayerPoToken') {
+          return 'content-bound-player-tok';
+        }
+        return null;
+      };
+      String? sentPoToken;
+      final service = _newService();
+      service.debugHttpClient = MockClient((request) async {
+        final body = jsonDecode(request.body) as Map<String, dynamic>;
+        sentPoToken =
+            ((body['playbackContext'] as Map)['contentPlaybackContext']
+                as Map)['poToken'] as String?;
+        return _json(_playerBody(adaptive: [_audioFormat(bitrate: 128000)]));
+      });
+      await service.resolveStream('potokvid001');
+      expect(sentPoToken, 'content-bound-player-tok');
+    });
+
+    test('preserves BOT_CHALLENGE, AGE_RESTRICTED and LOGIN_REQUIRED errors',
+        () async {
+      channelHandler = (_) async => null;
+
+      final botService = _newService();
+      botService.debugHttpClient = MockClient((_) async => _json({
+            'playabilityStatus': {
+              'status': 'LOGIN_REQUIRED',
+              'reason': 'Sign in to confirm you are not a bot',
+            },
+          }));
+      await expectLater(
+        botService.resolveStream('botvid00001'),
+        throwsA(isA<YtmException>()
+            .having((e) => e.code, 'code', 'BOT_CHALLENGE')),
+      );
+
+      final ageService = _newService();
+      ageService.debugHttpClient = MockClient((_) async => _json({
+            'playabilityStatus': {
+              'status': 'LOGIN_REQUIRED',
+              'reason': 'Sign in to confirm your age',
+            },
+          }));
+      await expectLater(
+        ageService.resolveStream('agevid00001'),
+        throwsA(isA<YtmException>()
+            .having((e) => e.code, 'code', 'AGE_RESTRICTED')),
+      );
+
+      final loginService = _newService();
+      loginService.debugHttpClient = MockClient((_) async => _json({
+            'playabilityStatus': {
+              'status': 'LOGIN_REQUIRED',
+              'reason': 'This video is private',
+            },
+          }));
+      await expectLater(
+        loginService.resolveStream('loginvid001'),
+        throwsA(isA<YtmException>()
+            .having((e) => e.code, 'code', 'LOGIN_REQUIRED')),
+      );
+    });
+
     test('an embed client is used when the first clients fail', () async {
       channelHandler = (_) async => null;
       final service = _newService();

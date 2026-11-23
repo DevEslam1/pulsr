@@ -257,7 +257,7 @@ class AssistantResolver {
   Future<AssistantResolution> _favorites({required bool shuffle}) async {
     final songIds = await _favoritesSongIds();
     if (songIds.isEmpty) {
-      return const AssistantResolutionFailure(AssistantStrings.noFavorites);
+      return AssistantResolutionFailure(AssistantStrings.noFavorites);
     }
     return AssistantPlayPlan(
       songIds: songIds,
@@ -270,7 +270,7 @@ class AssistantResolver {
   Future<AssistantResolution> _lastAlbum() async {
     final songIds = await _lastAlbumSongIds();
     if (songIds.isEmpty) {
-      return const AssistantResolutionFailure(AssistantStrings.noLastAlbum);
+      return AssistantResolutionFailure(AssistantStrings.noLastAlbum);
     }
     return AssistantPlayPlan(
       songIds: songIds,
@@ -294,7 +294,7 @@ class AssistantResolver {
         stackTrace: st,
         category: 'Assistant',
       );
-      return const AssistantResolutionFailure(
+      return AssistantResolutionFailure(
         AssistantStrings.libraryUnavailable,
       );
     }

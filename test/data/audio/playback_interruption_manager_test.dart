@@ -101,7 +101,7 @@ void main() {
       manager.onBecomingNoisy(isPlaying: true, now: t1);
       expect(manager.isPausedForNoisy, isTrue);
 
-      // Reconnect without headset (speaker) -> ignored
+      // Reconnect without headset (speaker) -> ignored and preserves isPausedForNoisy (BUG-P2-6)
       final speakerReconnect = manager.onDeviceReconnect(
         now: t1.add(const Duration(seconds: 10)),
         autoResumeEnabled: true,
@@ -109,12 +109,11 @@ void main() {
         hasHeadsetOutput: false,
       );
       expect(speakerReconnect, InterruptionDecision.ignore);
+      expect(manager.isPausedForNoisy, isTrue);
 
       // Reconnect with headset within timeout -> resume
-      final t2 = t1.add(const Duration(seconds: 10));
-      manager.onBecomingNoisy(isPlaying: true, now: t2);
       final validReconnect = manager.onDeviceReconnect(
-        now: t2.add(const Duration(seconds: 10)),
+        now: t1.add(const Duration(seconds: 20)),
         autoResumeEnabled: true,
         timeout: const Duration(seconds: 90),
         hasHeadsetOutput: true,

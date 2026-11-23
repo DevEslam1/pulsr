@@ -152,7 +152,7 @@ class _AudioProfilesScreenState extends State<AudioProfilesScreen> {
     final trimmed = name.trim();
     if (trimmed.isEmpty) {
       ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-        const SnackBar(content: Text(AudioProfileStrings.nameRequired)),
+        SnackBar(content: Text(AudioProfileStrings.nameRequired)),
       );
       return;
     }
@@ -193,7 +193,7 @@ class _AudioProfilesScreenState extends State<AudioProfilesScreen> {
     final pick = await PulsrDialogHelper.showPulsrDialog<_DefaultPick>(
       context,
       icon: const Icon(Icons.star_rounded, size: 26),
-      title: const Text(AudioProfileStrings.defaultDialogTitle),
+      title: Text(AudioProfileStrings.defaultDialogTitle),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -228,11 +228,11 @@ class _AudioProfilesScreenState extends State<AudioProfilesScreen> {
               ? null
               : () => Navigator.of(context, rootNavigator: true)
                   .pop<_DefaultPick>((profileId: null)),
-          child: const Text(AudioProfileStrings.defaultNone),
+          child: Text(AudioProfileStrings.defaultNone),
         ),
         TextButton(
           onPressed: () => Navigator.of(context, rootNavigator: true).pop(),
-          child: const Text(AudioProfileStrings.cancelAction),
+          child: Text(AudioProfileStrings.cancelAction),
         ),
       ],
     );
@@ -241,7 +241,7 @@ class _AudioProfilesScreenState extends State<AudioProfilesScreen> {
       () async {
         final saved = await _effectiveService.setGlobalDefaults(pick.profileId);
         if (!saved) {
-          throw const AudioProfileStoreError(
+          throw AudioProfileStoreError(
             code: 'audio-profile-default-missing',
             userMessage: AudioProfileStrings.defaultMissing,
           );
@@ -295,7 +295,7 @@ class _AudioProfilesScreenState extends State<AudioProfilesScreen> {
       );
       messenger?.showSnackBar(
         SnackBar(
-          content: const Text(AudioProfileStrings.shareFailed),
+          content: Text(AudioProfileStrings.shareFailed),
           backgroundColor: errorColor,
         ),
       );
@@ -341,7 +341,7 @@ class _AudioProfilesScreenState extends State<AudioProfilesScreen> {
         category: 'AudioProfilesScreen',
       );
       messenger?.showSnackBar(
-        const SnackBar(content: Text(AudioProfileStrings.importFailed)),
+        SnackBar(content: Text(AudioProfileStrings.importFailed)),
       );
       return null;
     }
@@ -351,7 +351,7 @@ class _AudioProfilesScreenState extends State<AudioProfilesScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(AudioProfileStrings.screenTitle),
+        title: Text(AudioProfileStrings.screenTitle),
         actions: <Widget>[
           IconButton(
             tooltip: AudioProfileStrings.defaultTooltip,
@@ -512,7 +512,7 @@ class _Header extends StatelessWidget {
                   child: FilledButton.icon(
                     onPressed: busy ? null : onCapture,
                     icon: const Icon(Icons.add_rounded),
-                    label: const Text(AudioProfileStrings.captureAction),
+                    label: Text(AudioProfileStrings.captureAction),
                   ),
                 ),
               ),
@@ -524,7 +524,7 @@ class _Header extends StatelessWidget {
                   child: OutlinedButton.icon(
                     onPressed: busy ? null : onImport,
                     icon: const Icon(Icons.file_open_rounded),
-                    label: const Text(AudioProfileStrings.importAction),
+                    label: Text(AudioProfileStrings.importAction),
                   ),
                 ),
               ),

@@ -97,7 +97,13 @@ class YtmOAuthService {
     iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
   );
 
-  final http.Client _client = http.Client();
+  http.Client _client = http.Client();
+
+  @visibleForTesting
+  set debugHttpClient(http.Client client) => _client = client;
+
+  @visibleForTesting
+  int get debugAuthGeneration => _authGeneration;
 
   String? _accessToken;
   String? _refreshToken;
@@ -220,6 +226,7 @@ class YtmOAuthService {
     void Function()? onTick,
     bool Function()? isCancelled,
   }) async {
+    final generation = _authGeneration;
     var interval = code.intervalSeconds.clamp(1, 60);
     var pollCount = 0;
     const maxPolls = 60;
@@ -228,9 +235,13 @@ class YtmOAuthService {
         pollCount < maxPolls &&
         DateTime.now().isBefore(deadline)) {
       pollCount++;
-      if (isCancelled?.call() ?? false) return false;
+      if ((isCancelled?.call() ?? false) || generation != _authGeneration) {
+        return false;
+      }
       await Future.delayed(Duration(seconds: interval));
-      if (isCancelled?.call() ?? false) return false;
+      if ((isCancelled?.call() ?? false) || generation != _authGeneration) {
+        return false;
+      }
       onTick?.call();
 
       final http.Response res;
@@ -261,12 +272,14 @@ class YtmOAuthService {
       final error = json['error'] as String?;
 
       if (access != null && access.isNotEmpty) {
+        if (generation != _authGeneration) return false;
         await _persistTokens(
           accessToken: access,
           refreshToken: json['refresh_token'] as String?,
           expiresInSeconds: (json['expires_in'] as num?)?.toInt(),
+          expectedGeneration: generation,
         );
-        return true;
+        return generation == _authGeneration;
       }
       if (error == null) continue;
       if (error == 'authorization_pending') continue;
@@ -315,12 +328,14 @@ class YtmOAuthService {
       final json = _decode(res.body);
       final access = json?['access_token'] as String?;
       if (access != null && access.isNotEmpty) {
+        if (generation != _authGeneration) return false;
         await _persistTokens(
           accessToken: access,
           refreshToken: json?['refresh_token'] as String?,
           expiresInSeconds: (json?['expires_in'] as num?)?.toInt(),
+          expectedGeneration: generation,
         );
-        return true;
+        return generation == _authGeneration;
       }
       // A revoked/consumed refresh token is terminal: clear the dead session so
       // the UI stops claiming the account is connected.
@@ -375,8 +390,9 @@ class YtmOAuthService {
     required String accessToken,
     String? refreshToken,
     int? expiresInSeconds,
+    int? expectedGeneration,
   }) async {
-    final generation = _authGeneration;
+    final generation = expectedGeneration ?? _authGeneration;
     // A sign-out raced this refresh: drop the result instead of writing it.
     if (generation != _authGeneration) return;
     _accessToken = accessToken;

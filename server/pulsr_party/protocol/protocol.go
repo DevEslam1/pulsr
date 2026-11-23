@@ -70,12 +70,13 @@ var ControlActions = map[string]bool{
 
 // JoinRequest is the identity submitted when creating or joining a party.
 type JoinRequest struct {
-	UserId      string  `json:"userId"`
-	DeviceId    string  `json:"deviceId"`
-	DisplayName string  `json:"displayName"`
-	AvatarUrl   *string `json:"avatarUrl,omitempty"`
-	MaxMembers  *int    `json:"maxMembers,omitempty"`
-	AutoplayEnabled *bool `json:"autoplayEnabled,omitempty"`
+	UserId          string  `json:"userId"`
+	DeviceId        string  `json:"deviceId"`
+	DisplayName     string  `json:"displayName"`
+	AvatarUrl       *string `json:"avatarUrl,omitempty"`
+	Token           *string `json:"token,omitempty"`
+	MaxMembers      *int    `json:"maxMembers,omitempty"`
+	AutoplayEnabled *bool   `json:"autoplayEnabled,omitempty"`
 }
 
 // Validate ensures all required identity fields are present and safe.

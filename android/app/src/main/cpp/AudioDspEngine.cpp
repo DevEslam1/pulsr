@@ -543,6 +543,7 @@ bool DspEngineRegistry::registerEngine(AudioDspEngine* engine) {
     engine->setPerformanceProfile(tmpl.getPerformanceProfile());
     engine->setThermalLevel(tmpl.getThermalLevel());
     engine->setReverbThreadingMode(tmpl.getReverbThreadingMode());
+    engine->setTapSrcQualityAtomic(tmpl.tapSrcQuality());
     const uint32_t nativeDeg = tmpl.getNativeAutoDegradedStages();
     if (nativeDeg != 0) {
         engine->triggerStageAutoDegrade(nativeDeg);
@@ -958,6 +959,15 @@ void DspEngineRegistry::setReverbThreadingMode(ReverbThreadingMode mode) {
     AudioDspEngine::instance().setReverbThreadingMode(mode);
 }
 
+void DspEngineRegistry::setTapSrcQuality(int quality) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    for (auto* engine : engines_) {
+        if (engine && engine != &AudioDspEngine::instance()) {
+            engine->setTapSrcQualityAtomic(quality);
+        }
+    }
+}
+
 void DspEngineRegistry::drainRetireQueues() {
     std::lock_guard<std::mutex> lock(mutex_);
     AudioDspEngine::instance().drainRetireQueue();
@@ -1082,6 +1092,10 @@ void AudioDspEngine::publishParams(std::shared_ptr<const DspParamSnapshot> snaps
     if (snapshot->generation >= snapshotGeneration_.load()) {
         snapshotGeneration_.store(snapshot->generation);
     }
+    if (this == &AudioDspEngine::instance()) {
+        tapSrcQuality_.store(mutableSnap->resampler.tapSrcQuality,
+                             std::memory_order_release);
+    }
     mutableSnap->generation = ++snapshotGeneration_;
     swapCurrentLocked(std::const_pointer_cast<const DspParamSnapshot>(mutableSnap));
 }
@@ -1108,6 +1122,7 @@ void AudioDspEngine::initVolumeSmoothersFromSnapshot(const DspParamSnapshot& sna
         : 1.0;
     lastAppliedDirectVolume_ = smoothedDirectVolume_;
     lastBitPerfectRequested_ = snap.bitPerfect.enabled;
+    lastBypassCompareRequested_ = snap.bypassCompare.enabled;
 }
 
 void AudioDspEngine::resetInternal() {
@@ -1221,7 +1236,8 @@ void AudioDspEngine::prepareTapResampler(double srcRate, double dstRate, int cha
     const auto snap = getParams();
     const int osMult = snap ? (snap->oversample.enabled ? snap->oversample.multiplier : 1) : oversampleMultiplier_;
     const int osKern = snap ? snap->oversample.kernel : oversampleKernel_;
-    const int srcQuality = snap ? snap->resampler.tapSrcQuality : tapSrcQuality_;
+    const int srcQuality = tapSrcQuality_.load(std::memory_order_acquire);
+    preparedTapSrcQuality_ = srcQuality;
     const int factor = static_cast<int>(std::round(expansion));
     if ((factor == 2 || factor == 4 || factor == 8) &&
         std::abs(dstRate - srcRate * factor) < 0.5 &&
@@ -1274,19 +1290,29 @@ void AudioDspEngine::prepareTapResampler(double srcRate, double dstRate, int cha
     tapChannels_ = channels;
 }
 
+void AudioDspEngine::setTapSrcQualityAtomic(int quality) {
+    const int clamped = quality < 0 ? 0 : (quality > 3 ? 3 : quality);
+    tapSrcQuality_.store(clamped, std::memory_order_release);
+}
+
 void AudioDspEngine::setTapSrcQuality(int quality) {
     const int clamped = quality < 0 ? 0 : (quality > 3 ? 3 : quality);
-    if (clamped != tapSrcQuality_) {
-        tapSrcQuality_ = clamped;
-    }
+    tapSrcQuality_.store(clamped, std::memory_order_release);
+    // Publish through the snapshot (which broadcasts to all registered render
+    // engines). Never call prepareTapResampler() on the control thread here:
+    // doing so races with resampleForTap() on the active render thread
+    // (BUG-P2-1). The render/tap thread observes the updated quality and
+    // reconfigures tapResampler_ safely on its own thread.
     updateParams([clamped](DspParamSnapshot& snap) {
         snap.resampler.tapSrcQuality = clamped;
     });
-    // Rebuild on the control thread; the next configure/flush picks the
-    // kernel up. Never reconfigure from the audio callback.
-    if (tapChannels_ > 0 && std::abs(tapSrcRate_ - tapDstRate_) >= 0.5) {
-        prepareTapResampler(tapSrcRate_, tapDstRate_, tapChannels_);
+    if (this == &AudioDspEngine::instance()) {
+        DspEngineRegistry::instance().setTapSrcQuality(clamped);
     }
+}
+
+int AudioDspEngine::tapSrcQuality() const {
+    return tapSrcQuality_.load(std::memory_order_acquire);
 }
 
 void AudioDspEngine::setOversampleMultiplier(int multiplier) {
@@ -1565,6 +1591,14 @@ int AudioDspEngine::resampleForTap(const float* in, int inFrames, float* out,
     }
 
     if (in == out || !tapResampler_.isConfigured()) return -1;
+    const int targetQuality = tapSrcQuality_.load(std::memory_order_acquire);
+    if (targetQuality != preparedTapSrcQuality_) {
+        if (tapResampler_.configure(channels, TapTapsForQuality(targetQuality),
+                                    TapPhasesForQuality(targetQuality),
+                                    srcRate, dstRate)) {
+            preparedTapSrcQuality_ = targetQuality;
+        }
+    }
     tapSrcEngaged_ = true;
 
     const double ratio = dstRate / srcRate;
@@ -1942,6 +1976,46 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
             ? std::clamp(snapshot->bitPerfect.directUsbGain, 0.0, 1.0)
             : 1.0;
         lastBitPerfectRequested_ = bitPerfectRequested;
+    }
+    const bool bypassCompareRequested = snapshot->bypassCompare.enabled;
+    if (bypassCompareRequested != lastBypassCompareRequested_) {
+        if (!bypassCompareRequested && !bitPerfectRequested) {
+            // Leaving A/B Bypass Compare: snap/restore smoothers to the active
+            // attenuated gains instead of ramping down from the forced 1.0f
+            // bypass state over 20ms (which causes an audible 0 dB volume
+            // blast/pop when DVC, Direct USB, or ReplayGain is attenuated,
+            // BUG-P1-2).
+            const double dvcTarget =
+                (snapshot->directVolume.enabled
+                     ? std::clamp(snapshot->directVolume.gainLinear, 0.0, 8.0)
+                     : 1.0) *
+                effectiveDirectUsbGain(*snapshot);
+            double rgTarget = 1.0;
+            if (snapshot->replayGain.enabled &&
+                snapshot->replayGain.mode != ReplayGainMode::Off) {
+                const auto& rg = snapshot->replayGain;
+                const bool useAlbum =
+                    rg.mode == ReplayGainMode::Album && rg.hasAlbumGain;
+                const bool useTrack = !useAlbum && rg.hasTrackGain;
+                const double tagDb =
+                    useAlbum ? rg.albumGainDb : (useTrack ? rg.trackGainDb : 0.0);
+                double gainLinear = std::pow(10.0, (tagDb + rg.preAmpDb) / 20.0);
+                if (rg.preventClipping && (useAlbum || useTrack)) {
+                    const double peak = useAlbum ? rg.albumPeak : rg.trackPeak;
+                    if (peak > 0.0 && gainLinear * peak > 1.0) {
+                        gainLinear = 1.0 / peak;
+                    }
+                }
+                rgTarget = gainLinear;
+            }
+            targetReplayGain_ = rgTarget;
+            smoothedReplayGain_ = rgTarget;
+            lastAppliedReplayGain_ = rgTarget;
+            smoothedDirectVolume_ = dvcTarget;
+            lastAppliedDirectVolume_ = dvcTarget;
+            smoothedDirectUsbVolume_ = effectiveDirectUsbGain(*snapshot);
+        }
+        lastBypassCompareRequested_ = bypassCompareRequested;
     }
     // Measured custody: capture the exact bytes this block enters with, and (via
     // the guard's destructor) leaves with. Placed after the pending reset so a

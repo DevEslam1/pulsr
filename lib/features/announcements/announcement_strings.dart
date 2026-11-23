@@ -1,164 +1,179 @@
 // lib/features/announcements/announcement_strings.dart
+//
+// Localized copy for the announcements module, backed by ARB
+// (`AppLocalizations`) with automatic English fallback in headless tests.
 
+import 'dart:ui' show Locale;
+
+import '../../core/utils/l10n_holder.dart';
+import '../../l10n/generated/app_localizations.dart';
 import 'announcement_composer.dart';
 
-/// Single translation point for every English string the announcements module
-/// renders. Keeping them here means a localisation pass touches one file.
+/// User-facing copy for the announcements module.
 abstract final class AnnouncementStrings {
+  static final AppLocalizations _fallback =
+      lookupAppLocalizations(const Locale('en'));
+
+  static AppLocalizations _l10n([AppLocalizations? l10n]) =>
+      l10n ?? L10nHolder.current ?? _fallback;
+
   /// App bar title of the announcements screen.
-  static const String screenTitle = 'Announcements';
+  static String get screenTitle => _l10n().annScreenTitle;
 
   /// Section header for the master switch.
-  static const String sectionAnnouncements = 'Announcements';
+  static String get sectionAnnouncements => _l10n().annSectionAnnouncements;
 
   /// Master switch label.
-  static const String masterTitle = 'Speak track details';
+  static String get masterTitle => _l10n().annMasterTitle;
 
   /// Master switch explanation.
-  static const String masterSubtitle =
-      'Read the selected details aloud when a track starts.';
+  static String get masterSubtitle => _l10n().annMasterSubtitle;
 
   /// Section header for the element toggles.
-  static const String sectionElements = 'What to announce';
+  static String get sectionElements => _l10n().annSectionElements;
 
   /// Section subtitle for the element toggles.
-  static const String elementsSubtitle =
-      'Items are spoken in the order they are listed.';
+  static String get elementsSubtitle => _l10n().annElementsSubtitle;
 
   /// Section header for delay, volume and ducking.
-  static const String sectionTiming = 'Timing and volume';
+  static String get sectionTiming => _l10n().annSectionTiming;
 
   /// Section subtitle for delay, volume and ducking.
-  static const String sectionTimingSubtitle =
-      'Applied to every announcement on this device.';
+  static String get sectionTimingSubtitle => _l10n().annSectionTimingSubtitle;
 
   /// Delay slider label.
-  static const String delayLabel = 'Delay before speaking';
+  static String get delayLabel => _l10n().annDelayLabel;
 
   /// Delay slider explanation.
-  static const String delaySubtitle =
-      'Waits briefly so the track is playing before the voice starts.';
+  static String get delaySubtitle => _l10n().annDelaySubtitle;
 
   /// Volume slider label.
-  static const String volumeLabel = 'Announcement volume';
+  static String get volumeLabel => _l10n().annVolumeLabel;
 
   /// Volume slider explanation.
-  static const String volumeSubtitle = 'Separate from the music volume.';
+  static String get volumeSubtitle => _l10n().annVolumeSubtitle;
 
   /// Maximum announcement length slider label.
-  static const String maxLengthLabel = 'Maximum length';
+  static String get maxLengthLabel => _l10n().annMaxLengthLabel;
 
   /// Maximum announcement length slider explanation.
-  static const String maxLengthSubtitle =
-      'Longer details are shortened to this many characters.';
+  static String get maxLengthSubtitle => _l10n().annMaxLengthSubtitle;
 
   /// Ducking switch label.
-  static const String duckAudioTitle = 'Duck the music while speaking';
+  static String get duckAudioTitle => _l10n().annDuckAudioTitle;
 
   /// Ducking switch explanation.
-  static const String duckAudioSubtitle =
-      'Lowers the music so the voice stays intelligible.';
+  static String get duckAudioSubtitle => _l10n().annDuckAudioSubtitle;
 
   /// Section header for the skip rules.
-  static const String sectionSkip = 'Skip announcements';
+  static String get sectionSkip => _l10n().annSectionSkip;
 
   /// Section subtitle for the skip rules.
-  static const String sectionSkipSubtitle =
-      'Some outputs should never be interrupted by a voice.';
+  static String get sectionSkipSubtitle => _l10n().annSectionSkipSubtitle;
 
   /// Casting skip switch label.
-  static const String skipCastingTitle = 'While casting';
+  static String get skipCastingTitle => _l10n().annSkipCastingTitle;
 
   /// Casting skip switch explanation.
-  static const String skipCastingSubtitle =
-      'Cast receivers already show the track details on screen.';
+  static String get skipCastingSubtitle => _l10n().annSkipCastingSubtitle;
 
   /// Bit-perfect skip switch label.
-  static const String skipBitPerfectTitle = 'During bit-perfect playback';
+  static String get skipBitPerfectTitle => _l10n().annSkipBitPerfectTitle;
 
   /// Bit-perfect skip switch explanation.
-  static const String skipBitPerfectSubtitle =
-      'Keeps the exclusive output free of system audio.';
+  static String get skipBitPerfectSubtitle =>
+      _l10n().annSkipBitPerfectSubtitle;
 
   /// Section header for voice selection.
-  static const String sectionVoice = 'Voice';
+  static String get sectionVoice => _l10n().annSectionVoice;
 
   /// Section subtitle for voice selection.
-  static const String sectionVoiceSubtitle =
-      'Voices are provided by the platform speech engine.';
+  static String get sectionVoiceSubtitle => _l10n().annSectionVoiceSubtitle;
 
   /// Voice picker row label.
-  static const String voiceLabel = 'System voice';
+  static String get voiceLabel => _l10n().annVoiceLabel;
 
   /// Dropdown entry that keeps the platform default voice.
-  static const String voiceSystemDefault = 'System default';
+  static String get voiceSystemDefault => _l10n().annVoiceSystemDefault;
 
   /// Shown while the installed voices are being listed.
-  static const String voiceLoading = 'Loading installed voices…';
+  static String get voiceLoading => _l10n().annVoiceLoading;
 
   /// Shown when the platform reports no extra voices.
-  static const String voiceNoneInstalled = 'No additional voices installed.';
+  static String get voiceNoneInstalled => _l10n().annVoiceNoneInstalled;
 
   /// Test row label.
-  static const String testTitle = 'Test announcement';
+  static String get testTitle => _l10n().annTestTitle;
 
   /// Test row explanation.
-  static const String testSubtitle =
-      'Speaks the current selection with the saved volume.';
+  static String get testSubtitle => _l10n().annTestSubtitle;
 
   /// Test button label.
-  static const String testButton = 'Speak test';
+  static String get testButton => _l10n().annTestButton;
 
   /// Sample track title read out by the test button when the screen was opened
   /// without a preview track.
-  static const String previewTrackTitle = 'Pulsr Music';
+  static String get previewTrackTitle => _l10n().annPreviewTrackTitle;
 
   /// Sample artist read out by the test button.
-  static const String previewTrackArtist = 'Announcement test';
+  static String get previewTrackArtist => _l10n().annPreviewTrackArtist;
 
   /// Shown when no element is selected, so there is nothing to say.
-  static const String emptySelection = 'Select at least one item to announce.';
+  static String get emptySelection => _l10n().annEmptySelection;
 
   /// Status line title when the platform cannot speak.
-  static const String unavailableTitle = 'Not available on this platform';
+  static String get unavailableTitle => _l10n().annUnavailableTitle;
 
   /// Status line body when the platform cannot speak.
-  static const String unavailableBody =
-      'Spoken announcements need the Android text-to-speech engine. '
-      'Every other setting keeps working.';
+  static String get unavailableBody => _l10n().annUnavailableBody;
 
   /// Label of [element] in the element toggle list.
-  static String elementLabel(AnnouncementElement element) => switch (element) {
-        AnnouncementElement.title => 'Title',
-        AnnouncementElement.artist => 'Artist',
-        AnnouncementElement.album => 'Album',
-        AnnouncementElement.year => 'Year',
-        AnnouncementElement.trackNumber => 'Track number',
-      };
+  static String elementLabel(
+    AnnouncementElement element, [
+    AppLocalizations? l10n,
+  ]) {
+    final l = _l10n(l10n);
+    return switch (element) {
+      AnnouncementElement.title => l.annElementTitle,
+      AnnouncementElement.artist => l.annElementArtist,
+      AnnouncementElement.album => l.annElementAlbum,
+      AnnouncementElement.year => l.annElementYear,
+      AnnouncementElement.trackNumber => l.annElementTrackNumber,
+    };
+  }
 
   /// Explanation under [element] in the element toggle list.
-  static String elementSubtitle(AnnouncementElement element) =>
-      switch (element) {
-        AnnouncementElement.title => '“Blue in Green”',
-        AnnouncementElement.artist => '“Miles Davis”',
-        AnnouncementElement.album => '“Kind of Blue”',
-        AnnouncementElement.year => 'Spoken as “from 1959”.',
-        AnnouncementElement.trackNumber => 'Spoken as “track 4”.',
-      };
+  static String elementSubtitle(
+    AnnouncementElement element, [
+    AppLocalizations? l10n,
+  ]) {
+    final l = _l10n(l10n);
+    return switch (element) {
+      AnnouncementElement.title => l.annElementSubtitleTitle,
+      AnnouncementElement.artist => l.annElementSubtitleArtist,
+      AnnouncementElement.album => l.annElementSubtitleAlbum,
+      AnnouncementElement.year => l.annElementSubtitleYear,
+      AnnouncementElement.trackNumber => l.annElementSubtitleTrackNumber,
+    };
+  }
 
   /// Formats the delay slider value: `Off` or tenths of a second.
-  static String delayValue(int milliseconds) => milliseconds <= 0
-      ? 'Off'
-      : '${(milliseconds / 1000).toStringAsFixed(1)} s';
+  static String delayValue(int milliseconds, [AppLocalizations? l10n]) {
+    final l = _l10n(l10n);
+    return milliseconds <= 0
+        ? l.annDelayOff
+        : l.annDelaySeconds((milliseconds / 1000).toStringAsFixed(1));
+  }
 
   /// Formats the volume slider value as a percentage.
   static String volumeValue(double value) => '${(value * 100).round()}%';
 
   /// Formats the maximum-length slider value in characters.
-  static String maxLengthValue(int characters) => '$characters characters';
+  static String maxLengthValue(int characters, [AppLocalizations? l10n]) =>
+      _l10n(l10n).annMaxLengthValue(characters);
 
   /// Refresh action for the voice list.
-  static const String voiceRefresh = 'Refresh voices';
+  static String get voiceRefresh => _l10n().annVoiceRefresh;
 
   /// Formats one voice dropdown entry as `Name (locale)`.
   static String voiceOption(String name, String localeCode) =>

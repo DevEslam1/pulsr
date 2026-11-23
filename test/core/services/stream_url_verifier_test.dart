@@ -29,9 +29,19 @@ void main() {
           reason: 'the legacy c.youtube.com edges serve the same bytes');
       expect(
           StreamUrlVerifier.isProbeable(
-              'https://backend.example.net/videoplayback/abc'),
+              'https://www.youtube.com/videoplayback?x=1'),
           isTrue,
-          reason: 'a self-hosted proxy path is still a videoplayback body');
+          reason: 'a YouTube domain /videoplayback path is probeable');
+      expect(
+          StreamUrlVerifier.isProbeable(
+              'https://www.youtube-nocookie.com/videoplayback?x=1'),
+          isTrue,
+          reason: 'a youtube-nocookie domain /videoplayback path is probeable');
+      expect(
+          StreamUrlVerifier.isProbeable(
+              'https://backend.example.net/videoplayback/abc'),
+          isFalse,
+          reason: 'arbitrary non-YouTube hosts must not be probed via /videoplayback');
       expect(StreamUrlVerifier.isProbeable(_otherUrl), isFalse);
       expect(StreamUrlVerifier.isProbeable('not a url'), isFalse);
       expect(

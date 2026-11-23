@@ -11,6 +11,7 @@
 
 import 'dart:convert';
 
+import 'package:mutex/mutex.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/utils/error_logger.dart';
@@ -33,6 +34,7 @@ class UsbQuirkStore {
   static const String globalDefaultsField = 'globalDefaults';
 
   final SharedPreferences _prefs;
+  final Mutex _writeMutex = Mutex();
 
   String? _cachedRaw;
   Map<String, UsbQuirkProfile> _cachedDevices = const {};
@@ -63,29 +65,35 @@ class UsbQuirkStore {
   ///
   /// Returns false when the platform rejected the write or the document could
   /// not be serialized; the previous value is left in place.
-  Future<bool> put(UsbQuirkProfile profile) async {
-    final snapshot = _read();
-    final devices = Map<String, UsbQuirkProfile>.of(snapshot.devices)
-      ..[profile.key] = profile;
-    return _write(devices: devices, defaults: snapshot.defaults);
+  Future<bool> put(UsbQuirkProfile profile) {
+    return _writeMutex.protect(() async {
+      final snapshot = _read();
+      final devices = Map<String, UsbQuirkProfile>.of(snapshot.devices)
+        ..[profile.key] = profile;
+      return _write(devices: devices, defaults: snapshot.defaults);
+    });
   }
 
   /// Removes the entry for [vid]/[pid]. Returns false only on a failed write;
   /// removing a device that was never stored still returns true.
-  Future<bool> remove(int vid, int pid) async {
-    final snapshot = _read();
-    if (!snapshot.devices.containsKey(UsbQuirkProfile.deviceKey(vid, pid))) {
-      return true;
-    }
-    final devices = Map<String, UsbQuirkProfile>.of(snapshot.devices)
-      ..remove(UsbQuirkProfile.deviceKey(vid, pid));
-    return _write(devices: devices, defaults: snapshot.defaults);
+  Future<bool> remove(int vid, int pid) {
+    return _writeMutex.protect(() async {
+      final snapshot = _read();
+      if (!snapshot.devices.containsKey(UsbQuirkProfile.deviceKey(vid, pid))) {
+        return true;
+      }
+      final devices = Map<String, UsbQuirkProfile>.of(snapshot.devices)
+        ..remove(UsbQuirkProfile.deviceKey(vid, pid));
+      return _write(devices: devices, defaults: snapshot.defaults);
+    });
   }
 
   /// Sets (or clears, with null) the fallback profile.
-  Future<bool> setGlobalDefaults(UsbQuirkProfile? profile) async {
-    final snapshot = _read();
-    return _write(devices: snapshot.devices, defaults: profile);
+  Future<bool> setGlobalDefaults(UsbQuirkProfile? profile) {
+    return _writeMutex.protect(() async {
+      final snapshot = _read();
+      return _write(devices: snapshot.devices, defaults: profile);
+    });
   }
 
   /// The profile to apply for a device: its own entry, else the global

@@ -2,6 +2,7 @@
 // ignore_for_file: experimental_member_use
 import 'dart:async';
 import 'dart:io';
+import 'dart:isolate';
 import 'dart:typed_data';
 import 'package:audio_service/audio_service.dart';
 import 'package:just_audio/just_audio.dart';
@@ -164,14 +165,21 @@ class MqaDecoderHelper {
     }
     final bd = ByteData.sublistView(bytes);
     int pos = 12;
-    int channels = 2;
-    int bits = 24;
+    int audioFormat = 0;
+    int channels = 0;
+    int bits = 0;
     int dataOffset = -1;
     int dataLength = -1;
     while (pos + 8 <= bytes.length) {
       final id = String.fromCharCodes(bytes.sublist(pos, pos + 4));
       final size = bd.getUint32(pos + 4, Endian.little);
       if (id == 'fmt ') {
+        if (size < 16 || pos + 24 > bytes.length) {
+          throw const MqaUnsupportedException(
+            'Truncated WAV fmt chunk; cannot unfold MQA payload.',
+          );
+        }
+        audioFormat = bd.getUint16(pos + 8, Endian.little);
         channels = bd.getUint16(pos + 10, Endian.little);
         bits = bd.getUint16(pos + 22, Endian.little);
       } else if (id == 'data') {
@@ -179,9 +187,15 @@ class MqaDecoderHelper {
         dataLength = size.clamp(0, bytes.length - dataOffset);
         break;
       }
-      pos += 8 + size + (size.isOdd ? 1 : 0);
+      final nextPos = pos + 8 + size + (size.isOdd ? 1 : 0);
+      if (nextPos <= pos) break;
+      pos = nextPos;
     }
-    if (dataOffset < 0 || dataLength <= 0 || bits != 24 || channels != 2) {
+    if (dataOffset < 0 ||
+        dataLength <= 0 ||
+        audioFormat != 1 ||
+        bits != 24 ||
+        channels != 2) {
       throw const MqaUnsupportedException(
         'MQA unfold supports only 24-bit stereo PCM WAV content.',
       );
@@ -210,21 +224,6 @@ class MqaDecoderHelper {
       );
     }
 
-    final bytes = await file.readAsBytes();
-
-    // Gate the approximate unfold on an actual MQA signature. Without this a
-    // caller could hand any 24-bit PCM as "MQA" and get resampled/relabelled
-    // output. Confirmed MQA paths keep their existing unfold behavior.
-    final hasSignature = testUnfold != null ||
-        containsMqaSignature(
-          bytes.length > 8192 ? bytes.sublist(0, 8192) : bytes,
-        );
-    if (!hasSignature) {
-      throw const MqaUnsupportedException(
-        'MQA signature not found; refusing to unfold non-MQA content.',
-      );
-    }
-
     // The MQA core signal is the file's native rate (typically 44.1 or 48 kHz)
     // and the first unfold doubles it. Deriving it from the track metadata keeps
     // 44.1 kHz-family files from being unfolded with the wrong ratio (which
@@ -235,25 +234,54 @@ class MqaDecoderHelper {
         : 48000;
     final targetRate = inputRate * 2; // Core Unfold (44.1→88.2, 48→96 kHz)
 
-    final Uint8List unfolded;
-    if (testUnfold != null) {
-      final res = await testUnfold!(bytes, originalRate: inputRate);
-      unfolded = res ?? bytes;
-    } else {
-      final pcm = _extractPcm24StereoPayload(bytes);
-      unfolded = coreUnfoldPcm24(pcm24Bytes: pcm, inputSampleRate: inputRate);
+    final customUnfold = testUnfold;
+    if (customUnfold != null) {
+      final bytes = await file.readAsBytes();
+      final res = await customUnfold(bytes, originalRate: inputRate);
+      final unfolded = res ?? bytes;
+      final fullWav = await Isolate.run(() {
+        final wavHeader = buildWavHeader(
+          dataLength: unfolded.length,
+          sampleRate: targetRate,
+          channels: 2,
+          bitsPerSample: 24,
+        );
+        final out = Uint8List(wavHeader.length + unfolded.length);
+        out.setRange(0, wavHeader.length, wavHeader);
+        out.setRange(wavHeader.length, out.length, unfolded);
+        return out;
+      });
+      return _MqaStreamAudioSource(fullWav, tag: tag);
     }
 
-    final wavHeader = buildWavHeader(
-      dataLength: unfolded.length,
-      sampleRate: targetRate,
-      channels: 2,
-      bitsPerSample: 24,
-    );
-
-    final fullWav = Uint8List(wavHeader.length + unfolded.length);
-    fullWav.setRange(0, wavHeader.length, wavHeader);
-    fullWav.setRange(wavHeader.length, fullWav.length, unfolded);
+    final filePath = song.path;
+    final fullWav = await Isolate.run(() {
+      final bytes = File(filePath).readAsBytesSync();
+      // Gate the approximate unfold on an actual MQA signature. Without this a
+      // caller could hand any 24-bit PCM as "MQA" and get resampled/relabelled
+      // output. Confirmed MQA paths keep their existing unfold behavior.
+      final hasSignature = containsMqaSignature(
+        bytes.length > 8192 ? Uint8List.sublistView(bytes, 0, 8192) : bytes,
+      );
+      if (!hasSignature) {
+        throw const MqaUnsupportedException(
+          'MQA signature not found; refusing to unfold non-MQA content.',
+        );
+      }
+      final pcm = _extractPcm24StereoPayload(bytes);
+      final unfolded =
+          coreUnfoldPcm24(pcm24Bytes: pcm, inputSampleRate: inputRate);
+      final wavHeader = buildWavHeader(
+        dataLength: unfolded.length,
+        sampleRate: targetRate,
+        channels: 2,
+        bitsPerSample: 24,
+      );
+      final out = Uint8List(wavHeader.length + unfolded.length);
+      out.setRange(0, wavHeader.length, wavHeader);
+      out.setRange(wavHeader.length, out.length, unfolded);
+      return out;
+    });
 
     return _MqaStreamAudioSource(fullWav, tag: tag);
   }

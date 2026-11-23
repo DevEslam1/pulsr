@@ -6,8 +6,12 @@
 // exchange, refresh, revoke) are exercised only through their pre-network
 // guards; the transport-dependent branches are documented as unreachable from
 // a unit test. Secure-storage state is seeded through the plugin's own mock.
+import 'dart:async';
+import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:pulsr/core/services/ytm_oauth_service.dart';
 
 void main() {
@@ -121,6 +125,115 @@ void main() {
             .pollForToken(code, isCancelled: () => true),
         isFalse,
       );
+    });
+
+    test('signOut during in-flight pollForToken prevents session resurrection',
+        () async {
+      FlutterSecureStorage.setMockInitialValues({});
+      final service = YtmOAuthService.shared;
+      final tokenGate = Completer<http.Response>();
+      service.debugHttpClient = MockClient((request) {
+        if (request.url.path.endsWith('/token')) {
+          return tokenGate.future;
+        }
+        return Future.value(http.Response('{}', 200));
+      });
+
+      final code = OAuthDeviceCode(
+        deviceCode: 'd',
+        userCode: 'u',
+        verificationUrl: 'https://google.com/device',
+        intervalSeconds: 1,
+        expiresInSeconds: 1800,
+        requestedAt: DateTime.now(),
+      );
+
+      var ticked = false;
+      final pollFuture = service.pollForToken(
+        code,
+        onTick: () => ticked = true,
+      );
+
+      while (!ticked) {
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+      }
+
+      // Sign out while the token exchange HTTP request is still in-flight.
+      await service.signOut();
+
+      tokenGate.complete(http.Response(
+        jsonEncode({
+          'access_token': 'resurrected-token',
+          'refresh_token': 'resurrected-refresh',
+          'expires_in': 3600,
+        }),
+        200,
+      ));
+
+      final result = await pollFuture;
+      expect(result, isFalse);
+      expect(service.isSignedIn, isFalse);
+      expect(service.accessToken, isNull);
+    });
+
+    test('signOut during in-flight refresh prevents session resurrection',
+        () async {
+      FlutterSecureStorage.setMockInitialValues({});
+      final service = YtmOAuthService.shared;
+
+      // Step 1: seed a valid session (with refresh token) via pollForToken.
+      service.debugHttpClient = MockClient((request) async {
+        return http.Response(
+          jsonEncode({
+            'access_token': 'initial-access',
+            'refresh_token': 'initial-refresh',
+            'expires_in': 3600,
+          }),
+          200,
+        );
+      });
+      final code = OAuthDeviceCode(
+        deviceCode: 'd2',
+        userCode: 'u2',
+        verificationUrl: 'https://google.com/device',
+        intervalSeconds: 1,
+        expiresInSeconds: 1800,
+        requestedAt: DateTime.now(),
+      );
+      expect(await service.pollForToken(code), isTrue);
+      expect(service.isSignedIn, isTrue);
+
+      // Step 2: start refresh() and pause it mid-flight.
+      final refreshStarted = Completer<void>();
+      final refreshGate = Completer<http.Response>();
+      service.debugHttpClient = MockClient((request) {
+        if (request.url.path.endsWith('/token')) {
+          if (!refreshStarted.isCompleted) refreshStarted.complete();
+          return refreshGate.future;
+        }
+        return Future.value(http.Response('', 200));
+      });
+
+      final refreshFuture = service.refresh();
+      await refreshStarted.future;
+
+      // Sign out while refresh is in-flight.
+      await service.signOut();
+
+      // Complete the refresh HTTP response with fresh tokens.
+      refreshGate.complete(http.Response(
+        jsonEncode({
+          'access_token': 'zombie-access',
+          'refresh_token': 'zombie-refresh',
+          'expires_in': 3600,
+        }),
+        200,
+      ));
+
+      final refreshed = await refreshFuture;
+      expect(refreshed, isFalse);
+      expect(service.isSignedIn, isFalse);
+      expect(service.accessToken, isNull);
     });
   });
 }

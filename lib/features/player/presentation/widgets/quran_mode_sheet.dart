@@ -5,6 +5,8 @@ import '../../../../core/utils/error_logger.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'ambient_sound_panel.dart';
+import '../../../../core/errors/app_error_base.dart';
+import '../../../../core/errors/error_message_resolver.dart';
 import '../../../../core/services/earbud_optimization_service.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/di/injection.dart';
@@ -12,6 +14,8 @@ import '../../../../domain/models/quran_metadata.dart';
 import '../../../../domain/models/quran_mode_profile.dart';
 import '../../../../domain/repositories/quran_repository.dart';
 import '../../../../data/repositories/quran_repository_impl.dart';
+import '../../cubit/controllers/player_playback_options_controller.dart'
+    show kQuranModeErrorCode;
 import '../../cubit/player_cubit.dart';
 import '../../cubit/player_state.dart';
 
@@ -176,6 +180,25 @@ class _QuranModePanelState extends State<QuranModePanel> {
     super.dispose();
   }
 
+  static const Set<String> _canonicalQuranErrorKeys = {
+    'Failed to save Quran style adjustments',
+    'Failed to save Quran Mode setting',
+    'Failed to apply Quran audio profile',
+    'Failed to restore audio settings from Quran Mode',
+    'Failed to save Quran reciter style',
+    'Failed to reset Quran style adjustments',
+    'Failed to set Quran learning speed',
+  };
+
+  bool _isQuranModeError(AppError? error) {
+    if (error == null) return false;
+    if (error.code == kQuranModeErrorCode) return true;
+    final msg = error.userMessage;
+    return _canonicalQuranErrorKeys.contains(msg) ||
+        msg.startsWith('Failed to set Quran ') ||
+        msg.startsWith('Quran ');
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
@@ -192,7 +215,7 @@ class _QuranModePanelState extends State<QuranModePanel> {
           a.isSaturationEnabled != b.isSaturationEnabled ||
           a.saturationMix != b.saturationMix ||
           a.playbackSpeed != b.playbackSpeed ||
-          a.errorMessage != b.errorMessage ||
+          a.playback.error != b.playback.error ||
           a.abLoopEnabled != b.abLoopEnabled ||
           a.abPointA != b.abPointA ||
           a.abPointB != b.abPointB ||
@@ -404,11 +427,14 @@ class _QuranModePanelState extends State<QuranModePanel> {
               ),
             if (_isApplying) const SizedBox(height: AppSpacing.sm),
 
-            if ((state.errorMessage ?? '').contains('Quran'))
+            if (_isQuranModeError(state.playback.error)) ...[
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
                 child: QuranErrorCard(
-                  message: state.errorMessage!,
+                  message: resolveUiErrorMessage(
+                    context,
+                    state.playback.error!.userMessage,
+                  ),
                   onRetry: !_isApplying
                       ? () => unawaited(
                             _runQuranAction(() => cubit.reapplyQuranProfile()),
@@ -416,8 +442,8 @@ class _QuranModePanelState extends State<QuranModePanel> {
                       : null,
                 ),
               ),
-            if ((state.errorMessage ?? '').contains('Quran'))
               const SizedBox(height: AppSpacing.sm),
+            ],
 
             // Tuning sliders
             _QuranSliderTile(

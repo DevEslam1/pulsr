@@ -457,9 +457,9 @@ class MiniPlayerState extends State<MiniPlayer> {
           alignment: Alignment.topCenter,
           children: [
             // Subtle ambient color bleed from current track's artwork
-            Positioned(
-              left: 14,
-              right: 14,
+            PositionedDirectional(
+              start: 14,
+              end: 14,
               top: 4,
               bottom: 4,
               child: IgnorePointer(

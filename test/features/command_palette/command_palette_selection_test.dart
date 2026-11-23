@@ -55,6 +55,14 @@ void main() {
           builder: (context, state) =>
               const Scaffold(body: Text('library-route')),
         ),
+        GoRoute(
+          path: '/diagnostics',
+          builder: (context, state) => const DiagnosticsScreen(),
+        ),
+        GoRoute(
+          path: '/audio-profiles',
+          builder: (context, state) => const AudioProfilesScreen(),
+        ),
       ],
     );
     addTearDown(router.dispose);

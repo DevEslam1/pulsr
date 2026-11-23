@@ -68,11 +68,15 @@ Future<void> _configureDependenciesImpl({required bool warmUpAsync}) async {
     getIt.init();
     if (!getIt.isRegistered<DiscordRpcService>()) {
       getIt.registerLazySingleton<DiscordRpcService>(
-          () => DiscordRpcService.instance);
+        () => DiscordRpcService.instance,
+        dispose: (service) => service.dispose(),
+      );
     }
     if (!getIt.isRegistered<AppUpdateService>()) {
       getIt.registerLazySingleton<AppUpdateService>(
-          () => AppUpdateService.instance);
+        () => AppUpdateService.instance,
+        dispose: (service) => service.dispose(),
+      );
     }
     if (!getIt.isRegistered<QuranRepository>()) {
       getIt.registerLazySingleton<QuranRepository>(() => QuranRepositoryImpl());

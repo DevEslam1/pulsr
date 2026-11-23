@@ -85,19 +85,41 @@ class AudioQualitySheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = context.palette;
     final settingsCubit = context.read<SettingsCubit?>();
-    final settingsState = settingsCubit?.state;
-    // `bitPerfectOutput` is part of the selection so toggling it rebuilds the
-    // sheet immediately.
-    final (streamingQuality, outputDevice, _, experienceMode) = context.select<
+    // Select all live-chain-relevant SettingsState fields so toggling any of
+    // them rebuilds the sheet immediately.
+    final (
+      streamingQuality,
+      outputDevice,
+      _,
+      experienceMode,
+      _,
+      _,
+      _,
+      _,
+    ) = context.select<
         SettingsCubit,
-        (YtmAudioQuality?, AudioOutputInfo?, bool, ExperienceMode)>(
+        (
+          YtmAudioQuality?,
+          AudioOutputInfo?,
+          bool,
+          ExperienceMode,
+          bool,
+          bool,
+          ReplayGainMode,
+          bool,
+        )>(
       (c) => (
         c.state.streamingQuality,
         c.state.currentOutputDevice,
         c.state.bitPerfectOutput,
         c.state.experienceMode,
+        c.state.strictBitPerfect,
+        c.state.bypassDspOnBitPerfect,
+        c.state.replayGainMode,
+        c.state.dvcEnabled,
       ),
     );
+    final settingsState = settingsCubit?.state;
     final isProfessional = experienceMode == ExperienceMode.professional;
     SongsTableData? currentSong;
     DspSlice dspSlice = const DspSlice();

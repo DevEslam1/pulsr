@@ -15,6 +15,7 @@ enum NativeDsdProducerState {
   paused,
   stopped,
   completed,
+  error,
 }
 
 /// Streams raw 1-bit DSD blocks to a UAC2 DAC in DSD_U32 native mode.
@@ -193,7 +194,8 @@ class NativeDsdProducer {
     _stopRequested = false;
     if (_state == NativeDsdProducerState.idle ||
         _state == NativeDsdProducerState.stopped ||
-        _state == NativeDsdProducerState.completed) {
+        _state == NativeDsdProducerState.completed ||
+        _state == NativeDsdProducerState.error) {
       _state = startPaused
           ? NativeDsdProducerState.paused
           : NativeDsdProducerState.streaming;
@@ -226,7 +228,8 @@ class NativeDsdProducer {
           continue;
         }
         if (_state == NativeDsdProducerState.stopped ||
-            _state == NativeDsdProducerState.completed) {
+            _state == NativeDsdProducerState.completed ||
+            _state == NativeDsdProducerState.error) {
           break;
         }
         final loopGen = _seekGeneration;
@@ -234,6 +237,7 @@ class NativeDsdProducer {
         final Uint8List chunkR;
         if (_source != null) {
           final chunk = await _source!.readChunk(_chunkSize);
+          if (_stopRequested) break;
           if (loopGen != _seekGeneration) continue;
           if (chunk == null) {
             _state = NativeDsdProducerState.completed;
@@ -262,6 +266,17 @@ class NativeDsdProducer {
           _currentByteOffset += chunkL.length;
         }
         _firstBlockWritten = true;
+      }
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Native DSD pump I/O failure; requesting fallback',
+        error: e,
+        stackTrace: st,
+        category: 'NativeDsdProducer',
+      );
+      if (!_stopRequested) {
+        _fallbackRequested = true;
+        _state = NativeDsdProducerState.error;
       }
     } finally {
       _pumpFuture = null;

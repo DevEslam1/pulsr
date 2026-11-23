@@ -12,6 +12,7 @@ import '../../core/constants/app_spacing.dart';
 import '../../core/constants/app_typography.dart';
 import '../../core/theme/aura_theme.dart';
 import '../../core/utils/error_logger.dart';
+import '../../core/widgets/pulsr_adaptive_sheet.dart';
 import 'assistant_search_channel.dart';
 import 'assistant_settings.dart';
 import 'assistant_strings.dart';
@@ -40,7 +41,7 @@ class AssistantSettingsScreen extends StatelessWidget {
         backgroundColor: palette.bg,
         foregroundColor: palette.textPrimary,
         elevation: 0,
-        title: const Text(
+        title: Text(
           AssistantStrings.settingsTitle,
           style: TextStyle(fontWeight: FontWeight.w800),
         ),
@@ -62,8 +63,8 @@ class AssistantSettingsScreen extends StatelessWidget {
               const SizedBox(height: AppSpacing.xs),
               SwitchListTile.adaptive(
                 value: settings.suggestionsEnabled,
-                title: const Text(AssistantStrings.suggestionsTitle),
-                subtitle: const Text(AssistantStrings.suggestionsSubtitle),
+                title: Text(AssistantStrings.suggestionsTitle),
+                subtitle: Text(AssistantStrings.suggestionsSubtitle),
                 onChanged: (value) {
                   settings.setSuggestionsEnabled(value);
                   if (value) {
@@ -113,15 +114,15 @@ void _clearSuggestionCache(AssistantSuggestionSync? sync) {
   }());
 }
 
-/// Shows the same toggle in a modal bottom sheet.
+/// Shows the same toggle in an adaptive modal sheet.
 Future<void> showAssistantSettingsSheet(
   BuildContext context, {
   required AssistantSettings settings,
   AssistantSuggestionSync? suggestionSync,
 }) {
-  return showModalBottomSheet<void>(
+  return PulsrAdaptiveSheet.show<void>(
     context: context,
-    showDragHandle: true,
+    title: Text(AssistantStrings.settingsTitle),
     builder: (context) => SafeArea(
       top: false,
       child: ListenableBuilder(
@@ -135,8 +136,8 @@ Future<void> showAssistantSettingsSheet(
           ),
           child: SwitchListTile.adaptive(
             value: settings.suggestionsEnabled,
-            title: const Text(AssistantStrings.suggestionsTitle),
-            subtitle: const Text(AssistantStrings.suggestionsSubtitle),
+            title: Text(AssistantStrings.suggestionsTitle),
+            subtitle: Text(AssistantStrings.suggestionsSubtitle),
             onChanged: (value) {
               settings.setSuggestionsEnabled(value);
               if (value) {
