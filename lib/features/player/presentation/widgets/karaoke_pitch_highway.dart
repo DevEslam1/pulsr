@@ -258,7 +258,7 @@ class _KaraokePitchHighwayState extends State<KaraokePitchHighway>
           color: p.surfaceContainerHigh.withValues(alpha: 0.4),
           borderRadius: AppRadii.r12All,
           border: Border.all(
-            color: p.hairline.withValues(alpha: 0.6),
+            color: p.isHighContrast ? p.borderStrong : p.hairline,
             width: 1.0,
           ),
         ),

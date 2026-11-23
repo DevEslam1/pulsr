@@ -33,8 +33,7 @@ extension _CardPlayerThemeBuild on CardPlayerTheme {
     final Color topBarSurface = isDark
         ? AppColors.scrimAt(0.30)
         : p.surface.withValues(alpha: 0.72);
-    final Color topBarBorder =
-        isDark ? AppColors.specularAt(0.18) : p.hairline;
+    final Color topBarBorder = p.hairline;
 
     return PlayerSurfaceShell(
       props: props,
@@ -467,7 +466,7 @@ class _SpatialTopPill extends StatelessWidget {
                   Icon(
                     Icons.graphic_eq_rounded,
                     size: 14,
-                    color: telemetry.isHiRes ? AppColors.dacGold : activeColor,
+                    color: telemetry.isHiRes ? p.goldAccent : activeColor,
                   ),
                   const SizedBox(width: AppSpacing.s4),
                 ],
@@ -814,9 +813,7 @@ class _SpatialCardDeckState extends State<_SpatialCardDeck>
                     decoration: BoxDecoration(
                       borderRadius: cardCorners,
                       border: Border.all(
-                        color: isDark
-                            ? AppColors.specularAt(0.24)
-                            : AppColors.specularAt(0.50),
+                        color: p.hairline,
                         width: 1.2,
                       ),
                       boxShadow: p.isCalmDensity
@@ -951,7 +948,7 @@ class _SpatialGlassControlCard extends StatelessWidget {
           )
         : p.surfaceContainer.withValues(alpha: AppBlur.solidFallbackMinAlpha);
 
-    final Color outerBorder = isDark ? AppColors.specularAt(0.18) : p.hairline;
+    final Color outerBorder = p.hairline;
     final double gap = isVeryShort
         ? AppSpacing.s4
         : (isCompact ? AppSpacing.s6 : AppSpacing.s10);
@@ -1047,7 +1044,7 @@ class _SpatialGlassControlCard extends StatelessWidget {
                     const SizedBox(width: AppSpacing.xs),
                     PlayerAnimatedFavoriteButton(
                       isFavorite: song?.isFavorite == true,
-                      favoriteColor: AppColors.favorite,
+                      favoriteColor: p.favorite,
                       inactiveColor: p.textSecondary,
                       iconSize: 23,
                       semanticLabel: song?.isFavorite == true
@@ -1104,7 +1101,7 @@ class _SpatialGlassControlCard extends StatelessWidget {
                 Divider(
                   height: 1,
                   thickness: 0.8,
-                  color: isDark ? AppColors.specularAt(0.10) : p.hairline,
+                  color: p.hairline,
                 ),
 
                 // 4. Compact footer row: Lyrics, Queue, PlayerToolsTriggerButton.
@@ -1356,8 +1353,7 @@ class _SpatialTransportRow extends StatelessWidget {
     final Color skipGlassSurface = isDark
         ? AppColors.specularAt(0.10)
         : p.textPrimary.withValues(alpha: 0.06);
-    final Color skipGlassBorder =
-        isDark ? AppColors.specularAt(0.14) : p.hairline;
+    final Color skipGlassBorder = p.hairline;
 
     return FittedBox(
       fit: BoxFit.scaleDown,

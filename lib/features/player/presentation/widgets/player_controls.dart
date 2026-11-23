@@ -115,9 +115,7 @@ class _PlayerControlsState extends State<PlayerControls> {
   Widget build(BuildContext context) {
     final p = context.palette;
     final l10n = context.l10n;
-    final onPrimaryColor = widget.primaryColor.computeLuminance() > 0.5
-        ? AppColors.controlInk
-        : Colors.white;
+    final onPrimaryColor = AppColors.textOnAccent(widget.primaryColor);
 
     final shuffleLabel =
         widget.isShuffle ? l10n.disableShuffle : l10n.enableShuffle;
@@ -281,8 +279,11 @@ class _PlayerControlsState extends State<PlayerControls> {
                                   : p.surfaceContainer.withValues(alpha: 0.45),
                               border: Border.all(
                                 color: widget.hasPrevious
-                                    ? p.hairline
-                                    : p.hairline.withValues(alpha: 0.4),
+                                    ? (p.isHighContrast
+                                        ? p.borderStrong
+                                        : p.hairline)
+                                    : p.hairline
+                                        .withValues(alpha: p.hairline.a * 0.5),
                                 width: 1.0,
                               ),
                               boxShadow: (widget.hasPrevious && !p.isCalmDensity)
@@ -470,8 +471,11 @@ class _PlayerControlsState extends State<PlayerControls> {
                                   : p.surfaceContainer.withValues(alpha: 0.45),
                               border: Border.all(
                                 color: widget.hasNext
-                                    ? p.hairline
-                                    : p.hairline.withValues(alpha: 0.4),
+                                    ? (p.isHighContrast
+                                        ? p.borderStrong
+                                        : p.hairline)
+                                    : p.hairline
+                                        .withValues(alpha: p.hairline.a * 0.5),
                                 width: 1.0,
                               ),
                               boxShadow: (widget.hasNext && !p.isCalmDensity)

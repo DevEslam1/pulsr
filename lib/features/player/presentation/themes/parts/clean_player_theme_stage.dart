@@ -26,6 +26,12 @@ class _CleanAmbientBackdrop extends StatelessWidget {
     final canBlur = AppBlur.canBlur(context);
     final double sigma = AppBlur.clampSigma(AppBlur.maxSigma);
 
+    final isHighContrast =
+        p.isHighContrast || MediaQuery.highContrastOf(context);
+    if (isHighContrast) {
+      return ColoredBox(color: p.bg);
+    }
+
     final hsl = HSLColor.fromColor(activeColor);
     final secondaryGlow = hsl
         .withHue((hsl.hue + 38.0) % 360.0)
@@ -287,9 +293,7 @@ class _CleanArtworkStage extends StatelessWidget {
                   decoration: BoxDecoration(
                     borderRadius: artCorners,
                     border: Border.all(
-                      color: isDark
-                          ? AppColors.specularAt(0.14)
-                          : AppColors.specularAt(0.35),
+                      color: p.hairline,
                       width: 1.0,
                     ),
                     boxShadow: shadows,

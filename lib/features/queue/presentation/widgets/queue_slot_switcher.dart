@@ -29,6 +29,8 @@ class QueueSlotSwitcher extends StatelessWidget {
     final p = context.palette;
     final l10n = context.l10n;
     final isCapsule = context.isCapsuleButtons;
+    final isHighContrast =
+        p.isHighContrast || (MediaQuery.maybeHighContrastOf(context) ?? false);
     final queueRadius =
         isCapsule ? context.buttonRadius(rectRadius: 6.0) : AppRadii.r10All;
 
@@ -80,13 +82,16 @@ class QueueSlotSwitcher extends StatelessWidget {
                                       color: p.onAccent.withValues(alpha: 0.35),
                                       width: 0.8,
                                     ),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: p.accent.withValues(alpha: 0.3),
-                                        blurRadius: 8,
-                                        offset: const Offset(0, 2),
-                                      ),
-                                    ],
+                                    boxShadow: p.isCalmDensity || isHighContrast
+                                        ? null
+                                        : [
+                                            BoxShadow(
+                                              color: p.accent
+                                                  .withValues(alpha: 0.3),
+                                              blurRadius: 8,
+                                              offset: const Offset(0, 2),
+                                            ),
+                                          ],
                                   )
                                 : PulsrCapsuleStyle.decoration(
                                     p,
@@ -98,7 +103,14 @@ class QueueSlotSwitcher extends StatelessWidget {
                                     : p.surfaceContainerHigh,
                                 borderRadius: AppRadii.r10All,
                                 border: Border.all(
-                                  color: isSelected ? p.accent : p.hairline,
+                                  color: isSelected
+                                      ? (isHighContrast
+                                          ? p.borderStrong
+                                          : p.accent)
+                                      : (isHighContrast
+                                          ? p.borderStrong
+                                          : p.hairline),
+                                  width: isHighContrast ? 1.25 : 1.0,
                                 ),
                               ),
                         child: Text(

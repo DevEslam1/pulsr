@@ -120,6 +120,9 @@ mixin SettingsAppearanceSection
                         Builder(builder: (context) {
                           final isSelected =
                               state.customAccentColorValue == color.toARGB32();
+                          final isHighContrast = p.isHighContrast ||
+                              (MediaQuery.maybeHighContrastOf(context) ??
+                                  false);
                           return Padding(
                             padding: const EdgeInsetsDirectional.only(
                                 end: AppSpacing.sm),
@@ -139,16 +142,20 @@ mixin SettingsAppearanceSection
                                     border: Border.all(
                                       color: isSelected
                                           ? p.textPrimary
-                                          : Colors.transparent,
-                                      width: 2.5,
+                                          : (isHighContrast
+                                              ? p.borderStrong
+                                              : p.hairline),
+                                      width: isSelected ? 2.5 : 1.0,
                                     ),
-                                    boxShadow: isSelected
+                                    boxShadow: isSelected &&
+                                            !p.isCalmDensity &&
+                                            !isHighContrast
                                         ? [
                                             BoxShadow(
                                               color:
-                                                  color.withValues(alpha: 0.5),
+                                                  color.withValues(alpha: 0.42),
                                               blurRadius: 12,
-                                              spreadRadius: 2,
+                                              spreadRadius: 1,
                                             ),
                                           ]
                                         : null,
@@ -157,9 +164,7 @@ mixin SettingsAppearanceSection
                                       ? Icon(
                                           Icons.check_rounded,
                                           size: 22,
-                                          color: color.computeLuminance() > 0.5
-                                              ? Colors.black
-                                              : Colors.white,
+                                          color: AppColors.textOnAccent(color),
                                         )
                                       : null,
                                 ),

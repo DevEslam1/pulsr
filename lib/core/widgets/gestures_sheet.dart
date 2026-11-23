@@ -90,10 +90,13 @@ class _GestureEntryCard extends StatelessWidget {
           vertical: AppSpacing.s10,
         ),
         decoration: BoxDecoration(
-          color: p.surfaceContainer.withValues(alpha: 0.65),
+          color: p.isHighContrast
+              ? p.surfaceContainer
+              : p.surfaceContainer.withValues(alpha: 0.65),
           borderRadius: AppRadii.r14All,
           border: Border.all(
-            color: p.hairline.withValues(alpha: 0.8),
+            color: p.isHighContrast ? p.borderStrong : p.hairline,
+            width: p.isHighContrast ? 1.5 : 1.0,
           ),
         ),
         child: Row(

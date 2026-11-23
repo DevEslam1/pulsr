@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:on_audio_query/on_audio_query.dart';
+import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_radii.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
@@ -309,7 +310,7 @@ class QueueScreen extends StatelessWidget {
               return Column(
                 children: [
                   headerBar,
-                  Divider(height: 1, color: p.hairline.withValues(alpha: 0.6)),
+                  Divider(height: 1, color: p.hairline),
                   Expanded(
                     child: PulsrEmptyState(
                       icon: Icons.queue_music_rounded,
@@ -338,7 +339,7 @@ class QueueScreen extends StatelessWidget {
             return Column(
               children: [
                 headerBar,
-                Divider(height: 1, color: p.hairline.withValues(alpha: 0.6)),
+                Divider(height: 1, color: p.hairline),
                 Expanded(
                   child: Align(
               alignment: Alignment.topCenter,
@@ -485,20 +486,24 @@ class QueueScreen extends StatelessWidget {
                     final song = queue[index];
                     final isCurrent = state.currentIndex == index;
 
+                    final isHighContrast = p.isHighContrast ||
+                        (MediaQuery.maybeHighContrastOf(context) ?? false);
                     return Container(
                       key: slotKeys[index],
                       margin:
                           const EdgeInsets.symmetric(vertical: AppSpacing.xxs),
                       decoration: BoxDecoration(
                         borderRadius: AppRadii.cardRadius,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black
-                                .withValues(alpha: p.isDark ? 0.12 : 0.04),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
+                        boxShadow: p.isCalmDensity || isHighContrast
+                            ? null
+                            : [
+                                BoxShadow(
+                                  color: AppColors.scrimAt(
+                                      p.isDark ? 0.12 : 0.04),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
                       ),
                       child: Material(
                         clipBehavior: Clip.antiAlias,
@@ -507,8 +512,12 @@ class QueueScreen extends StatelessWidget {
                         shape: RoundedRectangleBorder(
                           borderRadius: AppRadii.cardRadius,
                           side: BorderSide(
-                            color: isCurrent ? p.accent : p.hairline,
-                            width: 1,
+                            color: isCurrent
+                                ? p.accent
+                                : (isHighContrast
+                                    ? p.borderStrong
+                                    : p.hairline),
+                            width: isCurrent || isHighContrast ? 1.25 : 1,
                           ),
                         ),
                         child: Semantics(

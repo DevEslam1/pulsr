@@ -32,7 +32,8 @@ class HeroMixCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    final isHighContrast = MediaQuery.maybeHighContrastOf(context) ?? false;
+    final isHighContrast =
+        p.isHighContrast || (MediaQuery.maybeHighContrastOf(context) ?? false);
     final isCalm = p.isCalmDensity || GpuBudget.isEnabled || isHighContrast;
     final textScale =
         MediaQuery.textScalerOf(context).scale(1.0).clamp(1.0, 1.8);

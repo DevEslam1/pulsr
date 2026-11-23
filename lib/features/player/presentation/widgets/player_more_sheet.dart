@@ -2,7 +2,6 @@ import 'dart:async' show FutureOr;
 
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:pulsr/core/constants/app_colors.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 
@@ -145,7 +144,7 @@ class PlayerMoreSheet extends StatelessWidget {
               ),
             _MoreActionTile(
               icon: Icons.group_rounded,
-              iconColor: AppColors.accentCyan,
+              iconColor: p.info,
               title: l10n.partyListenTogether,
               subtitle: l10n.partySyncDescription,
               onTap: () => _triggerSecondarySheet(
@@ -204,7 +203,7 @@ class PlayerMoreSheet extends StatelessWidget {
                   border: Border.all(
                     color: canvasEnabled
                         ? activeColor.withValues(alpha: 0.32)
-                        : p.hairline.withValues(alpha: 0.65),
+                        : (p.isHighContrast ? p.borderStrong : p.hairline),
                     width: 1.0,
                   ),
                 ),
@@ -285,7 +284,7 @@ class _MoreActionTile extends StatelessWidget {
           border: Border.all(
             color: isActive
                 ? iconColor.withValues(alpha: 0.35)
-                : p.hairline.withValues(alpha: 0.65),
+                : (p.isHighContrast ? p.borderStrong : p.hairline),
             width: 1.0,
           ),
         ),
@@ -331,7 +330,7 @@ class _MoreActionTile extends StatelessWidget {
                   shape: BoxShape.circle,
                   color: p.surfaceContainerHigh.withValues(alpha: 0.7),
                   border: Border.all(
-                    color: p.hairline.withValues(alpha: 0.5),
+                    color: p.isHighContrast ? p.borderStrong : p.hairline,
                     width: 0.75,
                   ),
                 ),

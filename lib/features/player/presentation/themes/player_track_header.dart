@@ -142,10 +142,8 @@ class PlayerTrackHeader extends StatelessWidget {
     final isFav = song?.isFavorite == true;
     // Every theme shares one readable hierarchy: a white title and a neutral
     // grey artist on dark backdrops, palette text colours on light ones.
-    final resolvedTitle =
-        titleColor ?? (p.isDark ? Colors.white : p.textPrimary);
-    final resolvedSubtitle =
-        subtitleColor ?? (p.isDark ? Colors.white70 : p.textSecondary);
+    final resolvedTitle = titleColor ?? p.textPrimary;
+    final resolvedSubtitle = subtitleColor ?? p.textSecondary;
     final hasDownload = song != null &&
         (song.source == SongSource.youtube ||
             (song.remoteId != null && song.remoteId!.isNotEmpty));
@@ -196,8 +194,7 @@ class PlayerTrackHeader extends StatelessWidget {
                         : p.surfaceContainer,
                     shape: CircleBorder(
                       side: BorderSide(
-                        color:
-                            p.isDark ? AppColors.specularAt(0.13) : p.hairline,
+                        color: p.hairline,
                         width: 1.0,
                       ),
                     ),
@@ -294,7 +291,7 @@ class PlayerTrackHeader extends StatelessWidget {
                   border: Border.all(
                     color: isFav
                         ? p.favorite.withValues(alpha: 0.45)
-                        : (p.isDark ? AppColors.specularAt(0.13) : p.hairline),
+                        : p.hairline,
                     width: 1.0,
                   ),
                   boxShadow: isFav
@@ -340,9 +337,7 @@ class PlayerTrackHeader extends StatelessWidget {
                           : p.surfaceContainer,
                       shape: CircleBorder(
                         side: BorderSide(
-                          color: p.isDark
-                              ? AppColors.specularAt(0.13)
-                              : p.hairline,
+                          color: p.hairline,
                           width: 1.0,
                         ),
                       ),

@@ -318,7 +318,7 @@ class _SurfaceOverlayPane extends StatelessWidget {
                 color: p.surfaceContainer.withValues(alpha: 0.88),
                 border: Border(
                   top: BorderSide(
-                    color: p.isDark ? AppColors.specularAt(0.10) : p.hairline,
+                    color: p.hairline,
                   ),
                 ),
               ),

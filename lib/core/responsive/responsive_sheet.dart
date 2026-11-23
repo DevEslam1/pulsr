@@ -123,7 +123,10 @@ class PulsrResponsiveSheetContainer extends StatelessWidget {
       return GlassContainer.solid(
         borderRadius: AppRadii.dialogRadius,
         color: p.surfaceElevated,
-        border: Border.all(color: p.borderSubtle),
+        border: Border.all(
+          color: p.isHighContrast ? p.borderStrong : p.borderSubtle,
+          width: p.isHighContrast ? 1.5 : 1.0,
+        ),
         boxShadow: PulsrElevation.level3(context),
         child: ClipRRect(
           borderRadius: AppRadii.dialogRadius,

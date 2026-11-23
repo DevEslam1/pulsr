@@ -195,9 +195,15 @@ abstract class AppColors {
   static const Color posterThumb = Color(0xFF222230);
   static const Color chartNeutral = Color(0x33888888);
 
+  static const Color inkSlate = Color(0xFF0F1724);
+
   static Color scrimAt(double alpha) =>
       const Color(0xFF000000).withValues(alpha: alpha);
 
   static Color specularAt(double alpha) =>
       const Color(0xFFFFFFFF).withValues(alpha: alpha);
+
+  /// Cool-slate translucent ink used for light-mode hairlines, glass fills,
+  /// and crisp shadows so light surfaces stay refined rather than muddy grey.
+  static Color inkSlateAt(double alpha) => inkSlate.withValues(alpha: alpha);
 }

@@ -54,25 +54,27 @@ class PulsrChip extends StatelessWidget {
         ? (isActionSelected
             ? effectiveAccent
             : (isCapsule
-                ? effectiveAccent.withValues(alpha: p.isDark ? 0.32 : 0.22)
+                ? effectiveAccent.withValues(alpha: p.isDark ? 0.30 : 0.20)
                 : p.accentSoft))
         : (isCapsule
             ? PulsrCapsuleStyle.backgroundColor(p)
             : p.surfaceContainer);
 
     final Color borderColor = selected
-        ? (isActionSelected
+        ? (isActionSelected || p.isHighContrast
             ? effectiveAccent
             : effectiveAccent.withValues(alpha: 0.55))
-        : (isCapsule
-            ? (p.isDark
-                ? Colors.white.withValues(alpha: 0.12)
-                : Colors.black.withValues(alpha: 0.08))
-            : (p.isDark ? AppColors.specularAt(0.12) : p.borderSubtle));
+        : (p.isHighContrast
+            ? p.borderStrong
+            : (isCapsule
+                ? (p.isDark
+                    ? Colors.white.withValues(alpha: p.isAmoled ? 0.18 : 0.14)
+                    : AppColors.inkSlateAt(0.14))
+                : (p.isDark ? p.hairline : p.borderSubtle)));
 
     final Color textColor = selected
         ? (isActionSelected
-            ? p.textOnAccent
+            ? AppColors.textOnAccent(effectiveAccent)
             : (isCapsule
                 ? (p.isDark ? Colors.white : effectiveAccent)
                 : effectiveAccent))
@@ -126,11 +128,14 @@ class PulsrChip extends StatelessWidget {
                       p,
                       customBg: bgColor,
                       borderRadius: chipRadius,
-                      customBorder: Border.all(color: borderColor, width: 0.8),
+                      customBorder: Border.all(
+                        color: borderColor,
+                        width: p.isHighContrast ? 1.4 : 0.9,
+                      ),
                     )
                   : BoxDecoration(
-                      color: selected ? null : bgColor,
-                      gradient: selected
+                      color: (selected && !p.isHighContrast) ? null : bgColor,
+                      gradient: (selected && !p.isHighContrast)
                           ? LinearGradient(
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
@@ -161,13 +166,16 @@ class PulsrChip extends StatelessWidget {
                       borderRadius: chipRadius,
                       border: Border.all(
                         color: borderColor,
-                        width: selected ? 1.3 : 1.0,
+                        width: selected
+                            ? (p.isHighContrast ? 1.8 : 1.3)
+                            : (p.isHighContrast ? 1.4 : 1.0),
                       ),
-                      boxShadow: selected
+                      boxShadow: selected && p.chromeGlowScale > 0
                           ? [
                               BoxShadow(
                                 color: effectiveAccent.withValues(
-                                  alpha: isActionSelected ? 0.28 : 0.16,
+                                  alpha: (isActionSelected ? 0.26 : 0.15) *
+                                      p.chromeGlowScale,
                                 ),
                                 blurRadius: 12,
                                 spreadRadius: -2,
@@ -198,7 +206,8 @@ class PulsrChip extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          fontFamily: 'Manrope',
+                          fontFamily: fontFamily,
+                          fontFamilyFallback: fontFallbacks,
                           fontSize: AppFontSize.label,
                           fontWeight:
                               selected ? FontWeight.w800 : FontWeight.w600,

@@ -302,38 +302,55 @@ class DynamicThemeCubit extends PulsrCubit<DynamicThemeState> {
 
         if (token != _currentRequestToken || isClosed) return;
 
-        // Prioritize saturated/vibrant colors from the artwork
-        Color? primary;
+        // Prioritize rich chromatic swatches from the artwork and perceptually
+        // normalize them so Dynamic Aura avoids neon eye-strain, muddy browns,
+        // or dead monochrome greys across Dark, Light, and AMOLED themes.
+        Color? rawPrimary;
         final candidates = [
           palette.vibrantColor?.color,
           palette.lightVibrantColor?.color,
           palette.darkVibrantColor?.color,
           palette.dominantColor?.color,
           palette.mutedColor?.color,
+          palette.lightMutedColor?.color,
         ].whereType<Color>().toList();
 
         for (final c in candidates) {
           final hsl = HSLColor.fromColor(c);
-          if (hsl.saturation > 0.20 &&
-              hsl.lightness > 0.15 &&
-              hsl.lightness < 0.85) {
-            primary = c;
+          if (hsl.saturation >= 0.24 &&
+              hsl.lightness >= 0.18 &&
+              hsl.lightness <= 0.82) {
+            rawPrimary = c;
             break;
           }
         }
-        primary ??= palette.vibrantColor?.color ??
-            palette.dominantColor?.color ??
-            AppColors.primary;
+        rawPrimary ??= candidates.cast<Color?>().firstWhere(
+              (c) => c != null && HSLColor.fromColor(c).saturation >= 0.14,
+              orElse: () => null,
+            );
 
-        final darkVibrant =
-            palette.darkVibrantColor?.color ?? palette.darkMutedColor?.color;
-        final bg = darkVibrant != null
-            ? Color.alphaBlend(AppColors.scrimAt(0.75), darkVibrant)
-            : AppColors.darkSurface;
+        final primary = rawPrimary != null
+            ? _refineArtworkAccent(rawPrimary)
+            : AppColors.primary;
+
+        final rawSecondary = palette.mutedColor?.color ??
+            palette.lightMutedColor?.color ??
+            palette.darkVibrantColor?.color;
+        final secondary = rawSecondary != null
+            ? _refineArtworkSecondary(rawSecondary, fallback: primary)
+            : AppColors.secondary;
+
+        final darkVibrant = palette.darkVibrantColor?.color ??
+            palette.darkMutedColor?.color ??
+            primary;
+        final bg = Color.alphaBlend(
+          AppColors.scrimAt(0.78),
+          _refineBackdropSeed(darkVibrant),
+        );
 
         final newPalette = _CachedPalette(
           primaryColor: primary,
-          secondaryColor: palette.mutedColor?.color ?? AppColors.secondary,
+          secondaryColor: secondary,
           backgroundColor: bg,
           surfaceColor: Color.alphaBlend(
               primary.withValues(alpha: 0.08), AppColors.surface),
@@ -396,6 +413,44 @@ class DynamicThemeCubit extends PulsrCubit<DynamicThemeState> {
     if (token == _currentRequestToken && !isClosed) {
       safeEmit(DynamicThemeState(isDark: state.isDark, songId: songId));
     }
+  }
+
+  /// Normalizes raw artwork accents into a balanced studio band so Dynamic Aura
+  /// never ships harsh neon oversaturation or muddy near-grey browns.
+  static Color _refineArtworkAccent(Color raw) {
+    final hsl = HSLColor.fromColor(raw);
+    if (hsl.saturation < 0.14) {
+      return AppColors.primary;
+    }
+    // Warm yellows/olives (40°–75°) turn muddy easily when dark or low-sat;
+    // keep them slightly brighter and cleaner.
+    final isWarmYellowBand = hsl.hue >= 40.0 && hsl.hue <= 75.0;
+    final refinedSat = hsl.saturation.clamp(0.36, isWarmYellowBand ? 0.78 : 0.82);
+    final refinedLight =
+        hsl.lightness.clamp(isWarmYellowBand ? 0.44 : 0.40, 0.62);
+    return hsl
+        .withSaturation(refinedSat)
+        .withLightness(refinedLight)
+        .toColor();
+  }
+
+  static Color _refineArtworkSecondary(Color raw, {required Color fallback}) {
+    final hsl = HSLColor.fromColor(raw);
+    if (hsl.saturation < 0.14) {
+      return Color.lerp(fallback, AppColors.secondary, 0.35) ?? fallback;
+    }
+    return hsl
+        .withSaturation(hsl.saturation.clamp(0.28, 0.72))
+        .withLightness(hsl.lightness.clamp(0.36, 0.60))
+        .toColor();
+  }
+
+  static Color _refineBackdropSeed(Color raw) {
+    final hsl = HSLColor.fromColor(raw);
+    return hsl
+        .withSaturation(hsl.saturation.clamp(0.18, 0.65))
+        .withLightness(hsl.lightness.clamp(0.16, 0.36))
+        .toColor();
   }
 
   void resetToDefault() {

@@ -138,34 +138,44 @@ class _PulsrButtonState extends State<PulsrButton> {
         bg = baseAccent;
         fg = enabled ? p.textOnAccent : p.textOnAccent.withValues(alpha: 0.6);
         if (enabled) {
-          final topHighlight =
-              Color.lerp(baseAccent, Colors.white, _hovered ? 0.18 : 0.12)!;
-          gradient = LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [topHighlight, baseAccent],
-          );
+          if (!p.isHighContrast) {
+            final topHighlight =
+                Color.lerp(baseAccent, Colors.white, _hovered ? 0.18 : 0.12)!;
+            gradient = LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [topHighlight, baseAccent],
+            );
+          }
           border = Border.all(
-            color: AppColors.specularAt(p.isDark ? 0.22 : 0.30),
-            width: 0.8,
+            color: p.isHighContrast
+                ? p.borderStrong
+                : AppColors.specularAt(p.isDark ? 0.22 : 0.30),
+            width: p.isHighContrast ? 1.5 : 0.8,
           );
-          shadows = [
-            BoxShadow(
-              color: p.accent.withValues(alpha: _hovered ? 0.38 : 0.24),
-              blurRadius: _hovered ? 16 : 12,
-              spreadRadius: -2,
-              offset: const Offset(0, 4),
-            ),
-          ];
+          if (p.chromeGlowScale > 0) {
+            shadows = [
+              BoxShadow(
+                color: p.accent.withValues(
+                  alpha: (_hovered ? 0.36 : 0.22) * p.chromeGlowScale,
+                ),
+                blurRadius: _hovered ? 16 : 12,
+                spreadRadius: -2,
+                offset: const Offset(0, 4),
+              ),
+            ];
+          }
         }
         break;
 
       case PulsrButtonVariant.secondary:
         if (isCapsule) {
           bg = _hovered && enabled
-              ? (p.isDark
-                  ? Colors.white.withValues(alpha: 0.22)
-                  : Colors.black.withValues(alpha: 0.12))
+              ? (p.isHighContrast
+                  ? p.surfaceContainerHigh
+                  : (p.isDark
+                      ? Colors.white.withValues(alpha: 0.20)
+                      : AppColors.inkSlateAt(0.11)))
               : PulsrCapsuleStyle.backgroundColor(p);
           fg = enabled ? PulsrCapsuleStyle.foregroundColor(p) : p.textTertiary;
           border = PulsrCapsuleStyle.border(p);
@@ -173,8 +183,10 @@ class _PulsrButtonState extends State<PulsrButton> {
           bg = _hovered && enabled ? p.surfaceContainerHigh : p.surfaceContainer;
           fg = enabled ? p.textPrimary : p.textTertiary;
           border = Border.all(
-            color: _hovered && enabled ? p.borderStrong : p.hairline,
-            width: 1.0,
+            color: p.isHighContrast
+                ? p.borderStrong
+                : (_hovered && enabled ? p.borderStrong : p.hairline),
+            width: p.isHighContrast ? 1.5 : 1.0,
           );
         }
         break;
@@ -184,14 +196,17 @@ class _PulsrButtonState extends State<PulsrButton> {
           bg = enabled
               ? (_hovered
                   ? p.accent.withValues(alpha: p.isDark ? 0.30 : 0.22)
-                  : PulsrCapsuleStyle.backgroundColor(p))
-              : (p.isDark
-                  ? Colors.white.withValues(alpha: 0.08)
-                  : Colors.black.withValues(alpha: 0.04));
-          fg = enabled
-              ? PulsrCapsuleStyle.foregroundColor(p)
-              : p.accent.withValues(alpha: 0.45);
-          border = PulsrCapsuleStyle.border(p);
+                  : p.accent.withValues(alpha: p.isDark ? 0.18 : 0.12))
+              : p.surfaceContainer.withValues(alpha: 0.5);
+          fg = enabled ? p.accent : p.accent.withValues(alpha: 0.45);
+          border = Border.all(
+            color: enabled
+                ? p.accent.withValues(
+                    alpha: p.isHighContrast ? 0.85 : (_hovered ? 0.48 : 0.32),
+                  )
+                : p.hairline,
+            width: p.isHighContrast ? 1.5 : 1.0,
+          );
         } else {
           bg = enabled
               ? (_hovered
@@ -201,9 +216,11 @@ class _PulsrButtonState extends State<PulsrButton> {
           fg = enabled ? p.accent : p.accent.withValues(alpha: 0.45);
           border = Border.all(
             color: enabled
-                ? p.accent.withValues(alpha: _hovered ? 0.35 : 0.18)
+                ? p.accent.withValues(
+                    alpha: p.isHighContrast ? 0.85 : (_hovered ? 0.38 : 0.22),
+                  )
                 : Colors.transparent,
-            width: 1.0,
+            width: p.isHighContrast ? 1.5 : 1.0,
           );
         }
         break;
@@ -213,7 +230,9 @@ class _PulsrButtonState extends State<PulsrButton> {
             ? (p.isDark ? AppColors.specularAt(0.06) : AppColors.scrimAt(0.05))
             : Colors.transparent;
         fg = enabled ? p.textPrimary : p.textTertiary;
-        border = null;
+        border = p.isHighContrast && enabled
+            ? Border.all(color: p.borderSubtle, width: 1.2)
+            : null;
         break;
 
       case PulsrButtonVariant.destructive:
@@ -222,8 +241,10 @@ class _PulsrButtonState extends State<PulsrButton> {
             : p.errorSoft.withValues(alpha: 0.35);
         fg = enabled ? p.error : p.error.withValues(alpha: 0.45);
         border = Border.all(
-          color: enabled ? p.error.withValues(alpha: 0.45) : p.hairline,
-          width: 1.0,
+          color: enabled
+              ? p.error.withValues(alpha: p.isHighContrast ? 0.85 : 0.45)
+              : p.hairline,
+          width: p.isHighContrast ? 1.5 : 1.0,
         );
         break;
     }
@@ -233,7 +254,8 @@ class _PulsrButtonState extends State<PulsrButton> {
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
       style: TextStyle(
-        fontFamily: 'Manrope',
+        fontFamily: fontFamily,
+        fontFamilyFallback: fontFallbacks,
         fontSize: _fontSize,
         fontWeight: FontWeight.w700,
         letterSpacing: AppTracking.title,
@@ -297,6 +319,7 @@ class _PulsrButtonState extends State<PulsrButton> {
       cursor: enabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
       child: ConstrainedBox(
         constraints: const BoxConstraints(
+          minWidth: AppSpacing.minTouchTarget,
           minHeight: AppSpacing.minTouchTarget,
         ),
         child: Center(

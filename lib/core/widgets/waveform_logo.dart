@@ -2,6 +2,7 @@
 import 'dart:math' as math;
 import 'package:material_ui/material_ui.dart';
 import '../motion/pulsr_motion.dart';
+import '../theme/aura_theme.dart';
 
 /// {@category DesignSystem}
 /// Five-bar audio waveform glyph rendered via zero-allocation [CustomPaint].
@@ -83,7 +84,7 @@ class _WaveformLogoState extends State<WaveformLogo>
 
   @override
   Widget build(BuildContext context) {
-    final themeColor = widget.color ?? Colors.white;
+    final themeColor = widget.color ?? context.palette.textPrimary;
 
     return ExcludeSemantics(
       child: LayoutBuilder(

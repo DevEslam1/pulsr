@@ -462,9 +462,17 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                               decoration: BoxDecoration(
                                 gradient: LinearGradient(
                                   colors: [
-                                    p.accentContainer.withValues(
-                                      alpha: p.isDark ? 0.55 : 0.75,
-                                    ),
+                                    (p.isHighContrast ||
+                                            (MediaQuery.maybeHighContrastOf(
+                                                    context) ??
+                                                false) ||
+                                            (p.isDark &&
+                                                p.bg.computeLuminance() <
+                                                    0.001))
+                                        ? p.bg
+                                        : p.accent.withValues(
+                                            alpha: p.isDark ? 0.16 : 0.10,
+                                          ),
                                     p.bg,
                                   ],
                                   begin: Alignment.topCenter,
@@ -482,15 +490,21 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                                       Container(
                                         decoration: BoxDecoration(
                                           borderRadius: AppRadii.r24All,
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: Colors.black.withValues(
-                                                alpha: p.isDark ? 0.45 : 0.18,
-                                              ),
-                                              blurRadius: 28,
-                                              offset: const Offset(0, 10),
-                                            ),
-                                          ],
+                                          boxShadow: p.isCalmDensity ||
+                                                  p.isHighContrast ||
+                                                  (MediaQuery.maybeHighContrastOf(
+                                                          context) ??
+                                                      false)
+                                              ? null
+                                              : [
+                                                  BoxShadow(
+                                                    color: AppColors.scrimAt(
+                                                      p.isDark ? 0.45 : 0.18,
+                                                    ),
+                                                    blurRadius: 28,
+                                                    offset: const Offset(0, 10),
+                                                  ),
+                                                ],
                                         ),
                                         child: Hero(
                                           tag: widget.heroTag ??
@@ -1253,18 +1267,20 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
           builder: (context, constraints) {
             // Scale the primary artwork to the pane while staying crisp.
             final artSize = (constraints.maxWidth * 0.7).clamp(140.0, 280.0);
+            final isHighContrast = p.isHighContrast ||
+                (MediaQuery.maybeHighContrastOf(context) ?? false);
             return Container(
               decoration: BoxDecoration(
                 borderRadius: AppRadii.r24All,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(
-                      alpha: p.isDark ? 0.45 : 0.18,
-                    ),
-                    blurRadius: 28,
-                    offset: const Offset(0, 10),
-                  ),
-                ],
+                boxShadow: p.isCalmDensity || isHighContrast
+                    ? null
+                    : [
+                        BoxShadow(
+                          color: AppColors.scrimAt(p.isDark ? 0.45 : 0.18),
+                          blurRadius: 28,
+                          offset: const Offset(0, 10),
+                        ),
+                      ],
               ),
               child: Hero(
                 tag: widget.heroTag ?? 'album_${album.id}',
@@ -1392,9 +1408,16 @@ class _AlbumLoadingView extends StatelessWidget {
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
                             colors: [
-                              p.accentContainer.withValues(
-                                alpha: p.isDark ? 0.55 : 0.75,
-                              ),
+                              (p.isHighContrast ||
+                                      (MediaQuery.maybeHighContrastOf(
+                                              context) ??
+                                          false) ||
+                                      (p.isDark &&
+                                          p.bg.computeLuminance() < 0.001))
+                                  ? p.bg
+                                  : p.accent.withValues(
+                                      alpha: p.isDark ? 0.16 : 0.10,
+                                    ),
                               p.bg,
                             ],
                             begin: Alignment.topCenter,

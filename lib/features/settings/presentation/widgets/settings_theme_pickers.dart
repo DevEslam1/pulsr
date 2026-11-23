@@ -380,10 +380,22 @@ class _ThemePickerSheetContentState extends State<_ThemePickerSheetContent> {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.palette;
+    final isHighContrast =
+        p.isHighContrast || (MediaQuery.maybeHighContrastOf(context) ?? false);
+    final primaryColor = p.accent;
+    final cardColor = p.surfaceContainer;
+    final outlineColor = isHighContrast ? p.borderStrong : p.hairline;
+    final textPrimary = p.textPrimary;
+    final textSecondary = p.textSecondary;
+    final textScale =
+        MediaQuery.textScalerOf(context).scale(1.0).clamp(1.0, 1.45);
+    final carouselHeight = (140.0 * textScale).roundToDouble();
+
     return SafeArea(
       child: ConstrainedBox(
         constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(context).size.height * 0.85,
+          maxHeight: MediaQuery.sizeOf(context).height * 0.85,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -398,7 +410,7 @@ class _ThemePickerSheetContentState extends State<_ThemePickerSheetContent> {
                 style: TextStyle(
                   fontSize: AppFontSize.title,
                   fontWeight: FontWeight.w900,
-                  color: widget.textPrimary,
+                  color: textPrimary,
                 ),
               ),
             ),
@@ -406,7 +418,7 @@ class _ThemePickerSheetContentState extends State<_ThemePickerSheetContent> {
 
             // Live Preview Carousel
             SizedBox(
-              height: 140,
+              height: carouselHeight,
               child: PageView.builder(
                 controller: _pageController,
                 itemCount: widget.themes.length,
@@ -439,9 +451,9 @@ class _ThemePickerSheetContentState extends State<_ThemePickerSheetContent> {
                                 mode: t.mode,
                                 title: t.title,
                                 isSelected: isSelected,
-                                primaryColor: widget.primaryColor,
-                                cardColor: widget.cardColor,
-                                textPrimary: widget.textPrimary,
+                                primaryColor: primaryColor,
+                                cardColor: cardColor,
+                                textPrimary: textPrimary,
                               );
                             }
                             return Container(
@@ -451,14 +463,13 @@ class _ThemePickerSheetContentState extends State<_ThemePickerSheetContent> {
                               padding: const EdgeInsets.all(AppSpacing.sm),
                               decoration: BoxDecoration(
                                 color: isSelected
-                                    ? widget.primaryColor
-                                        .withValues(alpha: 0.14)
-                                    : widget.cardColor,
+                                    ? primaryColor.withValues(alpha: 0.14)
+                                    : cardColor,
                                 borderRadius: AppRadii.r16All,
                                 border: Border.all(
                                   color: isSelected
-                                      ? widget.primaryColor
-                                      : widget.outlineColor,
+                                      ? primaryColor
+                                      : outlineColor,
                                   width: isSelected ? 2 : 1,
                                 ),
                               ),
@@ -484,8 +495,8 @@ class _ThemePickerSheetContentState extends State<_ThemePickerSheetContent> {
                                             fontWeight: FontWeight.w800,
                                             fontSize: AppFontSize.body,
                                             color: isSelected
-                                                ? widget.primaryColor
-                                                : widget.textPrimary,
+                                                ? primaryColor
+                                                : textPrimary,
                                           ),
                                         ),
                                         const SizedBox(height: AppSpacing.xxs),
@@ -495,7 +506,7 @@ class _ThemePickerSheetContentState extends State<_ThemePickerSheetContent> {
                                           overflow: TextOverflow.ellipsis,
                                           style: TextStyle(
                                             fontSize: AppFontSize.label,
-                                            color: widget.textSecondary,
+                                            color: textSecondary,
                                           ),
                                         ),
                                       ],
@@ -530,14 +541,12 @@ class _ThemePickerSheetContentState extends State<_ThemePickerSheetContent> {
                     margin: const EdgeInsets.only(bottom: AppSpacing.xs),
                     child: Material(
                       color: isSelected
-                          ? widget.primaryColor.withValues(alpha: 0.12)
-                          : widget.cardColor,
+                          ? primaryColor.withValues(alpha: 0.12)
+                          : cardColor,
                       shape: RoundedRectangleBorder(
                         borderRadius: AppRadii.r16All,
                         side: BorderSide(
-                          color: isSelected
-                              ? widget.primaryColor
-                              : widget.outlineColor,
+                          color: isSelected ? primaryColor : outlineColor,
                           width: isSelected ? 1.5 : 1.0,
                         ),
                       ),
@@ -550,16 +559,15 @@ class _ThemePickerSheetContentState extends State<_ThemePickerSheetContent> {
                               return _ThemePreviewThumbnail(
                                 mode: t.mode,
                                 isSelected: isSelected,
-                                primaryColor: widget.primaryColor,
+                                primaryColor: primaryColor,
                               );
                             }
                             return Container(
                               decoration: BoxDecoration(
                                 borderRadius: AppRadii.r8All,
                                 border: Border.all(
-                                  color: isSelected
-                                      ? widget.primaryColor
-                                      : widget.outlineColor,
+                                  color:
+                                      isSelected ? primaryColor : outlineColor,
                                   width: isSelected ? 1.5 : 1.0,
                                 ),
                               ),
@@ -574,20 +582,18 @@ class _ThemePickerSheetContentState extends State<_ThemePickerSheetContent> {
                           t.title,
                           style: TextStyle(
                             fontWeight: FontWeight.w700,
-                            color: isSelected
-                                ? widget.primaryColor
-                                : widget.textPrimary,
+                            color: isSelected ? primaryColor : textPrimary,
                           ),
                         ),
                         subtitle: Text(
                           t.subtitle,
                           style: TextStyle(
                               fontSize: AppFontSize.label,
-                              color: widget.textSecondary),
+                              color: textSecondary),
                         ),
                         trailing: isSelected
                             ? Icon(Icons.check_circle_rounded,
-                                color: widget.primaryColor)
+                                color: primaryColor)
                             : null,
                         onTap: () {
                           setState(() => _selectedMode = t.mode);
@@ -746,7 +752,7 @@ class _ThemeMockupCard extends StatelessWidget {
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: primaryColor,
-                      border: Border.all(color: Colors.white24, width: 1),
+                      border: Border.all(color: p.hairline, width: 1),
                     ),
                     child: Center(
                       child: Container(
@@ -927,7 +933,7 @@ class _ThemeMockupCard extends StatelessWidget {
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.12),
+                    color: p.scrimLight,
                     blurRadius: 6,
                     offset: const Offset(0, 3),
                   ),
@@ -960,8 +966,8 @@ class _ThemeMockupCard extends StatelessWidget {
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
                   colors: [
-                    Colors.white.withValues(alpha: 0.35),
-                    primaryColor.withValues(alpha: 0.18),
+                    primaryColor.withValues(alpha: p.isDark ? 0.35 : 0.22),
+                    primaryColor.withValues(alpha: 0.12),
                     Colors.transparent,
                   ],
                 ),
@@ -972,20 +978,23 @@ class _ThemeMockupCard extends StatelessWidget {
               height: 40,
               decoration: BoxDecoration(
                 borderRadius: AppRadii.r8All,
-                color: primaryColor.withValues(alpha: 0.35),
-                border: Border.all(color: Colors.white70, width: 1.2),
+                color: primaryColor,
+                border: Border.all(
+                  color: p.onAccent.withValues(alpha: 0.4),
+                  width: 1.2,
+                ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.3),
+                    color: p.scrimLight,
                     blurRadius: 8,
                     offset: const Offset(0, 3),
                   ),
                 ],
               ),
-              child: const Center(
+              child: Center(
                 child: Icon(
                   Icons.blur_on_rounded,
-                  color: Colors.white,
+                  color: p.onAccent,
                   size: 20,
                 ),
               ),
@@ -1001,15 +1010,6 @@ void showLanguagePickerSheet(
   SettingsCubit cubit,
   String currentCode,
 ) {
-  final primaryColor = Theme.of(context).colorScheme.primary;
-  final cardColor =
-      Theme.of(context).cardTheme.color ?? context.palette.surfaceContainer;
-  final outlineColor = Theme.of(context).colorScheme.outline;
-  final textPrimary = Theme.of(context).textTheme.bodyLarge?.color ??
-      context.palette.textPrimary;
-  final textSecondary = Theme.of(context).textTheme.bodyMedium?.color ??
-      context.palette.textSecondary;
-
   final languages = [
     (
       code: 'system',
@@ -1039,80 +1039,87 @@ void showLanguagePickerSheet(
 
   PulsrSheetHelper.showPulsrSheet(
     context: context,
-    builder: (ctx) => SafeArea(
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(ctx).size.height * 0.85,
-        ),
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.symmetric(
-              vertical: AppSpacing.s20, horizontal: AppSpacing.md),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
-                child: Text(
-                  context.l10n.appLanguage,
-                  style: const TextStyle(
-                    fontSize: AppFontSize.title,
-                    fontWeight: FontWeight.w900,
+    builder: (ctx) {
+      final p = ctx.palette;
+      final isHighContrast =
+          p.isHighContrast || (MediaQuery.maybeHighContrastOf(ctx) ?? false);
+      final outlineColor = isHighContrast ? p.borderStrong : p.hairline;
+      return SafeArea(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(ctx).height * 0.85,
+          ),
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.symmetric(
+                vertical: AppSpacing.s20, horizontal: AppSpacing.md),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
+                  child: Text(
+                    context.l10n.appLanguage,
+                    style: TextStyle(
+                      fontSize: AppFontSize.title,
+                      fontWeight: FontWeight.w900,
+                      color: p.textPrimary,
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              ...languages.map((lang) {
-                final isSelected = lang.code == currentCode;
-                return Container(
-                  margin: const EdgeInsets.only(bottom: AppSpacing.xs),
-                  child: Material(
-                    color: isSelected
-                        ? primaryColor.withValues(alpha: 0.12)
-                        : cardColor,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: AppRadii.r16All,
-                      side: BorderSide(
-                        color: isSelected ? primaryColor : outlineColor,
-                        width: isSelected ? 1.5 : 1.0,
-                      ),
-                    ),
-                    child: ListTile(
-                      leading: Icon(
-                        lang.flag,
-                        color: isSelected ? primaryColor : textSecondary,
-                      ),
-                      title: Text(
-                        lang.name,
-                        style: TextStyle(
-                          fontWeight: FontWeight.w700,
-                          color: isSelected ? primaryColor : textPrimary,
+                const SizedBox(height: AppSpacing.sm),
+                ...languages.map((lang) {
+                  final isSelected = lang.code == currentCode;
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: AppSpacing.xs),
+                    child: Material(
+                      color: isSelected
+                          ? p.accent.withValues(alpha: 0.12)
+                          : p.surfaceContainer,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: AppRadii.r16All,
+                        side: BorderSide(
+                          color: isSelected ? p.accent : outlineColor,
+                          width: isSelected ? 1.5 : 1.0,
                         ),
                       ),
-                      subtitle: Text(
-                        lang.nativeName,
-                        style: TextStyle(
-                            fontSize: AppFontSize.label, color: textSecondary),
+                      child: ListTile(
+                        leading: Icon(
+                          lang.flag,
+                          color: isSelected ? p.accent : p.textSecondary,
+                        ),
+                        title: Text(
+                          lang.name,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: isSelected ? p.accent : p.textPrimary,
+                          ),
+                        ),
+                        subtitle: Text(
+                          lang.nativeName,
+                          style: TextStyle(
+                              fontSize: AppFontSize.label,
+                              color: p.textSecondary),
+                        ),
+                        trailing: isSelected
+                            ? Icon(Icons.check_circle_rounded, color: p.accent)
+                            : null,
+                        onTap: () {
+                          cubit.setLanguage(lang.code);
+                          Navigator.pop(ctx);
+                        },
                       ),
-                      trailing: isSelected
-                          ? Icon(Icons.check_circle_rounded,
-                              color: primaryColor)
-                          : null,
-                      onTap: () {
-                        cubit.setLanguage(lang.code);
-                        Navigator.pop(ctx);
-                      },
                     ),
-                  ),
-                );
-              }),
-            ],
+                  );
+                }),
+              ],
+            ),
           ),
         ),
-      ),
-    ),
+      );
+    },
   );
 }
 
@@ -1121,15 +1128,6 @@ void showColorSourcePickerSheet(
   SettingsCubit cubit,
   ThemeColorSource currentSource,
 ) {
-  final primaryColor = Theme.of(context).colorScheme.primary;
-  final cardColor =
-      Theme.of(context).cardTheme.color ?? context.palette.surfaceContainer;
-  final outlineColor = Theme.of(context).colorScheme.outline;
-  final textPrimary = Theme.of(context).textTheme.bodyLarge?.color ??
-      context.palette.textPrimary;
-  final textSecondary = Theme.of(context).textTheme.bodyMedium?.color ??
-      context.palette.textSecondary;
-
   final sources = [
     (
       source: ThemeColorSource.system,
@@ -1153,80 +1151,87 @@ void showColorSourcePickerSheet(
 
   PulsrSheetHelper.showPulsrSheet(
     context: context,
-    builder: (ctx) => SafeArea(
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(ctx).size.height * 0.85,
-        ),
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.symmetric(
-              vertical: AppSpacing.s20, horizontal: AppSpacing.md),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
-                child: Text(
-                  context.l10n.appColorSource,
-                  style: TextStyle(
-                    fontSize: AppFontSize.title,
-                    fontWeight: FontWeight.w900,
+    builder: (ctx) {
+      final p = ctx.palette;
+      final isHighContrast =
+          p.isHighContrast || (MediaQuery.maybeHighContrastOf(ctx) ?? false);
+      final outlineColor = isHighContrast ? p.borderStrong : p.hairline;
+      return SafeArea(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(ctx).height * 0.85,
+          ),
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.symmetric(
+                vertical: AppSpacing.s20, horizontal: AppSpacing.md),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
+                  child: Text(
+                    context.l10n.appColorSource,
+                    style: TextStyle(
+                      fontSize: AppFontSize.title,
+                      fontWeight: FontWeight.w900,
+                      color: p.textPrimary,
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              ...sources.map((s) {
-                final isSelected = s.source == currentSource;
-                return Container(
-                  margin: const EdgeInsets.only(bottom: AppSpacing.xs),
-                  child: Material(
-                    color: isSelected
-                        ? primaryColor.withValues(alpha: 0.12)
-                        : cardColor,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: AppRadii.r16All,
-                      side: BorderSide(
-                        color: isSelected ? primaryColor : outlineColor,
-                        width: isSelected ? 1.5 : 1.0,
-                      ),
-                    ),
-                    child: ListTile(
-                      leading: Icon(
-                        s.icon,
-                        color: isSelected ? primaryColor : textSecondary,
-                      ),
-                      title: Text(
-                        s.title,
-                        style: TextStyle(
-                          fontWeight: FontWeight.w700,
-                          color: isSelected ? primaryColor : textPrimary,
+                const SizedBox(height: AppSpacing.sm),
+                ...sources.map((s) {
+                  final isSelected = s.source == currentSource;
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: AppSpacing.xs),
+                    child: Material(
+                      color: isSelected
+                          ? p.accent.withValues(alpha: 0.12)
+                          : p.surfaceContainer,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: AppRadii.r16All,
+                        side: BorderSide(
+                          color: isSelected ? p.accent : outlineColor,
+                          width: isSelected ? 1.5 : 1.0,
                         ),
                       ),
-                      subtitle: Text(
-                        s.subtitle,
-                        style: TextStyle(
-                            fontSize: AppFontSize.label, color: textSecondary),
+                      child: ListTile(
+                        leading: Icon(
+                          s.icon,
+                          color: isSelected ? p.accent : p.textSecondary,
+                        ),
+                        title: Text(
+                          s.title,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: isSelected ? p.accent : p.textPrimary,
+                          ),
+                        ),
+                        subtitle: Text(
+                          s.subtitle,
+                          style: TextStyle(
+                              fontSize: AppFontSize.label,
+                              color: p.textSecondary),
+                        ),
+                        trailing: isSelected
+                            ? Icon(Icons.check_circle_rounded, color: p.accent)
+                            : null,
+                        onTap: () {
+                          cubit.setThemeColorSource(s.source);
+                          Navigator.pop(ctx);
+                        },
                       ),
-                      trailing: isSelected
-                          ? Icon(Icons.check_circle_rounded,
-                              color: primaryColor)
-                          : null,
-                      onTap: () {
-                        cubit.setThemeColorSource(s.source);
-                        Navigator.pop(ctx);
-                      },
                     ),
-                  ),
-                );
-              }),
-            ],
+                  );
+                }),
+              ],
+            ),
           ),
         ),
-      ),
-    ),
+      );
+    },
   );
 }
 
@@ -1235,15 +1240,6 @@ void showVisualizerStylePickerSheet(
   SettingsCubit cubit,
   VisualizerStyle currentStyle,
 ) {
-  final primaryColor = Theme.of(context).colorScheme.primary;
-  final cardColor =
-      Theme.of(context).cardTheme.color ?? context.palette.surfaceContainer;
-  final outlineColor = Theme.of(context).colorScheme.outline;
-  final textPrimary = Theme.of(context).textTheme.bodyLarge?.color ??
-      context.palette.textPrimary;
-  final textSecondary = Theme.of(context).textTheme.bodyMedium?.color ??
-      context.palette.textSecondary;
-
   final styles = [
     (
       style: VisualizerStyle.bar,
@@ -1303,160 +1299,169 @@ void showVisualizerStylePickerSheet(
 
   PulsrSheetHelper.showPulsrSheet(
     context: context,
-    builder: (ctx) => SafeArea(
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(ctx).size.height * 0.85,
-        ),
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.symmetric(
-              vertical: AppSpacing.s20, horizontal: AppSpacing.md),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: EdgeInsets.symmetric(
-                    horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
-                child: Text(
-                  context.l10n.visualizerStyleLabel,
-                  style: TextStyle(
-                    fontSize: AppFontSize.title,
-                    fontWeight: FontWeight.w900,
+    builder: (ctx) {
+      final p = ctx.palette;
+      final isHighContrast =
+          p.isHighContrast || (MediaQuery.maybeHighContrastOf(ctx) ?? false);
+      final outlineColor = isHighContrast ? p.borderStrong : p.hairline;
+      return SafeArea(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(ctx).height * 0.85,
+          ),
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.symmetric(
+                vertical: AppSpacing.s20, horizontal: AppSpacing.md),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
+                  child: Text(
+                    context.l10n.visualizerStyleLabel,
+                    style: TextStyle(
+                      fontSize: AppFontSize.title,
+                      fontWeight: FontWeight.w900,
+                      color: p.textPrimary,
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              ...styles.map((s) {
-                final isSelected = s.style == currentStyle;
-                return Container(
-                  margin: const EdgeInsets.only(bottom: AppSpacing.xs),
-                  child: Material(
-                    color: isSelected
-                        ? primaryColor.withValues(alpha: 0.12)
-                        : cardColor,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: AppRadii.r16All,
-                      side: BorderSide(
-                        color: isSelected ? primaryColor : outlineColor,
-                        width: isSelected ? 1.5 : 1.0,
-                      ),
-                    ),
-                    child: ListTile(
-                      leading: Icon(
-                        s.icon,
-                        color: isSelected ? primaryColor : textSecondary,
-                      ),
-                      title: Text(
-                        s.title,
-                        style: TextStyle(
-                          fontWeight: FontWeight.w700,
-                          color: isSelected ? primaryColor : textPrimary,
+                const SizedBox(height: AppSpacing.sm),
+                ...styles.map((s) {
+                  final isSelected = s.style == currentStyle;
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: AppSpacing.xs),
+                    child: Material(
+                      color: isSelected
+                          ? p.accent.withValues(alpha: 0.12)
+                          : p.surfaceContainer,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: AppRadii.r16All,
+                        side: BorderSide(
+                          color: isSelected ? p.accent : outlineColor,
+                          width: isSelected ? 1.5 : 1.0,
                         ),
                       ),
-                      subtitle: Text(
-                        s.subtitle,
-                        style: TextStyle(
-                            fontSize: AppFontSize.label, color: textSecondary),
+                      child: ListTile(
+                        leading: Icon(
+                          s.icon,
+                          color: isSelected ? p.accent : p.textSecondary,
+                        ),
+                        title: Text(
+                          s.title,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: isSelected ? p.accent : p.textPrimary,
+                          ),
+                        ),
+                        subtitle: Text(
+                          s.subtitle,
+                          style: TextStyle(
+                              fontSize: AppFontSize.label,
+                              color: p.textSecondary),
+                        ),
+                        trailing: isSelected
+                            ? Icon(Icons.check_circle_rounded, color: p.accent)
+                            : null,
+                        onTap: () {
+                          cubit.setVisualizerStyle(s.style);
+                          Navigator.pop(ctx);
+                        },
                       ),
-                      trailing: isSelected
-                          ? Icon(Icons.check_circle_rounded,
-                              color: primaryColor)
-                          : null,
-                      onTap: () {
-                        cubit.setVisualizerStyle(s.style);
-                        Navigator.pop(ctx);
+                    ),
+                  );
+                }),
+                Container(
+                  margin: const EdgeInsets.only(bottom: AppSpacing.xs),
+                  child: Material(
+                    color: p.surfaceContainer,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: AppRadii.r16All,
+                      side: BorderSide(color: outlineColor),
+                    ),
+                    child: ListTile(
+                      leading:
+                          Icon(Icons.file_open_rounded, color: p.textSecondary),
+                      title: Text(
+                        context.l10n.importMilk,
+                        style: TextStyle(
+                            fontWeight: FontWeight.w700, color: p.textPrimary),
+                      ),
+                      subtitle: Text(
+                        context.l10n.loadMilkDesc,
+                        style: TextStyle(
+                            fontSize: AppFontSize.label,
+                            color: p.textSecondary),
+                      ),
+                      onTap: () async {
+                        final preset =
+                            await MilkdropPresetStore().importFromFile();
+                        if (ctx.mounted) {
+                          Navigator.pop(ctx);
+                        }
+                        cubit.setVisualizerStyle(VisualizerStyle.milkdrop);
+                        if (preset != null && context.mounted) {
+                          ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+                            SnackBar(
+                              content: Text(context.l10n
+                                  .importedPresetTpl('Milkdrop', preset.name)),
+                            ),
+                          );
+                        }
                       },
                     ),
                   ),
-                );
-              }),
-              Container(
-                margin: const EdgeInsets.only(bottom: AppSpacing.xs),
-                child: Material(
-                  color: cardColor,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: AppRadii.r16All,
-                    side: BorderSide(color: outlineColor),
-                  ),
-                  child: ListTile(
-                    leading:
-                        Icon(Icons.file_open_rounded, color: textSecondary),
-                    title: Text(
-                      context.l10n.importMilk,
-                      style: TextStyle(
-                          fontWeight: FontWeight.w700, color: textPrimary),
+                ),
+                Container(
+                  margin: const EdgeInsets.only(bottom: AppSpacing.xs),
+                  child: Material(
+                    color: p.surfaceContainer,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: AppRadii.r16All,
+                      side: BorderSide(color: outlineColor),
                     ),
-                    subtitle: Text(
-                      context.l10n.loadMilkDesc,
-                      style: TextStyle(
-                          fontSize: AppFontSize.label, color: textSecondary),
+                    child: ListTile(
+                      leading: Icon(Icons.data_object_rounded,
+                          color: p.textSecondary),
+                      title: Text(
+                        context.l10n.importJsonViz,
+                        style: TextStyle(
+                            fontWeight: FontWeight.w700, color: p.textPrimary),
+                      ),
+                      subtitle: Text(
+                        context.l10n.loadJsonVizDesc,
+                        style: TextStyle(
+                            fontSize: AppFontSize.label,
+                            color: p.textSecondary),
+                      ),
+                      onTap: () async {
+                        final preset =
+                            await VisualizerPresetStore().importFromFile();
+                        if (ctx.mounted) {
+                          Navigator.pop(ctx);
+                        }
+                        cubit.setVisualizerStyle(VisualizerStyle.custom);
+                        if (preset != null && context.mounted) {
+                          ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+                            SnackBar(
+                              content: Text(context.l10n
+                                  .importedPresetTpl('JSON', preset.name)),
+                            ),
+                          );
+                        }
+                      },
                     ),
-                    onTap: () async {
-                      final preset =
-                          await MilkdropPresetStore().importFromFile();
-                      if (ctx.mounted) {
-                        Navigator.pop(ctx);
-                      }
-                      cubit.setVisualizerStyle(VisualizerStyle.milkdrop);
-                      if (preset != null && context.mounted) {
-                        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-                          SnackBar(
-                            content: Text(context.l10n
-                                .importedPresetTpl('Milkdrop', preset.name)),
-                          ),
-                        );
-                      }
-                    },
                   ),
                 ),
-              ),
-              Container(
-                margin: const EdgeInsets.only(bottom: AppSpacing.xs),
-                child: Material(
-                  color: cardColor,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: AppRadii.r16All,
-                    side: BorderSide(color: outlineColor),
-                  ),
-                  child: ListTile(
-                    leading:
-                        Icon(Icons.data_object_rounded, color: textSecondary),
-                    title: Text(
-                      context.l10n.importJsonViz,
-                      style: TextStyle(
-                          fontWeight: FontWeight.w700, color: textPrimary),
-                    ),
-                    subtitle: Text(
-                      context.l10n.loadJsonVizDesc,
-                      style: TextStyle(
-                          fontSize: AppFontSize.label, color: textSecondary),
-                    ),
-                    onTap: () async {
-                      final preset =
-                          await VisualizerPresetStore().importFromFile();
-                      if (ctx.mounted) {
-                        Navigator.pop(ctx);
-                      }
-                      cubit.setVisualizerStyle(VisualizerStyle.custom);
-                      if (preset != null && context.mounted) {
-                        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-                          SnackBar(
-                            content: Text(context.l10n
-                                .importedPresetTpl('JSON', preset.name)),
-                          ),
-                        );
-                      }
-                    },
-                  ),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
-      ),
-    ),
+      );
+    },
   );
 }
 
@@ -1465,15 +1470,6 @@ void showSliderStylePickerSheet(
   SettingsCubit cubit,
   PlayerSliderStyle currentStyle,
 ) {
-  final primaryColor = Theme.of(context).colorScheme.primary;
-  final cardColor =
-      Theme.of(context).cardTheme.color ?? context.palette.surfaceContainer;
-  final outlineColor = Theme.of(context).colorScheme.outline;
-  final textPrimary = Theme.of(context).textTheme.bodyLarge?.color ??
-      context.palette.textPrimary;
-  final textSecondary = Theme.of(context).textTheme.bodyMedium?.color ??
-      context.palette.textSecondary;
-
   final l10n = context.l10n;
   final styles = [
     (
@@ -1504,80 +1500,87 @@ void showSliderStylePickerSheet(
 
   PulsrSheetHelper.showPulsrSheet(
     context: context,
-    builder: (ctx) => SafeArea(
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(ctx).size.height * 0.85,
-        ),
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.symmetric(
-              vertical: AppSpacing.s20, horizontal: AppSpacing.md),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
-                child: Text(
-                  ctx.l10n.seekBarSliderStyleTitle,
-                  style: TextStyle(
-                    fontSize: AppFontSize.title,
-                    fontWeight: FontWeight.w900,
+    builder: (ctx) {
+      final p = ctx.palette;
+      final isHighContrast =
+          p.isHighContrast || (MediaQuery.maybeHighContrastOf(ctx) ?? false);
+      final outlineColor = isHighContrast ? p.borderStrong : p.hairline;
+      return SafeArea(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(ctx).height * 0.85,
+          ),
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.symmetric(
+                vertical: AppSpacing.s20, horizontal: AppSpacing.md),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
+                  child: Text(
+                    ctx.l10n.seekBarSliderStyleTitle,
+                    style: TextStyle(
+                      fontSize: AppFontSize.title,
+                      fontWeight: FontWeight.w900,
+                      color: p.textPrimary,
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              ...styles.map((s) {
-                final isSelected = s.style == currentStyle;
-                return Container(
-                  margin: const EdgeInsets.only(bottom: AppSpacing.xs),
-                  child: Material(
-                    color: isSelected
-                        ? primaryColor.withValues(alpha: 0.12)
-                        : cardColor,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: AppRadii.r16All,
-                      side: BorderSide(
-                        color: isSelected ? primaryColor : outlineColor,
-                        width: isSelected ? 1.5 : 1.0,
-                      ),
-                    ),
-                    child: ListTile(
-                      leading: Icon(
-                        s.icon,
-                        color: isSelected ? primaryColor : textSecondary,
-                      ),
-                      title: Text(
-                        s.title,
-                        style: TextStyle(
-                          fontWeight: FontWeight.w700,
-                          color: isSelected ? primaryColor : textPrimary,
+                const SizedBox(height: AppSpacing.sm),
+                ...styles.map((s) {
+                  final isSelected = s.style == currentStyle;
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: AppSpacing.xs),
+                    child: Material(
+                      color: isSelected
+                          ? p.accent.withValues(alpha: 0.12)
+                          : p.surfaceContainer,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: AppRadii.r16All,
+                        side: BorderSide(
+                          color: isSelected ? p.accent : outlineColor,
+                          width: isSelected ? 1.5 : 1.0,
                         ),
                       ),
-                      subtitle: Text(
-                        s.subtitle,
-                        style: TextStyle(
-                            fontSize: AppFontSize.label, color: textSecondary),
+                      child: ListTile(
+                        leading: Icon(
+                          s.icon,
+                          color: isSelected ? p.accent : p.textSecondary,
+                        ),
+                        title: Text(
+                          s.title,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: isSelected ? p.accent : p.textPrimary,
+                          ),
+                        ),
+                        subtitle: Text(
+                          s.subtitle,
+                          style: TextStyle(
+                              fontSize: AppFontSize.label,
+                              color: p.textSecondary),
+                        ),
+                        trailing: isSelected
+                            ? Icon(Icons.check_circle_rounded, color: p.accent)
+                            : null,
+                        onTap: () {
+                          cubit.setPlayerSliderStyle(s.style);
+                          Navigator.pop(ctx);
+                        },
                       ),
-                      trailing: isSelected
-                          ? Icon(Icons.check_circle_rounded,
-                              color: primaryColor)
-                          : null,
-                      onTap: () {
-                        cubit.setPlayerSliderStyle(s.style);
-                        Navigator.pop(ctx);
-                      },
                     ),
-                  ),
-                );
-              }),
-            ],
+                  );
+                }),
+              ],
+            ),
           ),
         ),
-      ),
-    ),
+      );
+    },
   );
 }
 
@@ -1586,14 +1589,6 @@ void showButtonStylePickerSheet(
   SettingsCubit cubit,
   AppButtonStyle currentStyle,
 ) {
-  final primaryColor = Theme.of(context).colorScheme.primary;
-  final cardColor =
-      Theme.of(context).cardTheme.color ?? context.palette.surfaceContainer;
-  final outlineColor = Theme.of(context).colorScheme.outline;
-  final textPrimary = Theme.of(context).textTheme.bodyLarge?.color ??
-      context.palette.textPrimary;
-  final textSecondary = Theme.of(context).textTheme.bodyMedium?.color ??
-      context.palette.textSecondary;
   final l10n = context.l10n;
 
   final styles = [
@@ -1619,79 +1614,86 @@ void showButtonStylePickerSheet(
 
   PulsrSheetHelper.showPulsrSheet(
     context: context,
-    builder: (ctx) => SafeArea(
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(ctx).size.height * 0.85,
-        ),
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.symmetric(
-              vertical: AppSpacing.s20, horizontal: AppSpacing.md),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
-                child: Text(
-                  l10n.buttonStyleTitle,
-                  style: TextStyle(
-                    fontSize: AppFontSize.title,
-                    fontWeight: FontWeight.w900,
+    builder: (ctx) {
+      final p = ctx.palette;
+      final isHighContrast =
+          p.isHighContrast || (MediaQuery.maybeHighContrastOf(ctx) ?? false);
+      final outlineColor = isHighContrast ? p.borderStrong : p.hairline;
+      return SafeArea(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(ctx).height * 0.85,
+          ),
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.symmetric(
+                vertical: AppSpacing.s20, horizontal: AppSpacing.md),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
+                  child: Text(
+                    l10n.buttonStyleTitle,
+                    style: TextStyle(
+                      fontSize: AppFontSize.title,
+                      fontWeight: FontWeight.w900,
+                      color: p.textPrimary,
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              ...styles.map((s) {
-                final isSelected = s.style == currentStyle;
-                return Container(
-                  margin: const EdgeInsets.only(bottom: AppSpacing.xs),
-                  child: Material(
-                    color: isSelected
-                        ? primaryColor.withValues(alpha: 0.12)
-                        : cardColor,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: AppRadii.r16All,
-                      side: BorderSide(
-                        color: isSelected ? primaryColor : outlineColor,
-                        width: isSelected ? 1.5 : 1.0,
-                      ),
-                    ),
-                    child: ListTile(
-                      leading: Icon(
-                        s.icon,
-                        color: isSelected ? primaryColor : textSecondary,
-                      ),
-                      title: Text(
-                        s.title,
-                        style: TextStyle(
-                          fontWeight: FontWeight.w700,
-                          color: isSelected ? primaryColor : textPrimary,
+                const SizedBox(height: AppSpacing.sm),
+                ...styles.map((s) {
+                  final isSelected = s.style == currentStyle;
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: AppSpacing.xs),
+                    child: Material(
+                      color: isSelected
+                          ? p.accent.withValues(alpha: 0.12)
+                          : p.surfaceContainer,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: AppRadii.r16All,
+                        side: BorderSide(
+                          color: isSelected ? p.accent : outlineColor,
+                          width: isSelected ? 1.5 : 1.0,
                         ),
                       ),
-                      subtitle: Text(
-                        s.subtitle,
-                        style: TextStyle(
-                            fontSize: AppFontSize.label, color: textSecondary),
+                      child: ListTile(
+                        leading: Icon(
+                          s.icon,
+                          color: isSelected ? p.accent : p.textSecondary,
+                        ),
+                        title: Text(
+                          s.title,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: isSelected ? p.accent : p.textPrimary,
+                          ),
+                        ),
+                        subtitle: Text(
+                          s.subtitle,
+                          style: TextStyle(
+                              fontSize: AppFontSize.label,
+                              color: p.textSecondary),
+                        ),
+                        trailing: isSelected
+                            ? Icon(Icons.check_circle_rounded, color: p.accent)
+                            : null,
+                        onTap: () {
+                          cubit.setAppButtonStyle(s.style);
+                          Navigator.pop(ctx);
+                        },
                       ),
-                      trailing: isSelected
-                          ? Icon(Icons.check_circle_rounded,
-                              color: primaryColor)
-                          : null,
-                      onTap: () {
-                        cubit.setAppButtonStyle(s.style);
-                        Navigator.pop(ctx);
-                      },
                     ),
-                  ),
-                );
-              }),
-            ],
+                  );
+                }),
+              ],
+            ),
           ),
         ),
-      ),
-    ),
+      );
+    },
   );
 }

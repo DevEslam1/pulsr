@@ -207,9 +207,27 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
     }
   }
 
+  Color _readableAccent(PulsrPalette p) {
+    final raw = Color(_accentColor);
+    double contrast(Color fg, Color bg) {
+      final l1 = fg.computeLuminance();
+      final l2 = bg.computeLuminance();
+      return l1 > l2 ? (l1 + 0.05) / (l2 + 0.05) : (l2 + 0.05) / (l1 + 0.05);
+    }
+
+    if (contrast(raw, p.surface) >= 4.5) return raw;
+    final target = p.isDark ? Colors.white : Colors.black;
+    for (var step = 0.1; step <= 0.88; step += 0.06) {
+      final c = Color.lerp(raw, target, step) ?? raw;
+      if (contrast(c, p.surface) >= 4.5) return c;
+    }
+    return p.accent;
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
+    final readableAccent = _readableAccent(p);
 
     return PulsrPagePopScope(
       child: Scaffold(
@@ -274,14 +292,14 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
                             ? Icons.view_compact_rounded
                             : Icons.play_circle_outline_rounded,
                         size: 18,
-                        color: Color(_accentColor),
+                        color: readableAccent,
                       ),
                       label: Text(
                         _showPlayerPreview
                             ? context.l10n.compactView
                             : context.l10n.nowPlaying,
                         style: TextStyle(
-                          color: Color(_accentColor),
+                          color: readableAccent,
                           fontWeight: FontWeight.w700,
                           fontSize: AppFontSize.bodySmall,
                         ),
@@ -310,7 +328,7 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
                             _getThemeIcon(mode),
                             size: 16,
                             color: isSelected
-                                ? Color(_accentColor)
+                                ? readableAccent
                                 : p.textSecondary,
                           ),
                           label: Text(
@@ -321,17 +339,17 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
                                   ? FontWeight.w700
                                   : FontWeight.w500,
                               color: isSelected
-                                  ? Color(_accentColor)
+                                  ? readableAccent
                                   : p.textSecondary,
                             ),
                           ),
                           selected: isSelected,
                           selectedColor:
-                              Color(_accentColor).withValues(alpha: 0.18),
+                              readableAccent.withValues(alpha: 0.16),
                           backgroundColor: p.surfaceCard,
                           side: BorderSide(
                             color:
-                                isSelected ? Color(_accentColor) : p.hairline,
+                                isSelected ? readableAccent : p.hairline,
                             width: isSelected ? 1.5 : 1.0,
                           ),
                           shape: RoundedRectangleBorder(
@@ -510,33 +528,39 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
                   runSpacing: 12,
                   children: _paletteOptions.map((colorVal) {
                     final isSelected = _accentColor == colorVal;
-                    return GestureDetector(
-                      onTap: () {
-                        setState(() => _accentColor = colorVal);
-                        context
-                            .read<SettingsCubit>()
-                            .setCustomAccentColor(Color(colorVal));
-                      },
-                      child: Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: Color(colorVal),
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: isSelected
-                                ? AppColors.textOnAccent(Color(colorVal))
-                                : Colors.transparent,
-                            width: 3,
+                    return Semantics(
+                      button: true,
+                      selected: isSelected,
+                      label: '#${colorVal.toRadixString(16).substring(2).toUpperCase()}',
+                      child: GestureDetector(
+                        onTap: () {
+                          setState(() => _accentColor = colorVal);
+                          context
+                              .read<SettingsCubit>()
+                              .setCustomAccentColor(Color(colorVal));
+                        },
+                        child: Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: Color(colorVal),
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: isSelected
+                                  ? AppColors.textOnAccent(Color(colorVal))
+                                  : p.hairline,
+                              width: isSelected ? 3 : 1.2,
+                            ),
                           ),
+                          child: isSelected
+                              ? Icon(
+                                  Icons.check_rounded,
+                                  color:
+                                      AppColors.textOnAccent(Color(colorVal)),
+                                  size: 22,
+                                )
+                              : null,
                         ),
-                        child: isSelected
-                            ? Icon(
-                                Icons.check_rounded,
-                                color: AppColors.textOnAccent(Color(colorVal)),
-                                size: 22,
-                              )
-                            : null,
                       ),
                     );
                   }).toList(),

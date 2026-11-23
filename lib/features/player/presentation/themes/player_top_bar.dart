@@ -105,7 +105,7 @@ class PlayerTopBar extends StatelessWidget {
             color: p.isDark ? AppColors.specularAt(0.08) : p.surfaceContainer,
             shape: CircleBorder(
               side: BorderSide(
-                color: p.isDark ? AppColors.specularAt(0.14) : p.hairline,
+                color: p.hairline,
                 width: 1.0,
               ),
             ),
@@ -176,9 +176,7 @@ class PlayerTopBar extends StatelessWidget {
                                   : p.surfaceContainer.withValues(alpha: 0.6),
                               borderRadius: AppRadii.r12All,
                               border: Border.all(
-                                color: p.isDark
-                                    ? AppColors.specularAt(0.09)
-                                    : p.hairline,
+                                color: p.hairline,
                                 width: 0.8,
                               ),
                             ),

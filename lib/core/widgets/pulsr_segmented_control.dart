@@ -61,7 +61,10 @@ class PulsrSegmentedControl extends StatelessWidget {
         decoration: BoxDecoration(
           color: p.surfaceContainer,
           borderRadius: AppRadii.r20All,
-          border: Border.all(color: p.hairline),
+          border: Border.all(
+            color: p.isHighContrast ? p.borderStrong : p.hairline,
+            width: p.isHighContrast ? 1.5 : 1.0,
+          ),
         ),
         child: ClipRRect(
           borderRadius: AppRadii.r20All,
@@ -211,7 +214,10 @@ class PulsrSegmentedControl extends StatelessWidget {
       decoration: BoxDecoration(
         color: p.surfaceContainer,
         borderRadius: AppRadii.r20All,
-        border: Border.all(color: p.hairline),
+        border: Border.all(
+          color: p.isHighContrast ? p.borderStrong : p.hairline,
+          width: p.isHighContrast ? 1.5 : 1.0,
+        ),
       ),
       child: ClipRRect(
         borderRadius: AppRadii.r20All,

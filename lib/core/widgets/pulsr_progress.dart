@@ -85,7 +85,9 @@ class PulsrProgressBar extends StatelessWidget {
     final p = context.palette;
     final activeColor = color ?? p.accent;
     final trackColor = backgroundColor ??
-        (p.isDark ? AppColors.specularAt(0.08) : p.surfaceContainerHigh);
+        (p.isHighContrast
+            ? p.borderSubtle
+            : (p.isDark ? AppColors.specularAt(0.10) : p.surfaceContainerHigh));
     final radius = borderRadius ?? AppRadii.full;
 
     // Indeterminate mode delegates to LinearProgressIndicator inside a recessed pill
@@ -134,12 +136,16 @@ class PulsrProgressBar extends StatelessWidget {
                       activeColor,
                     ],
                   ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: activeColor.withValues(alpha: 0.35),
-                      blurRadius: 6,
-                    ),
-                  ],
+                  boxShadow: p.chromeGlowScale > 0
+                      ? [
+                          BoxShadow(
+                            color: activeColor.withValues(
+                              alpha: 0.35 * p.chromeGlowScale,
+                            ),
+                            blurRadius: 6,
+                          ),
+                        ]
+                      : null,
                 ),
               ),
             );

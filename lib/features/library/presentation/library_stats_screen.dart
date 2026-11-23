@@ -683,11 +683,12 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
                           p: p,
                         ),
                         const SizedBox(height: AppSpacing.sm),
-                        Container(
-                          decoration: BoxDecoration(
-                            color: p.surfaceCard,
+                        Material(
+                          color: p.surfaceCard,
+                          clipBehavior: Clip.antiAlias,
+                          shape: RoundedRectangleBorder(
                             borderRadius: AppRadii.r18All,
-                            border: Border.all(color: p.hairline),
+                            side: BorderSide(color: p.hairline),
                           ),
                           child: Column(
                             children: List.generate(topArtists.length, (idx) {

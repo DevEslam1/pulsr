@@ -210,9 +210,13 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [
-              p.accentContainer.withValues(
-                alpha: p.isDark ? 0.45 : 0.65,
-              ),
+              (p.isHighContrast ||
+                      (MediaQuery.maybeHighContrastOf(context) ?? false) ||
+                      (p.isDark && p.bg.computeLuminance() < 0.001))
+                  ? p.bg
+                  : p.accent.withValues(
+                      alpha: p.isDark ? 0.16 : 0.10,
+                    ),
               p.bg,
             ],
             begin: Alignment.topCenter,
@@ -233,13 +237,17 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
                     shape: BoxShape.circle,
                     border: Border.all(
                         color: p.accent.withValues(alpha: 0.3), width: 2),
-                    boxShadow: [
-                      BoxShadow(
-                          color: p.glow,
-                          blurRadius: 28,
-                          spreadRadius: -4,
-                          offset: const Offset(0, 8)),
-                    ],
+                    boxShadow: p.isCalmDensity ||
+                            p.isHighContrast ||
+                            (MediaQuery.maybeHighContrastOf(context) ?? false)
+                        ? null
+                        : [
+                            BoxShadow(
+                                color: p.glow,
+                                blurRadius: 28,
+                                spreadRadius: -4,
+                                offset: const Offset(0, 8)),
+                          ],
                   ),
                   child: Hero(
                     tag: widget.heroTag ?? 'artist_${artist.id}',

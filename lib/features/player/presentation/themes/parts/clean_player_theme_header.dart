@@ -85,7 +85,7 @@ class _CleanTrackHeader extends StatelessWidget {
             icon: isFavorite
                 ? Icons.favorite_rounded
                 : Icons.favorite_border_rounded,
-            iconColor: isFavorite ? AppColors.favorite : deck.primary,
+            iconColor: isFavorite ? context.palette.favorite : deck.primary,
             isToggled: isFavorite,
             tooltip: isFavorite ? context.l10n.unlike : context.l10n.like,
             onTap: song == null

@@ -428,9 +428,7 @@ class _StudioTrackBayHeader extends StatelessWidget {
             decoration: BoxDecoration(
               borderRadius: AppRadii.circular(thumbRadius),
               border: Border.all(
-                color: p.isDark
-                    ? AppColors.specularAt(0.18)
-                    : p.hairline.withValues(alpha: 0.90),
+                color: p.hairline,
                 width: 1.0,
               ),
               boxShadow: [
@@ -517,7 +515,7 @@ class _StudioTrackBayHeader extends StatelessWidget {
             border: Border.all(
               color: isFav
                   ? p.favorite.withValues(alpha: 0.45)
-                  : p.hairline.withValues(alpha: 0.85),
+                  : (p.isHighContrast ? p.borderStrong : p.hairline),
               width: 1.0,
             ),
           ),
@@ -582,7 +580,7 @@ class _StudioTelemetryStrip extends StatelessWidget {
     final Color tierTint = telemetry.isUsbDac || telemetry.isHiRes
         ? p.goldAccent
         : (telemetry.isBitPerfect
-            ? AppColors.studioGreen
+            ? (p.isDark ? AppColors.studioGreen : p.success)
             : props.activeColor);
 
     final stripRadius = resolveCustomRadius(context, AppRadii.r10).clamp(
@@ -800,7 +798,9 @@ class _StudioTransportRow extends StatelessWidget {
                     color: activeColor,
                     borderRadius: AppRadii.circular(playRadius),
                     border: Border.all(
-                      color: AppColors.specularAt(0.28),
+                      color: p.isDark
+                          ? AppColors.specularAt(0.28)
+                          : p.borderSubtle,
                       width: 1.0,
                     ),
                     boxShadow: [

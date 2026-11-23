@@ -62,6 +62,8 @@ class _CdChassisPalette {
     final p = context.palette;
     final surface = context.playerSurfacePalette;
     final isDark = p.isDark;
+    final isHighContrast =
+        p.isHighContrast || MediaQuery.highContrastOf(context);
 
     if (isDark) {
       final titaniumTop = Color.lerp(
@@ -103,21 +105,24 @@ class _CdChassisPalette {
         )!,
         metalKeyMid: PlayerMaterialColors.cdHeadMid,
         metalKeyBottom: PlayerMaterialColors.cdSurfaceBottom,
-        metalKeyBorder: AppColors.specularAt(0.22),
+        metalKeyBorder:
+            isHighContrast ? p.borderStrong : AppColors.specularAt(0.22),
         metalKeyTopSpecular: AppColors.specularAt(0.40),
         heroKeyTop: heroTop,
         heroKeyBottom: heroBottom,
         heroKeyInk: AppColors.onBright,
-        inkPrimary: AppColors.textPrimary,
-        inkSecondary: AppColors.discSilver.withValues(alpha: 0.78),
-        hairline: AppColors.specularAt(0.14),
+        inkPrimary: isHighContrast ? p.textPrimary : AppColors.textPrimary,
+        inkSecondary: isHighContrast
+            ? p.textSecondary
+            : AppColors.discSilver.withValues(alpha: 0.78),
+        hairline: isHighContrast ? p.hairline : AppColors.specularAt(0.14),
         lcdSurfaceTop: Color.lerp(
           surface.tapeWindow,
           AppColors.accentCyan,
           0.07,
         )!,
         lcdSurfaceBottom: PlayerMaterialColors.cdTrayGradEnd,
-        lcdBorder: AppColors.specularAt(0.20),
+        lcdBorder: isHighContrast ? p.borderStrong : AppColors.specularAt(0.20),
         lcdInk: Color.lerp(surface.ledGlow, AppColors.accentCyan, 0.35)!,
         lcdInkDim: AppColors.discSilver.withValues(alpha: 0.72),
         lcdGridDot: AppColors.specularAt(0.06),
@@ -166,21 +171,28 @@ class _CdChassisPalette {
         AppColors.discSilver,
         0.35,
       )!,
-      metalKeyBorder: AppColors.slate.withValues(alpha: 0.36),
+      metalKeyBorder: isHighContrast
+          ? p.borderStrong
+          : AppColors.slate.withValues(alpha: 0.36),
       metalKeyTopSpecular: AppColors.specularAt(0.90),
       heroKeyTop: heroTop,
       heroKeyBottom: heroBottom,
       heroKeyInk: AppColors.onPrimary,
-      inkPrimary: AppColors.lightTextPrimary,
-      inkSecondary: AppColors.lightTextSecondary,
-      hairline: AppColors.slate.withValues(alpha: 0.24),
+      inkPrimary: isHighContrast ? p.textPrimary : AppColors.lightTextPrimary,
+      inkSecondary:
+          isHighContrast ? p.textSecondary : AppColors.lightTextSecondary,
+      hairline: isHighContrast
+          ? p.hairline
+          : AppColors.slate.withValues(alpha: 0.24),
       lcdSurfaceTop: Color.lerp(
         PlayerMaterialColors.cdSurfaceTop,
         AppColors.slate,
         0.18,
       )!,
       lcdSurfaceBottom: PlayerMaterialColors.cdTrayGradEnd,
-      lcdBorder: AppColors.slate.withValues(alpha: 0.45),
+      lcdBorder: isHighContrast
+          ? p.borderStrong
+          : AppColors.slate.withValues(alpha: 0.45),
       lcdInk: Color.lerp(surface.ledGlow, AppColors.accentCyan, 0.28)!,
       lcdInkDim: AppColors.discSilver.withValues(alpha: 0.80),
       lcdGridDot: AppColors.specularAt(0.07),

@@ -257,9 +257,10 @@ class _PulsrSliderState extends State<PulsrSlider>
               ? BoxDecoration(
                   borderRadius: AppRadii.r8All,
                   border: Border.all(
-                    color:
-                        (widget.activeColor ?? p.accent).withValues(alpha: 0.6),
-                    width: 1.5,
+                    color: (widget.activeColor ?? p.accent).withValues(
+                      alpha: p.isHighContrast ? 1.0 : 0.78,
+                    ),
+                    width: p.isHighContrast ? 2.4 : 1.8,
                   ),
                 )
               : null,
@@ -314,11 +315,13 @@ class _PulsrSliderState extends State<PulsrSlider>
                           style: effectiveStyle,
                           inactiveColor: widget.inactiveColor ??
                               (p.isDark ? Colors.white : Colors.black)
-                                  .withValues(alpha: 0.14),
+                                  .withValues(
+                                alpha: p.isHighContrast ? 0.42 : 0.18,
+                              ),
                           activeColor: widget.activeColor ?? p.accent,
-                          thumbColor: widget.thumbColor ??
-                              (p.isDark ? Colors.white : p.accent),
+                          thumbColor: widget.thumbColor ?? Colors.white,
                           glowColor: p.glow,
+                          glowScale: p.chromeGlowScale,
                           isRtl: direction == TextDirection.rtl,
                         ),
                         size: Size.infinite,
@@ -351,6 +354,7 @@ class _PulsrSliderPainter extends CustomPainter {
   final Color activeColor;
   final Color thumbColor;
   final Color glowColor;
+  final double glowScale;
   final bool isRtl;
 
   _PulsrSliderPainter({
@@ -364,6 +368,7 @@ class _PulsrSliderPainter extends CustomPainter {
     required this.activeColor,
     required this.thumbColor,
     required this.glowColor,
+    required this.glowScale,
     required this.isRtl,
   });
 
@@ -427,7 +432,7 @@ class _PulsrSliderPainter extends CustomPainter {
         canvas.drawRRect(
           pillRRect,
           Paint()
-            ..color = Colors.white
+            ..color = AppColors.textOnAccent(activeColor)
             ..style = PaintingStyle.fill,
         );
       }
@@ -509,17 +514,21 @@ class _PulsrSliderPainter extends CustomPainter {
         ..strokeJoin = StrokeJoin.round;
 
       if (style != PlayerSliderStyle.wavy || thumbX < 16.0) {
-        final lineGlowPaint = Paint()
-          ..color = activeColor.withValues(alpha: 0.16 + (0.16 * expandFactor))
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = trackHeight + 3.0
-          ..strokeCap = StrokeCap.round
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.5);
-        canvas.drawLine(
-          Offset(0, centerY),
-          Offset(thumbX, centerY),
-          lineGlowPaint,
-        );
+        if (glowScale > 0) {
+          final lineGlowPaint = Paint()
+            ..color = activeColor.withValues(
+              alpha: (0.16 + (0.16 * expandFactor)) * glowScale,
+            )
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = trackHeight + 3.0
+            ..strokeCap = StrokeCap.round
+            ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.5);
+          canvas.drawLine(
+            Offset(0, centerY),
+            Offset(thumbX, centerY),
+            lineGlowPaint,
+          );
+        }
         canvas.drawLine(
           Offset(0, centerY),
           Offset(thumbX, centerY),
@@ -546,15 +555,19 @@ class _PulsrSliderPainter extends CustomPainter {
         }
         wavePath.lineTo(thumbX, centerY);
 
-        final waveGlowPaint = Paint()
-          ..color = activeColor.withValues(alpha: 0.18 + (0.20 * expandFactor))
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = trackHeight + 3.8
-          ..strokeCap = StrokeCap.round
-          ..strokeJoin = StrokeJoin.round
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4.5);
+        if (glowScale > 0) {
+          final waveGlowPaint = Paint()
+            ..color = activeColor.withValues(
+              alpha: (0.18 + (0.20 * expandFactor)) * glowScale,
+            )
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = trackHeight + 3.8
+            ..strokeCap = StrokeCap.round
+            ..strokeJoin = StrokeJoin.round
+            ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4.5);
 
-        canvas.drawPath(wavePath, waveGlowPaint);
+          canvas.drawPath(wavePath, waveGlowPaint);
+        }
         canvas.drawPath(wavePath, activePaint);
       }
     }
@@ -565,7 +578,7 @@ class _PulsrSliderPainter extends CustomPainter {
         ..color = inactiveColor.withValues(alpha: 0.50)
         ..style = PaintingStyle.fill;
       final activeTickPaint = Paint()
-        ..color = Colors.white.withValues(alpha: 0.55)
+        ..color = AppColors.textOnAccent(activeColor).withValues(alpha: 0.65)
         ..style = PaintingStyle.fill;
 
       for (int i = 1; i < divisions!; i++) {
@@ -581,15 +594,19 @@ class _PulsrSliderPainter extends CustomPainter {
     }
 
     // 3. Ambient halo behind thumb
-    final glowPaint = Paint()
-      ..color = glowColor.withValues(alpha: 0.24 + (0.36 * expandFactor))
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4.0)
-      ..style = PaintingStyle.fill;
-    canvas.drawCircle(
-      Offset(thumbX, centerY),
-      thumbRadius + 4.5 + (2.5 * expandFactor),
-      glowPaint,
-    );
+    if (glowScale > 0) {
+      final glowPaint = Paint()
+        ..color = glowColor.withValues(
+          alpha: (0.24 + (0.36 * expandFactor)) * glowScale,
+        )
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4.0)
+        ..style = PaintingStyle.fill;
+      canvas.drawCircle(
+        Offset(thumbX, centerY),
+        thumbRadius + 4.5 + (2.5 * expandFactor),
+        glowPaint,
+      );
+    }
 
     // 4. Elevation drop shadow
     final shadowPaint = Paint()
@@ -637,5 +654,6 @@ class _PulsrSliderPainter extends CustomPainter {
       old.inactiveColor != inactiveColor ||
       old.thumbColor != thumbColor ||
       old.glowColor != glowColor ||
+      old.glowScale != glowScale ||
       old.isRtl != isRtl;
 }

@@ -700,7 +700,11 @@ class _MilkdropTopBar extends StatelessWidget {
     final Color glassFill = AppColors.scrimAt(
       allowBlur ? 0.36 : AppBlur.solidFallbackMinAlpha,
     );
-    final Color glassBorder = AppColors.specularAt(0.22);
+    final isHighContrast = context.palette.isHighContrast ||
+        MediaQuery.highContrastOf(context);
+    final Color glassBorder = isHighContrast
+        ? AppColors.specularAt(0.55)
+        : AppColors.specularAt(0.22);
 
     return Padding(
       padding: EdgeInsets.symmetric(
@@ -906,10 +910,14 @@ class _MilkdropGlassCapsule extends StatelessWidget {
         alpha: allowBlur ? 0.62 : AppBlur.solidFallbackMinAlpha,
       ),
     );
-    final Color capsuleBorder = Color.alphaBlend(
-      activeColor.withValues(alpha: 0.24),
-      AppColors.specularAt(0.20),
-    );
+    final isHighContrast =
+        p.isHighContrast || MediaQuery.highContrastOf(context);
+    final Color capsuleBorder = isHighContrast
+        ? AppColors.specularAt(0.55)
+        : Color.alphaBlend(
+            activeColor.withValues(alpha: 0.24),
+            AppColors.specularAt(0.20),
+          );
 
     final Widget artThumb = Hero(
       tag: props.heroTag,
@@ -1045,7 +1053,7 @@ class _MilkdropGlassCapsule extends StatelessWidget {
                   color: AppColors.fadeStopTransparent,
                   child: PlayerAnimatedFavoriteButton(
                     isFavorite: isFav,
-                    favoriteColor: p.favorite,
+                    favoriteColor: AppColors.favorite,
                     inactiveColor: secondaryInk,
                     iconSize: 21,
                     semanticLabel: isFav ? l10n.unlike : l10n.like,

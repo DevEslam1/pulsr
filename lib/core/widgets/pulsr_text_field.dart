@@ -112,24 +112,37 @@ class _PulsrTextFieldState extends State<PulsrTextField> {
     final border = OutlineInputBorder(
       borderRadius: AppRadii.r14All,
       borderSide: BorderSide(
-        color: p.isDark ? AppColors.specularAt(0.12) : p.borderSubtle,
-        width: 1.0,
+        color: p.isHighContrast
+            ? p.borderStrong
+            : (p.isDark
+                ? AppColors.specularAt(p.isAmoled ? 0.16 : 0.12)
+                : p.hairline),
+        width: p.isHighContrast ? 1.5 : 1.0,
       ),
     );
 
     final focusedBorder = OutlineInputBorder(
       borderRadius: AppRadii.r14All,
-      borderSide: BorderSide(color: p.accent, width: 1.5),
+      borderSide: BorderSide(
+        color: p.accent,
+        width: p.isHighContrast ? 2.4 : 1.5,
+      ),
     );
 
     final errorBorder = OutlineInputBorder(
       borderRadius: AppRadii.r14All,
-      borderSide: BorderSide(color: p.error, width: 1.4),
+      borderSide: BorderSide(
+        color: p.error,
+        width: p.isHighContrast ? 1.8 : 1.4,
+      ),
     );
 
     final focusedErrorBorder = OutlineInputBorder(
       borderRadius: AppRadii.r14All,
-      borderSide: BorderSide(color: p.error, width: 1.6),
+      borderSide: BorderSide(
+        color: p.error,
+        width: p.isHighContrast ? 2.4 : 1.6,
+      ),
     );
 
     return Column(
@@ -149,7 +162,8 @@ class _PulsrTextFieldState extends State<PulsrTextField> {
                   child: AnimatedDefaultTextStyle(
                     duration: context.motionMs(200),
                     style: TextStyle(
-                      fontFamily: 'Manrope',
+                      fontFamily: fontFamily,
+                      fontFamilyFallback: fontFallbacks,
                       fontSize: AppFontSize.label,
                       fontWeight: FontWeight.w800,
                       letterSpacing: AppTracking.label,
@@ -180,25 +194,29 @@ class _PulsrTextFieldState extends State<PulsrTextField> {
           decoration: BoxDecoration(
             borderRadius: AppRadii.r14All,
             boxShadow: _isFocused
-                ? [
-                    BoxShadow(
-                      color: activeTone.withValues(
-                        alpha: p.isDark ? 0.18 : 0.10,
-                      ),
-                      blurRadius: 14,
-                      spreadRadius: -2,
-                      offset: const Offset(0, 3),
-                    ),
-                  ]
-                : [
-                    BoxShadow(
-                      color: Colors.black.withValues(
-                        alpha: p.isDark ? 0.14 : 0.03,
-                      ),
-                      blurRadius: 6,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
+                ? (p.chromeGlowScale > 0
+                    ? [
+                        BoxShadow(
+                          color: activeTone.withValues(
+                            alpha: (p.isDark ? 0.18 : 0.10) * p.chromeGlowScale,
+                          ),
+                          blurRadius: 14,
+                          spreadRadius: -2,
+                          offset: const Offset(0, 3),
+                        ),
+                      ]
+                    : null)
+                : (p.isHighContrast
+                    ? null
+                    : [
+                        BoxShadow(
+                          color: Colors.black.withValues(
+                            alpha: p.isDark ? 0.14 : 0.03,
+                          ),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ]),
           ),
           child: TextField(
             controller: widget.controller,
@@ -212,7 +230,8 @@ class _PulsrTextFieldState extends State<PulsrTextField> {
             onChanged: widget.onChanged,
             onSubmitted: widget.onSubmitted,
             style: TextStyle(
-              fontFamily: 'Manrope',
+              fontFamily: fontFamily,
+              fontFamilyFallback: fontFallbacks,
               fontSize: AppFontSize.body,
               fontWeight: FontWeight.w600,
               color: p.textPrimary,
@@ -223,7 +242,8 @@ class _PulsrTextFieldState extends State<PulsrTextField> {
             decoration: InputDecoration(
               hintText: widget.hint,
               hintStyle: TextStyle(
-                fontFamily: 'Manrope',
+                fontFamily: fontFamily,
+                fontFamilyFallback: fontFallbacks,
                 fontSize: AppFontSize.body,
                 fontWeight: FontWeight.w500,
                 color: p.textTertiary,
@@ -256,7 +276,8 @@ class _PulsrTextFieldState extends State<PulsrTextField> {
               focusedErrorBorder: focusedErrorBorder,
               errorText: widget.error,
               errorStyle: TextStyle(
-                fontFamily: 'Manrope',
+                fontFamily: fontFamily,
+                fontFamilyFallback: fontFallbacks,
                 fontSize: AppFontSize.caption,
                 fontWeight: FontWeight.w700,
                 color: p.error,

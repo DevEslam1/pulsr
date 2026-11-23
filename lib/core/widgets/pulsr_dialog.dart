@@ -9,6 +9,7 @@ import '../constants/app_radii.dart';
 import '../motion/pulsr_motion.dart';
 import '../responsive/responsive_values.dart';
 import '../theme/aura_theme.dart';
+import '../theme/scrim_tokens.dart';
 import '../utils/l10n_extensions.dart';
 import 'glass_container.dart';
 import 'pulsr_modal_tracker.dart';
@@ -60,11 +61,13 @@ class PulsrDialogHelper {
     final trackManually = !useRootNavigator;
     if (trackManually) PulsrModalTracker.push();
     final navigator = Navigator.of(context, rootNavigator: useRootNavigator);
+    final effectiveBarrier = barrierColor ??
+        ScrimTokens.barrierScrim(context.palette.isDark);
     final future = navigator.push<T>(
       DialogRoute<T>(
         context: context,
         barrierDismissible: barrierDismissible,
-        barrierColor: barrierColor ?? AppColors.scrimAt(0.58),
+        barrierColor: effectiveBarrier,
         builder: builder,
       ),
     );
@@ -145,7 +148,11 @@ class PulsrDialogHelper {
             },
             style: FilledButton.styleFrom(
               backgroundColor: isDestructive ? p.error : p.accent,
-              foregroundColor: isDestructive ? Colors.white : p.onAccent,
+              foregroundColor: isDestructive ? p.onError : p.onAccent,
+              minimumSize: const Size(
+                AppSpacing.minTouchTarget,
+                AppSpacing.minTouchTarget,
+              ),
               padding: const EdgeInsets.symmetric(
                 horizontal: AppSpacing.s20,
                 vertical: AppSpacing.sm,
@@ -290,13 +297,21 @@ class _PulsrInputDialogState extends State<_PulsrInputDialog> {
                 border: Border.all(
                   color: _isFocused
                       ? p.accent
-                      : (p.isDark ? AppColors.specularAt(0.14) : p.hairline),
-                  width: _isFocused ? 1.4 : 1.0,
+                      : (p.isHighContrast
+                          ? p.borderStrong
+                          : (p.isDark
+                              ? AppColors.specularAt(p.isAmoled ? 0.16 : 0.12)
+                              : p.hairline)),
+                  width: _isFocused
+                      ? (p.isHighContrast ? 2.2 : 1.5)
+                      : (p.isHighContrast ? 1.5 : 1.0),
                 ),
-                boxShadow: _isFocused
+                boxShadow: _isFocused && p.chromeGlowScale > 0
                     ? [
                         BoxShadow(
-                          color: p.accent.withValues(alpha: 0.16),
+                          color: p.accent.withValues(
+                            alpha: 0.16 * p.chromeGlowScale,
+                          ),
                           blurRadius: 12,
                           spreadRadius: -2,
                         ),
@@ -435,21 +450,23 @@ class PulsrDialog extends StatelessWidget {
           // opaque colour here would paint over the 16σ BackdropFilter and
           // make the blur invisible.
           border: Border.all(
-            color: p.isDark ? AppColors.specularAt(0.16) : p.hairline,
-            width: 1.0,
+            color: p.isHighContrast
+                ? p.borderStrong
+                : (p.isDark
+                    ? AppColors.specularAt(p.isAmoled ? 0.20 : 0.16)
+                    : p.hairline),
+            width: p.isHighContrast ? 1.6 : 1.0,
           ),
           boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: p.isDark ? 0.45 : 0.12),
-              blurRadius: 28,
-              spreadRadius: 0,
-              offset: const Offset(0, 10),
-            ),
-            BoxShadow(
-              color: badgeColor.withValues(alpha: p.isDark ? 0.12 : 0.06),
-              blurRadius: 20,
-              spreadRadius: -4,
-            ),
+            ...PulsrElevation.level3(context),
+            if (p.chromeGlowScale > 0)
+              BoxShadow(
+                color: badgeColor.withValues(
+                  alpha: (p.isDark ? 0.12 : 0.06) * p.chromeGlowScale,
+                ),
+                blurRadius: 20,
+                spreadRadius: -4,
+              ),
           ],
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -474,16 +491,22 @@ class PulsrDialog extends StatelessWidget {
                         ),
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: badgeColor.withValues(alpha: 0.38),
-                          width: 1.2,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: badgeColor.withValues(alpha: 0.20),
-                            blurRadius: 14,
-                            spreadRadius: -2,
+                          color: badgeColor.withValues(
+                            alpha: p.isHighContrast ? 0.80 : 0.38,
                           ),
-                        ],
+                          width: p.isHighContrast ? 1.6 : 1.2,
+                        ),
+                        boxShadow: p.chromeGlowScale > 0
+                            ? [
+                                BoxShadow(
+                                  color: badgeColor.withValues(
+                                    alpha: 0.20 * p.chromeGlowScale,
+                                  ),
+                                  blurRadius: 14,
+                                  spreadRadius: -2,
+                                ),
+                              ]
+                            : null,
                       ),
                       alignment: Alignment.center,
                       child: iconWidget,

@@ -196,6 +196,11 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
     // phones and no split when the available pane is portrait/square.
     if (PulsrLayoutMetrics.isPlayerSplitMode(context)) {
       _wasSplitView = true;
+      final isHighContrast =
+          p.isHighContrast || MediaQuery.highContrastOf(context);
+      final isAmoled = p.isDark && p.bg == Colors.black && !isHighContrast;
+      final glowScale =
+          isHighContrast ? 0.0 : (isAmoled ? 0.55 : p.chromeGlowScale);
       final isQuran = widget.state.isQuranModeEnabled ||
           (widget.state.currentSong?.genre?.toLowerCase().contains('quran') ==
               true);
@@ -209,91 +214,110 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
             // 1. Unified Radiant Dynamic Ambient Backdrop (Continuous Edge-to-Edge Canvas)
             Positioned.fill(
               child: RepaintBoundary(
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    // Deep ambient base gradient
-                    Positioned.fill(
-                      child: AnimatedContainer(
-                        duration: context.motionMs(400),
-                        curve: context.motionCurve(Curves.easeInOut),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              Color.lerp(
+                child: isHighContrast
+                    ? ColoredBox(color: p.bg)
+                    : Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          // Deep ambient base gradient
+                          Positioned.fill(
+                            child: AnimatedContainer(
+                              duration: context.motionMs(400),
+                              curve: context.motionCurve(Curves.easeInOut),
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    Color.lerp(
+                                          widget.bgColor,
+                                          widget.activeColor,
+                                          (p.isDark
+                                                  ? (isAmoled ? 0.07 : 0.16)
+                                                  : 0.07) *
+                                              glowScale,
+                                        ) ??
+                                        widget.bgColor,
                                     widget.bgColor,
-                                    widget.activeColor,
-                                    p.isDark ? 0.16 : 0.10,
-                                  ) ??
-                                  widget.bgColor,
-                              widget.bgColor,
-                              Color.lerp(
-                                    widget.bgColor,
-                                    Colors.black,
-                                    p.isDark ? 0.32 : 0.08,
-                                  ) ??
-                                  widget.bgColor,
-                            ],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            stops: const [0.0, 0.45, 1.0],
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    // Atmospheric Stage Spotlight behind Left Deck (Continuous Full-Canvas Bounds)
-                    Positioned.fill(
-                      child: IgnorePointer(
-                        child: AnimatedContainer(
-                          duration: context.motionMs(400),
-                          decoration: BoxDecoration(
-                            gradient: RadialGradient(
-                              center: const Alignment(-0.55, -0.22),
-                              radius: 1.35,
-                              colors: [
-                                widget.activeColor.withValues(
-                                  alpha: p.isDark ? 0.36 : 0.22,
+                                    p.isDark
+                                        ? (Color.lerp(
+                                              widget.bgColor,
+                                              Colors.black,
+                                              isAmoled ? 0.0 : 0.32,
+                                            ) ??
+                                            widget.bgColor)
+                                        : (Color.lerp(
+                                              widget.bgColor,
+                                              p.surfaceContainer,
+                                              0.45,
+                                            ) ??
+                                            p.surfaceContainer),
+                                  ],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                  stops: const [0.0, 0.45, 1.0],
                                 ),
-                                widget.activeColor.withValues(
-                                  alpha: p.isDark ? 0.14 : 0.08,
-                                ),
-                                widget.activeColor.withValues(alpha: 0.02),
-                                Colors.transparent,
-                              ],
-                              stops: const [0.0, 0.45, 0.80, 1.0],
+                              ),
                             ),
                           ),
-                        ),
-                      ),
-                    ),
 
-                    // Soft Atmospheric Aura across Right Canvas
-                    Positioned.fill(
-                      child: IgnorePointer(
-                        child: AnimatedContainer(
-                          duration: context.motionMs(400),
-                          decoration: BoxDecoration(
-                            gradient: RadialGradient(
-                              center: const Alignment(0.60, 0.15),
-                              radius: 1.40,
-                              colors: [
-                                widget.activeColor.withValues(
-                                  alpha: p.isDark ? 0.14 : 0.07,
+                          // Atmospheric Stage Spotlight behind Left Deck
+                          if (glowScale > 0.0)
+                            Positioned.fill(
+                              child: IgnorePointer(
+                                child: AnimatedContainer(
+                                  duration: context.motionMs(400),
+                                  decoration: BoxDecoration(
+                                    gradient: RadialGradient(
+                                      center: const Alignment(-0.55, -0.22),
+                                      radius: 1.35,
+                                      colors: [
+                                        widget.activeColor.withValues(
+                                          alpha: (p.isDark ? 0.32 : 0.14) *
+                                              glowScale,
+                                        ),
+                                        widget.activeColor.withValues(
+                                          alpha: (p.isDark ? 0.12 : 0.06) *
+                                              glowScale,
+                                        ),
+                                        widget.activeColor.withValues(
+                                            alpha: 0.02 * glowScale),
+                                        Colors.transparent,
+                                      ],
+                                      stops: const [0.0, 0.45, 0.80, 1.0],
+                                    ),
+                                  ),
                                 ),
-                                widget.activeColor.withValues(
-                                  alpha: p.isDark ? 0.04 : 0.02,
-                                ),
-                                Colors.transparent,
-                              ],
-                              stops: const [0.0, 0.55, 1.0],
+                              ),
                             ),
-                          ),
-                        ),
+
+                          // Soft Atmospheric Aura across Right Canvas
+                          if (glowScale > 0.0)
+                            Positioned.fill(
+                              child: IgnorePointer(
+                                child: AnimatedContainer(
+                                  duration: context.motionMs(400),
+                                  decoration: BoxDecoration(
+                                    gradient: RadialGradient(
+                                      center: const Alignment(0.60, 0.15),
+                                      radius: 1.40,
+                                      colors: [
+                                        widget.activeColor.withValues(
+                                          alpha: (p.isDark ? 0.13 : 0.06) *
+                                              glowScale,
+                                        ),
+                                        widget.activeColor.withValues(
+                                          alpha: (p.isDark ? 0.04 : 0.02) *
+                                              glowScale,
+                                        ),
+                                        Colors.transparent,
+                                      ],
+                                      stops: const [0.0, 0.55, 1.0],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
-                    ),
-                  ],
-                ),
               ),
             ),
 
@@ -350,8 +374,21 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
                     ),
                   ),
 
-                  // Natural Open Gutter (No hard dividing line, breathing room like Apple Music)
-                  const SizedBox(width: AppSpacing.md),
+                  // Natural Open Gutter (crisp vertical hairline in High Contrast)
+                  if (isHighContrast)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.xs,
+                        vertical: AppSpacing.md,
+                      ),
+                      child: VerticalDivider(
+                        width: 1,
+                        thickness: 1,
+                        color: p.hairline,
+                      ),
+                    )
+                  else
+                    const SizedBox(width: AppSpacing.md),
 
                   // Right Pane: Seamless Apple Music Lyrics & Queue Canvas + Floating Bottom Actions
                   Expanded(
@@ -365,7 +402,7 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
                               start: AppSpacing.sm,
                               end: AppSpacing.xl,
                               top: AppSpacing.sm,
-                              bottom: 64.0,
+                              bottom: 76.0,
                             ),
                             child: TabBarView(
                               controller: _tabController,
@@ -740,7 +777,9 @@ class _DeckQuickActionButton extends StatelessWidget {
                 borderRadius: AppRadii.r14All,
                 color: isActive
                     ? activeColor.withValues(alpha: 0.22)
-                    : AppColors.specularAt(0.06),
+                    : (p.isDark
+                        ? AppColors.specularAt(0.06)
+                        : p.surfaceContainerHigh),
                 border: Border.all(
                   color: isActive
                       ? activeColor.withValues(alpha: 0.55)
@@ -860,7 +899,7 @@ class _QuickDspControls extends StatelessWidget {
             subtitle:
                 '${state.quranReciterStyle.name.toUpperCase()} • ${l10n.dspQuranModeOn}',
             value: true,
-            activeColor: AppColors.quranEmerald,
+            activeColor: p.isDark ? AppColors.quranEmerald : p.success,
             onChanged: (v) {
               PulsrHaptics.selectionClick();
               QuranModeSheet.show(context);
@@ -946,10 +985,12 @@ class _SignalChainVisualizerStrip extends StatelessWidget {
         vertical: AppSpacing.sm + 2,
       ),
       decoration: BoxDecoration(
-        color: AppColors.specularAt(p.isDark ? 0.04 : 0.03),
+        color: p.isDark
+            ? AppColors.specularAt(0.04)
+            : p.surfaceContainer.withValues(alpha: 0.85),
         borderRadius: AppRadii.r16All,
         border: Border.all(
-          color: anyActive ? activeColor.withValues(alpha: 0.28) : p.hairline,
+          color: anyActive ? activeColor.withValues(alpha: 0.34) : p.hairline,
           width: 1.0,
         ),
       ),
@@ -1020,12 +1061,12 @@ class _SignalStageChip extends StatelessWidget {
       decoration: BoxDecoration(
         color: isActive
             ? activeColor.withValues(alpha: 0.18)
-            : AppColors.specularAt(0.05),
+            : (p.isDark
+                ? AppColors.specularAt(0.05)
+                : p.surfaceContainerHigh),
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
-          color: isActive
-              ? activeColor.withValues(alpha: 0.50)
-              : AppColors.specularAt(0.10),
+          color: isActive ? activeColor.withValues(alpha: 0.50) : p.hairline,
           width: 1.0,
         ),
       ),
@@ -1116,19 +1157,22 @@ class _DspModuleBentoCard extends StatelessWidget {
             end: Alignment.bottomRight,
             colors: value
                 ? [
-                    activeColor.withValues(alpha: 0.18),
-                    activeColor.withValues(alpha: 0.06),
+                    activeColor.withValues(alpha: p.isDark ? 0.18 : 0.12),
+                    activeColor.withValues(alpha: p.isDark ? 0.06 : 0.04),
                   ]
-                : [
-                    AppColors.specularAt(0.07),
-                    AppColors.specularAt(0.03),
-                  ],
+                : (p.isDark
+                    ? [
+                        AppColors.specularAt(0.07),
+                        AppColors.specularAt(0.03),
+                      ]
+                    : [
+                        p.surfaceContainer,
+                        p.surfaceContainerHigh.withValues(alpha: 0.72),
+                      ]),
           ),
           borderRadius: AppRadii.r20All,
           border: Border.all(
-            color: value
-                ? activeColor.withValues(alpha: 0.48)
-                : AppColors.specularAt(0.12),
+            color: value ? activeColor.withValues(alpha: 0.48) : p.hairline,
             width: value ? 1.2 : 1.0,
           ),
           boxShadow: value
@@ -1152,11 +1196,12 @@ class _DspModuleBentoCard extends StatelessWidget {
                 shape: BoxShape.circle,
                 color: value
                     ? activeColor.withValues(alpha: 0.22)
-                    : AppColors.specularAt(0.08),
+                    : (p.isDark
+                        ? AppColors.specularAt(0.08)
+                        : p.surfaceContainerHigh),
                 border: Border.all(
-                  color: value
-                      ? activeColor.withValues(alpha: 0.55)
-                      : AppColors.specularAt(0.12),
+                  color:
+                      value ? activeColor.withValues(alpha: 0.55) : p.hairline,
                   width: 1.0,
                 ),
                 boxShadow: value
@@ -1327,7 +1372,7 @@ class _TabletLandscapeFloatingDock extends StatelessWidget {
                           size: 20,
                           color: isSelected
                               ? (isDark ? Colors.white : activeColor)
-                              : p.textSecondary.withValues(alpha: 0.70),
+                              : p.textSecondary,
                         ),
                       ),
                     ),

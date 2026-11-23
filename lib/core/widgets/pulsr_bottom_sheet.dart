@@ -361,19 +361,24 @@ class PulsrBottomSheetContainer extends StatelessWidget {
       );
     }
 
-    // Real material: enough translucency for the backdrop to read through,
-    // but never below the legibility floor. GPU Saver keeps the opaque
-    // surface (and canBlur disables the filter at the same time).
-    final baseSurfaceColor = GpuBudget.isGpuSaverActive
-        ? p.surfaceContainer
-        : (p.isDark
-            ? p.surfaceContainer.withValues(alpha: 0.86)
-            : p.surfaceContainer.withValues(alpha: 0.90));
+    final isHighContrast =
+        (MediaQuery.maybeOf(context)?.highContrast ?? false) ||
+            p.isHighContrast;
 
-    final topBlendColor = Color.alphaBlend(
-      p.accent.withValues(alpha: p.isDark ? 0.045 : 0.025),
-      baseSurfaceColor,
-    );
+    // Real material: enough translucency for the backdrop to read through,
+    // but never below the legibility floor. High Contrast and GPU Saver stay
+    // solid so text contrast is never compromised.
+    final rawSurface = p.isDark ? p.surfaceContainer : p.surfaceElevated;
+    final baseSurfaceColor = (GpuBudget.isGpuSaverActive || isHighContrast)
+        ? rawSurface
+        : rawSurface.withValues(alpha: p.isDark ? 0.88 : 0.94);
+
+    final topBlendColor = isHighContrast
+        ? baseSurfaceColor
+        : Color.alphaBlend(
+            p.accent.withValues(alpha: p.isDark ? 0.045 : 0.025),
+            baseSurfaceColor,
+          );
 
     final effectiveBorderRadius = isDialog
         ? AppRadii.dialogRadius
@@ -396,7 +401,7 @@ class PulsrBottomSheetContainer extends StatelessWidget {
               sigmaX: AppBlur.sheet,
               sigmaY: AppBlur.sheet,
             ),
-            enabled: AppBlur.canBlur(context),
+            enabled: !isHighContrast && AppBlur.canBlur(context),
             child: Container(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
@@ -407,10 +412,12 @@ class PulsrBottomSheetContainer extends StatelessWidget {
                 ),
                 borderRadius: effectiveBorderRadius,
                 border: Border.all(
-                  color: p.isDark
-                      ? Colors.white.withValues(alpha: 0.10)
-                      : p.hairline,
-                  width: AppStrokes.hairline,
+                  color: isHighContrast
+                      ? p.borderStrong
+                      : (p.isDark
+                          ? AppColors.specularAt(p.isAmoled ? 0.16 : 0.11)
+                          : p.hairline),
+                  width: isHighContrast ? 1.5 : AppStrokes.hairline,
                 ),
                 boxShadow: PulsrElevation.level3(context),
               ),
@@ -421,24 +428,27 @@ class PulsrBottomSheetContainer extends StatelessWidget {
             child: Stack(
               children: [
                 // Top specular refraction hairline
-                PositionedDirectional(
-                  top: 0,
-                  start: 24,
-                  end: 24,
-                  height: 1.2,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          AppColors.specularAt(0.0),
-                          AppColors.specularAt(p.isDark ? 0.36 : 0.60),
-                          AppColors.specularAt(0.0),
-                        ],
-                        stops: const [0.0, 0.5, 1.0],
+                if (!isHighContrast && p.specularScale > 0)
+                  PositionedDirectional(
+                    top: 0,
+                    start: 24,
+                    end: 24,
+                    height: 1.2,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            AppColors.specularAt(0.0),
+                            AppColors.specularAt(
+                              (p.isDark ? 0.34 : 0.60) * p.specularScale,
+                            ),
+                            AppColors.specularAt(0.0),
+                          ],
+                          stops: const [0.0, 0.5, 1.0],
+                        ),
                       ),
                     ),
                   ),
-                ),
                 SafeArea(
                   top: false,
                   left: false,
@@ -464,7 +474,9 @@ class PulsrBottomSheetContainer extends StatelessWidget {
                                   decoration: BoxDecoration(
                                     color:
                                         (p.isDark ? Colors.white : Colors.black)
-                                            .withValues(alpha: 0.24),
+                                            .withValues(
+                                      alpha: isHighContrast ? 0.58 : 0.26,
+                                    ),
                                     borderRadius: AppRadii.full,
                                   ),
                                 ),

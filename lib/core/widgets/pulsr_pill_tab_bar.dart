@@ -59,10 +59,14 @@ class PulsrPillTabBar extends StatelessWidget {
       labelColor: p.onAccent,
       unselectedLabelColor: p.textSecondary,
       labelStyle: const TextStyle(
+        fontFamily: fontFamily,
+        fontFamilyFallback: fontFallbacks,
         fontWeight: FontWeight.w700,
         fontSize: AppFontSize.label,
       ),
       unselectedLabelStyle: const TextStyle(
+        fontFamily: fontFamily,
+        fontFamilyFallback: fontFallbacks,
         fontWeight: FontWeight.w600,
         fontSize: AppFontSize.label,
       ),
@@ -86,7 +90,10 @@ class PulsrPillTabBar extends StatelessWidget {
       decoration: BoxDecoration(
         color: p.surfaceContainer,
         borderRadius: AppRadii.r20All,
-        border: Border.all(color: p.hairline),
+        border: Border.all(
+          color: p.isHighContrast ? p.borderStrong : p.hairline,
+          width: p.isHighContrast ? 1.5 : 1.0,
+        ),
       ),
       child: ClipRRect(
         borderRadius: AppRadii.r20All,

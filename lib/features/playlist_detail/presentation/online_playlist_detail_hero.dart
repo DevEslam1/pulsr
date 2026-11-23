@@ -9,19 +9,26 @@ extension _OnlinePlaylistDetailHero on _OnlinePlaylistDetailScreenState {
     int totalDurationMs,
   ) {
     const ytGradient = [AppColors.netflixRed, AppColors.ytRedDeep];
+    final isHighContrast =
+        p.isHighContrast || (MediaQuery.maybeHighContrastOf(context) ?? false);
 
     return Container(
       decoration: BoxDecoration(
         color: p.surfaceContainer,
         borderRadius: AppRadii.r24All,
-        border: Border.all(color: p.hairline),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.scrimAt(p.isDark ? 0.25 : 0.06),
-            blurRadius: 18,
-            offset: const Offset(0, 6),
-          ),
-        ],
+        border: Border.all(
+          color: isHighContrast ? p.borderStrong : p.hairline,
+          width: isHighContrast ? 1.25 : 1.0,
+        ),
+        boxShadow: p.isCalmDensity || isHighContrast
+            ? null
+            : [
+                BoxShadow(
+                  color: AppColors.scrimAt(p.isDark ? 0.25 : 0.06),
+                  blurRadius: 18,
+                  offset: const Offset(0, 6),
+                ),
+              ],
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(

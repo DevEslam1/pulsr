@@ -844,7 +844,7 @@ class _FolderBrowserTabState extends State<FolderBrowserTab> {
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
-                    p.accentContainer.withValues(alpha: 0.5),
+                    p.accentContainer,
                     p.surfaceContainerHigh,
                   ],
                   begin: Alignment.topLeft,

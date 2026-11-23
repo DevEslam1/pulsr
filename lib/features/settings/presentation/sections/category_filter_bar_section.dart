@@ -27,8 +27,14 @@ mixin CategoryFilterBarSection
           (c) => (id: c.id, title: c.title, icon: c.icon, color: c.tintColor)),
     ];
 
+    final isHighContrast =
+        p.isHighContrast || (MediaQuery.maybeHighContrastOf(context) ?? false);
+    final barHeight = MediaQuery.textScalerOf(context)
+        .scale(AppSpacing.minTouchTarget)
+        .clamp(AppSpacing.minTouchTarget, 68.0);
+
     return SizedBox(
-      height: AppSpacing.minTouchTarget,
+      height: barHeight,
       child: PulsrScrollEdgeFade(
         child: ListView.separated(
           scrollDirection: Axis.horizontal,
@@ -60,7 +66,10 @@ mixin CategoryFilterBarSection
                     color: isSelected ? p.accent : p.surfaceContainer,
                     borderRadius: AppRadii.r20All,
                     border: Border.all(
-                      color: isSelected ? p.accent : p.hairline,
+                      color: isSelected
+                          ? (isHighContrast ? p.borderStrong : p.accent)
+                          : (isHighContrast ? p.borderStrong : p.hairline),
+                      width: isHighContrast ? 1.25 : 1.0,
                     ),
                   ),
                   child: Row(

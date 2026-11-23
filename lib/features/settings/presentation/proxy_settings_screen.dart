@@ -811,7 +811,7 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen>
                     _testResult = null;
                   });
                 },
-                activeThumbColor: Colors.white,
+                activeThumbColor: p.onAccent,
                 activeTrackColor: p.accent,
               ),
             ],

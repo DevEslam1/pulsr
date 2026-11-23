@@ -83,7 +83,8 @@ class PulsrListTile extends StatelessWidget {
     final radius = borderRadius ?? AppRadii.r14All;
 
     final titleStyle = TextStyle(
-      fontFamily: 'Manrope',
+      fontFamily: fontFamily,
+      fontFamilyFallback: fontFallbacks,
       fontSize: density == PulsrListTileDensity.compact
           ? AppFontSize.body
           : AppFontSize.bodyLarge,
@@ -93,7 +94,8 @@ class PulsrListTile extends StatelessWidget {
     );
 
     final subtitleStyle = TextStyle(
-      fontFamily: 'Manrope',
+      fontFamily: fontFamily,
+      fontFamilyFallback: fontFallbacks,
       fontSize: AppFontSize.caption,
       fontWeight: FontWeight.w500,
       color: enabled ? p.textSecondary : p.textTertiary,
@@ -174,7 +176,12 @@ class PulsrListTile extends StatelessWidget {
       decoration: BoxDecoration(
         color: effectiveBg,
         borderRadius: radius,
-        border: selected ? Border.all(color: p.accent, width: 1.2) : null,
+        border: selected
+            ? Border.all(
+                color: p.accent,
+                width: p.isHighContrast ? 1.8 : 1.2,
+              )
+            : null,
       ),
       child: content,
     );

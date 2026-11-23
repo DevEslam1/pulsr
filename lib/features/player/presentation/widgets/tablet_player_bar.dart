@@ -197,121 +197,112 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                         height: maxAllowedHeight,
                         decoration: BoxDecoration(
                           borderRadius: barRadius,
-                          boxShadow: [
-                            BoxShadow(
-                              color:
-                                  AppColors.scrimAt(p.isDark ? 0.35 : 0.08),
-                              blurRadius: 18,
-                              spreadRadius: 0,
-                              offset: const Offset(0, 6),
-                            ),
-                            BoxShadow(
-                              color:
-                                  AppColors.scrimAt(p.isDark ? 0.15 : 0.04),
-                              blurRadius: 6,
-                              spreadRadius: 0,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
+                          boxShadow: (p.isCalmDensity || p.isHighContrast)
+                              ? null
+                              : PulsrElevation.level3(context),
                         ),
                         child: ClipRRect(
                           borderRadius: barRadius,
-                          child: Container(
-                            height: maxAllowedHeight,
+                          child: DecoratedBox(
                             decoration: BoxDecoration(
                               color: p.surfaceContainer,
                               borderRadius: barRadius,
                               border: Border.all(
-                                color: p.hairline,
+                                color: p.isHighContrast
+                                    ? p.borderStrong
+                                    : p.hairline,
                                 width: 1.0,
                               ),
                             ),
-                            child: Padding(
-                              padding: EdgeInsets.symmetric(
-                                horizontal: AppSpacing.md,
-                                vertical: isShortHeight
-                                    ? AppSpacing.xxs
-                                    : AppSpacing.s6,
-                              ),
-                              child: LayoutBuilder(
-                                builder: (context, barConstraints) {
-                                  final totalWidth = barConstraints.maxWidth;
-                                  final isCompactBar = totalWidth < 600;
-                                  final leftMaxWidth = isShortHeight
-                                      ? (totalWidth * 0.38).clamp(140.0, 240.0)
-                                      : (isCompactBar
-                                          ? (totalWidth * 0.28)
-                                              .clamp(60.0, 160.0)
-                                          : (totalWidth * 0.27)
-                                              .clamp(120.0, 300.0));
-                                  final rightMaxWidth = isShortHeight
-                                      ? (totalWidth * 0.20).clamp(60.0, 110.0)
-                                      : (isCompactBar
-                                          ? (totalWidth * 0.32)
-                                              .clamp(70.0, 200.0)
-                                          : (totalWidth * 0.34)
-                                              .clamp(140.0, 360.0));
-                                  final showVolumeSlider = !isShortHeight &&
-                                      totalWidth >= 680 &&
-                                      rightMaxWidth >= 160;
-                                  final showSecondaryBadges = !isShortHeight &&
-                                      totalWidth >= 600 &&
-                                      leftMaxWidth >= 140;
-                                  final showFavoriteButton = isShortHeight
-                                      ? leftMaxWidth >= 140
-                                      : (!isCompactBar && leftMaxWidth >= 130);
+                            child: SizedBox(
+                              height: maxAllowedHeight,
+                              child: Padding(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: AppSpacing.md,
+                                  vertical: isShortHeight
+                                      ? AppSpacing.xxs
+                                      : AppSpacing.s6,
+                                ),
+                                child: LayoutBuilder(
+                                  builder: (context, barConstraints) {
+                                    final totalWidth = barConstraints.maxWidth;
+                                    final isCompactBar = totalWidth < 600;
+                                    final leftMaxWidth = isShortHeight
+                                        ? (totalWidth * 0.38).clamp(140.0, 240.0)
+                                        : (isCompactBar
+                                            ? (totalWidth * 0.28)
+                                                .clamp(60.0, 160.0)
+                                            : (totalWidth * 0.27)
+                                                .clamp(120.0, 300.0));
+                                    final rightMaxWidth = isShortHeight
+                                        ? (totalWidth * 0.20).clamp(60.0, 110.0)
+                                        : (isCompactBar
+                                            ? (totalWidth * 0.32)
+                                                .clamp(70.0, 200.0)
+                                            : (totalWidth * 0.34)
+                                                .clamp(140.0, 360.0));
+                                    final showVolumeSlider = !isShortHeight &&
+                                        totalWidth >= 680 &&
+                                        rightMaxWidth >= 160;
+                                    final showSecondaryBadges = !isShortHeight &&
+                                        totalWidth >= 600 &&
+                                        leftMaxWidth >= 140;
+                                    final showFavoriteButton = isShortHeight
+                                        ? leftMaxWidth >= 140
+                                        : (!isCompactBar && leftMaxWidth >= 130);
 
-                                  return Row(
-                                    children: [
-                                      _buildLeftTrackSection(
-                                        context: context,
-                                        cubit: cubit,
-                                        state: state,
-                                        p: p,
-                                        activeColor: activeColor,
-                                        playerThemeMode: playerThemeMode,
-                                        leftMaxWidth: leftMaxWidth,
-                                        isShortHeight: isShortHeight,
-                                        isCompactBar: isCompactBar,
-                                        showSecondaryBadges:
-                                            showSecondaryBadges,
-                                        showFavoriteButton: showFavoriteButton,
-                                      ),
-                                      SizedBox(
-                                        width: isCompactBar
-                                            ? AppSpacing.xs
-                                            : AppSpacing.sm,
-                                      ),
-                                      _buildCenterTransportSection(
-                                        context: context,
-                                        cubit: cubit,
-                                        state: state,
-                                        p: p,
-                                        activeColor: activeColor,
-                                        playerSliderStyle: playerSliderStyle,
-                                        isShortHeight: isShortHeight,
-                                      ),
-                                      SizedBox(
-                                        width: isCompactBar
-                                            ? AppSpacing.xs
-                                            : AppSpacing.sm,
-                                      ),
-                                      _buildRightActionsSection(
-                                        context: context,
-                                        cubit: cubit,
-                                        state: state,
-                                        p: p,
-                                        activeColor: activeColor,
-                                        playerSliderStyle: playerSliderStyle,
-                                        currentOutputDevice:
-                                            currentOutputDevice,
-                                        rightMaxWidth: rightMaxWidth,
-                                        isShortHeight: isShortHeight,
-                                        showVolumeSlider: showVolumeSlider,
-                                      ),
-                                    ],
-                                  );
-                                },
+                                    return Row(
+                                      children: [
+                                        _buildLeftTrackSection(
+                                          context: context,
+                                          cubit: cubit,
+                                          state: state,
+                                          p: p,
+                                          activeColor: activeColor,
+                                          playerThemeMode: playerThemeMode,
+                                          leftMaxWidth: leftMaxWidth,
+                                          isShortHeight: isShortHeight,
+                                          isCompactBar: isCompactBar,
+                                          showSecondaryBadges:
+                                              showSecondaryBadges,
+                                          showFavoriteButton: showFavoriteButton,
+                                        ),
+                                        SizedBox(
+                                          width: isCompactBar
+                                              ? AppSpacing.xs
+                                              : AppSpacing.sm,
+                                        ),
+                                        _buildCenterTransportSection(
+                                          context: context,
+                                          cubit: cubit,
+                                          state: state,
+                                          p: p,
+                                          activeColor: activeColor,
+                                          playerSliderStyle: playerSliderStyle,
+                                          isShortHeight: isShortHeight,
+                                        ),
+                                        SizedBox(
+                                          width: isCompactBar
+                                              ? AppSpacing.xs
+                                              : AppSpacing.sm,
+                                        ),
+                                        _buildRightActionsSection(
+                                          context: context,
+                                          cubit: cubit,
+                                          state: state,
+                                          p: p,
+                                          activeColor: activeColor,
+                                          playerSliderStyle: playerSliderStyle,
+                                          currentOutputDevice:
+                                              currentOutputDevice,
+                                          rightMaxWidth: rightMaxWidth,
+                                          isShortHeight: isShortHeight,
+                                          showVolumeSlider: showVolumeSlider,
+                                        ),
+                                      ],
+                                    );
+                                  },
+                                ),
                               ),
                             ),
                           ),

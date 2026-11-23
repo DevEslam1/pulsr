@@ -103,13 +103,20 @@ class SettingsSection extends StatelessWidget {
           ),
           Material(
             color: isProminent
-                ? p.accentContainer.withValues(alpha: p.isDark ? 0.35 : 0.6)
+                ? Color.alphaBlend(
+                    p.accent.withValues(alpha: p.isDark ? 0.14 : 0.08),
+                    p.surfaceContainer,
+                  )
                 : p.surfaceContainer,
             shape: RoundedRectangleBorder(
               borderRadius: AppRadii.cardRadius,
               side: BorderSide(
-                color:
-                    isProminent ? p.accent.withValues(alpha: 0.45) : p.hairline,
+                color: isProminent
+                    ? p.accent.withValues(alpha: 0.45)
+                    : ((p.isHighContrast ||
+                            (MediaQuery.maybeHighContrastOf(context) ?? false))
+                        ? p.borderStrong
+                        : p.hairline),
                 width: isProminent ? 1.5 : 1.0,
               ),
             ),

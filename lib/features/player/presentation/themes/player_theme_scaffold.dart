@@ -1,16 +1,13 @@
 // lib/features/player/presentation/themes/player_theme_scaffold.dart
 import 'dart:math' as math;
 import 'package:material_ui/material_ui.dart';
-import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';
 import '../../../../core/utils/l10n_extensions.dart';
-import '../../../../core/utils/formatters.dart';
 import '../../../../core/widgets/waveform_logo.dart';
 import '../../../../data/db/app_database.dart';
-import '../../cubit/player_cubit.dart';
 import '../../../settings/cubit/settings_cubit.dart';
 import '../../../settings/cubit/settings_state.dart';
 import '../../../sheets/song_options_sheet.dart';
@@ -522,8 +519,10 @@ class PlayerThemeScaffold extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   if (!isPreview && state.bookmarkPosition != null) ...[
-                    _buildBookmarkPrompt(
-                        context, cubit, state.bookmarkPosition!),
+                    PlayerBookmarkPromptBanner(
+                      cubit: cubit,
+                      position: state.bookmarkPosition!,
+                    ),
                     const SizedBox(height: 8),
                   ],
                   PlayerControls(
@@ -709,8 +708,10 @@ class PlayerThemeScaffold extends StatelessWidget {
       return content;
     }
 
-    final bool effectiveScrims =
-        showLegibilityScrims || (background == null && !isPreview);
+    final isHighContrast = context.palette.isHighContrast ||
+        MediaQuery.highContrastOf(context);
+    final bool effectiveScrims = !isHighContrast &&
+        (showLegibilityScrims || (background == null && !isPreview));
 
     return AnimatedContainer(
       duration: context.motionMs(400),
@@ -770,50 +771,6 @@ class PlayerThemeScaffold extends StatelessWidget {
           ],
           SafeArea(child: content),
         ],
-      ),
-    );
-  }
-
-  Widget _buildBookmarkPrompt(
-      BuildContext context, PlayerCubit cubit, Duration pos) {
-    final l10n = context.l10n;
-    final p = context.palette;
-    return Semantics(
-      container: true,
-      liveRegion: true,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.md, vertical: AppSpacing.xxs),
-        child: Material(
-          color: p.warning.withValues(alpha: 0.15),
-          borderRadius: AppRadii.circular(12),
-          child: ListTile(
-            dense: true,
-            leading: Icon(Icons.bookmark, color: p.warning),
-            title: Text(l10n.resumeFromPrompt(Formatters.formatDuration(pos))),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextButton(
-                    style: TextButton.styleFrom(
-                      minimumSize: const Size(
-                        AppSpacing.minTouchTarget,
-                        AppSpacing.minTouchTarget,
-                      ),
-                    ),
-                    onPressed: cubit.seekToBookmark,
-                    child: Text(l10n.resume)),
-                IconButton(
-                    constraints: const BoxConstraints(
-                        minWidth: AppSpacing.minTouchTarget,
-                        minHeight: AppSpacing.minTouchTarget),
-                    tooltip: l10n.close,
-                    onPressed: cubit.dismissBookmark,
-                    icon: const Icon(Icons.close, size: 18)),
-              ],
-            ),
-          ),
-        ),
       ),
     );
   }

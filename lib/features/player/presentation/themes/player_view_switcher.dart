@@ -244,8 +244,7 @@ class PlayerViewSwitcher extends StatelessWidget {
                     p.surfaceContainer,
                 borderRadius: AppRadii.circular(barRadius),
                 border: Border.all(
-                  color:
-                      p.isDark ? AppColors.specularAt(borderAlpha) : p.hairline,
+                  color: p.hairline,
                   width: 1.0,
                 ),
                 boxShadow: PulsrElevation.level1(context),

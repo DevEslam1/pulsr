@@ -129,10 +129,10 @@ class ShortcutHelpSheet extends StatelessWidget {
               vertical: AppSpacing.s10,
             ),
             decoration: BoxDecoration(
-              color: p.surfaceContainer.withValues(alpha: 0.65),
+              color: p.surfaceContainer,
               borderRadius: AppRadii.r14All,
               border: Border.all(
-                color: p.hairline.withValues(alpha: 0.8),
+                color: p.hairline,
               ),
             ),
             child: Row(
@@ -161,8 +161,7 @@ class ShortcutHelpSheet extends StatelessWidget {
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black
-                            .withValues(alpha: p.isDark ? 0.35 : 0.12),
+                        color: p.isDark ? p.scrimMedium : p.scrimLight,
                         blurRadius: 0,
                         offset: const Offset(0, 2),
                       ),
@@ -209,10 +208,10 @@ class ShortcutHelpSheet extends StatelessWidget {
                   width: 32,
                   height: 32,
                   decoration: BoxDecoration(
-                    color: p.surfaceContainerHigh.withValues(alpha: 0.65),
+                    color: p.surfaceContainerHigh,
                     borderRadius: AppRadii.r10All,
                     border: Border.all(
-                      color: p.hairline.withValues(alpha: 0.6),
+                      color: p.hairline,
                     ),
                   ),
                   alignment: Alignment.center,

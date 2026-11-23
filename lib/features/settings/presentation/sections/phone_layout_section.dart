@@ -166,7 +166,7 @@ mixin PhoneLayoutSection
                 padding: const EdgeInsets.symmetric(
                     horizontal: AppSpacing.md, vertical: AppSpacing.s10),
                 decoration: BoxDecoration(
-                  color: p.accentContainer.withValues(alpha: 0.45),
+                  color: p.accentContainer,
                   borderRadius: AppRadii.cardRadius,
                   border: Border.all(color: p.accent.withValues(alpha: 0.3)),
                 ),
@@ -224,15 +224,15 @@ mixin PhoneLayoutSection
                   padding: const EdgeInsets.symmetric(
                       horizontal: AppSpacing.s6, vertical: 1),
                   decoration: BoxDecoration(
-                    color: AppColors.dacGold.withValues(alpha: 0.16),
+                    color: p.goldAccent.withValues(alpha: 0.14),
                     borderRadius: AppRadii.full,
                     border: Border.all(
-                        color: AppColors.dacGold.withValues(alpha: 0.5)),
+                        color: p.goldAccent.withValues(alpha: 0.45)),
                   ),
                   child: Text(
                     context.l10n.badgeExclusive,
                     style: TextStyle(
-                      color: p.warning,
+                      color: p.goldAccent,
                       fontSize: AppFontSize.caption,
                       fontWeight: FontWeight.w800,
                     ),

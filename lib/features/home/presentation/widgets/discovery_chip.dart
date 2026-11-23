@@ -30,7 +30,8 @@ class DiscoveryChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = context.palette;
     final isCapsule = context.isCapsuleButtons;
-    final isHighContrast = MediaQuery.maybeHighContrastOf(context) ?? false;
+    final isHighContrast =
+        p.isHighContrast || (MediaQuery.maybeHighContrastOf(context) ?? false);
     final chipRadius = context.buttonRadius(rectRadius: 6.0);
     final tintedSurface = isHighContrast
         ? p.surfaceContainerHigh

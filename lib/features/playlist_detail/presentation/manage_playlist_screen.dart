@@ -12,6 +12,7 @@ import '../../../core/constants/app_radii.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/errors/failures.dart';
 import '../../../core/motion/pulsr_motion.dart';
+import '../../../core/responsive/pulsr_layout_metrics.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/error_logger.dart';
@@ -397,7 +398,11 @@ class _ManagePlaylistScreenState extends State<ManagePlaylistScreen> {
                                         addRepaintBoundaries: true,
                                         padding: EdgeInsetsDirectional.only(
                                           top: AppSpacing.xxs,
-                                          bottom: 100,
+                                          bottom:
+                                              PulsrLayoutMetrics.scrollBottom(
+                                            context,
+                                            extra: AppSpacing.xl,
+                                          ),
                                           start: Adaptive.pagePadding(context),
                                           end: Adaptive.pagePadding(context),
                                         ),

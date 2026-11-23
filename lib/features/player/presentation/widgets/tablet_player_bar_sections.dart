@@ -373,6 +373,7 @@ extension _TabletPlayerBarSections on _TabletPlayerBarState {
     required Color activeColor,
     required bool isShortHeight,
   }) {
+    final p = context.palette;
     final l10n = context.l10n;
     final label = state.isPlaying ? l10n.pause : l10n.play;
     return Semantics(

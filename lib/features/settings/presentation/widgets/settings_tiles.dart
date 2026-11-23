@@ -263,13 +263,15 @@ void showAudioFeatureInfoDialog(BuildContext context, AudioFeatureInfo info,
           Container(
             padding: const EdgeInsets.all(AppSpacing.s10),
             decoration: BoxDecoration(
-                color: Colors.amber.withValues(alpha: 0.12),
+                color: p.warningSoft,
                 borderRadius: AppRadii.r10All,
-                border: Border.all(color: Colors.amber.withValues(alpha: 0.4))),
+                border:
+                    Border.all(color: p.goldAccent.withValues(alpha: 0.4))),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.warning_amber_rounded, color: p.warning, size: 18),
+                Icon(Icons.warning_amber_rounded,
+                    color: p.goldAccent, size: 18),
                 const SizedBox(width: AppSpacing.xs),
                 Expanded(
                     child: Text(
@@ -334,11 +336,16 @@ class SettingsSectionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
+    final isHighContrast =
+        p.isHighContrast || (MediaQuery.maybeHighContrastOf(context) ?? false);
     final content = Material(
       color: p.surfaceContainer,
       shape: RoundedRectangleBorder(
         borderRadius: AppRadii.r20All,
-        side: BorderSide(color: p.hairline),
+        side: BorderSide(
+          color: isHighContrast ? p.borderStrong : p.hairline,
+          width: isHighContrast ? 1.25 : 1.0,
+        ),
       ),
       clipBehavior: Clip.antiAlias,
       child: padding != null ? Padding(padding: padding!, child: child) : child,

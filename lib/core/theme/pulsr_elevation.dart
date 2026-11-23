@@ -20,6 +20,8 @@ class PulsrElevation {
   static List<BoxShadow> level1([dynamic contextOrPalette]) => _pair(
         _isDark(contextOrPalette),
         isAmoled: _isAmoled(contextOrPalette),
+        isCalmDensity: _isCalmDensity(contextOrPalette),
+        isHighContrast: _isHighContrast(contextOrPalette),
         keyAlpha: 0.16,
         ambAlpha: 0.10,
         keyBlur: 3,
@@ -31,6 +33,8 @@ class PulsrElevation {
   static List<BoxShadow> level2([dynamic contextOrPalette]) => _pair(
         _isDark(contextOrPalette),
         isAmoled: _isAmoled(contextOrPalette),
+        isCalmDensity: _isCalmDensity(contextOrPalette),
+        isHighContrast: _isHighContrast(contextOrPalette),
         keyAlpha: 0.24,
         ambAlpha: 0.16,
         keyBlur: 6,
@@ -42,6 +46,8 @@ class PulsrElevation {
   static List<BoxShadow> level3([dynamic contextOrPalette]) => _pair(
         _isDark(contextOrPalette),
         isAmoled: _isAmoled(contextOrPalette),
+        isCalmDensity: _isCalmDensity(contextOrPalette),
+        isHighContrast: _isHighContrast(contextOrPalette),
         keyAlpha: 0.34,
         ambAlpha: 0.24,
         keyBlur: 10,
@@ -53,6 +59,8 @@ class PulsrElevation {
   static List<BoxShadow> level4([dynamic contextOrPalette]) => _pair(
         _isDark(contextOrPalette),
         isAmoled: _isAmoled(contextOrPalette),
+        isCalmDensity: _isCalmDensity(contextOrPalette),
+        isHighContrast: _isHighContrast(contextOrPalette),
         keyAlpha: 0.44,
         ambAlpha: 0.32,
         keyBlur: 16,
@@ -64,6 +72,8 @@ class PulsrElevation {
   static List<BoxShadow> _pair(
     bool isDark, {
     bool isAmoled = false,
+    bool isCalmDensity = false,
+    bool isHighContrast = false,
     required double keyAlpha,
     required double ambAlpha,
     required double keyBlur,
@@ -71,39 +81,57 @@ class PulsrElevation {
     required double keyDy,
     required double ambDy,
   }) {
-    // Light mode needs far less ink to read the same depth.
-    final scale = isDark ? 1.0 : 0.45;
+    if (isHighContrast) {
+      // High Contrast communicates hierarchy through crisp borders rather than
+      // wide blurred shadows; keep only a tight grounding key shadow.
+      return [
+        BoxShadow(
+          color: isDark
+              ? AppColors.scrimAt(0.40)
+              : AppColors.inkSlateAt(0.14),
+          blurRadius: keyBlur,
+          offset: Offset(0, keyDy),
+        ),
+      ];
+    }
+    // Light mode uses cool-slate shadows at lower ink so cards lift crisply
+    // instead of reading as muddy grey stickers.
+    final scale = isDark ? 1.0 : 0.36;
+    final calmScale = isCalmDensity ? 0.65 : 1.0;
     // Over pure black both translucency and shadow lose signal, so the ambient
     // pass needs more ink to keep a surface from reading as a flat rectangle.
     final ambientScale = isAmoled ? 1.25 : 1.0;
+    final shadowBase = isDark ? AppColors.scrimAt : AppColors.inkSlateAt;
     return [
       BoxShadow(
-        color: AppColors.scrimAt(keyAlpha * scale),
+        color: shadowBase((keyAlpha * scale * calmScale).clamp(0.0, 1.0)),
         blurRadius: keyBlur,
         offset: Offset(0, keyDy),
       ),
       BoxShadow(
-        color: AppColors.scrimAt(ambAlpha * scale * ambientScale),
+        color: shadowBase(
+            (ambAlpha * scale * ambientScale * calmScale).clamp(0.0, 1.0)),
         blurRadius: ambBlur,
         offset: Offset(0, ambDy),
       ),
     ];
   }
 
-  static bool _isAmoled(dynamic contextOrPalette) {
-    final candidate = contextOrPalette is BuildContext
-        ? contextOrPalette.palette
-        : contextOrPalette;
-    if (candidate is! PulsrPalette || !candidate.isDark) return false;
-    // AMOLED's base is pure black; dark's is #12151D.
-    return candidate.bg.computeLuminance() < 0.005;
+  static PulsrPalette? _paletteOf(dynamic contextOrPalette) {
+    if (contextOrPalette is BuildContext) return contextOrPalette.palette;
+    if (contextOrPalette is PulsrPalette) return contextOrPalette;
+    return null;
   }
 
-  static bool _isDark(dynamic contextOrPalette) {
-    if (contextOrPalette is BuildContext) {
-      return contextOrPalette.palette.isDark;
-    }
-    if (contextOrPalette is PulsrPalette) return contextOrPalette.isDark;
-    return true;
-  }
+  static bool _isAmoled(dynamic contextOrPalette) =>
+      _paletteOf(contextOrPalette)?.isAmoled ?? false;
+
+  static bool _isCalmDensity(dynamic contextOrPalette) =>
+      _paletteOf(contextOrPalette)?.isCalmDensity ?? false;
+
+  static bool _isHighContrast(dynamic contextOrPalette) =>
+      _paletteOf(contextOrPalette)?.isHighContrast ?? false;
+
+  static bool _isDark(dynamic contextOrPalette) =>
+      _paletteOf(contextOrPalette)?.isDark ?? true;
 }

@@ -388,7 +388,8 @@ class StackedBottomDockState extends State<StackedBottomDock> {
               final isRtl = Directionality.of(context) == TextDirection.rtl;
               final startPad = isRtl ? rightPad : leftPad;
               final endPad = isRtl ? leftPad : rightPad;
-              final isCalmWide = p.isCalmDensity || GpuBudget.isEnabled;
+              final isCalmWide =
+                  p.isCalmDensity || GpuBudget.isEnabled || p.isHighContrast;
               final wideTopSurface =
                   p.isDark ? p.surfaceContainerHigh : p.surfaceElevated;
               final wideBottomSurface =
@@ -425,8 +426,10 @@ class StackedBottomDockState extends State<StackedBottomDock> {
                                 ),
                           borderRadius: AppRadii.r24All,
                           border: Border.all(
-                            color: p.hairline,
-                            width: 1.0,
+                            color: p.isHighContrast
+                                ? p.borderStrong
+                                : p.hairline,
+                            width: p.isHighContrast ? 1.5 : 1.0,
                           ),
                           boxShadow: PulsrElevation.level4(context),
                         ),

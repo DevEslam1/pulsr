@@ -86,8 +86,8 @@ class MiniPlayerCompactCard extends StatelessWidget {
     final activeAccent = p.accent;
     final isTablet = Adaptive.isTablet(context);
     final playerRadius = isTablet ? AppRadii.r28All : AppRadii.r24All;
-    final isHighContrast = MediaQuery.highContrastOf(context) ||
-        p.hairline.a >= 0.38;
+    final isHighContrast =
+        p.isHighContrast || MediaQuery.highContrastOf(context);
     final isCalm = p.isCalmDensity || GpuBudget.isEnabled || isHighContrast;
     final allowMotion = PulsrMotion.shouldAnimate(context);
     final textScale =

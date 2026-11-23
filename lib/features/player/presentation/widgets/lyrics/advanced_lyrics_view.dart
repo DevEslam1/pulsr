@@ -481,25 +481,27 @@ class _KaraokeWordView extends StatelessWidget {
       fontWeight: (isSung || isSinging) ? FontWeight.w900 : FontWeight.w600,
       fontStyle: isBackground ? FontStyle.italic : FontStyle.normal,
       color: isSung ? activeColor : inactiveColor,
-      shadows: isSinging
-          ? [
-              Shadow(
-                color: activeColor.withValues(alpha: 0.65),
-                blurRadius: 18,
-              ),
-              Shadow(
-                color: activeColor.withValues(alpha: 0.4),
-                blurRadius: 6,
-              ),
-            ]
-          : (isSung
+      shadows: palette.isCalmDensity
+          ? null
+          : (isSinging
               ? [
                   Shadow(
-                    color: activeColor.withValues(alpha: 0.3),
-                    blurRadius: 8,
+                    color: activeColor.withValues(alpha: 0.65),
+                    blurRadius: 18,
+                  ),
+                  Shadow(
+                    color: activeColor.withValues(alpha: 0.4),
+                    blurRadius: 6,
                   ),
                 ]
-              : null),
+              : (isSung
+                  ? [
+                      Shadow(
+                        color: activeColor.withValues(alpha: 0.3),
+                        blurRadius: 8,
+                      ),
+                    ]
+                  : null)),
     );
 
     Widget child = Text(word.word, style: style);

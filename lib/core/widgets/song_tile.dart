@@ -110,16 +110,26 @@ class _SongTileState extends State<SongTile> {
             borderRadius: AppRadii.r16All,
             border: Border.all(
               color: widget.selected
-                  ? p.accent.withValues(alpha: 0.55)
+                  ? (p.isHighContrast
+                      ? p.accent
+                      : p.accent.withValues(alpha: 0.55))
                   : (isActive
-                      ? p.accent.withValues(alpha: p.isDark ? 0.28 : 0.20)
+                      ? p.accent.withValues(
+                          alpha: p.isHighContrast
+                              ? 0.85
+                              : (p.isDark ? 0.28 : 0.22),
+                        )
                       : (_hovered ? p.borderSubtle : Colors.transparent)),
-              width: 1.0,
+              width: (widget.selected || isActive) && p.isHighContrast
+                  ? 1.5
+                  : 1.0,
             ),
-            boxShadow: isPlaying
+            boxShadow: isPlaying && p.chromeGlowScale > 0
                 ? [
                     BoxShadow(
-                      color: p.accent.withValues(alpha: p.isDark ? 0.14 : 0.08),
+                      color: p.accent.withValues(
+                        alpha: (p.isDark ? 0.14 : 0.08) * p.chromeGlowScale,
+                      ),
                       blurRadius: 14,
                       spreadRadius: -2,
                       offset: const Offset(0, 3),
@@ -163,8 +173,9 @@ class _SongTileState extends State<SongTile> {
                   final vPad = widget.dense ? AppSpacing.s2 : AppSpacing.s6;
                   return Container(
                     constraints: BoxConstraints(
-                        minHeight:
-                            widget.dense ? 44 : (isTileNarrow ? 48 : 58)),
+                        minHeight: widget.dense
+                            ? AppSpacing.minTouchTarget
+                            : (isTileNarrow ? 50 : 58)),
                     padding: EdgeInsetsDirectional.fromSTEB(
                       padH,
                       vPad,
@@ -254,9 +265,19 @@ class _SongTileState extends State<SongTile> {
                                                       AppRadii.circular(artRadius),
                                                   border: Border.all(
                                                     color: isActive
-                                                        ? p.accent.withValues(alpha: 0.65)
-                                                        : AppColors.specularAt(
-                                                            p.isDark ? 0.10 : 0.06),
+                                                        ? p.accent.withValues(
+                                                            alpha: p.isHighContrast
+                                                                ? 0.90
+                                                                : 0.65,
+                                                          )
+                                                        : (p.isDark
+                                                            ? AppColors
+                                                                .specularAt(
+                                                                p.isAmoled
+                                                                    ? 0.14
+                                                                    : 0.10,
+                                                              )
+                                                            : p.hairline),
                                                     width: isActive ? 1.4 : 0.8,
                                                   ),
                                                 ),
@@ -277,13 +298,15 @@ class _SongTileState extends State<SongTile> {
                                                     if (isActive)
                                                       Container(
                                                         decoration: BoxDecoration(
-                                                          color: AppColors.scrimAt(0.52),
+                                                          color: AppColors.scrimAt(0.56),
                                                           borderRadius: AppRadii.circular(
                                                               artRadius),
                                                         ),
                                                         child: Center(
                                                           child: NowPlayingIndicator(
-                                                            color: p.accent,
+                                                            color: p.isDark
+                                                                ? p.accent
+                                                                : Colors.white,
                                                             isPlaying: isPlaying,
                                                           ),
                                                         ),
@@ -372,10 +395,12 @@ class _SongTileState extends State<SongTile> {
                                                             .ellipsis,
                                                         style: TextStyle(
                                                           color: isActive
-                                                              ? p.textPrimary
-                                                                  .withValues(
-                                                                      alpha:
-                                                                          0.78)
+                                                              ? (p.isHighContrast
+                                                                  ? p.textPrimary
+                                                                  : p.textPrimary
+                                                                      .withValues(
+                                                                          alpha:
+                                                                              0.80))
                                                               : p.textSecondary,
                                                           fontWeight:
                                                               FontWeight.w500,

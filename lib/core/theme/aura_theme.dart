@@ -530,7 +530,7 @@ class AuraTheme {
     double containerAlpha = 0.12,
     Color bg = Colors.white,
   }) {
-    var hsl = HSLColor.fromColor(color);
+    final hsl = HSLColor.fromColor(color);
     // Keep extreme pastel/neon saturation controlled as lightness drops so
     // darkened accents read as rich editorial tones rather than harsh primaries.
     final baseSaturation = hsl.saturation.clamp(0.0, 0.90);
@@ -1341,14 +1341,17 @@ class AuraTheme {
       ),
       chipTheme: ChipThemeData(
         backgroundColor: p.surfaceContainer,
+        surfaceTintColor: Colors.transparent,
         disabledColor: p.surfaceContainer.withValues(alpha: 0.5),
         selectedColor: p.accentContainer,
         secondarySelectedColor: p.accentContainer,
+        checkmarkColor: p.accent,
+        deleteIconColor: p.textSecondary,
         padding: const EdgeInsets.symmetric(
             horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
         shape: RoundedRectangleBorder(
             borderRadius: AppRadii.chipRadius,
-            side: BorderSide(color: p.hairline)),
+            side: BorderSide(color: p.hairline, width: outlineWidth)),
         labelStyle: TextStyle(
             color: p.textSecondary,
             fontFamily: fontFamily,
@@ -1377,7 +1380,12 @@ class AuraTheme {
                   : p.textSecondary),
           overlayColor:
               WidgetStatePropertyAll(p.accent.withValues(alpha: 0.08)),
-          side: WidgetStatePropertyAll(BorderSide(color: p.hairline)),
+          side: WidgetStatePropertyAll(
+              BorderSide(color: p.hairline, width: outlineWidth)),
+          minimumSize: const WidgetStatePropertyAll(
+            Size(AppSpacing.minTouchTarget, AppSpacing.minTouchTarget),
+          ),
+          tapTargetSize: MaterialTapTargetSize.padded,
           shape: const WidgetStatePropertyAll(
               RoundedRectangleBorder(borderRadius: AppRadii.r20All)),
           textStyle: WidgetStatePropertyAll(TextStyle(
@@ -1386,19 +1394,19 @@ class AuraTheme {
             fontSize: AppFontSize.bodySmall,
             fontWeight: FontWeight.w700,
           )),
-          visualDensity: VisualDensity.compact,
+          visualDensity: VisualDensity.standard,
         ),
       ),
       // One material for every context menu. Without this the 12 raw
       // PopupMenuButtons inherit the Material default surface, elevation and
       // radius — the only surface class outside the Pulsr system.
       popupMenuTheme: PopupMenuThemeData(
-        color: p.surfaceContainerHigh,
+        color: isDark ? p.surfaceContainerHigh : p.surfaceElevated,
         surfaceTintColor: Colors.transparent,
-        elevation: 18,
+        elevation: isHighContrast ? 8 : 18,
         shape: RoundedRectangleBorder(
           borderRadius: AppRadii.cardRadius,
-          side: BorderSide(color: p.hairline, width: 1.0),
+          side: BorderSide(color: p.hairline, width: outlineWidth),
         ),
         textStyle: TextStyle(
           color: p.textPrimary,
@@ -1416,6 +1424,9 @@ class AuraTheme {
         style: ButtonStyle(
           visualDensity: VisualDensity.standard,
           tapTargetSize: MaterialTapTargetSize.padded,
+          minimumSize: const WidgetStatePropertyAll(
+            Size(AppSpacing.minTouchTarget, AppSpacing.minTouchTarget),
+          ),
           shape: WidgetStatePropertyAll(
             RoundedRectangleBorder(borderRadius: AppRadii.r14All),
           ),
@@ -1425,6 +1436,8 @@ class AuraTheme {
         backgroundColor: p.surface,
         modalBackgroundColor: p.surface,
         elevation: 24,
+        dragHandleColor: p.borderStrong,
+        dragHandleSize: const Size(40, 4.5),
         shape: const RoundedRectangleBorder(
             borderRadius: AppRadii.bottomSheetRadius),
         surfaceTintColor: Colors.transparent,
@@ -1432,17 +1445,53 @@ class AuraTheme {
       ),
       dialogTheme: DialogThemeData(
         backgroundColor: p.surface,
-        elevation: 24,
-        shape:
-            const RoundedRectangleBorder(borderRadius: AppRadii.dialogRadius),
+        surfaceTintColor: Colors.transparent,
+        elevation: isHighContrast ? 8 : 24,
+        titleTextStyle: TextStyle(
+          color: p.textPrimary,
+          fontFamily: fontFamily,
+          fontFamilyFallback: fontFallbacks,
+          fontSize: AppFontSize.title,
+          fontWeight: FontWeight.w800,
+          letterSpacing: AppTracking.title,
+        ),
+        contentTextStyle: TextStyle(
+          color: p.textSecondary,
+          fontFamily: fontFamily,
+          fontFamilyFallback: fontFallbacks,
+          fontSize: AppFontSize.body,
+          height: 1.45,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: AppRadii.dialogRadius,
+          side: BorderSide(color: p.hairline, width: outlineWidth),
+        ),
       ),
       listTileTheme: ListTileThemeData(
-        iconColor: p.textTertiary,
+        iconColor: p.textSecondary,
         textColor: p.textPrimary,
+        selectedColor: p.accent,
+        minTileHeight: AppSpacing.minTouchTarget,
+        titleTextStyle: TextStyle(
+          color: p.textPrimary,
+          fontFamily: fontFamily,
+          fontFamilyFallback: fontFallbacks,
+          fontSize: AppFontSize.bodyLarge,
+          fontWeight: FontWeight.w600,
+        ),
+        subtitleTextStyle: TextStyle(
+          color: p.textSecondary,
+          fontFamily: fontFamily,
+          fontFamilyFallback: fontFallbacks,
+          fontSize: AppFontSize.label,
+          fontWeight: FontWeight.w500,
+        ),
         shape: RoundedRectangleBorder(borderRadius: AppRadii.tileRadius),
       ),
       snackBarTheme: SnackBarThemeData(
-        backgroundColor: p.surfaceContainerHigh,
+        backgroundColor: isDark ? p.surfaceContainerHigh : p.surfaceElevated,
+        actionTextColor: p.accent,
+        closeIconColor: p.textSecondary,
         contentTextStyle: TextStyle(
             color: p.textPrimary,
             fontFamily: fontFamily,
@@ -1450,31 +1499,91 @@ class AuraTheme {
             fontWeight: FontWeight.w600,
             fontSize: AppFontSize.bodySmall),
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: AppRadii.r14All),
+        shape: RoundedRectangleBorder(
+          borderRadius: AppRadii.r14All,
+          side: BorderSide(color: p.hairline, width: outlineWidth),
+        ),
       ),
       switchTheme: SwitchThemeData(
         thumbColor: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) return p.onAccent;
-          return p.textSecondary;
+          return isHighContrast ? p.textPrimary : p.textSecondary;
         }),
         trackColor: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) return p.accent;
+          if (isHighContrast) return p.surfaceContainerHigh;
           return p.isDark
-              ? AppColors.specularAt(0.12)
-              : AppColors.scrimAt(0.08);
+              ? AppColors.specularAt(0.14)
+              : AppColors.scrimAt(0.11);
         }),
         trackOutlineColor: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) return Colors.transparent;
-          return p.hairline;
+          return isHighContrast ? p.borderStrong : p.hairline;
         }),
         trackOutlineWidth: WidgetStatePropertyAll(outlineWidth),
       ),
+      checkboxTheme: CheckboxThemeData(
+        fillColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) return p.accent;
+          return Colors.transparent;
+        }),
+        checkColor: WidgetStatePropertyAll(p.onAccent),
+        side: BorderSide(
+          color: isHighContrast ? p.borderStrong : p.textSecondary,
+          width: isHighContrast ? 2.0 : 1.6,
+        ),
+        shape: const RoundedRectangleBorder(borderRadius: AppRadii.r6All),
+      ),
+      radioTheme: RadioThemeData(
+        fillColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) return p.accent;
+          return isHighContrast ? p.textPrimary : p.textSecondary;
+        }),
+      ),
+      tooltipTheme: TooltipThemeData(
+        decoration: BoxDecoration(
+          color: isDark ? p.surfaceContainerHigh : p.textPrimary,
+          borderRadius: AppRadii.r10All,
+          border: Border.all(
+            color: isDark ? p.hairline : Colors.transparent,
+            width: outlineWidth,
+          ),
+        ),
+        textStyle: TextStyle(
+          color: isDark ? p.textPrimary : Colors.white,
+          fontFamily: fontFamily,
+          fontFamilyFallback: fontFallbacks,
+          fontSize: AppFontSize.label,
+          fontWeight: FontWeight.w600,
+        ),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.sm,
+          vertical: AppSpacing.xs,
+        ),
+      ),
+      progressIndicatorTheme: ProgressIndicatorThemeData(
+        color: p.accent,
+        linearTrackColor: isHighContrast
+            ? p.borderSubtle
+            : (isDark ? AppColors.specularAt(0.10) : p.surfaceContainerHigh),
+        circularTrackColor: isHighContrast
+            ? p.borderSubtle
+            : (isDark ? AppColors.specularAt(0.10) : p.surfaceContainerHigh),
+      ),
       sliderTheme: SliderThemeData(
         activeTrackColor: p.accent,
-        inactiveTrackColor:
-            (p.isDark ? Colors.white : Colors.black).withValues(alpha: 0.22),
+        inactiveTrackColor: (p.isDark ? Colors.white : Colors.black)
+            .withValues(alpha: isHighContrast ? 0.42 : 0.22),
         thumbColor: p.accent,
         overlayColor: p.accent.withValues(alpha: 0.14),
+        valueIndicatorColor: p.accent,
+        valueIndicatorTextStyle: TextStyle(
+          color: p.onAccent,
+          fontFamily: fontFamily,
+          fontFamilyFallback: fontFallbacks,
+          fontSize: AppFontSize.label,
+          fontWeight: FontWeight.w700,
+        ),
         trackHeight: 5.0,
         trackShape: const RoundedRectSliderTrackShape(),
         thumbShape: const RoundSliderThumbShape(
@@ -1484,16 +1593,39 @@ class AuraTheme {
         ),
         overlayShape: const RoundSliderOverlayShape(overlayRadius: 16.0),
       ),
-      dividerTheme: DividerThemeData(color: p.hairline, thickness: 1, space: 1),
+      dividerTheme: DividerThemeData(
+        color: p.hairline,
+        thickness: isHighContrast ? 1.5 : 1.0,
+        space: 1,
+      ),
       iconTheme: IconThemeData(color: p.textPrimary, size: 24),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: p.surfaceContainer,
+        prefixIconColor: p.textSecondary,
+        suffixIconColor: p.textSecondary,
+        labelStyle: TextStyle(
+            color: p.textSecondary,
+            fontFamily: fontFamily,
+            fontFamilyFallback: fontFallbacks,
+            fontSize: AppFontSize.body),
+        floatingLabelStyle: TextStyle(
+            color: p.accent,
+            fontFamily: fontFamily,
+            fontFamilyFallback: fontFallbacks,
+            fontWeight: FontWeight.w700,
+            fontSize: AppFontSize.bodySmall),
         hintStyle: TextStyle(
             color: p.textTertiary,
             fontFamily: fontFamily,
             fontFamilyFallback: fontFallbacks,
             fontSize: AppFontSize.body),
+        errorStyle: TextStyle(
+            color: p.error,
+            fontFamily: fontFamily,
+            fontFamilyFallback: fontFallbacks,
+            fontWeight: FontWeight.w700,
+            fontSize: AppFontSize.caption),
         contentPadding: const EdgeInsets.symmetric(
             horizontal: AppSpacing.md, vertical: AppSpacing.s14),
         border: outlineBorder,
@@ -1502,11 +1634,22 @@ class AuraTheme {
           borderRadius: AppRadii.r16All,
           borderSide: BorderSide(color: p.accent, width: focusRingWidth),
         ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: AppRadii.r16All,
+          borderSide: BorderSide(color: p.error, width: outlineWidth + 0.4),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: AppRadii.r16All,
+          borderSide: BorderSide(color: p.error, width: focusRingWidth),
+        ),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
           backgroundColor: p.accent,
           foregroundColor: p.onAccent,
+          minimumSize:
+              const Size(AppSpacing.minTouchTarget, AppSpacing.minTouchTarget),
+          tapTargetSize: MaterialTapTargetSize.padded,
           padding: const EdgeInsets.symmetric(
               horizontal: AppSpacing.s20, vertical: AppSpacing.sm),
           shape: RoundedRectangleBorder(borderRadius: resolvedButtonRadius),
@@ -1522,6 +1665,9 @@ class AuraTheme {
           backgroundColor: p.accent,
           foregroundColor: p.onAccent,
           elevation: 0,
+          minimumSize:
+              const Size(AppSpacing.minTouchTarget, AppSpacing.minTouchTarget),
+          tapTargetSize: MaterialTapTargetSize.padded,
           padding: const EdgeInsets.symmetric(
               horizontal: AppSpacing.lg, vertical: AppSpacing.s14),
           shape: RoundedRectangleBorder(borderRadius: resolvedButtonRadius),
@@ -1535,7 +1681,12 @@ class AuraTheme {
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: p.textPrimary,
-          side: BorderSide(color: p.hairline, width: outlineWidth),
+          minimumSize:
+              const Size(AppSpacing.minTouchTarget, AppSpacing.minTouchTarget),
+          tapTargetSize: MaterialTapTargetSize.padded,
+          side: BorderSide(
+              color: isHighContrast ? p.borderStrong : p.hairline,
+              width: outlineWidth),
           padding: const EdgeInsets.symmetric(
               horizontal: AppSpacing.s20, vertical: AppSpacing.s14),
           shape: RoundedRectangleBorder(borderRadius: resolvedButtonRadius),
@@ -1549,6 +1700,9 @@ class AuraTheme {
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
             foregroundColor: p.accent,
+            minimumSize: const Size(
+                AppSpacing.minTouchTarget, AppSpacing.minTouchTarget),
+            tapTargetSize: MaterialTapTargetSize.padded,
             textStyle: const TextStyle(
                 fontFamily: fontFamily,
                 fontFamilyFallback: fontFallbacks,

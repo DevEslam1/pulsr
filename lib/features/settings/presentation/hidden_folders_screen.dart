@@ -230,7 +230,7 @@ class HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                           SwitchListTile.adaptive(
                             value: state.autoHideSystemMedia,
                             activeTrackColor: p.accent,
-                            activeThumbColor: Colors.white,
+                            activeThumbColor: p.onAccent,
                             onChanged: state.isScanning
                                 ? null
                                 : (val) async {

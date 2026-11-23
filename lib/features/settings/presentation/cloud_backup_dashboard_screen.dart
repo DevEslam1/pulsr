@@ -247,13 +247,13 @@ class CloudBackupDashboardScreenState
                       shape:
                           RoundedRectangleBorder(borderRadius: AppRadii.r16All),
                     ),
-                    icon: Icon(Icons.sync_rounded, color: Colors.black),
+                    icon: Icon(Icons.sync_rounded, color: p.onAccent),
                     label: Text(
                       _isSyncing
                           ? context.l10n.settingsSyncing
                           : context.l10n.syncNow,
                       style: TextStyle(
-                          color: Colors.black,
+                          color: p.onAccent,
                           fontWeight: FontWeight.w700,
                           fontSize: AppFontSize.callout),
                     ),

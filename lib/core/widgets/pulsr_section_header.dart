@@ -103,7 +103,8 @@ class PulsrSectionHeader extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: isLargeHeader
                             ? TextStyle(
-                                fontFamily: 'Manrope',
+                                fontFamily: fontFamily,
+                                fontFamilyFallback: fontFallbacks,
                                 fontSize: AppFontSize.bodyLarge,
                                 fontWeight: FontWeight.w800,
                                 color: p.textPrimary,
@@ -131,16 +132,19 @@ class PulsrSectionHeader extends StatelessWidget {
                                     : p.surfaceContainerHigh,
                                 borderRadius: AppRadii.full,
                                 border: Border.all(
-                                  color: p.isDark
-                                      ? AppColors.specularAt(0.14)
-                                      : p.hairline,
-                                  width: 0.8,
+                                  color: p.isHighContrast
+                                      ? p.borderStrong
+                                      : (p.isDark
+                                          ? AppColors.specularAt(0.14)
+                                          : p.hairline),
+                                  width: p.isHighContrast ? 1.2 : 0.8,
                                 ),
                               ),
                         child: Text(
                           '$count',
                           style: TextStyle(
-                            fontFamily: 'Manrope',
+                            fontFamily: fontFamily,
+                            fontFamilyFallback: fontFallbacks,
                             fontSize: AppFontSize.caption,
                             fontWeight: FontWeight.w800,
                             color: isCapsule
@@ -214,7 +218,8 @@ class _SectionActionButtonState extends State<_SectionActionButton> {
       child: ConstrainedBox(
         constraints: const BoxConstraints(
           maxWidth: 168,
-          minHeight: 44,
+          minWidth: AppSpacing.minTouchTarget,
+          minHeight: AppSpacing.minTouchTarget,
         ),
         child: PulsrPressable(
           pressedScale: 0.96,
@@ -258,7 +263,8 @@ class _SectionActionButtonState extends State<_SectionActionButton> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontFamily: 'Manrope',
+                        fontFamily: fontFamily,
+                        fontFamilyFallback: fontFallbacks,
                         color: isCapsule
                             ? PulsrCapsuleStyle.foregroundColor(p)
                             : p.accent,

@@ -64,6 +64,8 @@ class SmartPlaylistCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
+    final isHighContrast =
+        p.isHighContrast || (MediaQuery.maybeHighContrastOf(context) ?? false);
     final description = _describePlaylist(context, playlist.name);
 
     return Semantics(
@@ -84,23 +86,28 @@ class SmartPlaylistCard extends StatelessWidget {
             width: 244,
             padding: const EdgeInsets.all(AppSpacing.s14),
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Color.alphaBlend(
-                    p.accent.withValues(alpha: p.isDark ? 0.10 : 0.06),
-                    p.surfaceContainer,
-                  ),
-                  p.surfaceContainer,
-                ],
-              ),
+              color: isHighContrast ? p.surfaceContainer : null,
+              gradient: isHighContrast
+                  ? null
+                  : LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Color.alphaBlend(
+                          p.accent.withValues(alpha: p.isDark ? 0.10 : 0.06),
+                          p.surfaceContainer,
+                        ),
+                        p.surfaceContainer,
+                      ],
+                    ),
               borderRadius: AppRadii.r18All,
               border: Border.all(
-                color: isSelected ? p.accent : p.hairline,
-                width: isSelected ? 2.0 : 1.0,
+                color: isSelected
+                    ? p.accent
+                    : (isHighContrast ? p.borderStrong : p.hairline),
+                width: isSelected ? 2.0 : (isHighContrast ? 1.25 : 1.0),
               ),
-              boxShadow: isSelected
+              boxShadow: isSelected && !p.isCalmDensity && !isHighContrast
                   ? [
                       BoxShadow(
                         color: p.glow.withValues(alpha: 0.32),

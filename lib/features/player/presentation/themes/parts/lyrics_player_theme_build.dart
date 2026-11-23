@@ -19,7 +19,8 @@ extension _LyricsPlayerThemeBuild on LyricsPlayerTheme {
         activeColor: activeColor,
         bgColor: props.bgColor,
         isDark: isDark,
-        isAmoled: themeMode == AppThemeMode.amoled,
+        isAmoled: themeMode == AppThemeMode.amoled ||
+            (p.isDark && p.bg == Colors.black),
         customGlow: customGlow,
       ),
       builder: (context, metrics, isInSplitView, isPreview) {
@@ -109,6 +110,11 @@ class _KaraokeStageBackdrop extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
+    final isHighContrast =
+        p.isHighContrast || MediaQuery.highContrastOf(context);
+    if (isHighContrast) {
+      return ColoredBox(color: p.bg);
+    }
     final surface = context.playerSurfacePalette;
     final glowBoost = customGlow ? 1.32 : 1.0;
 
@@ -249,8 +255,7 @@ class _KaraokeCompactHeader extends StatelessWidget {
     final Color buttonSurface = p.isDark
         ? AppColors.specularAt(0.08)
         : p.surface.withValues(alpha: 0.72);
-    final Color buttonBorder =
-        p.isDark ? AppColors.specularAt(0.14) : p.hairline;
+    final Color buttonBorder = p.hairline;
 
     final Widget artworkThumb = Hero(
       tag: props.heroTag,
@@ -833,7 +838,7 @@ class _KaraokeSyncedLineTile extends StatelessWidget {
             height: 1.32,
             letterSpacing: isActive ? AppTracking.heading : AppTracking.title,
             color: isActive ? activeColor : p.textSecondary,
-            shadows: isActive
+            shadows: (isActive && !p.isCalmDensity)
                 ? [
                     Shadow(
                       color: activeColor.withValues(alpha: glowAlpha),
@@ -1321,7 +1326,7 @@ class _KaraokePreviewStage extends StatelessWidget {
                                       ? 0.58
                                       : 0.30,
                                 ),
-                          shadows: i == highlightIdx
+                          shadows: (i == highlightIdx && !p.isCalmDensity)
                               ? [
                                   Shadow(
                                     color: activeColor.withValues(
@@ -1391,9 +1396,7 @@ class _KaraokeFloatingPill extends StatelessWidget {
             ),
           );
 
-    final Color borderColor = p.isDark
-        ? AppColors.specularAt(0.16)
-        : p.hairline.withValues(alpha: 0.90);
+    final Color borderColor = p.hairline;
 
     final repeatLabel = state.repeatMode == PlayerRepeatMode.one
         ? l10n.repeatOne

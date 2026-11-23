@@ -229,7 +229,11 @@ class _NowPlayingQueueViewState extends State<NowPlayingQueueView> {
                         minWidth: AppSpacing.minTouchTarget,
                         minHeight: AppSpacing.minTouchTarget,
                       ),
-                      icon: const Icon(Icons.group_rounded, size: 20),
+                      icon: Icon(
+                        Icons.group_rounded,
+                        size: 20,
+                        color: p.textSecondary,
+                      ),
                       tooltip: context.l10n.partyListenTogether,
                       onPressed: () {
                         PulsrHaptics.lightImpact();
@@ -241,7 +245,7 @@ class _NowPlayingQueueViewState extends State<NowPlayingQueueView> {
               ),
 
               Divider(
-                color: p.hairline.withValues(alpha: isInSplit ? 0.35 : 1.0),
+                color: p.isHighContrast ? p.borderStrong : p.hairline,
                 height: 1,
               ),
 
@@ -348,7 +352,10 @@ class _NowPlayingQueueViewState extends State<NowPlayingQueueView> {
                                       ),
                                       child: Center(
                                         child: NowPlayingIndicator(
-                                            color: p.accent),
+                                          color: p.isDark
+                                              ? p.accent
+                                              : AppColors.onPrimary,
+                                        ),
                                       ),
                                     ),
                                 ],

@@ -2,8 +2,10 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import '../constants/app_radii.dart';
+import '../constants/app_strokes.dart';
 import '../motion/pulsr_motion.dart';
 import '../theme/aura_theme.dart';
+import '../theme/focus_tokens.dart';
 import '../utils/pulsr_haptics.dart';
 
 /// {@category DesignSystem}
@@ -167,18 +169,23 @@ class _PulsrPressableState extends State<PulsrPressable>
     );
 
     if (_focused) {
-      final accent = context.palette.accent;
+      final p = context.palette;
+      final ringWidth = p.isHighContrast
+          ? AppStrokes.focusWidthHighContrast
+          : AppStrokes.focusWidth;
       animatedChild = DecoratedBox(
         position: DecorationPosition.foreground,
         decoration: BoxDecoration(
-          border: Border.all(color: accent, width: 2),
+          border: Border.all(color: p.accent, width: ringWidth),
           borderRadius: widget.focusBorderRadius,
           boxShadow: [
             BoxShadow(
-              color: accent.withValues(alpha: 0.24),
-              blurRadius: 10,
-              spreadRadius: -1,
+              color: (p.isDark ? Colors.white : Colors.black)
+                  .withValues(alpha: p.isHighContrast ? 0.70 : 0.45),
+              spreadRadius: p.isHighContrast ? 2.0 : 1.5,
+              blurRadius: 0,
             ),
+            if (p.chromeGlowScale > 0) ...FocusTokens.focusRingShadow(p.accent),
           ],
         ),
         child: animatedChild,

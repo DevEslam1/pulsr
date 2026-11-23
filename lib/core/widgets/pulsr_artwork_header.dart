@@ -63,8 +63,8 @@ class PulsrArtworkHeader extends StatelessWidget {
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  p.bg.withValues(alpha: 0.85),
-                  p.bg.withValues(alpha: 0.95),
+                  p.bg.withValues(alpha: p.isHighContrast ? 0.94 : 0.78),
+                  p.bg.withValues(alpha: p.isHighContrast ? 0.98 : 0.92),
                   p.bg,
                 ],
                 stops: const [0.0, 0.45, 1.0],

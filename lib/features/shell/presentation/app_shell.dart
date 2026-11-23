@@ -16,7 +16,6 @@ import '../../../core/router/app_router.dart';
 import '../../../core/router/safe_navigation.dart';
 import '../../../core/services/settings_cache.dart';
 import '../../../core/services/system_ui_controller.dart';
-import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/error_logger.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/a11y_live_announcer.dart';
@@ -491,7 +490,7 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
                                 SizeTransition(
                               sizeFactor: animation,
                               axis: Axis.horizontal,
-                              axisAlignment: -1.0,
+                              alignment: AlignmentDirectional.centerStart,
                               child: FadeTransition(
                                 opacity: animation,
                                 child: child,

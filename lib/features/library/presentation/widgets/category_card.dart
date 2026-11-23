@@ -31,7 +31,8 @@ class CategoryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    final isHighContrast = MediaQuery.maybeHighContrastOf(context) ?? false;
+    final isHighContrast =
+        p.isHighContrast || (MediaQuery.maybeHighContrastOf(context) ?? false);
     return Semantics(
       button: true,
       label: '$title, $subtitle',

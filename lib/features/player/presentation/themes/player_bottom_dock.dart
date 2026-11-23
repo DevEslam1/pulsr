@@ -425,7 +425,7 @@ class PlayerBottomActionDock extends StatelessWidget {
                 border: Border.all(
                   color: showCustomGlow
                       ? props.activeColor.withValues(alpha: 0.42)
-                      : (p.isDark ? AppColors.specularAt(0.12) : p.hairline),
+                      : p.hairline,
                   width: 1.0,
                 ),
                 boxShadow: [
@@ -478,8 +478,7 @@ class PlayerBottomActionDock extends StatelessWidget {
                               isCast ? l10n.googleCast : l10n.audioOutputAndDac,
                           badgeText: isCast ? 'CAST' : (isUsb ? 'DAC' : null),
                           isActive: isCast || isUsb,
-                          activeColor:
-                              isCast ? AppColors.accentCyan : AppColors.dacGold,
+                          activeColor: isCast ? p.info : p.goldAccent,
                           inactiveColor: p.textSecondary,
                           isTablet: isTablet,
                           style: dockIconStyle,
@@ -520,7 +519,8 @@ class PlayerBottomActionDock extends StatelessWidget {
                       icon: Icons.auto_stories_rounded,
                       tooltip: l10n.quranMode,
                       isActive: props.state.isQuranModeEnabled,
-                      activeColor: AppColors.quranEmerald,
+                      activeColor:
+                          p.isDark ? AppColors.quranEmerald : p.success,
                       inactiveColor: p.textSecondary,
                       isTablet: isTablet,
                       style: dockIconStyle,

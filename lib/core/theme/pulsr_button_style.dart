@@ -1,6 +1,7 @@
 // lib/core/theme/pulsr_button_style.dart
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../constants/app_colors.dart';
 import '../constants/app_radii.dart';
 import '../../features/settings/cubit/settings_cubit.dart';
 import '../../features/settings/cubit/settings_state.dart';
@@ -57,33 +58,55 @@ class PulsrCapsuleStyle {
     }
   }
 
-  /// Aurora glass: lighter fill, brighter specular edge. Depth comes from the
-  /// border + elevation pair, not from a heavy milky fill.
-  static Color backgroundColor(PulsrPalette p) => p.isDark
-      ? Colors.white.withValues(alpha: 0.10)
-      : Colors.black.withValues(alpha: 0.05);
+  /// Aurora glass: crisp fill, legible specular edge, and solid high-contrast
+  /// fallback when [PulsrPalette.isHighContrast] is active.
+  static Color backgroundColor(PulsrPalette p) {
+    if (p.isHighContrast) return p.surfaceContainer;
+    if (p.isAmoled) return Colors.white.withValues(alpha: 0.11);
+    return p.isDark
+        ? Colors.white.withValues(alpha: 0.10)
+        : AppColors.inkSlateAt(0.065);
+  }
 
-  static Border border(PulsrPalette p, {double width = 0.8}) => Border.all(
-        color: p.isDark
-            ? Colors.white.withValues(alpha: 0.14)
-            : Colors.black.withValues(alpha: 0.07),
-        width: width,
+  static Border border(PulsrPalette p, {double width = 0.8}) {
+    if (p.isHighContrast) {
+      return Border.all(
+        color: p.borderStrong,
+        width: width < 1.5 ? 1.5 : width,
       );
+    }
+    return Border.all(
+      color: p.isDark
+          ? Colors.white.withValues(alpha: p.isAmoled ? 0.18 : 0.14)
+          : AppColors.inkSlateAt(0.14),
+      width: width,
+    );
+  }
 
   /// NEW: subtle top-lit gradient for larger glass surfaces (docks, clusters).
-  static LinearGradient surfaceSheen(PulsrPalette p) => LinearGradient(
+  static LinearGradient surfaceSheen(PulsrPalette p) {
+    if (p.isHighContrast) {
+      return LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
-        colors: p.isDark
-            ? [
-                Colors.white.withValues(alpha: 0.13),
-                Colors.white.withValues(alpha: 0.07),
-              ]
-            : [
-                Colors.white.withValues(alpha: 0.65),
-                Colors.white.withValues(alpha: 0.40),
-              ],
+        colors: [p.surfaceContainer, p.surfaceContainer],
       );
+    }
+    final spec = p.specularScale;
+    return LinearGradient(
+      begin: Alignment.topCenter,
+      end: Alignment.bottomCenter,
+      colors: p.isDark
+          ? [
+              Colors.white.withValues(alpha: 0.13 * spec),
+              Colors.white.withValues(alpha: 0.07 * spec),
+            ]
+          : [
+              Colors.white.withValues(alpha: 0.72),
+              Colors.white.withValues(alpha: 0.46),
+            ],
+    );
+  }
 
   /// Primary high-contrast foreground color on the frosted glass surface.
   static Color foregroundColor(PulsrPalette p) {
@@ -92,7 +115,8 @@ class PulsrCapsuleStyle {
 
   /// Secondary muted foreground color on the frosted glass surface.
   static Color secondaryForegroundColor(PulsrPalette p) {
-    return (p.isDark ? Colors.white : p.textPrimary).withValues(alpha: 0.72);
+    if (p.isHighContrast) return p.textSecondary;
+    return (p.isDark ? Colors.white : p.textPrimary).withValues(alpha: 0.74);
   }
 
   /// Standard decoration for a frosted glass rectangular or capsule pill.

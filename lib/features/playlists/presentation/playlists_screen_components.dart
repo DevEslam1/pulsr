@@ -24,6 +24,10 @@ class _PlaylistHeroCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.palette;
+    final isHighContrast =
+        p.isHighContrast || (MediaQuery.maybeHighContrastOf(context) ?? false);
+    final onGradient = AppColors.textOnAccent(colors.first);
     return InkWell(
       onTap: onTap,
       borderRadius: AppRadii.r22All,
@@ -36,24 +40,29 @@ class _PlaylistHeroCard extends StatelessWidget {
             end: Alignment.bottomRight,
           ),
           borderRadius: AppRadii.r22All,
-          boxShadow: [
-            BoxShadow(
-              color: colors.first.withValues(alpha: 0.35),
-              blurRadius: 28,
-              spreadRadius: -6,
-              offset: const Offset(0, 12),
-            ),
-          ],
+          border: isHighContrast
+              ? Border.all(color: p.borderStrong, width: 1.5)
+              : null,
+          boxShadow: p.isCalmDensity || isHighContrast
+              ? null
+              : [
+                  BoxShadow(
+                    color: colors.first.withValues(alpha: 0.35),
+                    blurRadius: 28,
+                    spreadRadius: -6,
+                    offset: const Offset(0, 12),
+                  ),
+                ],
         ),
         child: Row(
           children: [
             Container(
               padding: const EdgeInsets.all(AppSpacing.sm),
               decoration: BoxDecoration(
-                color: AppColors.specularAt(0.2),
+                color: onGradient.withValues(alpha: 0.18),
                 shape: BoxShape.circle,
               ),
-              child: Icon(icon, color: Colors.white, size: 26),
+              child: Icon(icon, color: onGradient, size: 26),
             ),
             const SizedBox(width: AppSpacing.md),
             Expanded(
@@ -62,8 +71,8 @@ class _PlaylistHeroCard extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: onGradient,
                       fontWeight: FontWeight.w900,
                       fontSize: AppFontSize.title,
                       letterSpacing: AppTracking.title,
@@ -73,7 +82,7 @@ class _PlaylistHeroCard extends StatelessWidget {
                   Text(
                     subtitle,
                     style: TextStyle(
-                      color: AppColors.specularAt(0.8),
+                      color: onGradient.withValues(alpha: 0.82),
                       fontSize: AppFontSize.label,
                     ),
                   ),
@@ -83,8 +92,8 @@ class _PlaylistHeroCard extends StatelessWidget {
             Container(
               width: 40,
               height: 40,
-              decoration: const BoxDecoration(
-                color: Colors.white,
+              decoration: BoxDecoration(
+                color: onGradient,
                 shape: BoxShape.circle,
               ),
               child: Icon(
@@ -149,6 +158,40 @@ class _PlaylistCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
+    final isHighContrast =
+        p.isHighContrast || (MediaQuery.maybeHighContrastOf(context) ?? false);
+    final onGradient = AppColors.textOnAccent(gradient.first);
+    final artHeader = Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: gradient,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: Stack(
+        children: [
+          Center(
+            child: Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: muted
+                    ? p.accent.withValues(alpha: 0.12)
+                    : onGradient.withValues(alpha: 0.18),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                icon,
+                color: muted ? p.accent : onGradient,
+                size: 30,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
     final card = Semantics(
       button: true,
       selected: isSelected,
@@ -162,10 +205,12 @@ class _PlaylistCard extends StatelessWidget {
             color: p.surfaceContainer,
             borderRadius: AppRadii.r20All,
             border: Border.all(
-              color: isSelected ? p.accent : p.hairline,
-              width: isSelected ? 2.0 : 1.0,
+              color: isSelected
+                  ? p.accent
+                  : (isHighContrast ? p.borderStrong : p.hairline),
+              width: isSelected ? 2.0 : (isHighContrast ? 1.25 : 1.0),
             ),
-            boxShadow: isSelected
+            boxShadow: isSelected && !p.isCalmDensity && !isHighContrast
                 ? [
                     BoxShadow(
                       color: p.glow.withValues(alpha: 0.32),
@@ -181,69 +226,8 @@ class _PlaylistCard extends StatelessWidget {
             children: [
               Expanded(
                 child: heroTag != null
-                    ? Hero(
-                        tag: heroTag!,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: gradient,
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                          ),
-                          child: Stack(
-                            children: [
-                              Center(
-                                child: Container(
-                                  width: 56,
-                                  height: 56,
-                                  decoration: BoxDecoration(
-                                    color: muted
-                                        ? p.accent.withValues(alpha: 0.12)
-                                        : Colors.white.withValues(alpha: 0.16),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Icon(
-                                    icon,
-                                    color: muted ? p.accent : Colors.white,
-                                    size: 30,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      )
-                    : Container(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: gradient,
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                        ),
-                        child: Stack(
-                          children: [
-                            Center(
-                              child: Container(
-                                width: 56,
-                                height: 56,
-                                decoration: BoxDecoration(
-                                  color: muted
-                                      ? p.accent.withValues(alpha: 0.12)
-                                      : Colors.white.withValues(alpha: 0.16),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Icon(
-                                  icon,
-                                  color: muted ? p.accent : Colors.white,
-                                  size: 30,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                    ? Hero(tag: heroTag!, child: artHeader)
+                    : artHeader,
               ),
               Padding(
                 padding: const EdgeInsetsDirectional.fromSTEB(

@@ -130,8 +130,13 @@ class _PulsrSwitchState extends State<PulsrSwitch>
     final activeFill =
         widget.activeTrackColor ?? widget.activeColor ?? p.accent;
     final inactiveFill = widget.inactiveTrackColor ??
-        (p.isDark ? AppColors.specularAt(0.10) : AppColors.scrimAt(0.08));
-    final thumbFill = widget.thumbColor ?? Colors.white;
+        (p.isHighContrast
+            ? p.surfaceContainerHigh
+            : (p.isDark
+                ? AppColors.specularAt(p.isAmoled ? 0.14 : 0.12)
+                : AppColors.inkSlateAt(0.16)));
+    final inactiveThumb = p.isHighContrast ? p.textPrimary : Colors.white;
+    final activeThumb = AppColors.textOnAccent(activeFill);
 
     const double trackPadding = 3.0;
     final double thumbDiameter = widget.height - (trackPadding * 2.0);
@@ -193,11 +198,15 @@ class _PulsrSwitchState extends State<PulsrSwitch>
                     final slideT = _slideAnimation.value;
                     final currentColor =
                         Color.lerp(inactiveFill, activeFill, t)!;
-                    final topTrackColor = Color.lerp(
-                      currentColor,
-                      Colors.white,
-                      0.08 * t,
-                    )!;
+                    final thumbFill = widget.thumbColor ??
+                        Color.lerp(inactiveThumb, activeThumb, t)!;
+                    final topTrackColor = p.isHighContrast
+                        ? currentColor
+                        : Color.lerp(
+                            currentColor,
+                            Colors.white,
+                            0.08 * t,
+                          )!;
 
                     // Compensate for thumb width expansion when at the active end
                     // so the thumb stretches inward instead of overflowing the track.
@@ -218,17 +227,24 @@ class _PulsrSwitchState extends State<PulsrSwitch>
                         border: Border.all(
                           color: _focused
                               ? p.accent
-                              : t > 0.5
-                                  ? Colors.white.withValues(alpha: 0.22 * t)
-                                  : (p.isDark
-                                      ? AppColors.specularAt(0.14)
-                                      : p.hairline),
-                          width: _focused ? 2.0 : 1.0,
+                              : (p.isHighContrast
+                                  ? p.borderStrong
+                                  : (t > 0.5
+                                      ? Colors.white.withValues(alpha: 0.22 * t)
+                                      : (p.isDark
+                                          ? AppColors.specularAt(
+                                              p.isAmoled ? 0.18 : 0.14)
+                                          : p.hairline))),
+                          width: _focused
+                              ? (p.isHighContrast ? 2.4 : 2.0)
+                              : (p.isHighContrast ? 1.5 : 1.0),
                         ),
-                        boxShadow: t > 0.01
+                        boxShadow: t > 0.01 && p.chromeGlowScale > 0
                             ? [
                                 BoxShadow(
-                                  color: activeFill.withValues(alpha: 0.34 * t),
+                                  color: activeFill.withValues(
+                                    alpha: 0.34 * t * p.chromeGlowScale,
+                                  ),
                                   blurRadius: 12 * t,
                                   spreadRadius: -1 * t,
                                   offset: Offset(0, 2 * t),
@@ -250,12 +266,16 @@ class _PulsrSwitchState extends State<PulsrSwitch>
                                   AppRadii.circular(thumbDiameter / 2.0),
                               color: thumbFill,
                               border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.90),
+                                color: p.isDark
+                                    ? Colors.white.withValues(alpha: 0.90)
+                                    : AppColors.inkSlateAt(0.12),
                                 width: 0.8,
                               ),
                               boxShadow: [
                                 BoxShadow(
-                                  color: AppColors.scrimAt(0.26),
+                                  color: AppColors.scrimAt(
+                                    p.isDark ? 0.28 : 0.18,
+                                  ),
                                   blurRadius: 4.5,
                                   offset: const Offset(0, 1.5),
                                 ),
@@ -363,10 +383,12 @@ class PulsrSwitchListTile extends StatelessWidget {
                                         ? AppColors.specularAt(0.07)
                                         : p.surfaceContainerHigh,
                                     border: Border.all(
-                                      color: p.isDark
-                                          ? AppColors.specularAt(0.12)
-                                          : p.hairline,
-                                      width: 0.8,
+                                      color: p.isHighContrast
+                                          ? p.borderStrong
+                                          : (p.isDark
+                                              ? AppColors.specularAt(0.14)
+                                              : p.hairline),
+                                      width: p.isHighContrast ? 1.2 : 0.8,
                                     ),
                                   ),
                                   child: Icon(

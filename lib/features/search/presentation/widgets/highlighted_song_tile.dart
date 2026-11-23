@@ -3,6 +3,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 
+import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_radii.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_typography.dart';
@@ -243,17 +244,19 @@ class _ArtworkThumbnail extends StatelessWidget {
           if (isActive)
             DecoratedBox(
               decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.45),
+                color: AppColors.scrimAt(0.50),
                 borderRadius: AppRadii.circular(12),
                 border: Border.all(
-                  color: palette.accent.withValues(alpha: 0.6),
+                  color: palette.accent.withValues(alpha: 0.7),
                   width: 1.5,
                 ),
               ),
               child: Center(
                 child: Icon(
                   Icons.graphic_eq_rounded,
-                  color: palette.accent,
+                  color: palette.accent.computeLuminance() > 0.12
+                      ? palette.accent
+                      : AppColors.fadeStopOpaque,
                   size: 22,
                 ),
               ),

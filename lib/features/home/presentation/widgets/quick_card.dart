@@ -26,7 +26,8 @@ class QuickCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    final isHighContrast = MediaQuery.maybeHighContrastOf(context) ?? false;
+    final isHighContrast =
+        p.isHighContrast || (MediaQuery.maybeHighContrastOf(context) ?? false);
     final isCalm = p.isCalmDensity || GpuBudget.isEnabled || isHighContrast;
     final isCompact = MediaQuery.sizeOf(context).width < 380;
 

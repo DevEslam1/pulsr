@@ -153,21 +153,21 @@ class _GestureHintOverlayState extends State<GestureHintOverlay> {
                         ),
                         borderRadius: AppRadii.full,
                         border: Border.all(
-                          color: p.accent.withValues(alpha: 0.42),
-                          width: 1.2,
+                          color: p.accent.withValues(
+                            alpha: p.isHighContrast ? 0.90 : 0.42,
+                          ),
+                          width: p.isHighContrast ? 1.6 : 1.2,
                         ),
                         boxShadow: [
-                          BoxShadow(
-                            color: Colors.black
-                                .withValues(alpha: p.isDark ? 0.45 : 0.14),
-                            blurRadius: 18,
-                            offset: const Offset(0, 6),
-                          ),
-                          BoxShadow(
-                            color: p.accent.withValues(alpha: 0.18),
-                            blurRadius: 14,
-                            spreadRadius: -2,
-                          ),
+                          ...PulsrElevation.level3(context),
+                          if (p.chromeGlowScale > 0)
+                            BoxShadow(
+                              color: p.accent.withValues(
+                                alpha: 0.18 * p.chromeGlowScale,
+                              ),
+                              blurRadius: 14,
+                              spreadRadius: -2,
+                            ),
                         ],
                       ),
                       child: Row(

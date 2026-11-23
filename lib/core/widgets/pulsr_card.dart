@@ -99,9 +99,12 @@ class _PulsrCardState extends State<PulsrCard> {
   List<BoxShadow>? _resolveShadows(PulsrPalette p) {
     if (widget.boxShadow != null) return widget.boxShadow;
     if (widget.selected) {
+      if (p.chromeGlowScale <= 0) return null;
       return [
         BoxShadow(
-          color: p.accent.withValues(alpha: p.isDark ? 0.18 : 0.10),
+          color: p.accent.withValues(
+            alpha: (p.isDark ? 0.18 : 0.10) * p.chromeGlowScale,
+          ),
           blurRadius: 16,
           spreadRadius: -2,
           offset: const Offset(0, 4),
@@ -142,7 +145,9 @@ class _PulsrCardState extends State<PulsrCard> {
     final bg = _resolveBackground(p);
     final border = Border.all(
       color: _resolveBorderColor(p),
-      width: widget.selected ? 1.5 : 1.0,
+      width: widget.selected
+          ? (p.isHighContrast ? 2.0 : 1.5)
+          : (p.isHighContrast ? 1.5 : 1.0),
     );
     final radius = AppRadii.circular(widget.borderRadius);
     final shadows = _resolveShadows(p);

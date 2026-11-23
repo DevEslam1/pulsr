@@ -1,4 +1,5 @@
 // lib/features/shell/presentation/widgets/tablet_side_inspector.dart
+import 'dart:math' as math;
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
@@ -13,6 +14,7 @@ import '../../../../core/services/settings_cache.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';
 import '../../../../core/utils/l10n_extensions.dart';
+import '../../../../core/widgets/pulsr_dock_tracker.dart';
 import '../../../player/cubit/player_cubit.dart';
 import '../../../player/cubit/player_state.dart';
 import '../../../player/presentation/widgets/lyrics_view.dart';
@@ -203,31 +205,50 @@ class TabletSideInspectorState extends State<TabletSideInspector> {
     final p = context.palette;
     final activeColor = p.accent;
     final tabs = _resolveTabs(activeColor);
+    final isCalm = p.isCalmDensity;
+    final isSolidSurface = isCalm || p.isHighContrast;
+    final screenWidth = Adaptive.widthOf(context);
+    final effectiveMaxWidth = math.max(
+      TabletSideInspector.minWidth,
+      math.min(TabletSideInspector.maxWidth, screenWidth * 0.48),
+    );
 
-    final defaultWidth = (Adaptive.widthOf(context) * 0.35)
-        .clamp(TabletSideInspector.minWidth, TabletSideInspector.maxWidth);
+    final defaultWidth = (screenWidth * 0.35)
+        .clamp(TabletSideInspector.minWidth, effectiveMaxWidth);
     final inspectorWidth = (_customWidth ?? defaultWidth)
-        .clamp(TabletSideInspector.minWidth, TabletSideInspector.maxWidth);
+        .clamp(TabletSideInspector.minWidth, effectiveMaxWidth);
 
     final safeTabIndex = _selectedTabIndex.clamp(0, tabs.length - 1);
     final dir = Directionality.of(context);
+    final dockHeight = PulsrDockScope.heightOf(context);
+    final safeBottom = MediaQuery.paddingOf(context).bottom;
+    final bottomClearance =
+        dockHeight > 0 ? (dockHeight + safeBottom) : safeBottom;
+    final panelSurface = p.isDark ? p.surfaceContainer : p.surface;
 
     return Container(
       width: inspectorWidth,
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            p.surfaceContainerHigh.withValues(alpha: 0.55),
-            p.surfaceContainer,
-          ],
-          stops: const [0.0, 0.25],
-        ),
+        color: isSolidSurface ? panelSurface : null,
+        gradient: isSolidSurface
+            ? null
+            : LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  p.isDark
+                      ? p.surfaceContainerHigh.withValues(alpha: 0.55)
+                      : p.surfaceElevated,
+                  panelSurface,
+                ],
+                stops: const [0.0, 0.25],
+              ),
         border: BorderDirectional(
           start: BorderSide(
-            color: _isDragging ? p.accent.withValues(alpha: 0.70) : p.hairline,
-            width: _isDragging ? 1.5 : 1.0,
+            color: _isDragging
+                ? p.accent.withValues(alpha: p.isHighContrast ? 1.0 : 0.70)
+                : (p.isHighContrast ? p.borderStrong : p.hairline),
+            width: _isDragging || p.isHighContrast ? 1.5 : 1.0,
           ),
         ),
       ),
@@ -242,264 +263,289 @@ class TabletSideInspectorState extends State<TabletSideInspector> {
             Expanded(
               child: Directionality(
                 textDirection: dir,
-                child: Column(
-                  children: [
-                    // Header with Recessed Segmented Tabs & Close Button
-                    Padding(
-                      padding: const EdgeInsetsDirectional.only(
-                        start: AppSpacing.xs,
-                        end: AppSpacing.s14,
-                        top: AppSpacing.s10,
-                        bottom: AppSpacing.s10,
-                      ),
-                      child: Row(
+                child: SafeArea(
+                  top: true,
+                  bottom: false,
+                  left: false,
+                  right: false,
+                  child: Column(
                     children: [
-                      // Data-driven Segmented Selector
-                      Expanded(
-                        child: Container(
-                          height: PulsrLayoutMetrics.fieldHeight(context),
-                          decoration: BoxDecoration(
-                            color: p.surfaceContainer,
-                            borderRadius: AppRadii.r20All,
-                            border: Border.all(color: p.hairline),
-                          ),
-                          child: ClipRRect(
-                            borderRadius: AppRadii.r20All,
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                for (int i = 0; i < tabs.length; i++)
-                                  Expanded(
-                                    child: Semantics(
-                                      button: true,
-                                      selected: safeTabIndex == i,
-                                      label: tabs[i].label(context),
-                                      child: GestureDetector(
-                                        behavior: HitTestBehavior.opaque,
-                                        onTap: () {
-                                          if (_selectedTabIndex != i) {
-                                            PulsrHaptics.selectionClick();
-                                            setState(
-                                                () => _selectedTabIndex = i);
-                                          }
-                                        },
-                                        child: AnimatedContainer(
-                                          duration: context.motionMs(200),
-                                          curve: context
-                                              .motionCurve(Curves.easeOutCubic),
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: AppSpacing.xs,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: safeTabIndex == i
-                                                ? p.accent
-                                                : Colors.transparent,
-                                            borderRadius: AppRadii.r20All,
-                                          ),
-                                          alignment: Alignment.center,
-                                          child: Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Icon(
-                                                tabs[i].icon,
-                                                size: 15,
-                                                color: safeTabIndex == i
-                                                    ? p.onAccent
-                                                    : p.textSecondary,
+                      // Header with Recessed Segmented Tabs & Close Button
+                      Padding(
+                        padding: const EdgeInsetsDirectional.only(
+                          start: AppSpacing.xs,
+                          end: AppSpacing.xs,
+                          top: AppSpacing.s10,
+                          bottom: AppSpacing.s10,
+                        ),
+                        child: Row(
+                          children: [
+                            // Data-driven Segmented Selector
+                            Expanded(
+                              child: Container(
+                                height: PulsrLayoutMetrics.fieldHeight(context),
+                                decoration: BoxDecoration(
+                                  color: p.surfaceContainer,
+                                  borderRadius: AppRadii.r20All,
+                                  border: Border.all(color: p.hairline),
+                                ),
+                                child: ClipRRect(
+                                  borderRadius: AppRadii.r20All,
+                                  child: Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      for (int i = 0; i < tabs.length; i++)
+                                        Expanded(
+                                          child: Semantics(
+                                            button: true,
+                                            selected: safeTabIndex == i,
+                                            label: tabs[i].label(context),
+                                            child: GestureDetector(
+                                              behavior: HitTestBehavior.opaque,
+                                              onTap: () {
+                                                if (_selectedTabIndex != i) {
+                                                  PulsrHaptics.selectionClick();
+                                                  setState(() =>
+                                                      _selectedTabIndex = i);
+                                                }
+                                              },
+                                              child: AnimatedContainer(
+                                                duration:
+                                                    context.motionMs(200),
+                                                curve: context.motionCurve(
+                                                    Curves.easeOutCubic),
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                  horizontal: AppSpacing.xs,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  color: safeTabIndex == i
+                                                      ? p.accent
+                                                      : Colors.transparent,
+                                                  borderRadius: AppRadii.r20All,
+                                                ),
+                                                alignment: Alignment.center,
+                                                child: Row(
+                                                  mainAxisSize:
+                                                      MainAxisSize.min,
+                                                  children: [
+                                                    Icon(
+                                                      tabs[i].icon,
+                                                      size: 15,
+                                                      color: safeTabIndex == i
+                                                          ? p.onAccent
+                                                          : p.textSecondary,
+                                                    ),
+                                                    const SizedBox(
+                                                        width: AppSpacing.s6),
+                                                    Flexible(
+                                                      child: tabs[i]
+                                                                  .headerWidget !=
+                                                              null
+                                                          ? tabs[i]
+                                                              .headerWidget!(
+                                                              context,
+                                                              safeTabIndex == i,
+                                                            )
+                                                          : Text(
+                                                              tabs[i].label(
+                                                                  context),
+                                                              maxLines: 1,
+                                                              overflow:
+                                                                  TextOverflow
+                                                                      .ellipsis,
+                                                              style: TextStyle(
+                                                                fontSize:
+                                                                    AppFontSize
+                                                                        .label,
+                                                                fontWeight:
+                                                                    safeTabIndex ==
+                                                                            i
+                                                                        ? FontWeight
+                                                                            .w700
+                                                                        : FontWeight
+                                                                            .w600,
+                                                                color: safeTabIndex ==
+                                                                        i
+                                                                    ? p.onAccent
+                                                                    : p.textSecondary,
+                                                              ),
+                                                            ),
+                                                    ),
+                                                  ],
+                                                ),
                                               ),
-                                              const SizedBox(
-                                                  width: AppSpacing.s6),
-                                              Flexible(
-                                                child: tabs[i].headerWidget !=
-                                                        null
-                                                    ? tabs[i].headerWidget!(
-                                                        context,
-                                                        safeTabIndex == i,
-                                                      )
-                                                    : Text(
-                                                        tabs[i].label(context),
-                                                        maxLines: 1,
-                                                        overflow: TextOverflow
-                                                            .ellipsis,
-                                                        style: TextStyle(
-                                                          fontSize:
-                                                              AppFontSize.label,
-                                                          fontWeight:
-                                                              safeTabIndex == i
-                                                                  ? FontWeight
-                                                                      .w700
-                                                                  : FontWeight
-                                                                      .w600,
-                                                          color: safeTabIndex ==
-                                                                  i
-                                                              ? p.onAccent
-                                                              : p.textSecondary,
-                                                        ),
-                                                      ),
-                                              ),
-                                            ],
+                                            ),
                                           ),
                                         ),
-                                      ),
-                                    ),
+                                    ],
                                   ),
-                              ],
+                                ),
+                              ),
                             ),
-                          ),
+                            const SizedBox(width: AppSpacing.xxs),
+                            IconButton(
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(
+                                minWidth: AppSpacing.minTouchTarget,
+                                minHeight: AppSpacing.minTouchTarget,
+                              ),
+                              tooltip: context.l10n.close,
+                              onPressed: () {
+                                PulsrHaptics.selectionClick();
+                                widget.onClose();
+                              },
+                              icon: Container(
+                                width: 34,
+                                height: 34,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: p.surfaceContainerHigh,
+                                  border: Border.all(color: p.hairline),
+                                ),
+                                alignment: Alignment.center,
+                                child: Icon(
+                                  Icons.close_rounded,
+                                  size: 18,
+                                  color: p.textSecondary,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(width: AppSpacing.xs),
-                      Container(
-                        width: 34,
-                        height: 34,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: p.surfaceContainerHigh.withValues(alpha: 0.65),
-                          border: Border.all(
-                            color: p.hairline.withValues(alpha: 0.65),
+                      Divider(height: 1, thickness: 1, color: p.hairline),
+
+                      // Content Area built dynamically from active tab descriptor,
+                      // keeping bottom clearance above the floating TabletPlayerBar.
+                      Expanded(
+                        child: Padding(
+                          padding: EdgeInsets.only(bottom: bottomClearance),
+                          child: AnimatedSwitcher(
+                            duration: context.motionMs(200),
+                            child: KeyedSubtree(
+                              key: ValueKey(
+                                  'inspector_tab_${tabs[safeTabIndex].id}'),
+                              child: tabs[safeTabIndex].builder(context),
+                            ),
                           ),
-                        ),
-                        child: IconButton(
-                          padding: EdgeInsets.zero,
-                          icon: Icon(
-                            Icons.close_rounded,
-                            size: 18,
-                            color: p.textSecondary,
-                          ),
-                          tooltip: context.l10n.close,
-                          onPressed: () {
-                            PulsrHaptics.selectionClick();
-                            widget.onClose();
-                          },
-                          constraints: const BoxConstraints(
-                            minWidth: AppSpacing.minTouchTarget,
-                            minHeight: AppSpacing.minTouchTarget,
-                          ),
-                          visualDensity: VisualDensity.compact,
                         ),
                       ),
                     ],
                   ),
                 ),
-                Divider(height: 1, thickness: 1, color: p.hairline),
-
-                // Content Area built dynamically from active tab descriptor
-                Expanded(
-                  child: AnimatedSwitcher(
-                    duration: context.motionMs(200),
-                    child: KeyedSubtree(
-                      key: ValueKey('inspector_tab_${tabs[safeTabIndex].id}'),
-                      child: tabs[safeTabIndex].builder(context),
-                    ),
-                  ),
-                ),
-              ],
-            ),
               ),
             ),
 
             // Start-edge non-overlapping drag-to-resize divider handle (12dp strip)
-            SizedBox(
-              key: const Key('tablet_inspector_resize_handle'),
-              width: 12,
-              child: MouseRegion(
-                cursor: SystemMouseCursors.resizeLeftRight,
-                child: Listener(
-                  behavior: HitTestBehavior.translucent,
-                  onPointerDown: (event) {
-                    _lastHandlePointerDownAt = DateTime.now();
-                    _lastHandlePointerDownPos = event.position;
-                  },
-                  onPointerUp: (event) {
-                    final downAt = _lastHandlePointerDownAt;
-                    final downPos = _lastHandlePointerDownPos;
-                    if (downAt == null || downPos == null) return;
-                    final isTap =
-                        DateTime.now().difference(downAt).inMilliseconds <
-                                250 &&
-                            (event.position - downPos).distance < 8.0;
-                    if (!isTap) return;
-                    final now = DateTime.now();
-                    if (_lastHandleTapAt != null &&
-                        now.difference(_lastHandleTapAt!).inMilliseconds <
-                            320) {
-                      _lastHandleTapAt = null;
-                      PulsrHaptics.selectionClick();
-                      setState(() => _customWidth = null);
-                      final key = PrefsKeys.tabletInspectorWidthKey(
-                        _loadedDeviceClass ??
-                            PulsrViewport.fromContext(context).deviceClass.name,
-                      );
-                      SettingsCache().remove(key);
-                    } else {
-                      _lastHandleTapAt = now;
-                    }
-                  },
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onHorizontalDragStart: (_) {
-                      PulsrHaptics.selectionClick();
-                      _dragDeltaAccumulator = 0.0;
-                      setState(() => _isDragging = true);
+            Semantics(
+              label: context.l10n.sidebarSidePanel,
+              child: SizedBox(
+                key: const Key('tablet_inspector_resize_handle'),
+                width: 12,
+                child: MouseRegion(
+                  cursor: SystemMouseCursors.resizeLeftRight,
+                  child: Listener(
+                    behavior: HitTestBehavior.translucent,
+                    onPointerDown: (event) {
+                      _lastHandlePointerDownAt = DateTime.now();
+                      _lastHandlePointerDownPos = event.position;
                     },
-                    onHorizontalDragUpdate: (details) {
-                      final isRtl =
-                          Directionality.of(context) == TextDirection.rtl;
-                      final delta =
-                          isRtl ? details.delta.dx : -details.delta.dx;
-                      _dragDeltaAccumulator += delta;
-                      if (_dragDeltaAccumulator.abs() >= 1.0) {
-                        final current = _customWidth ?? defaultWidth;
-                        final newWidth =
-                            (current + _dragDeltaAccumulator).clamp(
-                          TabletSideInspector.minWidth,
-                          TabletSideInspector.maxWidth,
-                        );
-                        _dragDeltaAccumulator = 0.0;
-                        if (newWidth != _customWidth) {
-                          setState(() {
-                            _customWidth = newWidth;
-                          });
-                        }
-                      }
-                    },
-                    onHorizontalDragEnd: (_) {
-                      _dragDeltaAccumulator = 0.0;
-                      setState(() => _isDragging = false);
-                      if (_customWidth != null) {
+                    onPointerUp: (event) {
+                      final downAt = _lastHandlePointerDownAt;
+                      final downPos = _lastHandlePointerDownPos;
+                      if (downAt == null || downPos == null) return;
+                      final isTap =
+                          DateTime.now().difference(downAt).inMilliseconds <
+                                  250 &&
+                              (event.position - downPos).distance < 8.0;
+                      if (!isTap) return;
+                      final now = DateTime.now();
+                      if (_lastHandleTapAt != null &&
+                          now.difference(_lastHandleTapAt!).inMilliseconds <
+                              320) {
+                        _lastHandleTapAt = null;
+                        PulsrHaptics.selectionClick();
+                        setState(() => _customWidth = null);
                         final key = PrefsKeys.tabletInspectorWidthKey(
                           _loadedDeviceClass ??
                               PulsrViewport.fromContext(context)
                                   .deviceClass
                                   .name,
                         );
-                        SettingsCache().setDouble(key, _customWidth!);
+                        SettingsCache().remove(key);
+                      } else {
+                        _lastHandleTapAt = now;
                       }
                     },
-                    onHorizontalDragCancel: () {
-                      _dragDeltaAccumulator = 0.0;
-                      setState(() => _isDragging = false);
-                    },
-                    child: SizedBox(
-                      width: 12,
-                      child: Center(
-                        child: AnimatedContainer(
-                          duration: context.motionMs(120),
-                          width: _isDragging ? 4.5 : 3.0,
-                          height: _isDragging ? 52.0 : 32.0,
-                          decoration: BoxDecoration(
-                            color: _isDragging
-                                ? p.accent
-                                : p.textTertiary.withValues(alpha: 0.32),
-                            borderRadius: AppRadii.r4All,
-                            boxShadow: _isDragging
-                                ? [
-                                    BoxShadow(
-                                      color: p.accent.withValues(alpha: 0.45),
-                                      blurRadius: 8,
-                                    ),
-                                  ]
-                                : null,
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onHorizontalDragStart: (_) {
+                        PulsrHaptics.selectionClick();
+                        _dragDeltaAccumulator = 0.0;
+                        setState(() => _isDragging = true);
+                      },
+                      onHorizontalDragUpdate: (details) {
+                        final isRtl =
+                            Directionality.of(context) == TextDirection.rtl;
+                        final delta =
+                            isRtl ? details.delta.dx : -details.delta.dx;
+                        _dragDeltaAccumulator += delta;
+                        if (_dragDeltaAccumulator.abs() >= 1.0) {
+                          final current = _customWidth ?? defaultWidth;
+                          final newWidth =
+                              (current + _dragDeltaAccumulator).clamp(
+                            TabletSideInspector.minWidth,
+                            effectiveMaxWidth,
+                          );
+                          _dragDeltaAccumulator = 0.0;
+                          if (newWidth != _customWidth) {
+                            setState(() {
+                              _customWidth = newWidth;
+                            });
+                          }
+                        }
+                      },
+                      onHorizontalDragEnd: (_) {
+                        _dragDeltaAccumulator = 0.0;
+                        setState(() => _isDragging = false);
+                        if (_customWidth != null) {
+                          final key = PrefsKeys.tabletInspectorWidthKey(
+                            _loadedDeviceClass ??
+                                PulsrViewport.fromContext(context)
+                                    .deviceClass
+                                    .name,
+                          );
+                          SettingsCache().setDouble(key, _customWidth!);
+                        }
+                      },
+                      onHorizontalDragCancel: () {
+                        _dragDeltaAccumulator = 0.0;
+                        setState(() => _isDragging = false);
+                      },
+                      child: SizedBox(
+                        width: 12,
+                        child: Center(
+                          child: AnimatedContainer(
+                            duration: context.motionMs(120),
+                            width: _isDragging ? 4.5 : 3.0,
+                            height: _isDragging ? 52.0 : 32.0,
+                            decoration: BoxDecoration(
+                              color: _isDragging
+                                  ? p.accent
+                                  : p.textTertiary.withValues(alpha: 0.36),
+                              borderRadius: AppRadii.r4All,
+                              boxShadow: _isDragging && !isCalm
+                                  ? [
+                                      BoxShadow(
+                                        color:
+                                            p.accent.withValues(alpha: 0.45),
+                                        blurRadius: 8,
+                                      ),
+                                    ]
+                                  : null,
+                            ),
                           ),
                         ),
                       ),

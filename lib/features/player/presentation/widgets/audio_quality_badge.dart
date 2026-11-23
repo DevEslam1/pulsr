@@ -13,7 +13,6 @@ import '../../../../core/theme/aura_theme.dart';
 import 'audio_quality_sheet.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
-import 'package:pulsr/core/constants/app_colors.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 
 class AudioQualityBadge extends StatelessWidget {

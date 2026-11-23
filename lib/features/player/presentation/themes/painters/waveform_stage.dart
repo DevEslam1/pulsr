@@ -118,9 +118,8 @@ class _StudioOscilloscopeBayState extends State<_StudioOscilloscopeBay> {
         ? Color.lerp(surface.tapeWindow, p.bg, 0.25) ?? surface.tapeWindow
         : Color.lerp(p.surfaceContainerHigh, p.surface, 0.35) ??
             p.surfaceContainerHigh;
-    final Color gridColor = p.isDark
-        ? AppColors.specularAt(0.08)
-        : p.hairline.withValues(alpha: 0.72);
+    final Color gridColor =
+        p.isDark ? AppColors.specularAt(0.08) : p.hairline;
     final Color gridAccentColor = p.isDark
         ? AppColors.specularAt(0.16)
         : p.textSecondary.withValues(alpha: 0.25);

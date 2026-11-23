@@ -84,8 +84,8 @@ class _CleanDownBar extends StatelessWidget {
                       isActive: isCast || isUsb,
                       badgeText: isCast ? 'CAST' : (isUsb ? 'DAC' : null),
                       activeColor: isCast
-                          ? AppColors.accentCyan
-                          : (isUsb ? AppColors.dacGold : activeColor),
+                          ? context.palette.info
+                          : (isUsb ? context.palette.goldAccent : activeColor),
                       tooltip: isCast
                           ? context.l10n.googleCast
                           : context.l10n.audioOutputAndDac,

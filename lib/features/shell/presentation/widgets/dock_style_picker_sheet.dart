@@ -164,13 +164,16 @@ class _DockStyleOption extends StatelessWidget {
             child: AnimatedContainer(
               duration: context.motion(PulsrDurations.state),
               curve: context.motionCurve(Curves.easeOutCubic),
+              constraints: const BoxConstraints(
+                minHeight: AppSpacing.minTouchTarget,
+              ),
               margin: const EdgeInsets.only(bottom: AppSpacing.xs),
               padding: const EdgeInsets.symmetric(
                 horizontal: AppSpacing.sm,
                 vertical: AppSpacing.s10,
               ),
               decoration: BoxDecoration(
-                gradient: selected
+                gradient: selected && !p.isCalmDensity
                     ? LinearGradient(
                         begin: AlignmentDirectional.centerStart,
                         end: AlignmentDirectional.centerEnd,
@@ -183,17 +186,17 @@ class _DockStyleOption extends StatelessWidget {
                         ],
                       )
                     : null,
-                color: selected
+                color: selected && !p.isCalmDensity
                     ? null
-                    : p.surfaceContainer.withValues(alpha: 0.62),
+                    : (selected ? p.accentContainer : p.surfaceContainer),
                 borderRadius: AppRadii.r16All,
                 border: Border.all(
                   color: selected
                       ? p.accent.withValues(alpha: 0.65)
-                      : p.hairline.withValues(alpha: 0.8),
+                      : p.hairline,
                   width: selected ? 1.5 : 1.0,
                 ),
-                boxShadow: selected
+                boxShadow: selected && !p.isCalmDensity
                     ? [
                         BoxShadow(
                           color: p.accent.withValues(alpha: 0.14),
@@ -208,12 +211,12 @@ class _DockStyleOption extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(4),
                     decoration: BoxDecoration(
-                      color: p.surfaceContainerHighest.withValues(alpha: 0.45),
+                      color: p.surfaceContainerHighest.withValues(alpha: 0.55),
                       borderRadius: AppRadii.r12All,
                       border: Border.all(
                         color: selected
                             ? p.accent.withValues(alpha: 0.30)
-                            : p.hairline.withValues(alpha: 0.5),
+                            : p.hairline,
                       ),
                     ),
                     child: _DockMicroMockup(mode: mode, selected: selected),
@@ -428,14 +431,16 @@ class _HeroDockStage extends StatelessWidget {
                   : p.surfaceContainer.withValues(alpha: opacity),
               borderRadius: AppRadii.r12All,
               border: Border.all(
-                color:
-                    elevated ? p.accent : p.hairline.withValues(alpha: opacity),
+                color: elevated
+                    ? p.accent
+                    : p.hairline
+                        .withValues(alpha: (p.hairline.a * opacity).clamp(0, 1)),
                 width: elevated ? 1.2 : 1,
               ),
               boxShadow: elevated
                   ? [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.28),
+                        color: p.isDark ? p.scrimMedium : p.scrimLight,
                         blurRadius: 10,
                         offset: const Offset(0, 3),
                       ),
@@ -483,14 +488,16 @@ class _HeroDockStage extends StatelessWidget {
                   : p.surfaceContainerHigh.withValues(alpha: opacity),
               borderRadius: AppRadii.r12All,
               border: Border.all(
-                color:
-                    elevated ? p.accent : p.hairline.withValues(alpha: opacity),
+                color: elevated
+                    ? p.accent
+                    : p.hairline
+                        .withValues(alpha: (p.hairline.a * opacity).clamp(0, 1)),
                 width: elevated ? 1.2 : 1,
               ),
               boxShadow: elevated
                   ? [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.28),
+                        color: p.isDark ? p.scrimMedium : p.scrimLight,
                         blurRadius: 10,
                         offset: const Offset(0, 3),
                       ),
@@ -501,11 +508,11 @@ class _HeroDockStage extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Icon(Icons.home_rounded, size: 12, color: p.accent),
-                Icon(Icons.search_rounded, size: 12, color: p.textTertiary),
+                Icon(Icons.search_rounded, size: 12, color: p.textSecondary),
                 Icon(
                   Icons.library_music_rounded,
                   size: 12,
-                  color: p.textTertiary,
+                  color: p.textSecondary,
                 ),
               ],
             ),
@@ -539,8 +546,8 @@ class _HeroDockStage extends StatelessWidget {
             alignment: Alignment.bottomCenter,
             children: [
               Positioned(
-                  bottom: 2, child: navBarCard(opacity: 0.5, scale: 0.92)),
-              Positioned(bottom: 12, child: nowPlayingCard(elevated: true)),
+                  bottom: 14, child: navBarCard(opacity: 0.55, scale: 0.92)),
+              Positioned(bottom: 2, child: nowPlayingCard(elevated: true)),
             ],
           ),
         );
@@ -552,7 +559,8 @@ class _HeroDockStage extends StatelessWidget {
             alignment: Alignment.bottomCenter,
             children: [
               Positioned(
-                  bottom: 14, child: nowPlayingCard(opacity: 0.5, scale: 0.92)),
+                  bottom: 14,
+                  child: nowPlayingCard(opacity: 0.55, scale: 0.92)),
               Positioned(bottom: 2, child: navBarCard(elevated: true)),
             ],
           ),
@@ -583,7 +591,12 @@ class _DockMicroMockup extends StatelessWidget {
             color: miniColor.withValues(alpha: opacity),
             borderRadius: AppRadii.r6All,
             border: Border.all(
-                color: borderColor.withValues(alpha: opacity), width: 0.8),
+              color: selected
+                  ? borderColor.withValues(alpha: opacity)
+                  : borderColor
+                      .withValues(alpha: (borderColor.a * opacity).clamp(0, 1)),
+              width: 0.8,
+            ),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -616,14 +629,18 @@ class _DockMicroMockup extends StatelessWidget {
             color: navColor.withValues(alpha: opacity),
             borderRadius: AppRadii.r6All,
             border: Border.all(
-                color: p.hairline.withValues(alpha: opacity), width: 0.8),
+              color: p.hairline
+                  .withValues(alpha: (p.hairline.a * opacity).clamp(0, 1)),
+              width: 0.8,
+            ),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Icon(Icons.home_rounded, size: 7, color: p.accent),
-              Icon(Icons.search_rounded, size: 7, color: p.textTertiary),
-              Icon(Icons.library_music_rounded, size: 7, color: p.textTertiary),
+              Icon(Icons.search_rounded, size: 7, color: p.textSecondary),
+              Icon(Icons.library_music_rounded,
+                  size: 7, color: p.textSecondary),
             ],
           ),
         );
@@ -653,8 +670,8 @@ class _DockMicroMockup extends StatelessWidget {
           child: Stack(
             alignment: Alignment.bottomCenter,
             children: [
-              Positioned(bottom: 1, child: nav(opacity: 0.5, scale: 0.92)),
-              Positioned(bottom: 9, child: mini()),
+              Positioned(bottom: 9, child: nav(opacity: 0.55, scale: 0.92)),
+              Positioned(bottom: 1, child: mini()),
             ],
           ),
         );
@@ -666,7 +683,7 @@ class _DockMicroMockup extends StatelessWidget {
           child: Stack(
             alignment: Alignment.bottomCenter,
             children: [
-              Positioned(bottom: 9, child: mini(opacity: 0.5, scale: 0.92)),
+              Positioned(bottom: 9, child: mini(opacity: 0.55, scale: 0.92)),
               Positioned(bottom: 1, child: nav()),
             ],
           ),

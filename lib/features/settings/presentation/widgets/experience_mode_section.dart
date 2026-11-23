@@ -254,7 +254,7 @@ class _WhatChangesExpanderState extends State<_WhatChangesExpander>
       ),
       child: Column(
         children: [
-          Divider(height: 1, color: p.hairline.withValues(alpha: 0.4)),
+          Divider(height: 1, color: p.hairline),
           const SizedBox(height: AppSpacing.xs),
           for (final item in changes) ...[
             Padding(
@@ -304,7 +304,7 @@ class _WhatChangesExpanderState extends State<_WhatChangesExpander>
       decoration: BoxDecoration(
         color: p.surfaceContainer.withValues(alpha: 0.5),
         borderRadius: AppRadii.r10All,
-        border: Border.all(color: p.hairline.withValues(alpha: 0.5)),
+        border: Border.all(color: p.hairline),
       ),
       child: Column(
         children: [

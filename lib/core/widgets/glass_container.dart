@@ -139,7 +139,9 @@ class GlassContainer extends StatelessWidget {
     final effectiveRadius =
         borderRadius ?? (shape == null ? AppRadii.cardRadius : null);
 
-    final isHighContrast = MediaQuery.maybeOf(context)?.highContrast ?? false;
+    final isHighContrast =
+        (MediaQuery.maybeOf(context)?.highContrast ?? false) ||
+            p.isHighContrast;
 
     // Apply the user's Glass Intensity (0 = solid, 1 = full glass) and
     // preset opacity so glass surfaces respond live to user settings.
@@ -149,7 +151,8 @@ class GlassContainer extends StatelessWidget {
             SettingsCache()
                 .getDouble(PrefsKeys.liquidGlassTint, defaultValue: 0.8))
         .clamp(0.0, 1.0);
-    final canBlur = AppBlur.canBlur(context, enableBlur: enableBlur) &&
+    final canBlur = !isHighContrast &&
+        AppBlur.canBlur(context, enableBlur: enableBlur) &&
         blur > 0 &&
         tint > 0.0;
     final rawTintAlpha = (opacity * (0.35 + 0.65 * tint)).clamp(0.0, 1.0);
@@ -167,14 +170,17 @@ class GlassContainer extends StatelessWidget {
         base.a * (tier == GlassTier.solid ? 1.0 : tintAlpha);
     final baseColor = base.withValues(alpha: desiredAlpha.clamp(0.0, 1.0));
 
-    final showLiquidSheen = isLiquid || specularHighlight;
+    final showLiquidSheen = !isHighContrast && (isLiquid || specularHighlight);
 
     final effectiveBorder = border ??
         Border.all(
-          color: showLiquidSheen && p.isDark
-              ? AppColors.specularAt(0.16)
-              : p.hairline,
-          width: 1.0,
+          color: isHighContrast
+              ? p.borderStrong
+              : (showLiquidSheen && p.isDark
+                  ? AppColors.specularAt(
+                      (p.isAmoled ? 0.18 : 0.15) * p.specularScale)
+                  : p.hairline),
+          width: isHighContrast ? 1.5 : 1.0,
         );
 
     final effectiveShadow = boxShadow;
@@ -187,7 +193,7 @@ class GlassContainer extends StatelessWidget {
               Color.lerp(
                     baseColor,
                     Colors.white,
-                    p.isDark ? 0.055 : 0.12,
+                    (p.isDark ? 0.055 : 0.12) * p.specularScale,
                   ) ??
                   baseColor,
               baseColor,

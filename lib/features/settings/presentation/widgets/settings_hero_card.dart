@@ -219,6 +219,8 @@ class _QuickControlTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
+    final isHighContrast =
+        p.isHighContrast || (MediaQuery.maybeHighContrastOf(context) ?? false);
     final shouldAnimate = PulsrMotion.shouldAnimate(context);
 
     return Semantics(
@@ -245,9 +247,11 @@ class _QuickControlTile extends StatelessWidget {
             borderRadius: AppRadii.r14All,
             border: Border.all(
               color: isActive
-                  ? p.accent.withValues(alpha: 0.55)
-                  : p.hairline,
-              width: isActive ? 1.4 : 1.0,
+                  ? (isHighContrast
+                      ? p.accent
+                      : p.accent.withValues(alpha: 0.55))
+                  : (isHighContrast ? p.borderStrong : p.hairline),
+              width: isActive || isHighContrast ? 1.4 : 1.0,
             ),
           ),
           child: Row(
@@ -339,18 +343,26 @@ class SettingsHeroCard extends StatelessWidget {
           }
         }
 
+        final isHighContrast =
+        p.isHighContrast || (MediaQuery.maybeHighContrastOf(context) ?? false);
         return Container(
           margin: const EdgeInsets.only(bottom: AppSpacing.lg),
           decoration: BoxDecoration(
             color: p.surfaceContainer,
             borderRadius: AppRadii.cardRadius,
-            border: Border.all(color: isCalm ? p.borderSubtle : p.hairline),
-            boxShadow: isCalm
+            border: Border.all(
+              color: isHighContrast
+                  ? p.borderStrong
+                  : (isCalm ? p.borderSubtle : p.hairline),
+              width: isHighContrast ? 1.25 : 1.0,
+            ),
+            boxShadow: isCalm || isHighContrast
                 ? null
                 : [
                     BoxShadow(
-                      color: (user != null ? p.accent : Colors.black)
-                          .withValues(alpha: p.isDark ? 0.08 : 0.04),
+                      color: user != null
+                          ? p.accent.withValues(alpha: p.isDark ? 0.08 : 0.05)
+                          : p.scrimLight,
                       blurRadius: 16,
                       offset: const Offset(0, 4),
                     ),

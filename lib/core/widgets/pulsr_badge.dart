@@ -80,14 +80,15 @@ class PulsrBadge extends StatelessWidget {
         color: bg,
         borderRadius: AppRadii.r4All,
         border: Border.all(
-          color: fg.withValues(alpha: 0.25),
-          width: 0.8,
+          color: fg.withValues(alpha: p.isHighContrast ? 0.72 : 0.28),
+          width: p.isHighContrast ? 1.2 : 0.8,
         ),
       ),
       child: Text(
         label ?? '',
         style: TextStyle(
-          fontFamily: 'Manrope',
+          fontFamily: fontFamily,
+          fontFamilyFallback: fontFallbacks,
           fontSize: AppFontSize.caption,
           fontWeight: FontWeight.w800,
           letterSpacing: AppTracking.label,

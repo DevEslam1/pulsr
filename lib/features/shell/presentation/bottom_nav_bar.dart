@@ -157,6 +157,8 @@ class _PulsrBottomNavBarState extends State<PulsrBottomNavBar> {
                 builder: (context, visualDy, child) {
                   final isDraggingDock = visualDy.abs() > 0.5;
                   final isCalm = p.isCalmDensity || GpuBudget.isEnabled;
+                  final isHighContrast = p.isHighContrast;
+                  final useSolidSurface = isCalm || isHighContrast;
                   return AnimatedContainer(
                     // Direct manipulation must track the finger 1:1. Tweening a
                     // transform that is rewritten every drag frame meant the
@@ -175,7 +177,7 @@ class _PulsrBottomNavBarState extends State<PulsrBottomNavBar> {
                         ...PulsrElevation.level4(context),
                         // Intentional accent glow (not depth), brightened while
                         // the dock is being dragged.
-                        if (!isCalm)
+                        if (!useSolidSurface)
                           BoxShadow(
                             color: p.accent.withValues(
                               alpha: isDraggingDock
@@ -204,19 +206,20 @@ class _PulsrBottomNavBarState extends State<PulsrBottomNavBar> {
                               defaultValue: 0.8,
                             );
                           }
-                          final allowBlur = !isCalm &&
+                          final allowBlur = !useSolidSurface &&
                               AppBlur.canBlur(context,
                                   enableBlur: widget.enableBlur) &&
                               glassIntensity > 0.0;
-                          final topSurface =
-                              p.isDark ? p.surfaceContainerHigh : p.surfaceElevated;
+                          final topSurface = p.isDark
+                              ? p.surfaceContainerHigh
+                              : p.surfaceElevated;
                           final bottomSurface =
                               p.isDark ? p.surfaceContainer : p.surface;
                           final navContainer = DecoratedBox(
                             decoration: BoxDecoration(
                               borderRadius: navRadius,
-                              color: isCalm ? topSurface : null,
-                              gradient: isCalm
+                              color: useSolidSurface ? topSurface : null,
+                              gradient: useSolidSurface
                                   ? null
                                   : LinearGradient(
                                       begin: Alignment.topCenter,
@@ -232,16 +235,22 @@ class _PulsrBottomNavBarState extends State<PulsrBottomNavBar> {
                                     ),
                               border: Border.all(
                                 color: isDraggingDock
-                                    ? p.accent.withValues(alpha: 0.35)
-                                    : p.hairline,
-                                width: AppStrokes.hairline,
+                                    ? (isHighContrast
+                                        ? p.accent
+                                        : p.accent.withValues(alpha: 0.35))
+                                    : (isHighContrast
+                                        ? p.borderStrong
+                                        : p.hairline),
+                                width: isHighContrast
+                                    ? 1.5
+                                    : AppStrokes.hairline,
                               ),
                             ),
                             child: Stack(
                               alignment: Alignment.center,
                               children: [
                                 // Subtle top inner specular highlight hairline
-                                if (!isCalm)
+                                if (!useSolidSurface)
                                   PositionedDirectional(
                                     top: 0,
                                     start: 24,

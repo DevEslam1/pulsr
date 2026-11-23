@@ -348,7 +348,8 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
     final safePadding = MediaQuery.paddingOf(context);
     final basePad = Adaptive.pagePadding(context);
     final isPureBlack = p.isDark && p.bg.computeLuminance() < 0.001;
-    final isHighContrast = MediaQuery.maybeHighContrastOf(context) ?? false;
+    final isHighContrast =
+        p.isHighContrast || (MediaQuery.maybeHighContrastOf(context) ?? false);
     final showAmbientGlow =
         !isPureBlack && !p.isCalmDensity && !isHighContrast && !GpuBudget.isEnabled;
     // Sections already apply [basePad] horizontally, so only add the delta
@@ -983,7 +984,8 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
     HomeState homeState,
     bool isTablet,
   ) {
-    final isHighContrast = MediaQuery.maybeHighContrastOf(context) ?? false;
+    final isHighContrast =
+        p.isHighContrast || (MediaQuery.maybeHighContrastOf(context) ?? false);
     final flatChrome = p.isCalmDensity || isHighContrast;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

@@ -7,6 +7,7 @@ import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 
 import '../motion/pulsr_motion.dart';
+import '../theme/aura_theme.dart';
 import '../utils/l10n_extensions.dart';
 
 import '../utils/pulsr_haptics.dart';
@@ -332,13 +333,14 @@ class _PulsrDismissibleState extends State<PulsrDismissible>
           ? '${context.l10n.swipeAgainOrTapToConfirm}: $label'
           : context.l10n.swipeAgainOrTapToConfirm;
 
+      final p = context.palette;
       final messenger = ScaffoldMessenger.of(context);
       messenger.hideCurrentSnackBar();
       messenger.showSnackBar(
         SnackBar(
           content: Row(
             children: [
-              const Icon(Icons.swipe_rounded, size: 18, color: Colors.white),
+              Icon(Icons.swipe_rounded, size: 18, color: p.accent),
               const SizedBox(width: AppSpacing.xs),
               Expanded(
                 child: Text(

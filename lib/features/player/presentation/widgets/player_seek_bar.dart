@@ -3,7 +3,6 @@ import 'dart:math' as math;
 
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:pulsr/core/constants/app_colors.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
@@ -508,14 +507,13 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                               semanticFormatterCallback: (val) =>
                                   labelFor(Duration(milliseconds: val.round())),
                               activeColor: widget.activeColor,
-                              inactiveColor: Theme.of(context).brightness ==
-                                      Brightness.dark
+                              inactiveColor: p.isDark
                                   ? (sliderStyle == PlayerSliderStyle.capsule
-                                      ? Colors.white.withValues(alpha: 0.22)
-                                      : AppColors.specularStrong)
+                                      ? p.textPrimary.withValues(alpha: 0.22)
+                                      : p.borderStrong)
                                   : (sliderStyle == PlayerSliderStyle.capsule
-                                      ? Colors.black.withValues(alpha: 0.15)
-                                      : p.hairline.withValues(alpha: 0.8)),
+                                      ? p.textPrimary.withValues(alpha: 0.16)
+                                      : p.textPrimary.withValues(alpha: 0.20)),
                               sliderStyle: sliderStyle,
                               isWavy: sliderStyle == PlayerSliderStyle.wavy,
                               animateWave: isPlaying && enabled,

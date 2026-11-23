@@ -318,22 +318,26 @@ class _LyricsViewState extends State<LyricsView> {
       wrapWithContainer: false,
       builder: (sheetContext) => StatefulBuilder(
         builder: (sheetContext, setSheet) {
+          final sp = sheetContext.palette;
+          final accentCol = widget.activeColor ?? sp.accent;
           return Container(
             padding: const EdgeInsetsDirectional.fromSTEB(
                 AppSpacing.lg, AppSpacing.s20, AppSpacing.lg, AppSpacing.s28),
             decoration: BoxDecoration(
-              color: Theme.of(sheetContext).colorScheme.surface,
+              color: sp.surface,
               borderRadius: const BorderRadius.vertical(
                   top: Radius.circular(AppRadii.r20)),
+              border: Border(top: BorderSide(color: sp.hairline)),
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
                   l10n.settingsSyncOffset,
-                  style: const TextStyle(
+                  style: TextStyle(
                       fontSize: AppFontSize.bodyLarge,
-                      fontWeight: FontWeight.w800),
+                      fontWeight: FontWeight.w800,
+                      color: sp.textPrimary),
                 ),
                 const SizedBox(height: AppSpacing.xs),
                 Text(
@@ -341,7 +345,7 @@ class _LyricsViewState extends State<LyricsView> {
                   style: TextStyle(
                     fontSize: AppFontSize.display,
                     fontWeight: FontWeight.w800,
-                    color: widget.activeColor,
+                    color: accentCol,
                   ),
                 ),
                 const SizedBox(height: AppSpacing.sm),
@@ -466,7 +470,7 @@ class _LyricsViewState extends State<LyricsView> {
           Text(
             label,
             style: TextStyle(
-              color: widget.activeColor,
+              color: _activeColor,
               fontSize: AppFontSize.caption,
               fontWeight: FontWeight.w600,
               letterSpacing: AppTracking.medium,
@@ -527,7 +531,7 @@ class _LyricsViewState extends State<LyricsView> {
   }) {
     return IconButton(
       key: key,
-      icon: Icon(icon, color: widget.activeColor, size: 20),
+      icon: Icon(icon, color: _activeColor, size: 20),
       tooltip: tooltip,
       constraints: const BoxConstraints(
         minWidth: AppSpacing.minTouchTarget,
@@ -728,7 +732,7 @@ class _LyricsViewState extends State<LyricsView> {
                     height: 16,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: widget.activeColor,
+                      color: _activeColor,
                     ),
                   )
                 : Icon(
@@ -737,7 +741,7 @@ class _LyricsViewState extends State<LyricsView> {
                         : (_translationMode == 1
                             ? Icons.g_translate_rounded
                             : Icons.spellcheck_rounded),
-                    color: _translationMode > 0 ? p.accent : widget.activeColor,
+                    color: _translationMode > 0 ? p.accent : _activeColor,
                     size: 20,
                   ),
             tooltip: _translationMode == 0
@@ -974,7 +978,7 @@ class _LyricsViewState extends State<LyricsView> {
 
     if (widget.isLoading) {
       return Center(
-        child: CircularProgressIndicator(color: widget.activeColor),
+        child: CircularProgressIndicator(color: _activeColor),
       );
     }
 

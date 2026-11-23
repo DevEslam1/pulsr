@@ -45,6 +45,8 @@ class _VinylStudioPalette {
   ) {
     final p = context.palette;
     final isDark = p.isDark;
+    final isHighContrast =
+        p.isHighContrast || MediaQuery.highContrastOf(context);
     final amber = Color.lerp(AppColors.amberDeep, activeColor, 0.32)!;
     final brassHi = Color.lerp(AppColors.giltGold, AppColors.onGiltLight, 0.34)!;
     final brassLo = Color.lerp(AppColors.giltGold, AppColors.onGiltDark, 0.45)!;
@@ -59,28 +61,35 @@ class _VinylStudioPalette {
 
       return _VinylStudioPalette(
         isDark: true,
-        chassisTop: walnutTop,
-        chassisMid: walnutMid,
-        chassisBottom: walnutBottom,
+        chassisTop: isHighContrast ? p.bg : walnutTop,
+        chassisMid: isHighContrast ? p.surface : walnutMid,
+        chassisBottom: isHighContrast ? p.bg : walnutBottom,
         grainLight: AppColors.onGiltLight.withValues(alpha: 0.045),
         grainDark: AppColors.scrimAt(0.18),
-        amberAccent: amber,
+        amberAccent: isHighContrast ? p.accent : amber,
         brassHighlight: brassHi,
         brassDeep: brassLo,
-        primaryInk: AppColors.onGiltLight,
-        secondaryInk: Color.lerp(AppColors.onGiltLight, AppColors.giltGold, 0.34)!
-            .withValues(alpha: 0.78),
-        hardwareSurface: Color.lerp(
-          PlayerMaterialColors.gimbalMid,
-          AppColors.onGiltDark,
-          0.35,
-        )!,
-        hardwareBorder: brassHi.withValues(alpha: 0.26),
-        consoleSurface: Color.lerp(
-          PlayerMaterialColors.plinthSurface,
-          AppColors.onGiltDark,
-          0.42,
-        )!,
+        primaryInk: isHighContrast ? p.textPrimary : AppColors.onGiltLight,
+        secondaryInk: isHighContrast
+            ? p.textSecondary
+            : Color.lerp(AppColors.onGiltLight, AppColors.giltGold, 0.34)!
+                .withValues(alpha: 0.78),
+        hardwareSurface: isHighContrast
+            ? p.surfaceContainer
+            : Color.lerp(
+                PlayerMaterialColors.gimbalMid,
+                AppColors.onGiltDark,
+                0.35,
+              )!,
+        hardwareBorder:
+            isHighContrast ? p.borderStrong : brassHi.withValues(alpha: 0.26),
+        consoleSurface: isHighContrast
+            ? p.surfaceContainer
+            : Color.lerp(
+                PlayerMaterialColors.plinthSurface,
+                AppColors.onGiltDark,
+                0.42,
+              )!,
         ledActive: AppColors.amberDeep,
         ledStandby: AppColors.onGiltLight.withValues(alpha: 0.24),
       );
@@ -94,19 +103,27 @@ class _VinylStudioPalette {
 
     return _VinylStudioPalette(
       isDark: false,
-      chassisTop: silverTop,
-      chassisMid: silverMid,
-      chassisBottom: silverBottom,
+      chassisTop: isHighContrast ? p.bg : silverTop,
+      chassisMid: isHighContrast ? p.surface : silverMid,
+      chassisBottom: isHighContrast ? p.surfaceContainer : silverBottom,
       grainLight: AppColors.specularAt(0.45),
       grainDark: AppColors.onGiltDark.withValues(alpha: 0.055),
-      amberAccent: warmDarkAmber,
+      amberAccent: isHighContrast ? p.accent : warmDarkAmber,
       brassHighlight: brassHi,
       brassDeep: brassLo,
-      primaryInk: AppColors.onGiltDark,
-      secondaryInk: Color.lerp(AppColors.onGiltDark, p.textSecondary, 0.45)!,
-      hardwareSurface: Color.lerp(p.surfaceContainer, AppColors.onGiltLight, 0.50)!,
-      hardwareBorder: AppColors.onGiltDark.withValues(alpha: 0.16),
-      consoleSurface: Color.lerp(p.surfaceContainer, AppColors.giltGold, 0.10)!,
+      primaryInk: isHighContrast ? p.textPrimary : AppColors.onGiltDark,
+      secondaryInk: isHighContrast
+          ? p.textSecondary
+          : Color.lerp(AppColors.onGiltDark, p.textSecondary, 0.45)!,
+      hardwareSurface: isHighContrast
+          ? p.surfaceContainer
+          : Color.lerp(p.surfaceContainer, AppColors.onGiltLight, 0.50)!,
+      hardwareBorder: isHighContrast
+          ? p.borderStrong
+          : AppColors.onGiltDark.withValues(alpha: 0.16),
+      consoleSurface: isHighContrast
+          ? p.surfaceContainer
+          : Color.lerp(p.surfaceContainer, AppColors.giltGold, 0.10)!,
       ledActive: AppColors.amberDeep,
       ledStandby: AppColors.onGiltDark.withValues(alpha: 0.22),
     );
@@ -1347,7 +1364,7 @@ class _VinylAnalogFooter extends StatelessWidget {
                   isActive: isCast || isUsbDac,
                   iconColor: palette.secondaryInk,
                   activeColor:
-                      isCast ? AppColors.accentCyan : palette.amberAccent,
+                      isCast ? context.palette.info : palette.amberAccent,
                   showActiveDot: true,
                   onTap: song == null
                       ? null

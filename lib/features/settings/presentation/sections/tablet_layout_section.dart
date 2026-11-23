@@ -169,7 +169,10 @@ mixin TabletLayoutSection
         // Vertical hairline divider and foldable hinge
         Container(
           width: 1,
-          color: p.hairline,
+          color: (p.isHighContrast ||
+                  (MediaQuery.maybeHighContrastOf(context) ?? false))
+              ? p.borderStrong
+              : p.hairline,
         ),
         if (context.hasFoldableHinge &&
             (context.foldableHinge?.bounds.width ?? 0) > 0)
@@ -250,13 +253,18 @@ mixin TabletLayoutSection
     _SettingsCategoryItem cat,
   ) {
     final p = context.palette;
+    final isHighContrast =
+        p.isHighContrast || (MediaQuery.maybeHighContrastOf(context) ?? false);
     return Container(
       padding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.md, vertical: AppSpacing.sm),
       decoration: BoxDecoration(
-        color: p.surfaceContainer.withValues(alpha: 0.7),
+        color: p.surfaceContainer,
         borderRadius: AppRadii.cardRadius,
-        border: Border.all(color: p.hairline),
+        border: Border.all(
+          color: isHighContrast ? p.borderStrong : p.hairline,
+          width: isHighContrast ? 1.25 : 1.0,
+        ),
       ),
       child: Row(
         children: [

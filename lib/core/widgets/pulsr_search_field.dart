@@ -187,9 +187,13 @@ class _PulsrSearchFieldState extends State<PulsrSearchField> {
 
     final Color borderColor = _isFocused
         ? p.accent
-        : (hasText
-            ? p.accent.withValues(alpha: 0.45)
-            : (p.isDark ? AppColors.specularAt(0.12) : p.hairline));
+        : (p.isHighContrast
+            ? p.borderStrong
+            : (hasText
+                ? p.accent.withValues(alpha: 0.45)
+                : (p.isDark
+                    ? AppColors.specularAt(p.isAmoled ? 0.16 : 0.12)
+                    : p.hairline)));
 
     Widget field = AnimatedContainer(
       duration: context.motionMs(200),
@@ -204,7 +208,7 @@ class _PulsrSearchFieldState extends State<PulsrSearchField> {
                   Color.lerp(
                         p.surfaceContainerHigh,
                         p.accent,
-                        p.isDark ? 0.06 : 0.03,
+                        p.isHighContrast ? 0.0 : (p.isDark ? 0.06 : 0.03),
                       ) ??
                       p.surfaceContainerHigh,
                   p.surfaceContainerHigh,
@@ -218,25 +222,34 @@ class _PulsrSearchFieldState extends State<PulsrSearchField> {
         border: widget.showBorder
             ? Border.all(
                 color: borderColor,
-                width: _isFocused ? 1.4 : 1.0,
+                width: _isFocused
+                    ? (p.isHighContrast ? 2.2 : 1.4)
+                    : (p.isHighContrast ? 1.5 : 1.0),
               )
             : null,
         boxShadow: _isFocused
-            ? [
-                BoxShadow(
-                  color: p.accent.withValues(alpha: p.isDark ? 0.18 : 0.10),
-                  blurRadius: 16,
-                  spreadRadius: -2,
-                  offset: const Offset(0, 3),
-                ),
-              ]
-            : [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: p.isDark ? 0.16 : 0.03),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2),
-                ),
-              ],
+            ? (p.chromeGlowScale > 0
+                ? [
+                    BoxShadow(
+                      color: p.accent.withValues(
+                        alpha: (p.isDark ? 0.18 : 0.10) * p.chromeGlowScale,
+                      ),
+                      blurRadius: 16,
+                      spreadRadius: -2,
+                      offset: const Offset(0, 3),
+                    ),
+                  ]
+                : null)
+            : (p.isHighContrast
+                ? null
+                : [
+                    BoxShadow(
+                      color: Colors.black
+                          .withValues(alpha: p.isDark ? 0.16 : 0.03),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]),
       ),
       child: Center(
         child: TextField(

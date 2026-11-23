@@ -409,8 +409,14 @@ class _ToastWidgetState extends State<_ToastWidget>
         : (isCompactLandscape ? AppRadii.r16All : AppRadii.r20All);
 
     final Color borderColor = (widget.isError || widget.isSuccess)
-        ? statusColor.withValues(alpha: 0.48)
-        : (p.isDark ? AppColors.specularAt(0.15) : p.hairline);
+        ? statusColor.withValues(alpha: p.isHighContrast ? 0.90 : 0.48)
+        : (p.isHighContrast
+            ? p.borderStrong
+            : (p.isDark
+                ? AppColors.specularAt(p.isAmoled ? 0.20 : 0.15)
+                : p.hairline));
+    final Color toastSurface =
+        p.isDark ? p.surfaceContainerHigh : p.surfaceElevated;
 
     return AnimatedBuilder(
       animation: Listenable.merge([
@@ -484,13 +490,15 @@ class _ToastWidgetState extends State<_ToastWidget>
                             boxShadow: [
                               ...PulsrElevation.level3(context),
                               // Status-tinted glow (intentional signal colour).
-                              BoxShadow(
-                                color: statusColor.withValues(
-                                  alpha: p.isDark ? 0.14 : 0.06,
+                              if (p.chromeGlowScale > 0)
+                                BoxShadow(
+                                  color: statusColor.withValues(
+                                    alpha: (p.isDark ? 0.14 : 0.06) *
+                                        p.chromeGlowScale,
+                                  ),
+                                  blurRadius: 14,
+                                  spreadRadius: -2,
                                 ),
-                                blurRadius: 14,
-                                spreadRadius: -2,
-                              ),
                             ],
                           ),
                           child: ClipRRect(
@@ -506,17 +514,21 @@ class _ToastWidgetState extends State<_ToastWidget>
                                     end: AlignmentDirectional.centerEnd,
                                     colors: [
                                       Color.lerp(
-                                            p.surfaceContainerHigh,
+                                            toastSurface,
                                             statusColor,
-                                            p.isDark ? 0.10 : 0.05,
+                                            p.isHighContrast
+                                                ? 0.0
+                                                : (p.isDark ? 0.10 : 0.05),
                                           ) ??
-                                          p.surfaceContainerHigh,
-                                      p.surfaceContainerHigh,
+                                          toastSurface,
+                                      toastSurface,
                                     ],
                                   ),
                                   border: Border.all(
                                     color: borderColor,
-                                    width: AppStrokes.hairline,
+                                    width: p.isHighContrast
+                                        ? 1.5
+                                        : AppStrokes.hairline,
                                   ),
                                 ),
                                 padding: EdgeInsetsDirectional.fromSTEB(

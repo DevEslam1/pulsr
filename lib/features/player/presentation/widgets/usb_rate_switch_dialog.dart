@@ -181,7 +181,7 @@ class _UsbRateSwitchDialogState extends State<UsbRateSwitchDialog> {
                     color: p.surface.withValues(alpha: 0.5),
                     borderRadius: AppRadii.r12All,
                     border: Border.all(
-                      color: p.hairline.withValues(alpha: 0.2),
+                      color: p.hairline,
                     ),
                   ),
                   child: Row(

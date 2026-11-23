@@ -159,7 +159,8 @@ class ActiveAudioOutputPill extends StatelessWidget {
 
     final details = resolveOutputDetails(context, info);
     final accent = details.accentColor;
-    final isHighContrast = MediaQuery.maybeHighContrastOf(context) ?? false;
+    final isHighContrast =
+        p.isHighContrast || (MediaQuery.maybeHighContrastOf(context) ?? false);
     final flat = p.isCalmDensity || isHighContrast;
     final restGradient = flat
         ? null
@@ -349,7 +350,8 @@ class CompactSourceScopeSwitcher extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = context.palette;
     final isOnline = selectedScope == SourceScope.online;
-    final isHighContrast = MediaQuery.maybeHighContrastOf(context) ?? false;
+    final isHighContrast =
+        p.isHighContrast || (MediaQuery.maybeHighContrastOf(context) ?? false);
     final isWide = Adaptive.widthOf(context) >= _wideBreakpoint;
 
     final trackDecoration = BoxDecoration(

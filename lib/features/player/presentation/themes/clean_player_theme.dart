@@ -101,7 +101,9 @@ class CleanPlayerTheme extends StatelessWidget {
         (song.source == SongSource.youtube ||
             (song.remoteId != null && song.remoteId!.isNotEmpty));
 
-    final isAmoled = themeMode == AppThemeMode.amoled;
+    final p = context.palette;
+    final isAmoled =
+        themeMode == AppThemeMode.amoled || (p.isDark && p.bg == Colors.black);
     final textScale =
         MediaQuery.textScalerOf(context).scale(1.0).clamp(1.0, 2.0);
 

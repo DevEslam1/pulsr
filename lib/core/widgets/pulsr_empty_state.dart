@@ -1,6 +1,5 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import '../constants/app_radii.dart';
 import '../constants/app_spacing.dart';
 import '../constants/app_typography.dart';
 import '../motion/pulsr_motion.dart';
@@ -53,6 +52,7 @@ class PulsrEmptyState extends StatelessWidget {
         final double minH = constraints.maxHeight.isFinite
             ? constraints.maxHeight * 0.6
             : 0.0;
+        final double subtitleMaxW = constraints.maxWidth >= 600 ? 360.0 : 280.0;
         return Center(
           child: ConstrainedBox(
             constraints: BoxConstraints(minHeight: minH),
@@ -120,17 +120,23 @@ class PulsrEmptyState extends StatelessWidget {
                             shape: BoxShape.circle,
                             color: p.surfaceContainer,
                             border: Border.all(
-                              color: effectiveIconColor.withValues(alpha: 0.35),
-                              width: 1.5,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: effectiveIconColor.withValues(
-                                    alpha: p.isDark ? 0.22 : 0.10),
-                                blurRadius: 24,
-                                spreadRadius: -2,
+                              color: effectiveIconColor.withValues(
+                                alpha: p.isHighContrast ? 0.85 : 0.35,
                               ),
-                            ],
+                              width: p.isHighContrast ? 2.0 : 1.5,
+                            ),
+                            boxShadow: p.chromeGlowScale > 0
+                                ? [
+                                    BoxShadow(
+                                      color: effectiveIconColor.withValues(
+                                        alpha: (p.isDark ? 0.22 : 0.10) *
+                                            p.chromeGlowScale,
+                                      ),
+                                      blurRadius: 24,
+                                      spreadRadius: -2,
+                                    ),
+                                  ]
+                                : null,
                           ),
                           child: Center(
                             child:
@@ -152,7 +158,7 @@ class PulsrEmptyState extends StatelessWidget {
                   if (subtitle.isNotEmpty) ...[
                     const SizedBox(height: AppSpacing.xs),
                     ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 264),
+                      constraints: BoxConstraints(maxWidth: subtitleMaxW),
                       child: Text(
                         subtitle,
                         textAlign: TextAlign.center,
@@ -175,9 +181,6 @@ class PulsrEmptyState extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(
                           horizontal: AppSpacing.lg,
                           vertical: AppSpacing.sm,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: AppRadii.buttonRadius,
                         ),
                       ),
                       icon: isPrimaryLoading
@@ -202,12 +205,13 @@ class PulsrEmptyState extends StatelessWidget {
                       onPressed: onSecondaryAction,
                       icon: secondaryActionIcon != null
                           ? Icon(secondaryActionIcon,
-                              size: 16, color: p.textTertiary)
+                              size: 16, color: p.textSecondary)
                           : const SizedBox.shrink(),
                       label: Text(
                         secondaryActionLabel!,
                         style: TextStyle(
-                            color: p.textTertiary, fontSize: AppFontSize.label),
+                            color: p.textSecondary,
+                            fontSize: AppFontSize.label),
                       ),
                     ),
                   ],

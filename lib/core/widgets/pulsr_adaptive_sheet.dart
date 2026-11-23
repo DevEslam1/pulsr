@@ -272,16 +272,21 @@ class PulsrAdaptiveSheet extends StatelessWidget {
       );
     }
 
-    final baseSurfaceColor = GpuBudget.isGpuSaverActive
-        ? p.surface
-        : (p.isDark
-            ? p.surface.withValues(alpha: 0.96)
-            : p.surface.withValues(alpha: 0.98));
+    final isHighContrast =
+        (MediaQuery.maybeOf(context)?.highContrast ?? false) ||
+            p.isHighContrast;
 
-    final topBlendColor = Color.alphaBlend(
-      p.accent.withValues(alpha: p.isDark ? 0.045 : 0.025),
-      baseSurfaceColor,
-    );
+    final rawSurface = p.isDark ? p.surface : p.surfaceElevated;
+    final baseSurfaceColor = (GpuBudget.isGpuSaverActive || isHighContrast)
+        ? rawSurface
+        : rawSurface.withValues(alpha: p.isDark ? 0.96 : 0.98);
+
+    final topBlendColor = isHighContrast
+        ? baseSurfaceColor
+        : Color.alphaBlend(
+            p.accent.withValues(alpha: p.isDark ? 0.045 : 0.025),
+            baseSurfaceColor,
+          );
 
     final effectiveBorderRadius = isDialog
         ? AppRadii.dialogRadius
@@ -292,24 +297,27 @@ class PulsrAdaptiveSheet extends StatelessWidget {
       child: Stack(
         children: [
           // Specular top edge highlight
-          PositionedDirectional(
-            top: 0,
-            start: 24,
-            end: 24,
-            height: 1.2,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    AppColors.specularAt(0.0),
-                    AppColors.specularAt(p.isDark ? 0.38 : 0.65),
-                    AppColors.specularAt(0.0),
-                  ],
-                  stops: const [0.0, 0.5, 1.0],
+          if (!isHighContrast && p.specularScale > 0)
+            PositionedDirectional(
+              top: 0,
+              start: 24,
+              end: 24,
+              height: 1.2,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      AppColors.specularAt(0.0),
+                      AppColors.specularAt(
+                        (p.isDark ? 0.36 : 0.62) * p.specularScale,
+                      ),
+                      AppColors.specularAt(0.0),
+                    ],
+                    stops: const [0.0, 0.5, 1.0],
+                  ),
                 ),
               ),
             ),
-          ),
           Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -325,7 +333,7 @@ class PulsrAdaptiveSheet extends StatelessWidget {
                       height: 4.5,
                       decoration: BoxDecoration(
                         color: (p.isDark ? Colors.white : Colors.black)
-                            .withValues(alpha: 0.24),
+                            .withValues(alpha: isHighContrast ? 0.58 : 0.26),
                         borderRadius: AppRadii.full,
                       ),
                     ),
@@ -382,16 +390,14 @@ class PulsrAdaptiveSheet extends StatelessWidget {
           ),
           borderRadius: effectiveBorderRadius,
           border: Border.all(
-            color: p.isDark ? Colors.white.withValues(alpha: 0.10) : p.hairline,
-            width: 1.0,
+            color: isHighContrast
+                ? p.borderStrong
+                : (p.isDark
+                    ? AppColors.specularAt(p.isAmoled ? 0.16 : 0.11)
+                    : p.hairline),
+            width: isHighContrast ? 1.5 : 1.0,
           ),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.scrimAt(p.isDark ? 0.45 : 0.14),
-              blurRadius: 22,
-              offset: const Offset(0, -4),
-            ),
-          ],
+          boxShadow: PulsrElevation.level3(context),
         ),
         child: ClipRRect(
           borderRadius: effectiveBorderRadius,

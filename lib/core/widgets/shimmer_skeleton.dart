@@ -135,16 +135,20 @@ class _SkeletonBoxState extends State<SkeletonBox>
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    final base = p.surfaceContainerHigh;
-    final peak = Color.lerp(
-          p.surfaceContainer,
-          Colors.white,
-          p.isDark ? 0.05 : 0.35,
-        ) ??
-        p.surfaceContainer;
-    final rimColor = p.isDark
-        ? AppColors.specularAt(0.06)
-        : Colors.black.withValues(alpha: 0.03);
+    final base = p.surfaceContainer;
+    final peak = p.isDark
+        ? (Color.lerp(
+              p.surfaceContainerHigh,
+              Colors.white,
+              p.isHighContrast ? 0.14 : 0.08,
+            ) ??
+            p.surfaceContainerHigh)
+        : Colors.white;
+    final rimColor = p.isHighContrast
+        ? p.borderSubtle
+        : (p.isDark
+            ? AppColors.specularAt(p.isAmoled ? 0.10 : 0.06)
+            : p.borderSubtle);
     final borderRadius = AppRadii.circular(widget.radius);
 
     // Shared shimmer: paint the moving highlight inside this box (no layer).

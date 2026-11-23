@@ -64,28 +64,42 @@ class _CassetteDeckPalette {
     final p = context.palette;
     final surface = context.playerSurfacePalette;
     final isDark = p.isDark;
+    final isHighContrast =
+        p.isHighContrast || MediaQuery.highContrastOf(context);
     final accent = Color.lerp(AppColors.amberDeep, activeColor, 0.45)!;
 
     if (isDark) {
       return _CassetteDeckPalette(
         isDark: true,
-        chassisTop: PlayerMaterialColors.cassetteBodyTop,
-        chassisMid: PlayerMaterialColors.cassetteBodyMid,
-        chassisBottom: PlayerMaterialColors.cassetteWell,
+        chassisTop: isHighContrast ? p.bg : PlayerMaterialColors.cassetteBodyTop,
+        chassisMid:
+            isHighContrast ? p.surface : PlayerMaterialColors.cassetteBodyMid,
+        chassisBottom:
+            isHighContrast ? p.bg : PlayerMaterialColors.cassetteWell,
         bayRecess: PlayerMaterialColors.immersiveBackdrop,
-        bayBorder: PlayerMaterialColors.cassetteBodyBorder,
-        panelSurface: PlayerMaterialColors.cassetteShell,
-        panelBorder: PlayerMaterialColors.cassetteShellBorder,
+        bayBorder: isHighContrast
+            ? p.borderStrong
+            : PlayerMaterialColors.cassetteBodyBorder,
+        panelSurface: isHighContrast
+            ? p.surfaceContainer
+            : PlayerMaterialColors.cassetteShell,
+        panelBorder: isHighContrast
+            ? p.borderStrong
+            : PlayerMaterialColors.cassetteShellBorder,
         keyFaceTop: PlayerMaterialColors.cdWeightMid,
         keyFaceBottom: PlayerMaterialColors.cassetteShell,
         keyDepressedTop: PlayerMaterialColors.cassetteBodyBottom,
         keyDepressedBottom: PlayerMaterialColors.cassetteBodyMid,
-        keyBorder: PlayerMaterialColors.cassetteBridgeBorder,
+        keyBorder: isHighContrast
+            ? p.borderStrong
+            : PlayerMaterialColors.cassetteBridgeBorder,
         keyTray: PlayerMaterialColors.immersiveBackdrop,
         primaryInk: surface.highContrastInk,
-        secondaryInk: surface.mutedInk,
+        secondaryInk: isHighContrast ? p.textSecondary : surface.mutedInk,
         vfdBackground: PlayerMaterialColors.cassetteWell,
-        vfdBorder: PlayerMaterialColors.cassetteCapstanBorder,
+        vfdBorder: isHighContrast
+            ? p.borderStrong
+            : PlayerMaterialColors.cassetteCapstanBorder,
         ledGreen: PlayerMaterialColors.cassetteVuNormal,
         ledAmber: AppColors.warning,
         ledRed: PlayerMaterialColors.cassetteVuPeak,
@@ -105,27 +119,37 @@ class _CassetteDeckPalette {
 
     return _CassetteDeckPalette(
       isDark: false,
-      chassisTop: silverTop,
-      chassisMid: silverMid,
-      chassisBottom: silverBottom,
+      chassisTop: isHighContrast ? p.bg : silverTop,
+      chassisMid: isHighContrast ? p.surface : silverMid,
+      chassisBottom: isHighContrast ? p.surfaceContainer : silverBottom,
       bayRecess: PlayerMaterialColors.cassetteWell,
-      bayBorder: AppColors.discSteel.withValues(alpha: 0.45),
-      panelSurface: Color.lerp(p.surface, AppColors.surfaceGreyLight, 0.35)!,
-      panelBorder: AppColors.discSteel.withValues(alpha: 0.28),
+      bayBorder: isHighContrast
+          ? p.borderStrong
+          : AppColors.discSteel.withValues(alpha: 0.45),
+      panelSurface: isHighContrast
+          ? p.surface
+          : Color.lerp(p.surface, AppColors.surfaceGreyLight, 0.35)!,
+      panelBorder: isHighContrast
+          ? p.borderStrong
+          : AppColors.discSteel.withValues(alpha: 0.28),
       keyFaceTop: AppColors.surfaceGreyLight,
       keyFaceBottom: Color.lerp(AppColors.discSilver, p.surfaceContainer, 0.45)!,
       keyDepressedTop: Color.lerp(AppColors.discAluminum, p.surface, 0.35)!,
       keyDepressedBottom: AppColors.discSilver,
-      keyBorder: AppColors.discSteel.withValues(alpha: 0.42),
+      keyBorder: isHighContrast
+          ? p.borderStrong
+          : AppColors.discSteel.withValues(alpha: 0.42),
       keyTray: Color.lerp(AppColors.discGraphite, p.textPrimary, 0.35)!,
       primaryInk: p.textPrimary,
       secondaryInk: p.textSecondary,
       vfdBackground: PlayerMaterialColors.cassetteWell,
-      vfdBorder: AppColors.discSteel.withValues(alpha: 0.42),
+      vfdBorder: isHighContrast
+          ? p.borderStrong
+          : AppColors.discSteel.withValues(alpha: 0.42),
       ledGreen: AppColors.emeraldDeep,
       ledAmber: AppColors.warning,
       ledRed: AppColors.error,
-      accentTone: deepAccent,
+      accentTone: isHighContrast ? p.accent : deepAccent,
       screwColor: AppColors.discSteel,
       seamHighlight: AppColors.specularAt(0.65),
       seamShadow: AppColors.scrimAt(0.14),

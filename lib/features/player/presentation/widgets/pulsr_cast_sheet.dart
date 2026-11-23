@@ -807,7 +807,7 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
                           Divider(
                               height: 1,
                               thickness: 1,
-                              color: p.hairline.withValues(alpha: 0.5)),
+                              color: p.hairline),
                         ListTile(
                           leading: Icon(
                             _routes[i].selected
@@ -838,7 +838,7 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
                           Divider(
                               height: 1,
                               thickness: 1,
-                              color: p.hairline.withValues(alpha: 0.5)),
+                              color: p.hairline),
                         ListTile(
                           leading:
                               Icon(Icons.cast_rounded, color: p.textPrimary),

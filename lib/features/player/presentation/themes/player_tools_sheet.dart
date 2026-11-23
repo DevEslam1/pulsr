@@ -287,8 +287,8 @@ class PlayerToolsSheet extends StatelessWidget {
                 return _ToolActionTile(
                   icon: isCast ? Icons.cast_connected_rounded : deviceOutputIcon,
                   iconColor: isCast
-                      ? AppColors.accentCyan
-                      : (isUsb ? AppColors.dacGold : activeColor),
+                      ? p.info
+                      : (isUsb ? p.goldAccent : activeColor),
                   title: isCast ? l10n.googleCast : l10n.audioOutputAndDac,
                   subtitle: outputLabel,
                   badgeText: isCast ? 'CAST' : (isUsb ? 'DAC' : null),
@@ -331,7 +331,7 @@ class PlayerToolsSheet extends StatelessWidget {
             // 4. Quran Mode
             _ToolActionTile(
               icon: Icons.auto_stories_rounded,
-              iconColor: AppColors.quranEmerald,
+              iconColor: p.isDark ? AppColors.quranEmerald : p.success,
               title: l10n.quranMode,
               subtitle:
                   isQuranMode ? l10n.dspQuranModeOn : l10n.dspQuranModeOff,
@@ -456,7 +456,7 @@ class _AbLoopSection extends StatelessWidget {
             border: Border.all(
               color: ab.enabled
                   ? activeColor.withValues(alpha: 0.45)
-                  : p.hairline.withValues(alpha: 0.75),
+                  : (p.isHighContrast ? p.borderStrong : p.hairline),
             ),
           ),
           child: Column(
@@ -728,7 +728,7 @@ class _PartyAwareMoreTile extends StatelessWidget {
         final isConnecting = connState == PartyConnectionState.connecting;
         return _ToolActionTile(
           icon: Icons.apps_rounded,
-          iconColor: isLive ? AppColors.accentCyan : activeColor,
+          iconColor: isLive ? context.palette.info : activeColor,
           title: l10n.moreOptions,
           subtitle: l10n.partyListenTogether,
           badgeText: isLive ? 'LIVE' : (isConnecting ? '...' : null),
@@ -770,7 +770,7 @@ class _ToolActionTile extends StatelessWidget {
           border: Border.all(
             color: isActive
                 ? iconColor.withValues(alpha: 0.35)
-                : p.hairline.withValues(alpha: 0.65),
+                : (p.isHighContrast ? p.borderStrong : p.hairline),
           ),
         ),
         child: PulsrListTile(
