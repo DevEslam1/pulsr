@@ -3,9 +3,9 @@ import 'dart:collection';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:injectable/injectable.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../config/app_config.dart';
-import '../constants/prefs_keys.dart';
+import '../network/network_access_guard.dart';
+import '../network/remote_target_policy.dart';
 import '../utils/error_logger.dart';
 
 class ArtistInfo {
@@ -64,17 +64,20 @@ class ArtistBioService {
 
     final future = _fetchArtistInfo(cleanName, key);
     _inFlight[key] = future;
-    return future.whenComplete(() => _inFlight.remove(key));
+    return future.whenComplete(() {
+      if (identical(_inFlight[key], future)) {
+        _inFlight.remove(key);
+      }
+    });
+  }
+
+  void clearCache() {
+    _cache.clear();
   }
 
   Future<ArtistInfo?> _fetchArtistInfo(String cleanName, String key) async {
-    try {
-      if (!AppConfig.isCloudSyncAllowed) return null;
-      final prefs = await SharedPreferences.getInstance();
-      if (prefs.getBool(PrefsKeys.offlineOnlyMode) == true) return null;
-    } catch (e, st) {
-      ErrorLogger.log('Failed to read offline-only preference for artist bio',
-          error: e, stackTrace: st, category: 'ArtistBio');
+    if (await NetworkAccessGuard.isBlocked(category: 'ArtistBio')) {
+      return null;
     }
 
     try {
@@ -128,9 +131,14 @@ class ArtistBioService {
                 returnedName.contains(key) ||
                 key.contains(returnedName);
             if (matches) {
-              pictureUrl = first['picture_xl'] ??
+              final rawPicture = (first['picture_xl'] ??
                   first['picture_big'] ??
-                  first['picture_medium'];
+                  first['picture_medium']) as String?;
+              if (rawPicture != null &&
+                  RemoteTargetPolicy.isAllowed(rawPicture,
+                      requireHttps: true)) {
+                pictureUrl = rawPicture;
+              }
               fanCount = (first['nb_fan'] as num?)?.toInt();
             }
           }

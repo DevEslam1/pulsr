@@ -27,14 +27,32 @@ typedef RawSuggestionBuckets = ({
 class PlaylistSuggestionsService {
   List<PlaylistSuggestion>? _cachedSuggestions;
   DateTime? _lastGeneratedTime;
-  int? _lastSongCount;
+  int? _lastSignature;
   static const Duration _cacheTtl = Duration(minutes: 30);
 
   /// Invalidates the suggestion cache (e.g. after library scan or playlist changes).
   void invalidateCache() {
     _cachedSuggestions = null;
     _lastGeneratedTime = null;
-    _lastSongCount = null;
+    _lastSignature = null;
+  }
+
+  int _computeSignature(List<SongsTableData> allSongs) {
+    var totalPlays = 0;
+    var favs = 0;
+    var xorIds = 0;
+    for (final s in allSongs) {
+      totalPlays += s.playCount;
+      if (s.isFavorite) favs++;
+      xorIds ^= s.id;
+    }
+    return Object.hash(
+      allSongs.length,
+      L10nHolder.current?.localeName ?? '',
+      totalPlays,
+      favs,
+      xorIds,
+    );
   }
 
   /// Asynchronously generates smart suggested mixes using [compute] for large libraries (> 500 tracks).
@@ -45,10 +63,11 @@ class PlaylistSuggestionsService {
     if (allSongs.isEmpty) return [];
 
     final now = DateTime.now();
+    final signature = _computeSignature(allSongs);
     if (!forceRefresh &&
         _cachedSuggestions != null &&
         _lastGeneratedTime != null &&
-        _lastSongCount == allSongs.length &&
+        _lastSignature == signature &&
         now.difference(_lastGeneratedTime!) < _cacheTtl) {
       return _cachedSuggestions!;
     }
@@ -63,7 +82,7 @@ class PlaylistSuggestionsService {
 
     _cachedSuggestions = suggestions;
     _lastGeneratedTime = now;
-    _lastSongCount = allSongs.length;
+    _lastSignature = signature;
 
     return suggestions;
   }
@@ -75,10 +94,11 @@ class PlaylistSuggestionsService {
     if (allSongs.isEmpty) return [];
 
     final now = DateTime.now();
+    final signature = _computeSignature(allSongs);
     if (!forceRefresh &&
         _cachedSuggestions != null &&
         _lastGeneratedTime != null &&
-        _lastSongCount == allSongs.length &&
+        _lastSignature == signature &&
         now.difference(_lastGeneratedTime!) < _cacheTtl) {
       return _cachedSuggestions!;
     }
@@ -87,7 +107,7 @@ class PlaylistSuggestionsService {
     final suggestions = buildLocalizedSuggestions(buckets);
     _cachedSuggestions = suggestions;
     _lastGeneratedTime = now;
-    _lastSongCount = allSongs.length;
+    _lastSignature = signature;
 
     return suggestions;
   }
@@ -189,6 +209,7 @@ class PlaylistSuggestionsService {
     List<SongsTableData> allSongs, {
     int limit = 10,
   }) {
+    if (limit <= 0) return const [];
     final scored = <({SongsTableData song, int score})>[];
     for (final s in allSongs) {
       if (s.id == seed.id) continue;

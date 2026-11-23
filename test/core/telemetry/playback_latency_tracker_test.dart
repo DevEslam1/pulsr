@@ -273,5 +273,38 @@ void main() {
       expect(fakeSpan.wasFinished, isTrue);
       expect(fakeSpan.finishStatus, equals(SpanStatus.cancelled()));
     });
+
+    test('backward clock timestamp on markStageAt clamps non-negative offset',
+        () {
+      tracker.start(videoId: 'clockSkew');
+      final beforeStart = DateTime.fromMillisecondsSinceEpoch(999000);
+      final elapsed = tracker.markStageAt(
+        PlaybackStage.firstBytesReady,
+        beforeStart,
+      );
+      expect(elapsed, equals(Duration.zero));
+      clock.advance(const Duration(milliseconds: 50));
+      final report = tracker.finish();
+      expect(report, isNotNull);
+      expect(
+        report!.stageOffsets[PlaybackStage.firstBytesReady],
+        equals(Duration.zero),
+      );
+      expect(report.stageDurations[PlaybackStage.firstBytesReady],
+          equals(Duration.zero));
+    });
+
+    test('finishWithError scrubs PII and start skips disabled Sentry spans', () {
+      tracker.start(videoId: 'secretVid123');
+      clock.advance(const Duration(milliseconds: 25));
+      final report = tracker.finishWithError(
+        StateError('token=secret_tok_999 for C:/Users/alice/song.mp3'),
+      );
+      expect(report, isNotNull);
+      expect(report!.success, isFalse);
+      expect(report.failureStage, isNot(contains('secret_tok_999')));
+      expect(report.failureStage, contains('[REDACTED_TOKEN]'));
+      expect(report.failureStage, isNot(contains('alice')));
+    });
   });
 }

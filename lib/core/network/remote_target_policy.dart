@@ -129,24 +129,69 @@ abstract final class RemoteTargetPolicy {
     if (lower.endsWith('.local')) return true;
 
     if (lower.contains(':')) {
-      // IPv6 literal (Uri strips the brackets). Reject unspecified/loopback,
-      // unique-local, link-local, multicast, site-local, and IPv4-mapped private addresses.
-      const loopbacks = {'::', '::1', '0:0:0:0:0:0:0:0', '0:0:0:0:0:0:0:1'};
-      if (loopbacks.contains(lower)) return true;
-      final embedded = embeddedIpv4(lower);
-      if (embedded != null) return isUnsafeIpv4(embedded);
-      final firstGroup = lower.split(':').first;
-      final value = int.tryParse(firstGroup, radix: 16);
-      if (value != null) {
-        if ((value & 0xfe00) == 0xfc00) return true; // fc00::/7
-        if ((value & 0xffc0) == 0xfe80) return true; // fe80::/10
-        if ((value & 0xff00) == 0xff00) return true; // ff00::/8 (multicast)
-        if ((value & 0xffc0) == 0xfec0) return true; // fec0::/10 (deprecated site-local)
-      }
-      return false;
+      final bytes = _parseIpv6Bytes(lower);
+      if (bytes == null) return true; // Malformed or host:port — fail closed.
+      return _isUnsafeIpv6Bytes(bytes);
     }
 
     return isUnsafeIpv4(lower);
+  }
+
+  static List<int>? _parseIpv6Bytes(String raw) {
+    try {
+      return Uri.parseIPv6Address(raw);
+    } on FormatException {
+      return null;
+    }
+  }
+
+  static bool _isUnsafeIpv6Bytes(List<int> b) {
+    // :: (unspecified) and ::1 (loopback)
+    var prefixZero = true;
+    for (var i = 0; i < 15; i++) {
+      if (b[i] != 0) {
+        prefixZero = false;
+        break;
+      }
+    }
+    if (prefixZero && (b[15] == 0 || b[15] == 1)) return true;
+
+    // fc00::/7 (unique local), fe80::/10 (link-local), fec0::/10 (site-local), ff00::/8 (multicast)
+    if ((b[0] & 0xfe) == 0xfc) return true;
+    if (b[0] == 0xfe && (b[1] & 0xc0) == 0x80) return true;
+    if (b[0] == 0xfe && (b[1] & 0xc0) == 0xc0) return true;
+    if (b[0] == 0xff) return true;
+
+    // 100::/64 (discard-only) and 2001:db8::/32 (documentation)
+    if (b[0] == 0x01 &&
+        b[1] == 0x00 &&
+        b[2] == 0 &&
+        b[3] == 0 &&
+        b[4] == 0 &&
+        b[5] == 0 &&
+        b[6] == 0 &&
+        b[7] == 0) {
+      return true;
+    }
+    if (b[0] == 0x20 && b[1] == 0x01 && b[2] == 0x0d && b[3] == 0xb8) {
+      return true;
+    }
+
+    // IPv4-mapped (::ffff:a.b.c.d), IPv4-compatible (::a.b.c.d),
+    // and IPv4-translated (::ffff:0:a.b.c.d).
+    final isMapped = b.sublist(0, 10).every((v) => v == 0) &&
+        b[10] == 0xff &&
+        b[11] == 0xff;
+    final isCompatible = b.sublist(0, 12).every((v) => v == 0);
+    final isTranslated = b.sublist(0, 8).every((v) => v == 0) &&
+        b[8] == 0xff &&
+        b[9] == 0xff &&
+        b[10] == 0 &&
+        b[11] == 0;
+    if (isMapped || isCompatible || isTranslated) {
+      return isUnsafeIpv4('${b[12]}.${b[13]}.${b[14]}.${b[15]}');
+    }
+    return false;
   }
 
   /// True when [ip] is loopback, link-local, unique-local, unspecified, CGNAT
@@ -197,7 +242,7 @@ abstract final class RemoteTargetPolicy {
     }
     final zoneIdx = trimmed.indexOf('%');
     if (zoneIdx != -1) trimmed = trimmed.substring(0, zoneIdx);
-    if (trimmed.contains(':')) return true;
+    if (trimmed.contains(':')) return _parseIpv6Bytes(trimmed) != null;
     final parts = trimmed.split('.');
     if (parts.length != 4) return false;
     return parts.every((part) {

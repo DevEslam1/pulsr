@@ -98,5 +98,56 @@ void main() {
         async.flushTimers();
       });
     });
+
+    test('releases mutex during backoff sleep so concurrent fastFail rejects immediately',
+        () {
+      fakeAsync((async) {
+        YtmRateLimiter.debugReset();
+        final limiter = YtmRateLimiter.shared;
+        limiter.onRateLimited(45);
+
+        bool sleeperDone = false;
+        Object? fastFailError;
+        Duration? fastFailElapsed;
+
+        limiter.acquirePermit().then((_) => sleeperDone = true);
+        limiter
+            .acquirePermit(fastFail: true)
+            .catchError((Object e) {
+              fastFailError = e;
+              fastFailElapsed = async.elapsed;
+            });
+
+        async.flushMicrotasks();
+        expect(sleeperDone, isFalse);
+        expect(fastFailError, isNotNull);
+        expect(fastFailElapsed, Duration.zero);
+
+        async.flushTimers();
+      });
+    });
+
+    test('runDeduplicated shares active future cleanly and removes on completion',
+        () async {
+      YtmRateLimiter.debugReset();
+      final limiter = YtmRateLimiter.shared;
+      var runs = 0;
+
+      final results = await Future.wait([
+        limiter.runDeduplicated('k1', () async {
+          runs++;
+          return 42;
+        }),
+        limiter.runDeduplicated('k1', () async {
+          runs++;
+          return 99;
+        }),
+      ]);
+      expect(results, [42, 42]);
+      expect(runs, 1);
+
+      final next = await limiter.runDeduplicated('k1', () async => 7);
+      expect(next, 7);
+    });
   });
 }

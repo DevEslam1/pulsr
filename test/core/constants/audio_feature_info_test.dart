@@ -994,5 +994,48 @@ void main() {
         );
       });
     });
+
+    group('case-insensitive codes and bypass consistency', () {
+      test('bitPerfectReasonMessage handles uppercase and surrounding whitespace',
+          () {
+        expect(
+          AudioConflicts.bitPerfectReasonMessage('  EXCLUSIVE_REQUIRES_USB_DAC  '),
+          isNotNull,
+        );
+        expect(
+          AudioConflicts.bitPerfectReasonMessage('No_Supported_Mixer_Attributes'),
+          isNotNull,
+        );
+      });
+
+      test('bitPerfectBlockedReason normalizes failure codes', () {
+        final device = _device(reason: '  EXCLUSIVE_REQUIRES_USB_DAC ');
+        expect(AudioConflicts.bitPerfectBlockedReason(device), isNotNull);
+      });
+
+      test(
+          'speedBlockedByBitPerfect and silenceSkipBlockedByBitPerfect honor AAudio Direct and DoP',
+          () {
+        final wired = _device();
+        expect(
+          AudioConflicts.speedBlockedByBitPerfect(
+            bitPerfectOutput: false,
+            bypassDspOnBitPerfect: false,
+            device: wired,
+            aaudioEnabled: true,
+          ),
+          contains('AAudio Direct'),
+        );
+        expect(
+          AudioConflicts.silenceSkipBlockedByBitPerfect(
+            bitPerfectOutput: false,
+            bypassDspOnBitPerfect: false,
+            device: wired,
+            dsdDopActive: true,
+          ),
+          contains('DoP'),
+        );
+      });
+    });
   });
 }

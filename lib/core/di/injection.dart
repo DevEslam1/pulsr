@@ -1,6 +1,7 @@
 import 'package:pulsr/data/audio/headphone_profiles_repository.dart';
 import 'dart:async';
 import 'dart:io';
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get_it/get_it.dart';
 import 'package:http/http.dart' as http;
@@ -26,7 +27,8 @@ import 'injection.config.dart';
 
 final GetIt getIt = GetIt.instance;
 
-final Completer<void> _initializationReady = Completer<void>();
+Completer<void> _initializationReady = Completer<void>();
+Future<void>? _initFuture;
 
 /// Marker registered once [configureDependencies] succeeds; using a GetIt
 /// binding lets `getIt.reset()` in tests reset idempotency cleanly.
@@ -34,24 +36,60 @@ class _DiConfiguredMarker {
   const _DiConfiguredMarker();
 }
 
+class _DiAttemptedMarker {
+  const _DiAttemptedMarker();
+}
+
 Future<void>? _configureInFlight;
 
-/// Completes when [configureDependencies] has finished (or failed). The splash
+/// Test hook allowing bootstrap retry tests to drive [configureDependencies]
+/// without platform channels. Must remain `null` in production.
+@visibleForTesting
+Future<void> Function(bool warmUpAsync)? debugConfigureDependenciesOverride;
+
+/// Completes when [configureDependencies] has finished successfully. The splash
 /// gates its routing on this real signal instead of an arbitrary delay (I25).
-Future<void> get initializationReady => _initializationReady.future;
+Future<void> get initializationReady =>
+    _initFuture ?? _initializationReady.future;
 
 @InjectableInit()
 Future<void> configureDependencies({bool warmUpAsync = true}) {
   // Hardening pass: make DI initialization idempotent across repeated or
-  // overlapping calls and ensure _initializationReady completes at most once.
+  // overlapping calls and ensure _initializationReady completes on success.
   if (getIt.isRegistered<_DiConfiguredMarker>()) {
     if (!_initializationReady.isCompleted) _initializationReady.complete();
+    _initFuture ??= _initializationReady.future;
     return Future<void>.value();
   }
   final inFlight = _configureInFlight;
   if (inFlight != null) return inFlight;
 
-  final future = _configureDependenciesImpl(warmUpAsync: warmUpAsync);
+  if (_initializationReady.isCompleted) {
+    _initializationReady = Completer<void>();
+  }
+  final targetCompleter = _initializationReady;
+  _initFuture = targetCompleter.future;
+  if (!getIt.isRegistered<_DiAttemptedMarker>()) {
+    getIt.registerSingleton<_DiAttemptedMarker>(const _DiAttemptedMarker());
+  }
+
+  final override = debugConfigureDependenciesOverride;
+  final future = override != null
+      ? () async {
+          try {
+            await override(warmUpAsync);
+            if (!getIt.isRegistered<_DiConfiguredMarker>()) {
+              getIt.registerSingleton<_DiConfiguredMarker>(
+                  const _DiConfiguredMarker());
+            }
+          } finally {
+            if (!targetCompleter.isCompleted) targetCompleter.complete();
+          }
+        }()
+      : _configureDependenciesImpl(
+          warmUpAsync: warmUpAsync,
+          readyCompleter: targetCompleter,
+        );
   _configureInFlight = future;
   return future.whenComplete(() {
     if (identical(_configureInFlight, future)) {
@@ -60,22 +98,29 @@ Future<void> configureDependencies({bool warmUpAsync = true}) {
   });
 }
 
-Future<void> _configureDependenciesImpl({required bool warmUpAsync}) async {
-  // Resolve/install the database key and migrate a legacy plaintext database
-  // before the first AppDatabase query. Never throws; degrades to plaintext.
-  await DatabaseEncryptionBootstrap.prepare();
+Future<void> _configureDependenciesImpl({
+  required bool warmUpAsync,
+  required Completer<void> readyCompleter,
+}) async {
   try {
+    // Resolve/install the database key and migrate a legacy plaintext database
+    // before the first AppDatabase query. Never throws; degrades to plaintext.
+    await DatabaseEncryptionBootstrap.prepare();
+    // If a retry superseded this run while prepare() was blocked, abort quietly.
+    if (!identical(_initializationReady, readyCompleter)) return;
+
     getIt.init();
     if (!getIt.isRegistered<DiscordRpcService>()) {
+      // Process-wide singleton outlives DI resets; never brick it on reset.
       getIt.registerLazySingleton<DiscordRpcService>(
         () => DiscordRpcService.instance,
-        dispose: (service) => service.dispose(),
       );
     }
     if (!getIt.isRegistered<AppUpdateService>()) {
+      // Process-wide singleton outlives DI resets; cancel active transfer only.
       getIt.registerLazySingleton<AppUpdateService>(
         () => AppUpdateService.instance,
-        dispose: (service) => service.dispose(),
+        dispose: (service) => service.cancelDownload(),
       );
     }
     if (!getIt.isRegistered<QuranRepository>()) {
@@ -140,7 +185,7 @@ Future<void> _configureDependenciesImpl({required bool warmUpAsync}) async {
       getIt.registerSingleton<_DiConfiguredMarker>(const _DiConfiguredMarker());
     }
   } finally {
-    if (!_initializationReady.isCompleted) _initializationReady.complete();
+    if (!readyCompleter.isCompleted) readyCompleter.complete();
   }
 }
 
@@ -223,12 +268,48 @@ bool get appDependenciesReady =>
 
 /// Awaits the app-shell singletons that [PulsrApp] looks up synchronously.
 /// Warm-up failures in [configureDependencies] are swallowed, so this gives a
-/// slow or partially failed cold start a second, awaitable chance. Never
-/// throws; returns whether the app can render.
+/// slow or partially failed cold start a second, awaitable chance. When
+/// [reconfigureIfNeeded] is `true` and configuration did not finish (or an
+/// async singleton failed), partial registrations are reset and
+/// [configureDependencies] is re-invoked cleanly. Never throws; returns whether
+/// the app can render.
 Future<bool> ensureAppDependenciesReady({
   Duration timeout = const Duration(seconds: 30),
+  bool reconfigureIfNeeded = false,
 }) async {
   try {
+    if (reconfigureIfNeeded) {
+      final inFlight = _configureInFlight;
+      final canReconfigure = debugConfigureDependenciesOverride != null ||
+          inFlight != null ||
+          getIt.isRegistered<_DiAttemptedMarker>() ||
+          getIt.isRegistered<_DiConfiguredMarker>();
+      if (inFlight != null) {
+        try {
+          await inFlight.timeout(const Duration(seconds: 2));
+        } catch (e, st) {
+          ErrorLogger.log('In-flight DI configuration failed before retry',
+              error: e, stackTrace: st, category: 'DI');
+        }
+      }
+      if (canReconfigure &&
+          (!getIt.isRegistered<_DiConfiguredMarker>() ||
+              !appDependenciesReady)) {
+        if (!appDependenciesReady ||
+            !getIt.isRegistered<_DiConfiguredMarker>()) {
+          _configureInFlight = null;
+          _initializationReady = Completer<void>();
+          _initFuture = _initializationReady.future;
+          try {
+            await getIt.reset();
+          } catch (e, st) {
+            ErrorLogger.log('DI reset failed during bootstrap retry',
+                error: e, stackTrace: st, category: 'DI');
+          }
+        }
+        await configureDependencies(warmUpAsync: false).timeout(timeout);
+      }
+    }
     await Future.wait<void>([
       _awaitDependency<PulsrAudioHandler>(),
       _awaitDependency<PlayerCubit>(),

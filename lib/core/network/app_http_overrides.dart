@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import '../constants/channels.dart';
 import 'proxy_config.dart';
+import 'remote_target_policy.dart';
 
 /// Global [HttpOverrides] that intercepts all Dart [HttpClient] instances and
 /// applies the active proxy settings and authentication credentials.
@@ -221,8 +222,10 @@ class AppHttpOverrides extends HttpOverrides {
     }
     if (statusCode >= 400 &&
         statusCode < 500 &&
-        (uri.host.contains('youtube.com') ||
-            uri.host.contains('googlevideo.com'))) {
+        RemoteTargetPolicy.hostMatchesAnySuffix(
+          uri.host,
+          const {'youtube.com', 'googlevideo.com'},
+        )) {
       // YouTube answered (even with 403/404): the proxy path itself works,
       // the restriction is IP-level. Count the proxy as reachable.
       return (success: true, error: null);
@@ -453,21 +456,51 @@ class AppHttpOverrides extends HttpOverrides {
       }
 
       // 3. SOCKS5 CONNECT to target host & port
-      final hostBytes = utf8.encode(targetHost);
-      if (hostBytes.isEmpty || hostBytes.length > 255) {
-        throw const SocketException(
-            'SOCKS5 host must be non-empty and 255 bytes or fewer');
+      if (targetPort <= 0 || targetPort > 65535) {
+        throw const SocketException('SOCKS5 target port out of range');
       }
-      socket.add([
-        0x05, // VER
-        0x01, // CMD: CONNECT
-        0x00, // RSV
-        0x03, // ATYP: DOMAINNAME
-        hostBytes.length,
-        ...hostBytes,
-        (targetPort >> 8) & 0xFF,
-        targetPort & 0xFF,
-      ]);
+      var cleanHost = targetHost.trim();
+      if (cleanHost.startsWith('[') && cleanHost.endsWith(']')) {
+        cleanHost = cleanHost.substring(1, cleanHost.length - 1).trim();
+      }
+      final parsedIp = InternetAddress.tryParse(cleanHost);
+      if (parsedIp != null && parsedIp.type == InternetAddressType.IPv4) {
+        socket.add([
+          0x05, // VER
+          0x01, // CMD: CONNECT
+          0x00, // RSV
+          0x01, // ATYP: IPv4
+          ...parsedIp.rawAddress,
+          (targetPort >> 8) & 0xFF,
+          targetPort & 0xFF,
+        ]);
+      } else if (parsedIp != null && parsedIp.type == InternetAddressType.IPv6) {
+        socket.add([
+          0x05, // VER
+          0x01, // CMD: CONNECT
+          0x00, // RSV
+          0x04, // ATYP: IPv6
+          ...parsedIp.rawAddress,
+          (targetPort >> 8) & 0xFF,
+          targetPort & 0xFF,
+        ]);
+      } else {
+        final hostBytes = utf8.encode(cleanHost);
+        if (hostBytes.isEmpty || hostBytes.length > 255) {
+          throw const SocketException(
+              'SOCKS5 host must be non-empty and 255 bytes or fewer');
+        }
+        socket.add([
+          0x05, // VER
+          0x01, // CMD: CONNECT
+          0x00, // RSV
+          0x03, // ATYP: DOMAINNAME
+          hostBytes.length,
+          ...hostBytes,
+          (targetPort >> 8) & 0xFF,
+          targetPort & 0xFF,
+        ]);
+      }
       await socket.flush();
 
       final replyHeader = await reader.readBytes(4, timeout);
@@ -522,6 +555,12 @@ class AppHttpOverrides extends HttpOverrides {
       final method = requestLineParts[0].toUpperCase();
       final requestTarget = requestLineParts[1];
       final httpVersion = requestLineParts[2];
+      if (method.contains(RegExp(r'[^A-Z]')) ||
+          httpVersion.contains(RegExp(r'[\r\n\s]')) ||
+          requestTarget.contains(RegExp(r'[\r\n]'))) {
+        clientSocket.destroy();
+        return;
+      }
 
       if (method == 'CONNECT') {
         var targetHost = requestTarget;
@@ -764,6 +803,18 @@ class _SocketByteReader {
           return;
         }
         _buffer.addAll(chunk);
+        if (_availableBytes > 131072) {
+          _error = const SocketException('Control buffer exceeds 128 KB limit');
+          if (_waitCompleter != null && !_waitCompleter!.isCompleted) {
+            _waitCompleter!.completeError(
+              const SocketException('Control buffer exceeds 128 KB limit'),
+            );
+            _waitCompleter = null;
+          }
+          _sub?.cancel();
+          _sub = null;
+          return;
+        }
         if (_waitHeaderEnd &&
             _availableBytes > 65536 &&
             _findHeaderEndIndex() == -1) {

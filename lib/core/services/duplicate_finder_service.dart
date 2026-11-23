@@ -72,6 +72,9 @@ class DuplicateFinderService {
     final Map<(int, int), List<SongsTableData>> byDurationSize = {};
 
     for (final song in allSongs) {
+      if (!SongSource.hasLocalFile(song.source) || song.path.isEmpty) {
+        continue;
+      }
       final normTitle = _normalizeString(song.title);
       final normArtist = _normalizeString(song.artist);
       final titleArtistKey = '$normTitle-$normArtist';
@@ -156,8 +159,10 @@ class DuplicateFinderService {
     return result;
   }
 
+  static const String _promoWords =
+      r'(?:official\s+(?:audio|video|music\s+video)|lyric\s+video|audio|video|visualizer|hq|hd|4k)';
   static final RegExp _promotionalNoise = RegExp(
-    r'(\(|\[)\s*(official\s+(audio|video|music\s+video)|lyric\s+video|audio|video|visualizer|hq|hd|4k)\s*(\)|\])',
+    r'\(\s*' + _promoWords + r'\s*\)|\[\s*' + _promoWords + r'\s*\]',
     caseSensitive: false,
   );
 
@@ -171,14 +176,28 @@ class DuplicateFinderService {
     return matches.map((m) => m.group(0)!).join(',');
   }
 
+  static bool _isUnknownAlbum(String normalizedAlbum) =>
+      normalizedAlbum.isEmpty || normalizedAlbum == 'unknownalbum';
+
   /// Two files inside a title+artist group are the same recording when their
-  /// albums agree (an unknown/empty album is treated as compatible) and their
-  /// durations are within tolerance. When version tags differ, tolerance is tightened
-  /// from 5s to 2s.
+  /// albums agree, missing/zero-duration tracks do not pair with timed tracks or
+  /// empty-album siblings, and their durations fall within tolerance.
   static bool _isSameRecording(SongsTableData a, SongsTableData b) {
     final albumA = _normalizeString(a.album);
     final albumB = _normalizeString(b.album);
-    if (albumA.isNotEmpty && albumB.isNotEmpty && albumA != albumB) {
+    final unknownA = _isUnknownAlbum(albumA);
+    final unknownB = _isUnknownAlbum(albumB);
+    if (!unknownA && !unknownB && albumA != albumB) {
+      return false;
+    }
+    if ((a.durationMs > 0) != (b.durationMs > 0)) {
+      return false;
+    }
+    if (a.durationMs <= 0 && b.durationMs <= 0) {
+      return !unknownA && !unknownB && albumA == albumB;
+    }
+    final diffMs = (a.durationMs - b.durationMs).abs();
+    if ((unknownA || unknownB) && diffMs > 2000) {
       return false;
     }
     final tagsA = _extractVersionTags(a.title);
@@ -187,11 +206,9 @@ class DuplicateFinderService {
       if (tagsA.isNotEmpty && tagsB.isNotEmpty && tagsA != tagsB) {
         return false;
       }
-      if (a.durationMs <= 0 || b.durationMs <= 0) return true;
-      return (a.durationMs - b.durationMs).abs() <= 2000;
+      return diffMs <= 2000;
     }
-    if (a.durationMs <= 0 || b.durationMs <= 0) return true;
-    return (a.durationMs - b.durationMs).abs() <= _pass1DurationToleranceMs;
+    return diffMs <= _pass1DurationToleranceMs;
   }
 
   static const int _pass1DurationToleranceMs = 5000;
@@ -207,14 +224,16 @@ class DuplicateFinderService {
     }
     final verifiedClusters = <List<SongsTableData>>[];
     for (final cluster in byHash.values.where((c) => c.length > 1)) {
-      // Confirm with full-file SHA-256 (reuse ChainOfCustodyService.hashFileContents, cap 512MB)
+      // Confirm with inline streaming SHA-256 (already running inside compute()
+      // for large libraries, avoiding nested Isolate.run spawns).
       final byFullHash = <String, List<SongsTableData>>{};
       for (final song in cluster) {
         final file = File(song.path);
         if (!await file.exists()) continue;
         final size = await file.length();
-        if (size > 512 * 1024 * 1024) continue;
-        final fullHash = await ChainOfCustodyService.hashFileContents(song.path, size);
+        if (size > ChainOfCustodyService.maxHashableBytes) continue;
+        final fullHash =
+            await ChainOfCustodyService.hashFileContentsInline(song.path, size);
         if (fullHash != null) {
           byFullHash.putIfAbsent(fullHash, () => []).add(song);
         }

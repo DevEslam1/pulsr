@@ -66,7 +66,8 @@ class PulsrPalette extends ThemeExtension<PulsrPalette> {
     Color? warningSoft,
     Color? goldAccent,
     this.isCalmDensity = false,
-  }) : _goldAccent = goldAccent,
+  })  : _accentMedium = accentMedium,
+        _goldAccent = goldAccent,
         surfaceElevated =
             surfaceElevated ?? (isDark ? surfaceContainerHigh : surface),
         surfaceOverlay = surfaceOverlay ??
@@ -81,7 +82,6 @@ class PulsrPalette extends ThemeExtension<PulsrPalette> {
         borderStrong = borderStrong ??
             (isDark ? const Color(0x2EFFFFFF) : const Color(0x33000000)),
         accentSoft = accentSoft ?? accentContainer,
-        accentMedium = accentMedium ?? const Color(0x409B9EF5),
         successSoft = successSoft ?? const Color(0x264CAF50),
         errorSoft = errorSoft ?? const Color(0x26FF5252),
         warningSoft = warningSoft ?? const Color(0x26FFB300);
@@ -134,7 +134,8 @@ class PulsrPalette extends ThemeExtension<PulsrPalette> {
   final Color borderSubtle;
   final Color borderStrong;
   final Color accentSoft; // 12% alpha
-  final Color accentMedium; // 25% alpha
+  final Color? _accentMedium;
+  Color get accentMedium => _accentMedium ?? accent.withValues(alpha: 0.25);
   final Color successSoft;
   final Color errorSoft;
   final Color warningSoft;
@@ -224,7 +225,7 @@ class PulsrPalette extends ThemeExtension<PulsrPalette> {
       borderSubtle: borderSubtle ?? this.borderSubtle,
       borderStrong: borderStrong ?? this.borderStrong,
       accentSoft: accentSoft ?? this.accentSoft,
-      accentMedium: accentMedium ?? this.accentMedium,
+      accentMedium: accentMedium ?? _accentMedium,
       successSoft: successSoft ?? this.successSoft,
       errorSoft: errorSoft ?? this.errorSoft,
       warningSoft: warningSoft ?? this.warningSoft,
@@ -573,12 +574,22 @@ class AuraTheme {
         minContrast: isHighContrast ? 7.05 : 4.55,
         containerAlpha: isHighContrast ? 0.22 : 0.12,
       );
-      final readableSuccess =
-          _lightReadable(AppColors.success, isHighContrast ? 0.40 : 0.30);
-      final readableError =
-          _lightReadable(AppColors.error, isHighContrast ? 0.35 : 0.30);
-      final readableWarning =
-          _lightReadable(AppColors.warning, isHighContrast ? 0.45 : 0.40);
+      final semContrast = isHighContrast ? 7.05 : 4.55;
+      final readableSuccess = _lightReadable(
+          AppColors.success, isHighContrast ? 0.40 : 0.30,
+          minContrast: semContrast);
+      final readableError = _lightReadable(
+          AppColors.error, isHighContrast ? 0.35 : 0.30,
+          minContrast: semContrast);
+      final readableWarning = _lightReadable(
+          AppColors.warning, isHighContrast ? 0.45 : 0.40,
+          minContrast: semContrast);
+      final readableFavorite = _lightReadable(
+          AppColors.favorite, isHighContrast ? 0.35 : 0.30,
+          minContrast: semContrast);
+      final readableInfo = _lightReadable(
+          AppColors.info, isHighContrast ? 0.58 : 0.45,
+          minContrast: semContrast);
       final lightOnAccent = readableAccent.computeLuminance() > 0.179
           ? AppColors.onBright
           : Colors.white;
@@ -608,10 +619,11 @@ class AuraTheme {
           textPrimary: Colors.black,
           textSecondary: const Color(0xFF33373F),
           textTertiary: const Color(0xFF444B5A),
-          favorite: AppColors.favorite,
+          favorite: readableFavorite,
           success: readableSuccess,
           error: readableError,
           warning: readableWarning,
+          info: readableInfo,
           isDark: false,
           goldAccent: _lightGold(0.62),
           playerCard: Colors.white,
@@ -650,10 +662,11 @@ class AuraTheme {
         textPrimary: const Color(0xFF131722),
         textSecondary: const Color(0xFF5A6274),
         textTertiary: const Color(0xFF565E70),
-        favorite: AppColors.favorite,
+        favorite: readableFavorite,
         success: readableSuccess,
         error: readableError,
         warning: readableWarning,
+        info: readableInfo,
         isDark: false,
         goldAccent: _lightGold(0.50),
         playerCard: Colors.white,
@@ -1307,7 +1320,7 @@ class AuraTheme {
       ),
       switchTheme: SwitchThemeData(
         thumbColor: WidgetStateProperty.resolveWith((states) {
-          if (states.contains(WidgetState.selected)) return Colors.white;
+          if (states.contains(WidgetState.selected)) return p.onAccent;
           return p.textSecondary;
         }),
         trackColor: WidgetStateProperty.resolveWith((states) {
@@ -1326,7 +1339,7 @@ class AuraTheme {
         activeTrackColor: p.accent,
         inactiveTrackColor:
             (p.isDark ? Colors.white : Colors.black).withValues(alpha: 0.22),
-        thumbColor: Colors.white,
+        thumbColor: p.accent,
         overlayColor: p.accent.withValues(alpha: 0.14),
         trackHeight: 5.0,
         trackShape: const RoundedRectSliderTrackShape(),

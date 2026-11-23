@@ -12,6 +12,7 @@ import 'dart:convert';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
 import 'package:pulsr/core/theme/dynamic_theme_cubit.dart';
 import 'package:pulsr/core/widgets/cached_artwork.dart';
@@ -45,6 +46,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   setUp(() {
+    SharedPreferences.setMockInitialValues({});
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(_audioQueryChannel, (call) async => null);
   });

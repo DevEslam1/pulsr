@@ -38,9 +38,10 @@ class LibrarySnapshot {
         .toList();
     return LibrarySnapshot(
       songs: songs,
-      totalSongCount: json['totalSongCount'] as int? ?? songs.length,
-      albumCount: json['albumCount'] as int? ?? 0,
-      artistCount: json['artistCount'] as int? ?? 0,
+      totalSongCount:
+          (json['totalSongCount'] as num?)?.toInt() ?? songs.length,
+      albumCount: (json['albumCount'] as num?)?.toInt() ?? 0,
+      artistCount: (json['artistCount'] as num?)?.toInt() ?? 0,
       timestamp: DateTime.tryParse(json['timestamp'] as String? ?? '') ??
           DateTime.now(),
     );
@@ -56,6 +57,7 @@ class LibraryCacheManager {
   File? _snapshotFile;
   LibrarySnapshot? _inMemorySnapshot;
   Timer? _saveDebounceTimer;
+  int _cacheEpoch = 0;
 
   Future<void> _initFile() async {
     if (_snapshotFile != null) return;
@@ -97,10 +99,11 @@ class LibraryCacheManager {
     int? artistCount,
   }) {
     _saveDebounceTimer?.cancel();
+    final epoch = _cacheEpoch;
     _saveDebounceTimer = Timer(const Duration(milliseconds: 800), () async {
       try {
         await _initFile();
-        if (_snapshotFile == null) return;
+        if (epoch != _cacheEpoch || _snapshotFile == null) return;
         // Bounded to 200 songs for instant cold start
         final boundedSongs = songs.take(200).toList();
         final snapshot = LibrarySnapshot(
@@ -110,10 +113,15 @@ class LibraryCacheManager {
           artistCount: artistCount ?? 0,
           timestamp: DateTime.now(),
         );
-        _inMemorySnapshot = snapshot;
         final raw = json.encode(snapshot.toJson());
         final tmpFile = File('${_snapshotFile!.path}.tmp');
         await tmpFile.writeAsString(raw, flush: true);
+        if (epoch != _cacheEpoch) {
+          if (await tmpFile.exists()) {
+            await tmpFile.delete().catchError((_) => tmpFile);
+          }
+          return;
+        }
         try {
           await tmpFile.rename(_snapshotFile!.path);
         } on FileSystemException {
@@ -121,6 +129,9 @@ class LibraryCacheManager {
           try {
             await tmpFile.delete();
           } catch (_) {}
+        }
+        if (epoch == _cacheEpoch) {
+          _inMemorySnapshot = snapshot;
         }
       } catch (e, st) {
         ErrorLogger.log('Failed to save library snapshot',
@@ -131,6 +142,7 @@ class LibraryCacheManager {
 
   /// Clears the library snapshot (e.g. on library reset / full rescan).
   Future<void> clearSnapshot() async {
+    _cacheEpoch++;
     _saveDebounceTimer?.cancel();
     _saveDebounceTimer = null;
     _inMemorySnapshot = null;

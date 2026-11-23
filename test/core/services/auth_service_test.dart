@@ -21,6 +21,10 @@ void main() {
       service = AuthService();
     });
 
+    tearDown(() async {
+      await service.dispose();
+    });
+
     test('reports Firebase unavailable before initialize()', () {
       expect(service.isFirebaseAvailable, isFalse);
     });
@@ -40,8 +44,21 @@ void main() {
       expect(service.currentUser, isNull);
     });
 
-    test('authStateChanges is a single null event', () async {
-      final events = await service.authStateChanges.toList();
+    test(
+        'authStateChanges is a live broadcast stream that emits null on '
+        'unavailable init', () async {
+      final stream = service.authStateChanges;
+      expect(stream.isBroadcast, isTrue);
+
+      final events = <Object?>[];
+      final sub = stream.listen(events.add);
+      addTearDown(sub.cancel);
+
+      // Must remain open pre-init so early listeners survive startup init.
+      await Future<void>.delayed(Duration.zero);
+      expect(events, isEmpty);
+
+      await service.initialize();
       expect(events, [null]);
     });
 

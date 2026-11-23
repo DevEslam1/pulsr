@@ -460,6 +460,13 @@ class RadioStationStore {
       return tarteelArtwork;
     }
 
+    if (id != null && _curatedArtwork.containsKey(id)) {
+      return _curatedArtwork[id];
+    }
+    if (lowerId.isNotEmpty && _curatedArtwork.containsKey(lowerId)) {
+      return _curatedArtwork[lowerId];
+    }
+
     // Any other Quran station fallback to quranCairoArtwork or tarteelArtwork
     if (lowerId.startsWith('cur-quran') ||
         lowerUrl.contains('qurango.net') ||
@@ -535,10 +542,6 @@ class RadioStationStore {
         lowerName.contains('bbc') ||
         lowerName.contains('news')) {
       return newsArtwork;
-    }
-
-    if (id != null && _curatedArtwork.containsKey(id)) {
-      return _curatedArtwork[id];
     }
 
     return null;
@@ -924,7 +927,12 @@ class RadioStationStore {
     });
   }
 
-  Future<void> load() => _writeMutex.protect(_loadFromDisk);
+  Future<void> load() async {
+    await _writeMutex.protect(_loadFromDisk);
+    if (_loadFailed) {
+      _sharedReady = null;
+    }
+  }
 
   Future<void> _loadFromDisk() async {
     _loadFailed = false;
@@ -960,7 +968,14 @@ class RadioStationStore {
       }
 
       final decoded = jsonDecode(raw);
-      if (decoded is! List) return;
+      if (decoded is! List) {
+        _loadFailed = true;
+        ErrorLogger.log(
+          'Corrupted radio stations payload (expected JSON list)',
+          category: 'RadioStationStore',
+        );
+        return;
+      }
       _stations.clear();
       var migrated = false;
       for (final item in decoded) {
@@ -1015,7 +1030,7 @@ class RadioStationStore {
     if (station.id == 'cur-quran-tarteel' ||
         station.url == 'https://stream.qurango.net/radio/tarteel') {
       const updatedUrl = 'https://backup.qurango.net/radio/tarateel';
-      const updatedName = 'إذاعة تراتيل القرآن الكريم';
+      const updatedName = 'إذاعة تراتيل قصيرة متميزة';
       if (station.url != updatedUrl || station.name != updatedName) {
         updated = updated.copyWith(name: updatedName, url: updatedUrl);
       }

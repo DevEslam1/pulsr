@@ -270,10 +270,14 @@ class AmbientSoundService extends ChangeNotifier {
   Future<void> _listenForDucking() async {
     try {
       final session = await AudioSession.instance;
+      if (_disposed) return;
+      _interruptionSub?.cancel();
       _interruptionSub = session.interruptionEventStream.listen((event) {
+        if (_disposed) return;
         if (event.type != AudioInterruptionType.duck) return;
         _duckFactor = event.begin ? 0.3 : 1.0;
         for (final entry in _players.entries.toList()) {
+          if (!identical(_players[entry.key], entry.value)) continue;
           unawaited(entry.value
               .setVolume(_effectiveVolume(entry.key))
               .catchError((Object _) {}));
@@ -298,6 +302,7 @@ class AmbientSoundService extends ChangeNotifier {
   /// Starts (or with null cancels) a timer that fades out and stops all
   /// ambient effects.
   void setSleepTimer(Duration? duration) {
+    ++_fadeEpoch;
     _sleepTimer?.cancel();
     _sleepTicker?.cancel();
     _sleepTimer = null;
@@ -310,7 +315,7 @@ class AmbientSoundService extends ChangeNotifier {
         if (!_disposed) notifyListeners();
       });
     }
-    notifyListeners();
+    if (!_disposed) notifyListeners();
   }
 
   Future<void> _onSleepTimerFired() async {
@@ -320,6 +325,7 @@ class AmbientSoundService extends ChangeNotifier {
     _sleepEndsAt = null;
     final epoch = ++_fadeEpoch;
     await _fadeAll(0, epoch);
+    if (_disposed || epoch != _fadeEpoch) return;
     if (_activeEffects.isNotEmpty) {
       _lastActiveEffects = Set.from(_activeEffects);
     }
@@ -388,6 +394,7 @@ class AmbientSoundService extends ChangeNotifier {
       if (epoch != _fadeEpoch || _disposed) return;
       final t = i / steps;
       for (final e in players) {
+        if (!identical(_players[e.key], e.value)) continue;
         final goal = target == 0 ? 0.0 : _effectiveVolume(e.key);
         final v = starts[e.key]! + (goal - starts[e.key]!) * t;
         unawaited(
@@ -453,6 +460,7 @@ class AmbientSoundService extends ChangeNotifier {
   final Map<AmbientSoundEffect, int> _generation = {};
   bool _disposed = false;
   bool _initialized = false;
+  Future<void>? _initFuture;
 
   // ─── Public API ────────────────────────────────────────────────────────────
 
@@ -600,12 +608,18 @@ class AmbientSoundService extends ChangeNotifier {
   }
 
   /// Restores persisted state from disk. Safe to call multiple times.
-  Future<void> init() async {
-    if (_initialized) return;
-    _initialized = true;
-    unawaited(_listenForDucking());
+  Future<void> init() {
+    if (_initialized || _disposed) return Future.value();
+    return _initFuture ??= _runInit();
+  }
+
+  Future<void> _runInit() async {
+    if (_interruptionSub == null) {
+      unawaited(_listenForDucking());
+    }
     try {
       final prefs = await prefsProvider();
+      if (_disposed) return;
 
       _masterVolume = (prefs.getDouble(_keyMaster) ?? 1.0).clamp(0.0, 1.0);
       _allowDuringQuran = prefs.getBool(_keyAllowQuran) ?? false;
@@ -667,11 +681,14 @@ class AmbientSoundService extends ChangeNotifier {
         _lastActiveEffects = Set.from(_activeEffects);
       }
 
+      _initialized = true;
+
       // Start players for all persisted active effects
       for (final effect in List.of(_activeEffects)) {
         unawaited(_startEffectPlayer(effect));
       }
     } catch (e, st) {
+      _initFuture = null;
       ErrorLogger.log('Failed to initialize ambient sound service',
           error: e, stackTrace: st, category: 'AmbientSoundService');
     }
@@ -684,6 +701,10 @@ class AmbientSoundService extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    ++_fadeEpoch;
+    if (_persistTimer?.isActive == true) {
+      unawaited(_executePersist());
+    }
     _persistTimer?.cancel();
     unawaited(_interruptionSub?.cancel());
     _sleepTimer?.cancel();
@@ -709,6 +730,7 @@ class AmbientSoundService extends ChangeNotifier {
         _generation[effect] != token ||
         !_activeEffects.contains(effect);
 
+    AudioPlayer? player;
     try {
       // Dispose any existing player for this effect
       final existing = _players.remove(effect);
@@ -716,7 +738,7 @@ class AmbientSoundService extends ChangeNotifier {
       await existing?.dispose();
       if (stale()) return;
 
-      final player = playerFactory();
+      player = playerFactory();
       _players[effect] = player;
 
       await player.setVolume(_effectiveVolume(effect));
@@ -731,12 +753,22 @@ class AmbientSoundService extends ChangeNotifier {
           AudioSource.asset(effect.assetPath),
         ]);
       } catch (assetError) {
-        bool offline = false;
+        bool offline = true;
         try {
           final prefs = await prefsProvider();
           offline = prefs.getBool(PrefsKeys.offlineOnlyMode) == true;
-        } catch (_) {}
-        if (!AppConfig.isCloudSyncAllowed || offline || effect.remoteUrl.isEmpty) {
+        } catch (e, st) {
+          ErrorLogger.log(
+            'Ambient offline mode check failed; refusing remote sound load',
+            error: e,
+            stackTrace: st,
+            category: 'AmbientSoundService',
+          );
+          offline = true;
+        }
+        if (!AppConfig.isCloudSyncAllowed ||
+            offline ||
+            effect.remoteUrl.isEmpty) {
           rethrow;
         }
         await player.setAudioSources([
@@ -748,6 +780,7 @@ class AmbientSoundService extends ChangeNotifier {
       if (stale()) {
         if (identical(_players[effect], player)) _players.remove(effect);
         await player.dispose();
+        player = null;
         return;
       }
 
@@ -763,13 +796,18 @@ class AmbientSoundService extends ChangeNotifier {
       if (stale()) {
         if (identical(_players[effect], player)) _players.remove(effect);
         await player.dispose();
+        player = null;
         return;
       }
 
       _loadingEffects[effect] = false;
-      notifyListeners();
+      if (!_disposed) notifyListeners();
     } catch (e) {
-      if (!_disposed) {
+      if (player != null) {
+        if (identical(_players[effect], player)) _players.remove(effect);
+        unawaited(player.dispose().catchError((Object _) {}));
+      }
+      if (!_disposed && _generation[effect] == token) {
         _loadingEffects[effect] = false;
         _activeEffects.remove(effect);
         _errorMessage = 'Could not load ${effect.label} sound.';

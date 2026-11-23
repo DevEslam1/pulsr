@@ -1,6 +1,7 @@
 // lib/services/canvas/canvas_repository.dart
 import 'dart:async';
 import 'package:http/http.dart' as http;
+import '../../core/network/network_access_guard.dart';
 import '../../core/utils/error_logger.dart';
 import '../../data/db/app_database.dart';
 import 'apple_music_canvas.dart';
@@ -104,7 +105,16 @@ class CanvasRepository {
         return mem;
       }
 
-      // 2. Query sources in order
+      // 2. Check Pure / offline-only before querying remote sources
+      if (await NetworkAccessGuard.isBlocked(category: 'CanvasRepository')) {
+        return null;
+      }
+
+      // 3. Query sources in order
+      if (await NetworkAccessGuard.isBlocked(category: 'CanvasRepository')) {
+        return null;
+      }
+
       CanvasArtwork? hit;
 
       // Source 1: Community Canvas manifest
@@ -192,6 +202,10 @@ class CanvasRepository {
           }
         }
         return mem;
+      }
+
+      if (await NetworkAccessGuard.isBlocked(category: 'CanvasRepository')) {
+        return null;
       }
 
       CanvasArtwork? hit;

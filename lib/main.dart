@@ -57,6 +57,7 @@ import 'data/audio/eq_legacy_migration.dart';
 import 'features/audio_profiles/audio_profile_bootstrap.dart';
 import 'features/audio_profiles/audio_profile_service.dart';
 import 'data/db/app_database.dart';
+import 'data/party/listen_together_service.dart';
 import 'data/scanner/media_scanner_service.dart';
 import 'domain/repositories/music_repository_interface.dart';
 import 'domain/usecases/get_songs_usecase.dart';
@@ -95,6 +96,7 @@ import 'features/usb_tools/usb_ergonomics_service.dart';
 import 'features/usb_tools/usb_quirk_store.dart';
 import 'services/discord/discord_rpc_service.dart';
 import 'services/updater/app_update_service.dart';
+import 'services/updater/update_dialog.dart';
 
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
@@ -119,6 +121,49 @@ bool _isDependencyReady<T extends Object>() {
 Future<T> _resolveDependency<T extends Object>() {
   if (_isDependencyReady<T>()) return Future<T>.value(getIt<T>());
   return getIt.getAsync<T>();
+}
+
+bool _startupUpdateDialogShown = false;
+
+void _surfaceStartupUpdate(UpdateInfo info) {
+  if (_startupUpdateDialogShown) return;
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    if (_startupUpdateDialogShown) return;
+    final ctx = rootNavigatorKey.currentContext;
+    if (ctx == null || !ctx.mounted) return;
+    final router = GoRouter.maybeOf(ctx);
+    if (router == null) {
+      _startupUpdateDialogShown = true;
+      unawaited(UpdateDialog.show(ctx, info));
+      return;
+    }
+    bool isTransientRoute(String path) =>
+        path == '/splash' || path == '/onboarding';
+    final currentPath = router.routerDelegate.currentConfiguration.uri.path;
+    if (!isTransientRoute(currentPath)) {
+      _startupUpdateDialogShown = true;
+      unawaited(UpdateDialog.show(ctx, info));
+      return;
+    }
+    late final VoidCallback listener;
+    listener = () {
+      if (_startupUpdateDialogShown) {
+        router.routerDelegate.removeListener(listener);
+        return;
+      }
+      final nextPath = router.routerDelegate.currentConfiguration.uri.path;
+      if (isTransientRoute(nextPath)) return;
+      router.routerDelegate.removeListener(listener);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_startupUpdateDialogShown) return;
+        final navCtx = rootNavigatorKey.currentContext;
+        if (navCtx == null || !navCtx.mounted) return;
+        _startupUpdateDialogShown = true;
+        unawaited(UpdateDialog.show(navCtx, info));
+      });
+    };
+    router.routerDelegate.addListener(listener);
+  });
 }
 
 Future<void> main() async {
@@ -420,18 +465,45 @@ Future<void> main() async {
                   error: e, stackTrace: st, category: 'Startup');
             }));
           }
-        } catch (_) {}
+        } catch (e, st) {
+          ErrorLogger.log('DiscordRpcService startup hook failed',
+              error: e, stackTrace: st, category: 'Startup');
+        }
+
+        // Initialize Listen Together party auto-rejoin once PlayerCubit is ready
+        try {
+          if (onlineAllowed && getIt.isRegistered<ListenTogetherService>()) {
+            unawaited(_resolveDependency<PlayerCubit>()
+                .timeout(const Duration(seconds: 30))
+                .then((_) => getIt<ListenTogetherService>()
+                    .init()
+                    .timeout(const Duration(seconds: 10)))
+                .catchError((e, st) {
+              ErrorLogger.log('ListenTogetherService init failed',
+                  error: e, stackTrace: st, category: 'Startup');
+            }));
+          }
+        } catch (e, st) {
+          ErrorLogger.log('ListenTogetherService startup hook failed',
+              error: e, stackTrace: st, category: 'Startup');
+        }
 
         // Best-effort check for app updates off GitHub releases
         try {
           if (onlineAllowed) {
-            unawaited(AppUpdateService.instance.check().catchError((e, st) {
+            unawaited(AppUpdateService.instance.check().then((info) {
+              if (info != null) {
+                _surfaceStartupUpdate(info);
+              }
+            }).catchError((e, st) {
               ErrorLogger.log('AppUpdateService startup check failed',
                   error: e, stackTrace: st, category: 'Startup');
-              return null;
             }));
           }
-        } catch (_) {}
+        } catch (e, st) {
+          ErrorLogger.log('AppUpdateService startup hook failed',
+              error: e, stackTrace: st, category: 'Startup');
+        }
       } catch (e, st) {
         ErrorLogger.log('Parallel startup init failed',
             error: e, stackTrace: st, category: 'Startup');
@@ -563,10 +635,12 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
   /// Awaits the async singletons the UI resolves synchronously. A slow or
   /// partially failed warm-up paints a retry screen instead of crashing in
   /// build with an un-ready StateError.
-  Future<void> _resolveDependencies() async {
+  Future<void> _resolveDependencies({bool reconfigureIfNeeded = false}) async {
     if (_bootstrapInFlight) return;
     _bootstrapInFlight = true;
-    final ready = await ensureAppDependenciesReady();
+    final ready = await ensureAppDependenciesReady(
+      reconfigureIfNeeded: reconfigureIfNeeded,
+    );
     _bootstrapInFlight = false;
     if (!mounted) return;
     if (ready) {
@@ -574,9 +648,10 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
       // With the deferred warm-up this is the first point where that is true.
       _router ??= _createRouterSafely();
     }
+    final resolvedReady = ready && _router != null;
     setState(() {
-      _dependenciesReady = ready;
-      _bootstrapFailed = !ready;
+      _dependenciesReady = resolvedReady;
+      _bootstrapFailed = !resolvedReady;
     });
   }
 
@@ -584,10 +659,9 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
     if (!mounted) return;
     setState(() {
       _bootstrapFailed = false;
-      _router ??= _createRouterSafely();
     });
     if (!_dependenciesReady || _router == null) {
-      unawaited(_resolveDependencies());
+      unawaited(_resolveDependencies(reconfigureIfNeeded: true));
     }
   }
 
@@ -668,7 +742,9 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
   /// is not reliably observable from Dart without a native change.
   void _startAutomationTriggers() {
     try {
-      final service = AutomationTriggerService();
+      final service = getIt.isRegistered<AutomationTriggerService>()
+          ? getIt<AutomationTriggerService>()
+          : AutomationTriggerService();
       _automationTriggerService = service;
       service.start();
     } catch (e, st) {
@@ -813,14 +889,20 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
     unawaited(() async {
       try {
         await getIt.allReady().timeout(const Duration(seconds: 30));
+        if (!mounted) return;
         AssistantIntentBootstrap.ensureInstalled();
         if (!getIt.isRegistered<IMusicRepository>()) return;
         // One settings instance for the process: the Extras toggle writes it
         // and this sync reads it, so flipping the opt-in takes effect without
         // a restart.
-        final settings = getIt.isRegistered<AssistantSettings>()
+        final hadSettings = getIt.isRegistered<AssistantSettings>();
+        final settings = hadSettings
             ? getIt<AssistantSettings>()
             : await AssistantSettings.load();
+        if (!mounted) {
+          if (!hadSettings) settings.dispose();
+          return;
+        }
         if (!getIt.isRegistered<AssistantSettings>()) {
           getIt.registerSingleton<AssistantSettings>(settings);
         }
@@ -848,16 +930,28 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
       try {
         final handler = await _resolveDependency<PulsrAudioHandler>()
             .timeout(const Duration(seconds: 30));
+        if (!mounted) return;
         // One settings/engine pair for the whole process. The Extras hub edits
         // these same instances, so toggles and voice changes reach the live
         // announcer without a restart.
-        final settings = getIt.isRegistered<AnnouncementSettings>()
+        final hadSettings = getIt.isRegistered<AnnouncementSettings>();
+        final settings = hadSettings
             ? getIt<AnnouncementSettings>()
             : await AnnouncementSettings.load();
-        final engine = getIt.isRegistered<MethodChannelTtsEngine>()
+        if (!mounted) {
+          if (!hadSettings) settings.dispose();
+          return;
+        }
+        final hadEngine = getIt.isRegistered<MethodChannelTtsEngine>();
+        final engine = hadEngine
             ? getIt<MethodChannelTtsEngine>()
             : MethodChannelTtsEngine();
         await engine.init();
+        if (!mounted) {
+          if (!hadSettings) settings.dispose();
+          if (!hadEngine) unawaited(engine.dispose());
+          return;
+        }
         engine.voiceId = settings.voiceId;
         engine.localeId = settings.localeId;
         if (!getIt.isRegistered<AnnouncementSettings>()) {
@@ -951,22 +1045,19 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
     // Clear only the in-memory bytes; the persistent disk cache is kept so a
     // transient memory warning does not force a full re-fetch + re-decode.
     try {
-      getIt<ArtworkCacheManager>().trimMemoryForPressure();
+      final cacheManager = getIt.isRegistered<ArtworkCacheManager>()
+          ? getIt<ArtworkCacheManager>()
+          : ArtworkCacheManager();
+      cacheManager.trimMemoryForPressure();
     } catch (e, st) {
       ErrorLogger.log('Failed to trim artwork memory cache on memory pressure',
           error: e, stackTrace: st, category: 'PulsrApp');
     }
     try {
-      // ignore: avoid_dynamic_calls
-      (getIt.get<ArtworkLruCache>() as dynamic)?.trimForMemoryPressure();
-    } catch (_) {
-      // Fallback direct trim
-      try {
-        ArtworkLruCache().trimForMemoryPressure();
-      } catch (e, st) {
-        ErrorLogger.log('Failed direct trim for memory pressure',
-            error: e, stackTrace: st, category: 'PulsrApp');
-      }
+      ArtworkLruCache().trimForMemoryPressure();
+    } catch (e, st) {
+      ErrorLogger.log('Failed to trim artwork LRU cache on memory pressure',
+          error: e, stackTrace: st, category: 'PulsrApp');
     }
   }
 
@@ -985,11 +1076,11 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
 
           final ctx = rootNavigatorKey.currentContext;
           if (ctx == null || !ctx.mounted) return;
-          ScaffoldMessenger.of(ctx)
-            ..hideCurrentSnackBar()
+          ScaffoldMessenger.maybeOf(ctx)
+            ?..hideCurrentSnackBar()
             ..showSnackBar(
               SnackBar(
-                content: Text(context.l10n.ytmSessionExpired),
+                content: Text(ctx.l10n.ytmSessionExpired),
                 behavior: SnackBarBehavior.floating,
                 duration: const Duration(seconds: 6),
                 action: SnackBarAction(
@@ -1267,7 +1358,7 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
                   if (overlayCtx != null && overlayCtx.mounted) {
                     PulsrToast.show(
                       overlayCtx,
-                      message: resolveUiErrorMessage(context, message),
+                      message: resolveUiErrorMessage(overlayCtx, message),
                       icon: Icons.error_outline_rounded,
                       isError: true,
                     );
@@ -1563,30 +1654,32 @@ class PulsrConfigurationErrorApp extends StatelessWidget {
       theme: AuraTheme.darkTheme,
       localizationsDelegates: appLocalizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
-      home: Scaffold(
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(28),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.error_outline_rounded,
-                    size: 52, color: Colors.redAccent),
-                const SizedBox(height: 18),
-                Text(
-                  context.l10n.bootConfigurationError,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                      fontSize: AppFontSize.title, fontWeight: FontWeight.w800),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  message,
-                  textAlign: TextAlign.center,
-                  style:
-                      const TextStyle(fontSize: AppFontSize.body, height: 1.4),
-                ),
-              ],
+      home: Builder(
+        builder: (innerContext) => Scaffold(
+          body: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(28),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.error_outline_rounded,
+                      size: 52, color: Colors.redAccent),
+                  const SizedBox(height: 18),
+                  Text(
+                    innerContext.l10n.bootConfigurationError,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                        fontSize: AppFontSize.title, fontWeight: FontWeight.w800),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    message,
+                    textAlign: TextAlign.center,
+                    style:
+                        const TextStyle(fontSize: AppFontSize.body, height: 1.4),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -1614,40 +1707,42 @@ class _DependencyBootstrapScreen extends StatelessWidget {
       theme: AuraTheme.darkTheme,
       localizationsDelegates: appLocalizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
-      home: Scaffold(
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(28),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (!failed)
-                  const CircularProgressIndicator()
-                else ...[
-                  const Icon(Icons.refresh_rounded,
-                      size: 48, color: Colors.white70),
-                  const SizedBox(height: 16),
-                  Text(
-                    context.l10n.bootStartupFailed,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                        fontSize: AppFontSize.subtitle,
-                        fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    context.l10n.bootStartupFailedMessage,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                        fontSize: AppFontSize.bodySmall, height: 1.4),
-                  ),
-                  const SizedBox(height: 20),
-                  FilledButton(
-                    onPressed: onRetry,
-                    child: Text(context.l10n.retry),
-                  ),
+      home: Builder(
+        builder: (innerContext) => Scaffold(
+          body: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(28),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (!failed)
+                    const CircularProgressIndicator()
+                  else ...[
+                    const Icon(Icons.refresh_rounded,
+                        size: 48, color: Colors.white70),
+                    const SizedBox(height: 16),
+                    Text(
+                      innerContext.l10n.bootStartupFailed,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                          fontSize: AppFontSize.subtitle,
+                          fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      innerContext.l10n.bootStartupFailedMessage,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                          fontSize: AppFontSize.bodySmall, height: 1.4),
+                    ),
+                    const SizedBox(height: 20),
+                    FilledButton(
+                      onPressed: onRetry,
+                      child: Text(innerContext.l10n.retry),
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
         ),

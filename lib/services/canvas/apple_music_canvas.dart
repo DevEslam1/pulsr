@@ -1,6 +1,7 @@
 // lib/services/canvas/apple_music_canvas.dart
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../../core/network/network_access_guard.dart';
 import '../../core/utils/error_logger.dart';
 import 'canvas_artwork.dart';
 
@@ -22,6 +23,9 @@ class AppleMusicCanvas {
   /// Searches Apple Music catalog for motion artwork.
   Future<CanvasArtwork?> search(
       String title, String artist, String? album) async {
+    if (await NetworkAccessGuard.isBlocked(category: 'AppleMusicCanvas')) {
+      return null;
+    }
     final bearer = await _getToken();
     if (bearer == null) return null;
 
@@ -112,6 +116,9 @@ class AppleMusicCanvas {
 
   /// Searches Apple Music catalog for motion artwork for an album.
   Future<CanvasArtwork?> searchAlbum(String album, String artist) async {
+    if (await NetworkAccessGuard.isBlocked(category: 'AppleMusicCanvas')) {
+      return null;
+    }
     final bearer = await _getToken();
     if (bearer == null) return null;
 

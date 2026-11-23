@@ -30,6 +30,8 @@ void main() {
     late LrclibService service;
 
     setUp(() {
+      TestWidgetsFlutterBinding.ensureInitialized();
+      SharedPreferences.setMockInitialValues({});
       mockClient = MockHttpClient();
       mockRequest = MockHttpClientRequest();
       mockResponse = MockHttpClientResponse();

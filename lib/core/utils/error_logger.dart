@@ -12,19 +12,21 @@ class ErrorLogger {
   static final _emailRegex =
       RegExp(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}');
   static final _cookieAuthRegex = RegExp(
-      r'\b(SAPISID|HSID|SSID|APISID|SID|__Secure-[^=;\s]+|po_token|visitor_data)\s*=\s*([^;,\s]+)',
+      r'\b(SAPISID|HSID|SSID|APISID|SID|SIDCC|LOGIN_INFO|__Secure-[^=;\s]+|__Host-[^=;\s]+|po_token|visitor_data)\s*=\s*([^;,\s]+)',
       caseSensitive: false);
   static final _secretKvRegex = RegExp(
-      r'\b(token|api_key|password|secret)\s*=\s*([^;&,\s]+)',
+      r'\b(token|api_?key|api_?sig|password|passwd|secret|access_?token|refresh_?token|id_?token|client_?secret|private_?key|session_?(?:id|key|token)|auth_?token)\s*=\s*([^;&,\s]+)',
       caseSensitive: false);
   static final _jsonCredentialRegex = RegExp(
-      r'("(?:token|password|secret|api_key|authorization)")\s*:\s*"[^"]*"',
+      r'("(?:token|password|passwd|secret|api_?key|api_?sig|authorization|access_?token|refresh_?token|id_?token|client_?secret|private_?key|cookie)")\s*:\s*"[^"]*"',
       caseSensitive: false);
   static final _authHeaderRegex = RegExp(
       r'\b(Authorization|token|key):\s*(?:Bearer\s+)?([^\s,;]+)|\b(Bearer)\s+([A-Za-z0-9._~+/-]+=*)',
       caseSensitive: false);
+  static final _jwtRegex = RegExp(
+      r'\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}(?:\.[A-Za-z0-9_-]*)?');
   static final _userPathRegex = RegExp(
-      r'(?:/Users/|/home/|[A-Za-z]:\\Users\\)[^/\\\s\n\r"\)]+',
+      r'(?:/Users/|/home/|[A-Za-z]:[/\\]Users[/\\])[^\s\n\r"\)\],;]+',
       caseSensitive: false);
   static final _deviceStoragePathRegex = RegExp(
       r'/(?:data/user/\d+|data/data|storage/emulated/\d+)(?:/[^\s\n\r"\)]*)?',
@@ -33,8 +35,8 @@ class ErrorLogger {
       r'\b(userId|user_id|memberId)\s*[:=]\s*["' ']?[A-Za-z0-9_-]+["' ']?',
       caseSensitive: false);
 
-  /// Redacts PII including email addresses, auth tokens, session cookies,
-  /// filesystem paths, and user identifiers (P5-2 / BUG-027).
+  /// Redacts PII including email addresses, auth tokens, JWTs, session
+  /// cookies, filesystem paths, and user identifiers (P5-2 / BUG-027).
   static String redactPii(String input) {
     var sanitized = input;
     sanitized =
@@ -50,6 +52,7 @@ class ErrorLogger {
         (m) => m.group(1) != null
             ? '${m.group(1)}: [REDACTED_TOKEN]'
             : 'Bearer [REDACTED_TOKEN]');
+    sanitized = sanitized.replaceAll(_jwtRegex, '[REDACTED_TOKEN]');
     sanitized = sanitized.replaceAllMapped(
         _userPathRegex, (m) => '[REDACTED_USER_PATH]');
     sanitized = sanitized.replaceAllMapped(
@@ -57,6 +60,27 @@ class ErrorLogger {
     sanitized = sanitized.replaceAllMapped(
         _userIdRegex, (m) => '${m.group(1)}: [REDACTED_ID]');
     return sanitized;
+  }
+
+  /// Wraps a logged error into a PII-scrubbed payload suitable for Sentry capture.
+  @visibleForTesting
+  static Object sanitizeErrorForReport(dynamic error) {
+    if (error is String) {
+      return redactPii(error);
+    }
+    final typeName = error.runtimeType.toString();
+    final safeText = redactPii(error.toString());
+    return _RedactedException(typeName, safeText);
+  }
+
+  /// Scrubs file paths/PII inside stack frames before forwarding to Sentry.
+  @visibleForTesting
+  static StackTrace? sanitizeStackTrace(StackTrace? stackTrace) {
+    if (stackTrace == null) return null;
+    final raw = stackTrace.toString();
+    final clean = redactPii(raw);
+    if (identical(clean, raw) || clean == raw) return stackTrace;
+    return StackTrace.fromString(clean);
   }
 
   static void log(
@@ -84,12 +108,13 @@ class ErrorLogger {
         stackTrace: stackTrace,
       );
     }
+    final sanitizedMeta = meta == null ? null : redactMap(meta);
     if (Sentry.isEnabled) {
       Sentry.addBreadcrumb(
         Breadcrumb(
           message: sanitizedMessage,
           category: category,
-          data: meta,
+          data: sanitizedMeta,
           level: error != null ? SentryLevel.error : SentryLevel.info,
           timestamp: DateTime.now(),
         ),
@@ -105,24 +130,78 @@ class ErrorLogger {
           '[Pulsr.Error][$category] $sanitizedMessage: ${redactPii(error.toString())}');
       onCrashReported?.call(error, stackTrace, category);
       if (Sentry.isEnabled) {
+        final safeError = sanitizeErrorForReport(error);
+        final safeStackTrace = sanitizeStackTrace(stackTrace);
+        final safeUserMessage = redactPii(classified.userMessage);
         Sentry.captureException(
-          error,
-          stackTrace: stackTrace,
+          safeError,
+          stackTrace: safeStackTrace,
           withScope: (scope) {
             scope.setTag('category', category);
             scope.setTag('errorType', errorType);
             scope.setContexts('message', {'value': sanitizedMessage});
             scope.setContexts('classifiedError', {
               'type': errorType,
-              'message': classified.userMessage,
+              'message': safeUserMessage,
             });
-            if (meta != null) {
-              scope.setContexts('meta', meta);
+            if (sanitizedMeta != null) {
+              scope.setContexts('meta', sanitizedMeta);
             }
           },
         );
       }
     }
+  }
+
+  static final _sensitiveKeyRegex = RegExp(
+    r'(?:token|auth|authorization|cookie|secret|password|passwd|pwd|api_?key|api_?sig|sapisid|session|credential|private_?key|po_token|visitor_data|email)',
+    caseSensitive: false,
+  );
+
+  /// Recursively redacts PII and credential fields inside arbitrary metadata maps.
+  static Map<String, dynamic> redactMap(Map<dynamic, dynamic> input) {
+    final result = <String, dynamic>{};
+    for (final entry in input.entries) {
+      final key = entry.key.toString();
+      result[key] = redactValue(entry.value, keyName: key);
+    }
+    return result;
+  }
+
+  /// Recursively scrubs PII from strings, maps, and iterables.
+  static dynamic redactValue(
+    dynamic value, {
+    String? keyName,
+    int depth = 0,
+  }) {
+    if (value == null) return null;
+    if (depth > 16) return '[REDACTED_DEPTH_LIMIT]';
+    final isSensitiveKey =
+        keyName != null && _sensitiveKeyRegex.hasMatch(keyName);
+    if (value is Map) {
+      final out = <String, dynamic>{};
+      for (final entry in value.entries) {
+        final k = entry.key.toString();
+        out[k] = redactValue(entry.value, keyName: k, depth: depth + 1);
+      }
+      return out;
+    }
+    if (value is Iterable) {
+      return value
+          .map((item) => redactValue(item, keyName: keyName, depth: depth + 1))
+          .toList(growable: false);
+    }
+    if (value is String) {
+      if (isSensitiveKey) return '[REDACTED_TOKEN]';
+      return redactPii(value).replaceAll(_jwtRegex, '[REDACTED_TOKEN]');
+    }
+    if (value is Uri) {
+      if (isSensitiveKey) return '[REDACTED_TOKEN]';
+      return redactPii(value.toString())
+          .replaceAll(_jwtRegex, '[REDACTED_TOKEN]');
+    }
+    if (isSensitiveKey) return '[REDACTED_TOKEN]';
+    return value;
   }
 
   static void addBreadcrumb(
@@ -131,10 +210,7 @@ class ErrorLogger {
     Map<String, dynamic>? data,
   }) {
     final sanitizedMessage = redactPii(message);
-    final sanitizedData = data?.map((k, v) => MapEntry(
-          k,
-          v is String ? redactPii(v) : v,
-        ));
+    final sanitizedData = data == null ? null : redactMap(data);
 
     if (kDebugMode) {
       developer.log(
@@ -228,4 +304,17 @@ class ErrorLogger {
       return true;
     };
   }
+}
+
+class _RedactedException implements Exception {
+  final String originalType;
+  final String redactedMessage;
+
+  const _RedactedException(this.originalType, this.redactedMessage);
+
+  @override
+  String toString() =>
+      redactedMessage.startsWith(originalType)
+          ? redactedMessage
+          : '$originalType: $redactedMessage';
 }

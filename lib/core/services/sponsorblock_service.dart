@@ -5,9 +5,9 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:injectable/injectable.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../config/app_config.dart';
 import '../constants/prefs_keys.dart';
 import '../di/injection.dart';
+import '../network/network_access_guard.dart';
 
 class SponsorBlockSegment {
   final String category;
@@ -56,6 +56,9 @@ class SponsorBlockService {
 
   @disposeMethod
   void dispose() {
+    if (identical(_fallbackInstance, this)) {
+      _fallbackInstance = null;
+    }
     if (_ownsClient) {
       _client.close();
     }
@@ -124,13 +127,11 @@ class SponsorBlockService {
 
   /// Retrieves skip segments for a YouTube video. Results are cached in-memory.
   Future<List<SponsorBlockSegment>> getSegments(String videoId) async {
-    // Pulsr Pure / offline-only: never reach the SponsorBlock API.
-    if (!AppConfig.isCloudSyncAllowed) return const [];
+    // Pulsr Pure / offline-only / unreadable prefs: never reach SponsorBlock.
+    if (await NetworkAccessGuard.isBlocked(category: 'SponsorBlock')) {
+      return const [];
+    }
     await loadPreferences();
-    try {
-      final prefs = _prefs ?? await SharedPreferences.getInstance();
-      if (prefs.getBool(PrefsKeys.offlineOnlyMode) == true) return const [];
-    } catch (_) {}
 
     // Letting an empty set short-circuit avoids a pointless request when the
     // user has disabled every category.

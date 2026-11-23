@@ -277,5 +277,21 @@ void main() {
 
       expect(uncaught, isEmpty);
     });
+
+    test('setSleepTimer replaces previous timer via epoch and does not cancel early',
+        () async {
+      final service = AmbientSoundService();
+      await service.init();
+      await service.toggleEffect(AmbientSoundEffect.rain);
+      expect(service.isEnabled, isTrue);
+
+      service.setSleepTimer(const Duration(milliseconds: 20));
+      service.setSleepTimer(const Duration(seconds: 30));
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      expect(service.isEnabled, isTrue);
+      service.setSleepTimer(null);
+      await service.setEnabled(false);
+    });
   });
 }

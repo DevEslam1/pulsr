@@ -2,10 +2,9 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:injectable/injectable.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../domain/models/lyrics_line.dart';
 import '../config/app_config.dart';
-import '../constants/prefs_keys.dart';
+import '../network/network_access_guard.dart';
 import '../utils/error_logger.dart';
 import '../utils/lrc_parser.dart';
 
@@ -55,13 +54,8 @@ class LrclibService implements LrclibLyricsClient {
     String? albumName,
     int? durationSeconds,
   }) async {
-    try {
-      if (!AppConfig.isCloudSyncAllowed) return null;
-      final prefs = await SharedPreferences.getInstance();
-      if (prefs.getBool(PrefsKeys.offlineOnlyMode) == true) return null;
-    } catch (e, st) {
-      ErrorLogger.log('Failed to read offline-only preference for lyrics',
-          error: e, stackTrace: st, category: 'Lrclib');
+    if (await NetworkAccessGuard.isBlocked(category: 'Lrclib')) {
+      return null;
     }
     final candidates = _generateCandidates(
       trackName: trackName,
@@ -197,58 +191,66 @@ class LrclibService implements LrclibLyricsClient {
     return candidates;
   }
 
+  static const String _videoNoiseKeywords =
+      r'(?:official|video|audio|mv|lyrics|lyric|remix|version|hq|hd|4k|explicit|clean|visualizer|clip|حفل|كليب|فيديو|موسيقى|جلسة|لايف|بث|مهرجان)';
+
+  static final RegExp _bracketedNoisePattern = RegExp(
+    '\\s*(?:'
+    '\\([^)]*$_videoNoiseKeywords[^)]*\\)'
+    '|\\[[^\\]]*$_videoNoiseKeywords[^\\]]*\\]'
+    '|\\{[^}]*$_videoNoiseKeywords[^}]*\\}'
+    ')',
+    caseSensitive: false,
+  );
+
+  static final RegExp _trailingDashNoisePattern = RegExp(
+    r'\s*-\s*(official|video|audio|mv|lyrics|lyric|remix|version|visualizer|clip|فيديو|كليب|حفل).*',
+    caseSensitive: false,
+  );
+
+  static final RegExp _standaloneNoisePattern = RegExp(
+    r'\b(official\s+video|official\s+audio|lyric\s+video|4k|hd|hq)\b',
+    caseSensitive: false,
+  );
+
+  static final RegExp _bracketedFeatPattern = RegExp(
+    r'\s*(?:'
+    r'\([^)]*\b(?:feat\.|ft\.|with)\s+[^)]*\)'
+    r'|\[[^\]]*\b(?:feat\.|ft\.|with)\s+[^\]]*\]'
+    r'|\{[^}]*\b(?:feat\.|ft\.|with)\s+[^}]*\}'
+    r')',
+    caseSensitive: false,
+  );
+
+  static final RegExp _trailingFeatPattern = RegExp(
+    r'\s+\b(?:feat\.|ft\.|with)\s+.*$',
+    caseSensitive: false,
+  );
+
+  static final RegExp _arabicNoiseTailPattern = RegExp(
+    r'\s*(فيديو كليب|حفل|مهرجان|جلسة|سهرة|كوكتيل|ميكس|حصري|حصرى).*',
+    caseSensitive: false,
+  );
+
+  static final RegExp _cleanArtistBracketPattern = RegExp(
+    r'\s*(?:\([^)]*(?:topic|vevo)[^)]*\)|\[[^\]]*(?:topic|vevo)[^\]]*\]|\{[^}]*(?:topic|vevo)[^}]*\})',
+    caseSensitive: false,
+  );
+
   String _stripVideoNoise(String text) {
     var cleaned = text;
-
-    // Strip common YouTube / release clutter inside brackets/parentheses
-    cleaned = cleaned.replaceAll(
-      RegExp(
-        r'\s*[\(\[\{].*?(official|video|audio|mv|lyrics|lyric|remix|version|hq|hd|4k|explicit|clean|visualizer|clip|حفل|كليب|فيديو|موسيقى|جلسة|لايف|بث|مهرجان).*?[\)\]\}]',
-        caseSensitive: false,
-      ),
-      '',
-    );
-
-    // Strip trailing "- Official Video", etc.
-    cleaned = cleaned.replaceAll(
-      RegExp(
-        r'\s*-\s*(official|video|audio|mv|lyrics|lyric|remix|version|visualizer|clip|فيديو|كليب|حفل).*',
-        caseSensitive: false,
-      ),
-      '',
-    );
-
-    // Strip standalone keywords
-    cleaned = cleaned.replaceAll(
-      RegExp(r'\b(official\s+video|official\s+audio|lyric\s+video|4k|hd|hq)\b',
-          caseSensitive: false),
-      '',
-    );
-
-    // Strip common YouTube "feat." or "ft." in brackets or standalone
-    cleaned = cleaned.replaceAll(
-      RegExp(r'\s*[\(\[\{]?\s*(feat\.|ft\.|with)\s+.*?[\)\]\}]?',
-          caseSensitive: false),
-      '',
-    );
-
-    // Strip remaining generic Arabic video labels
-    cleaned = cleaned.replaceAll(
-      RegExp(r'\s*(فيديو كليب|حفل|مهرجان|جلسة|سهرة|كوكتيل|ميكس|حصري|حصرى).*',
-          caseSensitive: false),
-      '',
-    );
-
+    cleaned = cleaned.replaceAll(_bracketedNoisePattern, '');
+    cleaned = cleaned.replaceAll(_trailingDashNoisePattern, '');
+    cleaned = cleaned.replaceAll(_standaloneNoisePattern, '');
+    cleaned = cleaned.replaceAll(_bracketedFeatPattern, '');
+    cleaned = cleaned.replaceAll(_trailingFeatPattern, '');
+    cleaned = cleaned.replaceAll(_arabicNoiseTailPattern, '');
     return cleaned.trim();
   }
 
   String _cleanArtist(String artist) {
     return artist
-        .replaceAll(
-          RegExp(r'\s*[\(\[\{].*?(topic|vevo).*?[\)\]\}]',
-              caseSensitive: false),
-          '',
-        )
+        .replaceAll(_cleanArtistBracketPattern, '')
         .replaceAll(RegExp(r'\s*-\s*Topic', caseSensitive: false), '')
         .replaceAll(RegExp(r'\s*Vevo', caseSensitive: false), '')
         .trim();
@@ -302,12 +304,14 @@ class LrclibService implements LrclibLyricsClient {
   Future<dynamic> _getJson(Uri uri) {
     return (() async {
       final request = await _client.getUrl(uri);
+      request.followRedirects = false;
       request.headers.set(HttpHeaders.userAgentHeader,
           'PulsrMusic/${AppConfig.appVersion} (https://github.com/pulsr)');
       final response = await request.close();
 
       if (response.statusCode == 200) {
         final responseBody = await response.transform(utf8.decoder).join();
+        if (responseBody.length > 2 * 1024 * 1024) return null;
         return jsonDecode(responseBody);
       } else {
         await response.drain();

@@ -332,5 +332,62 @@ void main() {
       expect((decoded['certificateSha256'] as String).length, 64);
       expect(decoded['verdict'], 'chainModifiedMeasured');
     });
+
+    test('concurrent verifyChain calls serialize cleanly without overlapping arm/collect',
+        () async {
+      final events = <String>[];
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+        events.add(call.method);
+        switch (call.method) {
+          case 'getChainOfCustodyReport':
+            return baseEngineReport(bitPerfectActive: true);
+          case 'armCustodyWindow':
+            await Future<void>.delayed(const Duration(milliseconds: 25));
+            return {'armed': true, 'reason': 'ok'};
+          case 'collectCustodyWindow':
+            return {'available': true, ...bitExactWindow()};
+          case 'cancelCustodyWindow':
+            return true;
+        }
+        return null;
+      });
+      final service = ChainOfCustodyService();
+      await Future.wait([
+        service.verifyChain(trackId: 's1', trackTitle: 'One', hashFile: false),
+        service.verifyChain(trackId: 's2', trackTitle: 'Two', hashFile: false),
+      ]);
+
+      final firstArm = events.indexOf('armCustodyWindow');
+      final firstCollect = events.indexOf('collectCustodyWindow');
+      final secondArm = events.lastIndexOf('armCustodyWindow');
+      expect(firstArm, isNonNegative);
+      expect(firstCollect, greaterThan(firstArm));
+      expect(secondArm, greaterThan(firstCollect));
+    });
+
+    test('contentHashFailed limitation scrubs user path PII from exception text',
+        () async {
+      stubChannel(window: modifiedWindow());
+      final directory = await Directory.systemTemp.createTemp('pulsr_custody');
+      final file = File('${directory.path}/broken.flac');
+      await file.writeAsBytes(List<int>.filled(64, 3), flush: true);
+
+      final service = ChainOfCustodyService(
+        contentHasher: (path, size) => throw StateError(
+            r'Cannot read C:\Users\alice\Private\broken.flac'),
+      );
+      final report = await service.verifyChain(
+        trackId: 't_pii',
+        trackTitle: 'Redacted',
+        filePath: file.path,
+      );
+
+      expect(report.limitations,
+          anyElement(allOf(startsWith('contentHashFailed:'),
+              isNot(contains('alice')),
+              contains('[REDACTED_USER_PATH]'))));
+      await directory.delete(recursive: true);
+    });
   });
 }

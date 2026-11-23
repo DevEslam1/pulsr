@@ -8,7 +8,13 @@ import 'package:pulsr/core/services/sponsorblock_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   group('SponsorBlockService', () {
+    setUp(() {
+      SharedPreferences.setMockInitialValues({});
+    });
+
     test('parses skip segments successfully', () async {
       final mockClient = MockClient((request) async {
         expect(request.url.host, 'sponsor.ajay.app');

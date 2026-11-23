@@ -33,6 +33,7 @@ class WaveformService {
   final Set<String> _syntheticMemKeys = {};
   final Map<String, Future<List<double>>> _inFlight = {};
   Directory? _cacheDir;
+  int _cacheEpoch = 0;
 
   static const Duration _pruneInterval = Duration(seconds: 60);
   final Map<String, DateTime> _lastPruneByPrefix = {};
@@ -50,9 +51,11 @@ class WaveformService {
     String? filePath,
     int count = 60,
   }) {
+    if (count <= 0) return const [];
     final memKey = '${songId}_$count';
-    final cached = _memCache[memKey];
+    final cached = _memCache.remove(memKey);
     if (cached != null && cached.isNotEmpty) {
+      _memCache[memKey] = cached; // refresh LRU position
       return cached;
     }
 
@@ -71,6 +74,7 @@ class WaveformService {
     String? filePath,
     int count = 60,
   }) async {
+    if (count <= 0) return const [];
     final memKey = '${songId}_$count';
     final wasSynthetic = _syntheticMemKeys.contains(memKey);
     final cached = _memCache.remove(memKey);
@@ -87,11 +91,13 @@ class WaveformService {
       return existing;
     }
 
+    final epoch = _cacheEpoch;
     final future = _loadAndCacheWaveform(
       songId: songId,
       filePath: filePath,
       count: count,
       memKey: memKey,
+      epoch: epoch,
     );
     _inFlight[memKey] = future;
     try {
@@ -108,6 +114,7 @@ class WaveformService {
     String? filePath,
     required int count,
     required String memKey,
+    required int epoch,
   }) async {
     List<double>? samples;
     if (_isLocalFile(filePath)) {
@@ -120,8 +127,14 @@ class WaveformService {
       count: count,
     );
 
-    _putMem(memKey, samples);
-    if (isSynthetic) _syntheticMemKeys.add(memKey);
+    if (epoch == _cacheEpoch) {
+      _putMem(memKey, samples);
+      if (isSynthetic) {
+        _syntheticMemKeys.add(memKey);
+      } else {
+        _syntheticMemKeys.remove(memKey);
+      }
+    }
     return samples;
   }
 
@@ -132,12 +145,14 @@ class WaveformService {
       !path.startsWith('ytmusic://');
 
   void clearMemoryCache() {
+    _cacheEpoch++;
     _memCache.clear();
     _syntheticMemKeys.clear();
     _inFlight.clear();
   }
 
   void _putMem(String key, List<double> value) {
+    _memCache.remove(key);
     if (_memCache.length >= _maxMemCacheSize) {
       final evicted = _memCache.keys.first;
       _memCache.remove(evicted);
@@ -151,8 +166,15 @@ class WaveformService {
       int mtime = 0;
       int size = 0;
       if (!path.startsWith('content:')) {
-        final file = File(
-            path.startsWith('file://') ? Uri.parse(path).toFilePath() : path);
+        String fsPath = path;
+        if (path.startsWith('file://')) {
+          try {
+            fsPath = Uri.parse(path).toFilePath();
+          } catch (_) {
+            fsPath = path.replaceFirst('file://', '');
+          }
+        }
+        final file = File(fsPath);
         if (await file.exists()) {
           final stat = await file.stat();
           mtime = stat.modified.millisecondsSinceEpoch;
@@ -172,11 +194,16 @@ class WaveformService {
         }
       }
 
-      final result = await _decodeNative(path, count);
-      if (result != null && result.isNotEmpty) {
+      final rawResult = await _decodeNative(path, count);
+      if (rawResult != null && rawResult.length == count) {
+        final result = rawResult
+            .map((v) => v.isFinite ? v.clamp(0.0, 1.0) : 0.0)
+            .toList(growable: false);
         await _pruneStaleEntries(path, keep: diskFile.path);
         try {
-          await diskFile.writeAsString(jsonEncode(result));
+          final tmp = File('${diskFile.path}.tmp');
+          await tmp.writeAsString(jsonEncode(result));
+          await tmp.rename(diskFile.path);
         } catch (e, st) {
           ErrorLogger.log('Failed to write waveform cache for $path',
               error: e, stackTrace: st, category: 'Waveform');

@@ -162,5 +162,34 @@ void main() {
         isFalse,
       );
     });
+
+    test('reconfigureIfNeeded resets failed partial DI and retries cleanly',
+        () async {
+      var attempts = 0;
+      debugConfigureDependenciesOverride = (_) async {
+        attempts++;
+        if (attempts == 1) {
+          getIt.registerSingleton<PulsrAudioHandler>(_MockAudioHandler());
+          throw StateError('transient DI failure');
+        }
+        getIt.registerSingleton<PulsrAudioHandler>(_MockAudioHandler());
+        getIt.registerSingleton<PlayerCubit>(_MockPlayerCubit());
+        if (AppConfig.ytmEnabled) {
+          getIt.registerSingleton<YtmDownloadCubit>(_MockYtmDownloadCubit());
+        }
+      };
+      addTearDown(() => debugConfigureDependenciesOverride = null);
+
+      await expectLater(configureDependencies(), throwsStateError);
+      expect(appDependenciesReady, isFalse);
+
+      final ready = await ensureAppDependenciesReady(
+        reconfigureIfNeeded: true,
+        timeout: const Duration(seconds: 2),
+      );
+      expect(ready, isTrue);
+      expect(attempts, 2);
+      expect(appDependenciesReady, isTrue);
+    });
   });
 }

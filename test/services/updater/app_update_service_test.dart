@@ -5,8 +5,15 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:pulsr/services/updater/app_update_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+  });
+
   group('ParsedVersion', () {
     test('parses standard semver and prefixed versions', () {
       final v1 = ParsedVersion.parse('1.0.0');
@@ -187,6 +194,86 @@ void main() {
           .where((f) => f.path.endsWith('.apk'))
           .toList();
       expect(remaining, isEmpty);
+    });
+
+    test('ParsedVersion ignores +build suffix cleanly during comparison', () {
+      expect(ParsedVersion.isNewer('1.2.4+5', '1.2.3+99'), isTrue);
+      expect(ParsedVersion.isNewer('1.2.3+5', '1.2.3+1'), isFalse);
+      expect(ParsedVersion.parse('2.0.1+42').parts, [2, 0, 1]);
+    });
+
+    test('rejects APK download when mandatory sha256 is absent', () async {
+      final client = MockClient.streaming((request, _) async {
+        return http.StreamedResponse(Stream.fromIterable([utf8.encode('apk')]), 200);
+      });
+      final service = AppUpdateService(client: client);
+      addTearDown(() => service.dispose());
+      final tempDir = await Directory.systemTemp.createTemp('pulsr_upd_nosha_');
+      addTearDown(() async {
+        if (await tempDir.exists()) await tempDir.delete(recursive: true);
+      });
+
+      await expectLater(
+        () => service.downloadApk(
+          const UpdateInfo(
+            version: '1.2.2',
+            tagName: 'v1.2.2',
+            releaseUrl:
+                'https://github.com/pulsr-audio/pulsr/releases/tag/v1.2.2',
+            apkUrl:
+                'https://github.com/pulsr-audio/pulsr/releases/download/v1.2.2/pulsr.apk',
+          ),
+          cacheDirectoryOverride: tempDir,
+        ),
+        throwsArgumentError,
+      );
+    });
+
+    test('blocks APK redirect to non-allowlisted host', () async {
+      final client = MockClient.streaming((request, _) async {
+        return http.StreamedResponse(
+          const Stream<List<int>>.empty(),
+          302,
+          headers: {'location': 'https://evil.example.com/malicious.apk'},
+        );
+      });
+      final service = AppUpdateService(client: client);
+      addTearDown(() => service.dispose());
+      final tempDir = await Directory.systemTemp.createTemp('pulsr_upd_redir_');
+      addTearDown(() async {
+        if (await tempDir.exists()) await tempDir.delete(recursive: true);
+      });
+
+      await expectLater(
+        () => service.downloadApk(
+          UpdateInfo(
+            version: '1.2.3',
+            tagName: 'v1.2.3',
+            releaseUrl:
+                'https://github.com/pulsr-audio/pulsr/releases/tag/v1.2.3',
+            apkUrl:
+                'https://github.com/pulsr-audio/pulsr/releases/download/v1.2.3/pulsr.apk',
+            sha256: 'a' * 64,
+          ),
+          cacheDirectoryOverride: tempDir,
+        ),
+        throwsStateError,
+      );
+    });
+
+    test('respects offlineOnlyMode in checkForUpdate', () async {
+      SharedPreferences.setMockInitialValues({'setting_offline_only_mode': true});
+      var called = false;
+      final client = MockClient((request) async {
+        called = true;
+        return http.Response('{}', 200);
+      });
+      final service = AppUpdateService(client: client);
+      addTearDown(() => service.dispose());
+
+      final info = await service.check();
+      expect(info, isNull);
+      expect(called, isFalse);
     });
   });
 }

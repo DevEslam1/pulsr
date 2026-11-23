@@ -286,5 +286,36 @@ void main() {
       expect(service.externalAssetCacheSize,
           equals(DiscordRpcService.maxAssetCacheEntries));
     });
+
+    test('blocks remote RPC network lookups in offlineOnlyMode and enforces SSRF artwork checks',
+        () async {
+      SharedPreferences.setMockInitialValues({
+        PrefsKeys.offlineOnlyMode: true,
+        PrefsKeys.discordRpcEnabled: true,
+      });
+      secureStore[PrefsKeys.discordRpcToken] = 'offline_token';
+      final prefs = await SharedPreferences.getInstance();
+      final service = DiscordRpcService.instance;
+
+      await service.init(prefs);
+      expect(await service.fetchUserInfo(), isNull);
+      expect(
+        await service.fetchExternalAsset('https://i.ytimg.com/vi/abc/hq.jpg'),
+        isNull,
+      );
+
+      expect(
+        DiscordRpcService.isSafeRemoteArtworkUrl('http://localhost/cover.jpg'),
+        isFalse,
+      );
+      expect(
+        DiscordRpcService.isSafeRemoteArtworkUrl('https://127.0.0.1/cover.jpg'),
+        isFalse,
+      );
+      expect(
+        DiscordRpcService.isSafeRemoteArtworkUrl('https://[fe80::1]/cover.jpg'),
+        isFalse,
+      );
+    });
   });
 }

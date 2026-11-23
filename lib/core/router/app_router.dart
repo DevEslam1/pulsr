@@ -55,7 +55,9 @@ import '../../features/playlists/cubit/playlist_cubit.dart';
 import '../../features/quran_mode/presentation/quran_mode_screen.dart';
 import '../../features/audio_profiles/audio_profiles_screen.dart';
 import '../../features/diagnostics/diagnostics_screen.dart';
+import '../../features/diagnostics/safe_mode_controller.dart';
 import '../../features/dlna/dlna_screen.dart';
+import '../../features/settings/cubit/settings_cubit.dart';
 import '../services/ytm_account_service.dart';
 import '../widgets/pulsr_modal_tracker.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
@@ -63,6 +65,28 @@ import 'package:pulsr/core/constants/app_typography.dart';
 
 final GlobalKey<NavigatorState> rootNavigatorKey =
     GlobalKey<NavigatorState>(debugLabel: 'root');
+
+String? _resolveCurrentOutputDeviceLabel() {
+  if (!getIt.isRegistered<SettingsCubit>()) return null;
+  final name = getIt<SettingsCubit>().state.currentOutputDevice?.deviceName;
+  if (name == null || name.trim().isEmpty) return null;
+  return name;
+}
+
+String _resolveCurrentOutputDeviceKey() {
+  if (!getIt.isRegistered<SettingsCubit>()) return 'default';
+  final info = getIt<SettingsCubit>().state.currentOutputDevice;
+  if (info == null) return 'default';
+  final type = info.isUsbDac || info.isUsb
+      ? 'usb'
+      : info.isBluetooth || info.isBt
+          ? 'bluetooth'
+          : (info.activeDeviceType.trim().isNotEmpty
+              ? info.activeDeviceType.trim()
+              : 'wired');
+  final name = info.deviceName.trim().isEmpty ? 'unknown' : info.deviceName;
+  return '${type}_$name';
+}
 
 Page<dynamic> _buildPulsrPageRoute({
   required LocalKey key,
@@ -165,7 +189,7 @@ bool isExternalAudioLocation(Uri uri) {
   ];
 
   for (final ext in audioExtensions) {
-    if (path.endsWith(ext) || full.endsWith(ext)) {
+    if (path.endsWith(ext)) {
       return true;
     }
   }
@@ -944,7 +968,13 @@ GoRouter createRouter(MediaScannerService scannerService,
         parentNavigatorKey: rootNavigatorKey,
         pageBuilder: (context, state) => _buildPulsrPageRoute(
           key: state.pageKey,
-          child: const DiagnosticsScreen(),
+          child: DiagnosticsScreen(
+            safeMode: getIt.isRegistered<SafeModeController>()
+                ? getIt<SafeModeController>()
+                : null,
+            deviceLabel: _resolveCurrentOutputDeviceLabel,
+            deviceKey: _resolveCurrentOutputDeviceKey,
+          ),
         ),
       ),
       GoRoute(
@@ -953,7 +983,9 @@ GoRouter createRouter(MediaScannerService scannerService,
         parentNavigatorKey: rootNavigatorKey,
         pageBuilder: (context, state) => _buildPulsrPageRoute(
           key: state.pageKey,
-          child: const AudioProfilesScreen(),
+          child: AudioProfilesScreen(
+            deviceLabel: _resolveCurrentOutputDeviceLabel,
+          ),
         ),
       ),
       GoRoute(

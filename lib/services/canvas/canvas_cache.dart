@@ -7,6 +7,8 @@ import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import '../../core/network/network_access_guard.dart';
+import '../../core/network/remote_target_policy.dart';
 import '../../core/utils/error_logger.dart';
 import 'canvas_artwork.dart';
 
@@ -117,10 +119,17 @@ class CanvasCache {
     return null;
   }
 
+  /// Maximum remote Canvas clip size accepted per download (50 MiB).
+  static const int maxVideoBytes = 50 * 1024 * 1024;
+
   /// Downloads and caches the video file to disk, enforcing the 150 MB LRU boundary.
   Future<String?> getOrDownloadVideo(String videoUrl) async {
     final existing = await getLocalPathIfExists(videoUrl);
     if (existing != null) return existing;
+
+    if (await NetworkAccessGuard.isBlocked(category: 'CanvasCache')) {
+      return null;
+    }
 
     // Deduplicate concurrent requests for the same URL
     if (_inFlightDownloads.containsKey(videoUrl)) {
@@ -134,32 +143,84 @@ class CanvasCache {
       final result = await downloadFuture;
       return result;
     } finally {
-      _inFlightDownloads.remove(videoUrl);
+      if (identical(_inFlightDownloads[videoUrl], downloadFuture)) {
+        _inFlightDownloads.remove(videoUrl);
+      }
     }
   }
 
   Future<String?> _downloadAndCache(String videoUrl) async {
+    IOSink? sink;
+    File? tempFile;
     try {
-      final dir = await _dir;
-      final targetFile = File(p.join(dir.path, _urlToFilename(videoUrl)));
-      final tempFile = File('${targetFile.path}.tmp');
-
-      final uri = Uri.tryParse(videoUrl);
-      if (uri == null) return null;
-
-      final request = http.Request('GET', uri)
-        ..headers['User-Agent'] =
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
-
-      final response =
-          await _client.send(request).timeout(const Duration(seconds: 20));
-      if (response.statusCode != 200) {
+      if (!RemoteTargetPolicy.isAllowed(videoUrl)) return null;
+      final initialUri = Uri.tryParse(videoUrl);
+      if (initialUri == null ||
+          !await RemoteTargetPolicy.isSafeHost(initialUri.host)) {
         return null;
       }
 
-      final sink = tempFile.openWrite();
-      await response.stream.pipe(sink);
-      await sink.close();
+      final dir = await _dir;
+      final targetFile = File(p.join(dir.path, _urlToFilename(videoUrl)));
+      tempFile = File('${targetFile.path}.tmp');
+
+      var currentUri = initialUri;
+      http.StreamedResponse? response;
+      const maxRedirects = 3;
+      for (var hop = 0; hop <= maxRedirects; hop++) {
+        final request = http.Request('GET', currentUri)
+          ..followRedirects = false
+          ..headers['User-Agent'] =
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
+        final candidate =
+            await _client.send(request).timeout(const Duration(seconds: 20));
+        final status = candidate.statusCode;
+
+        if (status >= 300 &&
+            status < 400 &&
+            candidate.headers.containsKey('location')) {
+          await candidate.stream.listen((_) {}, onError: (_) {}).cancel();
+          if (hop == maxRedirects) return null;
+          final nextUri = currentUri.resolve(candidate.headers['location']!);
+          if (!RemoteTargetPolicy.isAllowed(nextUri.toString()) ||
+              !await RemoteTargetPolicy.isSafeHost(nextUri.host)) {
+            return null;
+          }
+          currentUri = nextUri;
+          continue;
+        }
+        response = candidate;
+        break;
+      }
+
+      if (response == null || response.statusCode != 200) {
+        await response?.stream.listen((_) {}, onError: (_) {}).cancel();
+        return null;
+      }
+
+      final contentLength = response.contentLength;
+      if (contentLength != null && contentLength > maxVideoBytes) {
+        await response.stream.listen((_) {}, onError: (_) {}).cancel();
+        return null;
+      }
+
+      final activeSink = tempFile.openWrite();
+      sink = activeSink;
+      var totalBytes = 0;
+      await for (final chunk
+          in response.stream.timeout(const Duration(seconds: 20))) {
+        totalBytes += chunk.length;
+        if (totalBytes > maxVideoBytes) {
+          await activeSink.close();
+          sink = null;
+          if (await tempFile.exists()) await tempFile.delete();
+          return null;
+        }
+        activeSink.add(chunk);
+      }
+      await activeSink.flush();
+      await activeSink.close();
+      sink = null;
 
       if (await tempFile.length() == 0) {
         if (await tempFile.exists()) await tempFile.delete();
@@ -169,6 +230,7 @@ class CanvasCache {
       // Rename atomically
       if (await targetFile.exists()) await targetFile.delete();
       await tempFile.rename(targetFile.path);
+      tempFile = null;
 
       // Enforce 150 MB boundary
       await _evictDiskIfNeeded();
@@ -178,6 +240,17 @@ class CanvasCache {
       ErrorLogger.log('Canvas video download failed: $videoUrl',
           error: e, stackTrace: st, category: 'CanvasCache');
       return null;
+    } finally {
+      if (sink != null) {
+        await sink.close().catchError((e, st) {
+          ErrorLogger.log('Canvas temp sink close failed',
+              error: e, stackTrace: st, category: 'CanvasCache');
+        });
+      }
+      if (tempFile != null && await tempFile.exists()) {
+        final cleanup = tempFile;
+        await cleanup.delete().catchError((_) => cleanup);
+      }
     }
   }
 
@@ -226,7 +299,7 @@ class CanvasCache {
       if (!await dir.exists()) return 0;
       int total = 0;
       for (final e in dir.listSync()) {
-        if (e is File) total += e.lengthSync();
+        if (e is File && !e.path.endsWith('.tmp')) total += e.lengthSync();
       }
       return total;
     } catch (_) {

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/services.dart';
@@ -45,6 +46,8 @@ class ScrobblerService {
   static const String keyLastFmSessionKey = 'setting_lastfm_session_key';
   static const String keyLastFmEnabled = 'setting_lastfm_enabled';
 
+  static const String keyLibreFmApiKey = 'setting_librefm_api_key';
+  static const String keyLibreFmSecret = 'setting_librefm_secret';
   static const String keyLibreFmSessionKey = 'setting_librefm_session_key';
   static const String keyLibreFmEnabled = 'setting_librefm_enabled';
 
@@ -58,6 +61,8 @@ class ScrobblerService {
   static const String keyLastFmApiKeySecure = 'lastfm_api_key_secure';
   static const String keyLastFmSecretSecure = 'lastfm_secret_secure';
   static const String keyLastFmSessionKeySecure = 'lastfm_session_key_secure';
+  static const String keyLibreFmApiKeySecure = 'librefm_api_key_secure';
+  static const String keyLibreFmSecretSecure = 'librefm_secret_secure';
   static const String keyLibreFmSessionKeySecure = 'librefm_session_key_secure';
   static const String keyListenBrainzTokenSecure = 'listenbrainz_token_secure';
 
@@ -111,6 +116,8 @@ class ScrobblerService {
       (keyLastFmApiKeySecure, keyLastFmApiKey),
       (keyLastFmSecretSecure, keyLastFmSecret),
       (keyLastFmSessionKeySecure, keyLastFmSessionKey),
+      (keyLibreFmApiKeySecure, keyLibreFmApiKey),
+      (keyLibreFmSecretSecure, keyLibreFmSecret),
       (keyLibreFmSessionKeySecure, keyLibreFmSessionKey),
       (keyListenBrainzTokenSecure, keyListenBrainzToken),
     ];
@@ -138,6 +145,7 @@ class ScrobblerService {
 
   int? _lastScrobbledTrackId;
   int? _nowPlayingTrackId;
+  int? _lastPositionMs;
   DateTime? _trackStartTime;
   final Map<String, DateTime> _lastScrobblePerService = {};
   static const int _maxScrobbleEntries = 10;
@@ -147,11 +155,27 @@ class ScrobblerService {
 
   /// Serializes scrobble submissions (see [_submitScrobbleDirect]).
   final AsyncMutex _submitMutex = AsyncMutex();
+  final AsyncMutex _queueMutex = AsyncMutex();
+  int _enqueueEpoch = 0;
 
   SharedPreferences? _cachedPrefs;
   Future<SharedPreferences> _getPrefs() async {
     _cachedPrefs ??= await SharedPreferences.getInstance();
     return _cachedPrefs!;
+  }
+
+  /// Fails closed if [PrefsKeys.offlineOnlyMode] cannot be read so offline
+  /// preference or network isolation is never bypassed silently.
+  Future<bool> _isNetworkAllowed() async {
+    if (!AppConfig.isCloudSyncAllowed) return false;
+    try {
+      final prefs = await _getPrefs();
+      return prefs.getBool(PrefsKeys.offlineOnlyMode) != true;
+    } catch (e, st) {
+      ErrorLogger.log('Scrobbler offline check failed; treating as offline',
+          error: e, stackTrace: st, category: 'Scrobbler');
+      return false;
+    }
   }
 
   void _recordServiceScrobble(String service) {
@@ -177,6 +201,10 @@ class ScrobblerService {
   Future<void> checkPendingScrobble() async {
     try {
       final prefs = await _getPrefs();
+      if (!AppConfig.isCloudSyncAllowed) {
+        await _clearPendingSessionPrefs(prefs);
+        return;
+      }
       final lastId = prefs.getInt(_keyLastScrobbleSong);
       final lastTime = prefs.getInt(_keyLastScrobbleTime);
       final lastPos = prefs.getInt(_keyLastScrobblePos) ?? 0;
@@ -206,29 +234,25 @@ class ScrobblerService {
 
           if (!isDuplicate) {
             final timestamp = DateTime.fromMillisecondsSinceEpoch(lastTime);
-            await _submitScrobble(
+            final submitted = await _submitScrobble(
               artist: artist,
               track: track,
               album: album,
               durationSec: (duration / 1000).round(),
               timestamp: timestamp,
             );
-            final nowMs = DateTime.now().millisecondsSinceEpoch;
-            await prefs.setString('last_scrobble_key', pendingKey);
-            await prefs.setInt('last_scrobble_time', nowMs);
-            await prefs.setInt('last_scrobbled_id', lastId);
-            await prefs.setInt('last_scrobbled_timestamp', nowMs);
+            if (submitted) {
+              final nowMs = DateTime.now().millisecondsSinceEpoch;
+              await prefs.setString('last_scrobble_key', pendingKey);
+              await prefs.setInt('last_scrobble_time', nowMs);
+              await prefs.setInt('last_scrobbled_id', lastId);
+              await prefs.setInt('last_scrobbled_timestamp', nowMs);
+            }
           }
         }
       }
 
-      await prefs.remove(_keyLastScrobbleSong);
-      await prefs.remove(_keyLastScrobbleTime);
-      await prefs.remove(_keyLastScrobblePos);
-      await prefs.remove(_keyLastScrobbleArtist);
-      await prefs.remove(_keyLastScrobbleTrack);
-      await prefs.remove(_keyLastScrobbleAlbum);
-      await prefs.remove(_keyLastScrobbleDuration);
+      await _clearPendingSessionPrefs(prefs);
       _lastPosPersistEpochMs = 0;
       _lastWasPlaying = false;
 
@@ -237,6 +261,16 @@ class ScrobblerService {
       ErrorLogger.log('Failed checking pending scrobble from previous session',
           error: e, stackTrace: st, category: 'Scrobbler');
     }
+  }
+
+  Future<void> _clearPendingSessionPrefs(SharedPreferences prefs) async {
+    await prefs.remove(_keyLastScrobbleSong);
+    await prefs.remove(_keyLastScrobbleTime);
+    await prefs.remove(_keyLastScrobblePos);
+    await prefs.remove(_keyLastScrobbleArtist);
+    await prefs.remove(_keyLastScrobbleTrack);
+    await prefs.remove(_keyLastScrobbleAlbum);
+    await prefs.remove(_keyLastScrobbleDuration);
   }
 
   /// Broadcasts playback state to both native Android scrobbler apps and direct REST APIs.
@@ -251,31 +285,49 @@ class ScrobblerService {
     String? artworkUrl,
     bool isQuran = false,
   }) async {
-    // 1. Android Broadcast Intent
-    try {
-      await _channel.invokeMethod('broadcastPlaybackState', {
-        'id': id,
-        'artist': artist,
-        'track': track,
-        'album': album,
-        'duration': durationMs,
-        'position': positionMs,
-        'isPlaying': isPlaying,
-      });
-    } catch (e) {
-      ErrorLogger.log('Failed to broadcast scrobble intent: $e',
-          category: 'Scrobbler');
+    // Quran recitation and Pure builds must never broadcast playback externally
+    // to third-party scrobblers or REST endpoints.
+    if (isQuran || !AppConfig.isCloudSyncAllowed) return;
+    final isOnline = await _isNetworkAllowed();
+
+    // 1. Android Broadcast Intent (only when online; offline playback queues REST)
+    if (isOnline) {
+      try {
+        await _channel.invokeMethod('broadcastPlaybackState', {
+          'id': id,
+          'artist': artist,
+          'track': track,
+          'album': album,
+          'duration': durationMs,
+          'position': positionMs,
+          'isPlaying': isPlaying,
+        });
+      } catch (e) {
+        ErrorLogger.log('Failed to broadcast scrobble intent: $e',
+            category: 'Scrobbler');
+      }
     }
 
     // 2. Direct REST Scrobbler Logic
-    // Quran recitation is worship, not music listening: never scrobble it.
-    if (isQuran) return;
     try {
       if (artist.isEmpty || track.isEmpty || durationMs < 30000) {
         return; // Skip tracks < 30s
       }
 
-      if (_nowPlayingTrackId != id && isPlaying) {
+      if (_nowPlayingTrackId != null && _nowPlayingTrackId != id) {
+        _lastScrobbledTrackId = null;
+        _lastPositionMs = null;
+      }
+
+      final restartThresholdMs =
+          durationMs < 10000 ? (durationMs * 0.7).round() : 10000;
+      final isTrackRestart = _nowPlayingTrackId == id &&
+          isPlaying &&
+          _lastPositionMs != null &&
+          positionMs < 3000 &&
+          _lastPositionMs! > restartThresholdMs;
+
+      if ((_nowPlayingTrackId != id || isTrackRestart) && isPlaying) {
         _nowPlayingTrackId = id;
         _trackStartTime = DateTime.now();
         _lastScrobbledTrackId = null;
@@ -305,6 +357,7 @@ class ScrobblerService {
           durationSec: (durationMs / 1000).round(),
         );
       }
+      _lastPositionMs = positionMs;
 
       final nowMs = DateTime.now().millisecondsSinceEpoch;
       final shouldPersistPos = isPlaying
@@ -365,59 +418,123 @@ class ScrobblerService {
     }
   }
 
+  Future<({String apiKey, String secret, String sessionKey})?>
+      _readAudioscrobblerCredentials({
+    required String apiKeySecure,
+    required String apiKeyLegacy,
+    required String secretSecure,
+    required String secretLegacy,
+    required String sessionSecure,
+    required String sessionLegacy,
+  }) async {
+    final apiKey = await _getSecureOrMigrate(apiKeySecure, apiKeyLegacy);
+    final secret = await _getSecureOrMigrate(secretSecure, secretLegacy);
+    final sessionKey = await _getSecureOrMigrate(sessionSecure, sessionLegacy);
+    if (apiKey == null ||
+        secret == null ||
+        sessionKey == null ||
+        apiKey.isEmpty ||
+        secret.isEmpty ||
+        sessionKey.isEmpty) {
+      return null;
+    }
+    return (apiKey: apiKey, secret: secret, sessionKey: sessionKey);
+  }
+
+  Future<void> _postAudioscrobblerNowPlaying({
+    required Uri endpoint,
+    required String serviceLabel,
+    required String apiKey,
+    required String secret,
+    required String sessionKey,
+    required String artist,
+    required String track,
+    required String album,
+    required int durationSec,
+  }) async {
+    final params = <String, String>{
+      'method': 'track.updateNowPlaying',
+      'artist': artist,
+      'track': track,
+      if (album.isNotEmpty) 'album': album,
+      'duration': durationSec.toString(),
+      'api_key': apiKey,
+      'sk': sessionKey,
+    };
+    params['api_sig'] = _generateLastFmSignature(params, secret);
+    params['format'] = 'json';
+
+    try {
+      await _httpClient
+          .post(endpoint, body: params)
+          .timeout(const Duration(seconds: 4));
+    } catch (e) {
+      ErrorLogger.log('$serviceLabel now-playing post skipped: $e',
+          category: 'Scrobbler');
+    }
+  }
+
   Future<void> _updateNowPlaying({
     required String artist,
     required String track,
     required String album,
     required int durationSec,
   }) async {
+    if (!await _isNetworkAllowed()) return;
     final prefs = await _getPrefs();
-    if (!AppConfig.isCloudSyncAllowed ||
-        prefs.getBool(PrefsKeys.offlineOnlyMode) == true) {
-      return;
-    }
+    final tasks = <Future<void>>[];
 
     // 1. Last.fm Now Playing
     if (prefs.getBool(keyLastFmEnabled) == true) {
-      final apiKey =
-          await _getSecureOrMigrate(keyLastFmApiKeySecure, keyLastFmApiKey);
-      final secret =
-          await _getSecureOrMigrate(keyLastFmSecretSecure, keyLastFmSecret);
-      final sessionKey = await _getSecureOrMigrate(
-          keyLastFmSessionKeySecure, keyLastFmSessionKey);
-
-      if (apiKey != null &&
-          secret != null &&
-          sessionKey != null &&
-          apiKey.isNotEmpty &&
-          sessionKey.isNotEmpty) {
-        final params = <String, String>{
-          'method': 'track.updateNowPlaying',
-          'artist': artist,
-          'track': track,
-          if (album.isNotEmpty) 'album': album,
-          'duration': durationSec.toString(),
-          'api_key': apiKey,
-          'sk': sessionKey,
-        };
-        params['api_sig'] = _generateLastFmSignature(params, secret);
-        params['format'] = 'json';
-
-        try {
-          await _httpClient
-              .post(
-                Uri.parse('https://ws.audioscrobbler.com/2.0/'),
-                body: params,
-              )
-              .timeout(const Duration(seconds: 8));
-        } catch (e) {
-          ErrorLogger.log('Last.fm now-playing post skipped: $e',
-              category: 'Scrobbler');
-        }
+      final creds = await _readAudioscrobblerCredentials(
+        apiKeySecure: keyLastFmApiKeySecure,
+        apiKeyLegacy: keyLastFmApiKey,
+        secretSecure: keyLastFmSecretSecure,
+        secretLegacy: keyLastFmSecret,
+        sessionSecure: keyLastFmSessionKeySecure,
+        sessionLegacy: keyLastFmSessionKey,
+      );
+      if (creds != null) {
+        tasks.add(_postAudioscrobblerNowPlaying(
+          endpoint: Uri.parse('https://ws.audioscrobbler.com/2.0/'),
+          serviceLabel: 'Last.fm',
+          apiKey: creds.apiKey,
+          secret: creds.secret,
+          sessionKey: creds.sessionKey,
+          artist: artist,
+          track: track,
+          album: album,
+          durationSec: durationSec,
+        ));
       }
     }
 
-    // 2. ListenBrainz Playing Now
+    // 2. Libre.fm Now Playing
+    if (prefs.getBool(keyLibreFmEnabled) == true) {
+      final creds = await _readAudioscrobblerCredentials(
+        apiKeySecure: keyLibreFmApiKeySecure,
+        apiKeyLegacy: keyLibreFmApiKey,
+        secretSecure: keyLibreFmSecretSecure,
+        secretLegacy: keyLibreFmSecret,
+        sessionSecure: keyLibreFmSessionKeySecure,
+        sessionLegacy: keyLibreFmSessionKey,
+      );
+      if (creds != null) {
+        tasks.add(_postAudioscrobblerNowPlaying(
+          endpoint: Uri.parse('https://libre.fm/2.0/'),
+          serviceLabel: 'Libre.fm',
+          apiKey: creds.apiKey,
+          secret: creds.secret,
+          sessionKey: creds.sessionKey,
+          artist: artist,
+          track: track,
+          album: album,
+          durationSec: durationSec,
+        ));
+      }
+    }
+
+    // 3. ListenBrainz Playing Now
     if (prefs.getBool(keyListenBrainzEnabled) == true) {
       final token = await _getSecureOrMigrate(
           keyListenBrainzTokenSecure, keyListenBrainzToken);
@@ -440,22 +557,28 @@ class ScrobblerService {
           ],
         };
 
-        try {
-          await _httpClient
-              .post(
-                Uri.parse('https://api.listenbrainz.org/1/submit-listens'),
-                headers: {
-                  'Authorization': 'Token $token',
-                  'Content-Type': 'application/json',
-                },
-                body: jsonEncode(payload),
-              )
-              .timeout(const Duration(seconds: 8));
-        } catch (e) {
-          ErrorLogger.log('ListenBrainz playing-now post skipped: $e',
-              category: 'Scrobbler');
-        }
+        tasks.add(() async {
+          try {
+            await _httpClient
+                .post(
+                  Uri.parse('https://api.listenbrainz.org/1/submit-listens'),
+                  headers: {
+                    'Authorization': 'Token $token',
+                    'Content-Type': 'application/json',
+                  },
+                  body: jsonEncode(payload),
+                )
+                .timeout(const Duration(seconds: 4));
+          } catch (e) {
+            ErrorLogger.log('ListenBrainz playing-now post skipped: $e',
+                category: 'Scrobbler');
+          }
+        }());
       }
+    }
+
+    if (tasks.isNotEmpty) {
+      await Future.wait(tasks);
     }
   }
 
@@ -467,6 +590,29 @@ class ScrobblerService {
             .post(url, headers: headers, body: body)
             .timeout(const Duration(seconds: 10));
         if (resp.statusCode >= 200 && resp.statusCode < 300) {
+          final bodyTrimmed = resp.body.trimLeft();
+          if (bodyTrimmed.startsWith('{')) {
+            try {
+              final decoded = jsonDecode(bodyTrimmed);
+              if (decoded is Map && decoded.containsKey('error')) {
+                final err = decoded['error'];
+                if (err != null && err != 0) {
+                  // Last.fm / Libre.fm transient error codes: 11 (offline),
+                  // 16 (temporary), 29 (rate limit).
+                  final isTransient = err == 11 || err == 16 || err == 29;
+                  if (isTransient && attempt < maxAttempts) {
+                    await Future.delayed(Duration(milliseconds: 500 * attempt));
+                    continue;
+                  }
+                  ErrorLogger.log('Scrobble API returned JSON error: $err',
+                      category: 'Scrobbler');
+                  return false;
+                }
+              }
+            } catch (_) {
+              // Ignore non-JSON bodies on 2xx responses.
+            }
+          }
           return true;
         } else if (resp.statusCode == 429 || resp.statusCode >= 500) {
           if (attempt == maxAttempts) return false;
@@ -546,36 +692,65 @@ class ScrobblerService {
     required DateTime timestamp,
     List<String>? services,
   }) async {
-    try {
-      final prefs = await _getPrefs();
-      final queueJson = prefs.getString(_keyOfflineQueue);
-      final list = <Map<String, dynamic>>[];
-      if (queueJson != null && queueJson.isNotEmpty) {
-        final decoded = jsonDecode(queueJson) as List<dynamic>;
-        for (final item in decoded) {
-          if (item is Map<String, dynamic>) list.add(item);
+    await _queueMutex.run(() async {
+      try {
+        _enqueueEpoch++;
+        final prefs = await _getPrefs();
+        final queueJson = prefs.getString(_keyOfflineQueue);
+        final list = <Map<String, dynamic>>[];
+        if (queueJson != null && queueJson.isNotEmpty) {
+          final decoded = jsonDecode(queueJson) as List<dynamic>;
+          for (final item in decoded) {
+            if (item is Map<String, dynamic>) list.add(item);
+          }
         }
+        list.add({
+          'artist': artist,
+          'track': track,
+          'album': album,
+          'durationSec': durationSec,
+          'timestamp': timestamp.millisecondsSinceEpoch,
+          // When set, limits later delivery to the services that still need this
+          // scrobble so flushOfflineQueue can't double-send to delivered ones.
+          if (services != null) 'services': services,
+        });
+        final trimmed =
+            list.length > 200 ? list.sublist(list.length - 200) : list;
+        await prefs.setString(_keyOfflineQueue, jsonEncode(trimmed));
+      } catch (_) {
+        ErrorLogger.addBreadcrumb('Offline scrobble queue persist skipped',
+            category: 'Scrobbler');
       }
-      list.add({
-        'artist': artist,
-        'track': track,
-        'album': album,
-        'durationSec': durationSec,
-        'timestamp': timestamp.millisecondsSinceEpoch,
-        // When set, limits later delivery to the services that still need this
-        // scrobble so flushOfflineQueue can't double-send to delivered ones.
-        if (services != null) 'services': services,
-      });
-      final trimmed =
-          list.length > 200 ? list.sublist(list.length - 200) : list;
-      await prefs.setString(_keyOfflineQueue, jsonEncode(trimmed));
-    } catch (_) {
-      ErrorLogger.addBreadcrumb('Offline scrobble queue persist skipped',
-          category: 'Scrobbler');
-    }
+    });
   }
 
-  Future<void> _submitScrobble({
+  Future<bool> _submitAudioscrobblerScrobble({
+    required Uri endpoint,
+    required String apiKey,
+    required String secret,
+    required String sessionKey,
+    required String artist,
+    required String track,
+    required String album,
+    required int durationSec,
+    required DateTime timestamp,
+  }) {
+    final params = <String, String>{
+      'method': 'track.scrobble',
+      'artist': artist,
+      'track': track,
+      if (album.isNotEmpty) 'album': album,
+      'duration': durationSec.toString(),
+      'timestamp': (timestamp.millisecondsSinceEpoch ~/ 1000).toString(),
+      'api_key': apiKey,
+      'sk': sessionKey,
+    };
+    params['api_sig'] = _generateLastFmSignature(params, secret);
+    params['format'] = 'json';
+    return _postWithRetry(endpoint, body: params);
+  }
+
+  Future<bool> _submitScrobble({
     required String artist,
     required String track,
     required String album,
@@ -593,7 +768,7 @@ class ScrobblerService {
         ));
   }
 
-  Future<void> _submitScrobbleLocked({
+  Future<bool> _submitScrobbleLocked({
     required String artist,
     required String track,
     required String album,
@@ -601,18 +776,17 @@ class ScrobblerService {
     required DateTime timestamp,
     String? artworkUrl,
   }) async {
+    if (!AppConfig.isCloudSyncAllowed) return false;
     final prefs = await _getPrefs();
-    // Offline-only mode (and Pure builds, which have no network): queue
-    // locally, never hit the network.
-    if (!AppConfig.isCloudSyncAllowed ||
-        prefs.getBool(PrefsKeys.offlineOnlyMode) == true) {
+    // Offline-only mode: queue locally, never hit the network.
+    if (!await _isNetworkAllowed()) {
       await _enqueueOfflineScrobble(
           artist: artist,
           track: track,
           album: album,
           durationSec: durationSec,
           timestamp: timestamp);
-      return;
+      return false;
     }
 
     // Deduplication check
@@ -622,47 +796,36 @@ class ScrobblerService {
     final now = DateTime.now().millisecondsSinceEpoch;
 
     if (lastScrobbledKey == dedupKey && (now - lastScrobbledTime) < 300000) {
-      return; // Already scrobbled within 5 minutes
+      return false; // Already scrobbled within 5 minutes
     }
 
     final pending = <String>{};
-    bool anyServiceEnabled = false;
     bool anySuccess = false;
 
     // 1. Last.fm Scrobble
     if (prefs.getBool(keyLastFmEnabled) == true) {
-      anyServiceEnabled = true;
       if (!_canScrobbleService('lastfm')) {
         pending.add('lastfm');
       } else {
-        final apiKey =
-            await _getSecureOrMigrate(keyLastFmApiKeySecure, keyLastFmApiKey);
-        final secret =
-            await _getSecureOrMigrate(keyLastFmSecretSecure, keyLastFmSecret);
-        final sessionKey = await _getSecureOrMigrate(
-            keyLastFmSessionKeySecure, keyLastFmSessionKey);
-
-        if (apiKey != null &&
-            secret != null &&
-            sessionKey != null &&
-            apiKey.isNotEmpty &&
-            sessionKey.isNotEmpty) {
-          final params = <String, String>{
-            'method': 'track.scrobble',
-            'artist': artist,
-            'track': track,
-            if (album.isNotEmpty) 'album': album,
-            'duration': durationSec.toString(),
-            'timestamp': (timestamp.millisecondsSinceEpoch ~/ 1000).toString(),
-            'api_key': apiKey,
-            'sk': sessionKey,
-          };
-          params['api_sig'] = _generateLastFmSignature(params, secret);
-          params['format'] = 'json';
-
-          final ok = await _postWithRetry(
-            Uri.parse('https://ws.audioscrobbler.com/2.0/'),
-            body: params,
+        final creds = await _readAudioscrobblerCredentials(
+          apiKeySecure: keyLastFmApiKeySecure,
+          apiKeyLegacy: keyLastFmApiKey,
+          secretSecure: keyLastFmSecretSecure,
+          secretLegacy: keyLastFmSecret,
+          sessionSecure: keyLastFmSessionKeySecure,
+          sessionLegacy: keyLastFmSessionKey,
+        );
+        if (creds != null) {
+          final ok = await _submitAudioscrobblerScrobble(
+            endpoint: Uri.parse('https://ws.audioscrobbler.com/2.0/'),
+            apiKey: creds.apiKey,
+            secret: creds.secret,
+            sessionKey: creds.sessionKey,
+            artist: artist,
+            track: track,
+            album: album,
+            durationSec: durationSec,
+            timestamp: timestamp,
           );
           if (ok) {
             anySuccess = true;
@@ -676,26 +839,28 @@ class ScrobblerService {
 
     // 2. Libre.fm Scrobble
     if (prefs.getBool(keyLibreFmEnabled) == true) {
-      anyServiceEnabled = true;
       if (!_canScrobbleService('librefm')) {
         pending.add('librefm');
       } else {
-        final sessionKey = await _getSecureOrMigrate(
-            keyLibreFmSessionKeySecure, keyLibreFmSessionKey);
-        if (sessionKey != null && sessionKey.isNotEmpty) {
-          final params = <String, String>{
-            'method': 'track.scrobble',
-            'artist': artist,
-            'track': track,
-            if (album.isNotEmpty) 'album': album,
-            'duration': durationSec.toString(),
-            'timestamp': (timestamp.millisecondsSinceEpoch ~/ 1000).toString(),
-            'sk': sessionKey,
-            'format': 'json',
-          };
-          final ok = await _postWithRetry(
-            Uri.parse('https://libre.fm/2.0/'),
-            body: params,
+        final creds = await _readAudioscrobblerCredentials(
+          apiKeySecure: keyLibreFmApiKeySecure,
+          apiKeyLegacy: keyLibreFmApiKey,
+          secretSecure: keyLibreFmSecretSecure,
+          secretLegacy: keyLibreFmSecret,
+          sessionSecure: keyLibreFmSessionKeySecure,
+          sessionLegacy: keyLibreFmSessionKey,
+        );
+        if (creds != null) {
+          final ok = await _submitAudioscrobblerScrobble(
+            endpoint: Uri.parse('https://libre.fm/2.0/'),
+            apiKey: creds.apiKey,
+            secret: creds.secret,
+            sessionKey: creds.sessionKey,
+            artist: artist,
+            track: track,
+            album: album,
+            durationSec: durationSec,
+            timestamp: timestamp,
           );
           if (ok) {
             anySuccess = true;
@@ -709,7 +874,6 @@ class ScrobblerService {
 
     // 3. Custom Webhook Scrobble
     if (prefs.getBool(keyCustomWebhookEnabled) == true) {
-      anyServiceEnabled = true;
       if (!_canScrobbleService('webhook')) {
         pending.add('webhook');
       } else {
@@ -745,7 +909,6 @@ class ScrobblerService {
 
     // 4. ListenBrainz Single Listen Scrobble
     if (prefs.getBool(keyListenBrainzEnabled) == true) {
-      anyServiceEnabled = true;
       if (!_canScrobbleService('listenbrainz')) {
         pending.add('listenbrainz');
       } else {
@@ -799,19 +962,19 @@ class ScrobblerService {
         services: pending.toList(),
       );
     }
-    // Mark the real-time dedup guard whenever a service was enabled, so the same
-    // track can't be re-scrobbled within 5 minutes. Only count stats on a full
-    // delivery; still-pending services are counted when flushOfflineQueue
-    // delivers them from the per-service queue entry.
-    if (anyServiceEnabled) {
+    // Only record dedup keys when at least one remote submission actually
+    // succeeded — never poison the 5-minute window when credentials are missing,
+    // targets are SSRF-blocked, or all enabled services failed.
+    if (anySuccess) {
       await prefs.setString('last_scrobble_key', dedupKey);
       await prefs.setInt('last_scrobble_time', now);
       await prefs.setInt('last_scrobbled_timestamp', now);
-      if (anySuccess && pending.isEmpty) {
+      if (pending.isEmpty) {
         await _recordSuccessfulScrobble(
             prefs, timestamp.millisecondsSinceEpoch);
       }
     }
+    return anySuccess;
   }
 
   static const String keyTotalScrobbleCount = 'total_scrobble_count';
@@ -859,17 +1022,26 @@ class ScrobblerService {
     if (_isFlushing) return;
     _isFlushing = true;
     try {
-      final prefs = await _getPrefs();
       // Offline-only mode (and Pure builds): keep the queue stored, never hit
       // the network.
-      if (!AppConfig.isCloudSyncAllowed ||
-          prefs.getBool(PrefsKeys.offlineOnlyMode) == true) {
+      if (!await _isNetworkAllowed()) {
         return;
       }
-      final queueJson = prefs.getString(_keyOfflineQueue);
-      if (queueJson == null || queueJson.isEmpty) return;
+      final prefs = await _getPrefs();
+      late List<dynamic> list;
+      late int epochBefore;
+      await _queueMutex.run(() async {
+        epochBefore = _enqueueEpoch;
+        final queueJson = prefs.getString(_keyOfflineQueue);
+        if (queueJson == null || queueJson.isEmpty) {
+          list = const [];
+          return;
+        }
+        final decoded = jsonDecode(queueJson);
+        list = decoded is List ? decoded : const [];
+      });
+      if (list.isEmpty) return;
 
-      final List<dynamic> list = jsonDecode(queueJson);
       final remaining = <Map<String, dynamic>>[];
       const batchSize = 5;
 
@@ -917,11 +1089,35 @@ class ScrobblerService {
         }
       }
 
-      if (remaining.isEmpty) {
-        await prefs.remove(_keyOfflineQueue);
-      } else {
-        await prefs.setString(_keyOfflineQueue, jsonEncode(remaining));
-      }
+      await _queueMutex.run(() async {
+        final merged = <Map<String, dynamic>>[...remaining];
+        final delta = _enqueueEpoch - epochBefore;
+        if (delta > 0) {
+          final latestRaw = prefs.getString(_keyOfflineQueue);
+          if (latestRaw != null && latestRaw.isNotEmpty) {
+            final latestDecoded = jsonDecode(latestRaw);
+            if (latestDecoded is List) {
+              final tailCount = delta.clamp(0, latestDecoded.length);
+              final tail = latestDecoded.sublist(latestDecoded.length - tailCount);
+              for (final item in tail) {
+                if (item is Map<String, dynamic>) {
+                  merged.add(item);
+                } else if (item is Map) {
+                  merged.add(Map<String, dynamic>.from(item));
+                }
+              }
+            }
+          }
+        }
+        final trimmed = merged.length > 200
+            ? merged.sublist(merged.length - 200)
+            : merged;
+        if (trimmed.isEmpty) {
+          await prefs.remove(_keyOfflineQueue);
+        } else {
+          await prefs.setString(_keyOfflineQueue, jsonEncode(trimmed));
+        }
+      });
     } catch (e, st) {
       ErrorLogger.log('Failed to flush offline scrobble queue',
           error: e, stackTrace: st, category: 'Scrobbler');
@@ -1005,33 +1201,26 @@ class ScrobblerService {
     bool anySuccess = false;
 
     if (wants('lastfm') && prefs.getBool(keyLastFmEnabled) == true) {
-      final apiKey =
-          await _getSecureOrMigrate(keyLastFmApiKeySecure, keyLastFmApiKey);
-      final secret =
-          await _getSecureOrMigrate(keyLastFmSecretSecure, keyLastFmSecret);
-      final sessionKey = await _getSecureOrMigrate(
-          keyLastFmSessionKeySecure, keyLastFmSessionKey);
-
-      if (apiKey != null &&
-          secret != null &&
-          sessionKey != null &&
-          apiKey.isNotEmpty &&
-          sessionKey.isNotEmpty) {
-        final params = <String, String>{
-          'method': 'track.scrobble',
-          'artist': artist,
-          'track': track,
-          if (album.isNotEmpty) 'album': album,
-          'duration': durationSec.toString(),
-          'timestamp': (timestamp.millisecondsSinceEpoch ~/ 1000).toString(),
-          'api_key': apiKey,
-          'sk': sessionKey,
-        };
-        params['api_sig'] = _generateLastFmSignature(params, secret);
-        params['format'] = 'json';
-        if (await _postWithRetry(
-            Uri.parse('https://ws.audioscrobbler.com/2.0/'),
-            body: params)) {
+      final creds = await _readAudioscrobblerCredentials(
+        apiKeySecure: keyLastFmApiKeySecure,
+        apiKeyLegacy: keyLastFmApiKey,
+        secretSecure: keyLastFmSecretSecure,
+        secretLegacy: keyLastFmSecret,
+        sessionSecure: keyLastFmSessionKeySecure,
+        sessionLegacy: keyLastFmSessionKey,
+      );
+      if (creds != null) {
+        if (await _submitAudioscrobblerScrobble(
+          endpoint: Uri.parse('https://ws.audioscrobbler.com/2.0/'),
+          apiKey: creds.apiKey,
+          secret: creds.secret,
+          sessionKey: creds.sessionKey,
+          artist: artist,
+          track: track,
+          album: album,
+          durationSec: durationSec,
+          timestamp: timestamp,
+        )) {
           anySuccess = true;
         } else {
           pending.add('lastfm');
@@ -1040,21 +1229,26 @@ class ScrobblerService {
     }
 
     if (wants('librefm') && prefs.getBool(keyLibreFmEnabled) == true) {
-      final sessionKey = await _getSecureOrMigrate(
-          keyLibreFmSessionKeySecure, keyLibreFmSessionKey);
-      if (sessionKey != null && sessionKey.isNotEmpty) {
-        final params = <String, String>{
-          'method': 'track.scrobble',
-          'artist': artist,
-          'track': track,
-          if (album.isNotEmpty) 'album': album,
-          'duration': durationSec.toString(),
-          'timestamp': (timestamp.millisecondsSinceEpoch ~/ 1000).toString(),
-          'sk': sessionKey,
-          'format': 'json',
-        };
-        if (await _postWithRetry(Uri.parse('https://libre.fm/2.0/'),
-            body: params)) {
+      final creds = await _readAudioscrobblerCredentials(
+        apiKeySecure: keyLibreFmApiKeySecure,
+        apiKeyLegacy: keyLibreFmApiKey,
+        secretSecure: keyLibreFmSecretSecure,
+        secretLegacy: keyLibreFmSecret,
+        sessionSecure: keyLibreFmSessionKeySecure,
+        sessionLegacy: keyLibreFmSessionKey,
+      );
+      if (creds != null) {
+        if (await _submitAudioscrobblerScrobble(
+          endpoint: Uri.parse('https://libre.fm/2.0/'),
+          apiKey: creds.apiKey,
+          secret: creds.secret,
+          sessionKey: creds.sessionKey,
+          artist: artist,
+          track: track,
+          album: album,
+          durationSec: durationSec,
+          timestamp: timestamp,
+        )) {
           anySuccess = true;
         } else {
           pending.add('librefm');

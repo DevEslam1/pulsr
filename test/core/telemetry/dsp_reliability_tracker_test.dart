@@ -150,5 +150,19 @@ void main() {
       expect(tracker.counters.nativeSetterRejection, 0);
       expect(tracker.counters.bridgeTimeoutFailure, 0);
     });
+
+    test('dispose during initial load does not reopen controller or emit stale events',
+        () async {
+      final tracker = DspReliabilityTracker.instance;
+      final events = <DspReliabilityCounters>[];
+      final sub = tracker.stream.listen(events.add);
+      addTearDown(sub.cancel);
+
+      tracker.dispose();
+      await tracker.ensureInitialized();
+      tracker.recordNativeSetterRejection('afterDispose', 'err');
+
+      expect(events, isEmpty);
+    });
   });
 }

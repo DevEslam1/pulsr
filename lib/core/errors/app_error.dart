@@ -154,7 +154,8 @@ AppError resolveAppError(Object error, [StackTrace? stackTrace]) {
   }
 
   if (error is PlatformException) {
-    if (error.code.contains('permission') || error.code.contains('DENIED')) {
+    final lowerCode = error.code.toLowerCase();
+    if (lowerCode.contains('permission') || lowerCode.contains('denied')) {
       return PermissionError(
         code: 'PERM_DENIED',
         userMessage: error.message ?? 'Permission denied.',
@@ -163,7 +164,7 @@ AppError resolveAppError(Object error, [StackTrace? stackTrace]) {
         stackTrace: stackTrace,
       );
     }
-    if (error.code.contains('audio') || error.code.contains('playback')) {
+    if (lowerCode.contains('audio') || lowerCode.contains('playback')) {
       return AudioError(
         code: 'AUDIO_PLATFORM_ERR',
         userMessage: error.message ?? 'Audio playback device error.',

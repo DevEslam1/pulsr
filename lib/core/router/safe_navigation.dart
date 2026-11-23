@@ -60,6 +60,15 @@ extension PulsrSafePush on BuildContext {
     return _equality.equals(a, b);
   }
 
+  /// Clears an active debounce window (e.g. when a pushed route pops early).
+  static void clearDebounce() {
+    _clearTimer?.cancel();
+    _clearTimer = null;
+    _lastLocation = null;
+    _lastExtra = null;
+    _windowActive = false;
+  }
+
   /// Pushes [location] unless an identical push happened within the last
   /// [_window]; returns whether the navigation was actually performed.
   bool pushDebounced(String location, {Object? extra}) {
@@ -79,24 +88,19 @@ extension PulsrSafePush on BuildContext {
       _clearTimer = null;
     });
     try {
-      push<void>(location, extra: extra);
+      final Future<void> pushFuture = push<void>(location, extra: extra);
+      unawaited(pushFuture.whenComplete(() {
+        if (_lastLocation == location && _areExtrasEqual(_lastExtra, extra)) {
+          clearDebounce();
+        }
+      }));
     } catch (_) {
-      _clearTimer?.cancel();
-      _clearTimer = null;
-      _lastLocation = null;
-      _lastExtra = null;
-      _windowActive = false;
+      clearDebounce();
       rethrow;
     }
     return true;
   }
 
   @visibleForTesting
-  static void resetForTesting() {
-    _clearTimer?.cancel();
-    _clearTimer = null;
-    _lastLocation = null;
-    _lastExtra = null;
-    _windowActive = false;
-  }
+  static void resetForTesting() => clearDebounce();
 }

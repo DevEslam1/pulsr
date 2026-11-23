@@ -5,11 +5,14 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:pulsr/services/canvas/canvas_artwork.dart';
 import 'package:pulsr/services/canvas/canvas_cache.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   late Directory tempDir;
 
   setUp(() async {
+    SharedPreferences.setMockInitialValues({});
     tempDir = await Directory.systemTemp.createTemp('pulsr_canvas_cache_test_');
   });
 
@@ -95,6 +98,42 @@ void main() {
 
       // Oldest file should be evicted
       expect(File(path1).existsSync(), isFalse);
+    });
+
+    test('blocks canvas downloads when offlineOnlyMode is active', () async {
+      SharedPreferences.setMockInitialValues({'setting_offline_only_mode': true});
+      var networkCalls = 0;
+      final mockClient = MockClient((request) async {
+        networkCalls++;
+        return http.Response.bytes(List<int>.filled(10, 1), 200);
+      });
+      final cache = CanvasCache(
+        client: mockClient,
+        customCacheDirPath: tempDir.path,
+      );
+
+      final path =
+          await cache.getOrDownloadVideo('https://example.com/offline.mp4');
+      expect(path, isNull);
+      expect(networkCalls, 0);
+    });
+
+    test('blocks redirect to private loopback IP target', () async {
+      final mockClient = MockClient.streaming((request, _) async {
+        return http.StreamedResponse(
+          const Stream<List<int>>.empty(),
+          302,
+          headers: {'location': 'http://127.0.0.1/secret.mp4'},
+        );
+      });
+      final cache = CanvasCache(
+        client: mockClient,
+        customCacheDirPath: tempDir.path,
+      );
+
+      final path =
+          await cache.getOrDownloadVideo('https://example.com/redir.mp4');
+      expect(path, isNull);
     });
   });
 }

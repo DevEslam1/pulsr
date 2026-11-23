@@ -128,7 +128,9 @@ class YtmRateLimiter {
       final result = await future;
       return result;
     } finally {
-      _inFlightRequests.remove(key);
+      if (identical(_inFlightRequests[key], future)) {
+        _inFlightRequests.remove(key);
+      }
     }
   }
 
@@ -164,40 +166,50 @@ class YtmRateLimiter {
   /// Acquires a permit before making a native YTM request.
   /// If [fastFail] is true and an active backoff window is longer than 30s,
   /// throws a [TimeoutException] immediately instead of blocking the async mutex for minutes.
-  Future<void> acquirePermit({bool fastFail = false, Duration? maxWait}) =>
-      _nativeMutex.run(() async {
-        while (true) {
-          final now = clock.now();
-          if (now.isBefore(_backoffUntil)) {
-            final waitDuration = _backoffUntil.difference(now);
-            if (fastFail && waitDuration > const Duration(seconds: 30)) {
-              throw TimeoutException(
-                  'Rate limiter in long backoff (${waitDuration.inSeconds}s remaining)');
-            }
-            if (maxWait != null && waitDuration > maxWait) {
-              throw TimeoutException(
-                  'Rate limiter backoff ${waitDuration.inSeconds}s exceeds ${maxWait.inSeconds}s budget');
-            }
-            await Future<void>.delayed(waitDuration);
-          }
-
-          _refill();
-          if (_tokens >= 1.0) {
-            _tokens -= 1.0;
-            _persist();
-            return;
-          }
-
-          // Wait for the next token to become available
-          final waitMs =
-              ((1.0 - _tokens) / _refillRate * 1000).ceil().clamp(10, 5000);
-          if (maxWait != null && Duration(milliseconds: waitMs) > maxWait) {
+  Future<void> acquirePermit({bool fastFail = false, Duration? maxWait}) async {
+    final deadline = maxWait != null ? clock.now().add(maxWait) : null;
+    while (true) {
+      // Hold _nativeMutex only to inspect/update limiter state; release before sleeping
+      // so concurrent callers can fail fast or observe live state updates.
+      final waitDuration = await _nativeMutex.run(() async {
+        final now = clock.now();
+        if (now.isBefore(_backoffUntil)) {
+          final backoffRemaining = _backoffUntil.difference(now);
+          if (fastFail && backoffRemaining > const Duration(seconds: 30)) {
             throw TimeoutException(
-                'Rate limiter token wait ${waitMs}ms exceeds ${maxWait.inSeconds}s budget');
+                'Rate limiter in long backoff (${backoffRemaining.inSeconds}s remaining)');
           }
-          await Future<void>.delayed(Duration(milliseconds: waitMs));
+          if (deadline != null && now.add(backoffRemaining).isAfter(deadline)) {
+            throw TimeoutException(
+                'Rate limiter backoff ${backoffRemaining.inSeconds}s exceeds ${maxWait!.inSeconds}s budget');
+          }
+          return backoffRemaining;
         }
+
+        _refill();
+        if (_tokens >= 1.0) {
+          _tokens -= 1.0;
+          _persist();
+          return Duration.zero;
+        }
+
+        // Wait for the next token to become available
+        final waitMs =
+            ((1.0 - _tokens) / _refillRate * 1000).ceil().clamp(10, 5000);
+        final tokenWait = Duration(milliseconds: waitMs);
+        if (deadline != null && now.add(tokenWait).isAfter(deadline)) {
+          throw TimeoutException(
+              'Rate limiter token wait ${waitMs}ms exceeds ${maxWait!.inSeconds}s budget');
+        }
+        return tokenWait;
       });
+
+      if (waitDuration == Duration.zero) {
+        return;
+      }
+      await Future<void>.delayed(waitDuration);
+    }
+  }
 
   /// Called when a 429 rate-limit response is received from native YouTube.
   /// [_adaptiveMultiplier] actually scales the backoff (previously it was

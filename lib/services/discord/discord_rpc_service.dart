@@ -7,7 +7,9 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../core/config/app_config.dart';
 import '../../core/constants/prefs_keys.dart';
+import '../../core/network/remote_target_policy.dart';
 import '../../core/utils/error_logger.dart';
 import '../../data/db/app_database.dart';
 import '../../domain/models/audio_quality_info.dart';
@@ -103,6 +105,7 @@ class DiscordRpcService {
     http.Client? httpClient,
     FlutterSecureStorage? secureStorage,
   })  : _httpClient = httpClient ?? http.Client(),
+        _ownsClient = httpClient == null,
         _secureStorage = secureStorage ?? const FlutterSecureStorage();
 
   factory DiscordRpcService({
@@ -129,6 +132,7 @@ class DiscordRpcService {
   static const int maxReconnectAttempts = 8;
 
   final http.Client _httpClient;
+  final bool _ownsClient;
   final FlutterSecureStorage _secureStorage;
   final Map<String, String> _externalAssetCache = {};
 
@@ -149,12 +153,17 @@ class DiscordRpcService {
   bool _awaitingAck = false;
   int _sequence = 0;
   int _connectGeneration = 0;
+  int _presenceEpoch = 0;
   int _reconnectAttempts = 0;
   String? _sessionId;
   String? _resumeGatewayUrl;
   int _heartbeatInterval = 41250;
   int get heartbeatInterval => _heartbeatInterval;
   bool _disposed = false;
+
+  bool get _isNetworkBlocked =>
+      !AppConfig.isCloudSyncAllowed ||
+      (_prefs?.getBool(PrefsKeys.offlineOnlyMode) == true);
 
   @visibleForTesting
   int get externalAssetCacheSize => _externalAssetCache.length;
@@ -172,7 +181,13 @@ class DiscordRpcService {
     _externalAssetCache[key] = value;
   }
 
-  static bool isFatalCloseCode(int? code) => code == 4004 || code == 4010;
+  static bool isFatalCloseCode(int? code) =>
+      code == 4004 ||
+      code == 4010 ||
+      code == 4011 ||
+      code == 4012 ||
+      code == 4013 ||
+      code == 4014;
 
   static bool isSafeRemoteArtworkUrl(String? rawUrl) {
     if (rawUrl == null) return false;
@@ -185,10 +200,7 @@ class DiscordRpcService {
       return false;
     }
     if (lower.startsWith('mp:')) return true;
-    final uri = Uri.tryParse(trimmed);
-    if (uri == null || !uri.hasAuthority) return false;
-    final scheme = uri.scheme.toLowerCase();
-    return scheme == 'https' || scheme == 'http';
+    return RemoteTargetPolicy.isAllowed(trimmed);
   }
 
   Map<String, dynamic>? _lastPresencePayload;
@@ -206,6 +218,7 @@ class DiscordRpcService {
 
   /// Initializes configuration from [SharedPreferences] and [FlutterSecureStorage].
   Future<void> init(SharedPreferences prefs) async {
+    _disposed = false;
     _prefs = prefs;
     _enabled = prefs.getBool(PrefsKeys.discordRpcEnabled) ?? false;
     String? secureToken;
@@ -244,11 +257,11 @@ class DiscordRpcService {
     _applicationId =
         prefs.getString(PrefsKeys.discordApplicationId) ?? defaultApplicationId;
 
-    if (_token.isNotEmpty) {
+    if (!_isNetworkBlocked && _token.isNotEmpty) {
       unawaited(fetchUserInfo());
     }
 
-    if (_enabled && _token.isNotEmpty) {
+    if (!_isNetworkBlocked && _enabled && _token.isNotEmpty) {
       connect();
     }
   }
@@ -257,7 +270,7 @@ class DiscordRpcService {
   Future<void> setEnabled(bool enabled) async {
     _enabled = enabled;
     await _prefs?.setBool(PrefsKeys.discordRpcEnabled, enabled);
-    if (enabled) {
+    if (enabled && !_isNetworkBlocked) {
       _reconnectAttempts = 0;
       if (_token.isNotEmpty) {
         connect();
@@ -293,7 +306,7 @@ class DiscordRpcService {
     }
     _currentUser = null;
 
-    if (clean.isNotEmpty) {
+    if (clean.isNotEmpty && !_isNetworkBlocked) {
       await fetchUserInfo();
       if (_enabled) {
         reconnect();
@@ -332,7 +345,7 @@ class DiscordRpcService {
 
   /// Validates the token and fetches user identity from Discord REST API.
   Future<DiscordUser?> fetchUserInfo() async {
-    if (_token.isEmpty) return null;
+    if (_token.isEmpty || _isNetworkBlocked) return null;
     final user = await getUserInfo(_token, client: _httpClient);
     if (user != null) {
       _currentUser = user;
@@ -345,6 +358,7 @@ class DiscordRpcService {
     String token, {
     http.Client? client,
   }) async {
+    if (!AppConfig.isCloudSyncAllowed) return null;
     final c = client ?? http.Client();
     try {
       final res = await c.get(
@@ -374,7 +388,13 @@ class DiscordRpcService {
 
   /// Establishes the Gateway WebSocket connection.
   Future<void> connect() async {
-    if (_disposed || !_enabled || _isConnecting || _isConnected) return;
+    if (_disposed ||
+        !_enabled ||
+        _isNetworkBlocked ||
+        _isConnecting ||
+        _isConnected) {
+      return;
+    }
     if (_token.isEmpty) return;
 
     _isConnecting = true;
@@ -438,7 +458,7 @@ class DiscordRpcService {
     _awaitingAck = false;
     _heartbeatTimer?.cancel();
     _heartbeatTimer = null;
-    _webSocket?.close();
+    unawaited(_webSocket?.close().catchError((Object _) {}));
     _webSocket = null;
 
     if (isFatalCloseCode(closeCode)) {
@@ -447,7 +467,7 @@ class DiscordRpcService {
       return;
     }
 
-    if (_enabled && !_disposed && _token.isNotEmpty) {
+    if (_enabled && !_disposed && !_isNetworkBlocked && _token.isNotEmpty) {
       _reconnectAttempts++;
       if (_reconnectAttempts > maxReconnectAttempts) {
         debugPrint(
@@ -458,7 +478,7 @@ class DiscordRpcService {
       final delaySeconds =
           math.min(60, 5 * (1 << (_reconnectAttempts - 1)));
       _reconnectTimer = Timer(Duration(seconds: delaySeconds), () {
-        if (_enabled && !_disposed && !_isConnected) {
+        if (_enabled && !_disposed && !_isNetworkBlocked && !_isConnected) {
           connect();
         }
       });
@@ -469,7 +489,7 @@ class DiscordRpcService {
   void reconnect() {
     disconnect();
     _reconnectAttempts = 0;
-    if (_enabled && _token.isNotEmpty) {
+    if (_enabled && !_isNetworkBlocked && _token.isNotEmpty) {
       connect();
     }
   }
@@ -483,7 +503,7 @@ class DiscordRpcService {
     _heartbeatTimer = null;
     _isConnected = false;
     _sessionReady = false;
-    _webSocket?.close();
+    unawaited(_webSocket?.close().catchError((Object _) {}));
     _webSocket = null;
   }
 
@@ -521,8 +541,14 @@ class DiscordRpcService {
           _sequence = 0;
           _sessionId = null;
           _resumeGatewayUrl = null;
+          final gen = _connectGeneration;
           Future.delayed(const Duration(milliseconds: 150), () {
-            if (!_disposed && _isConnected) _sendIdentify();
+            if (!_disposed &&
+                _isConnected &&
+                gen == _connectGeneration &&
+                !_isNetworkBlocked) {
+              _sendIdentify();
+            }
           });
           break;
 
@@ -632,8 +658,9 @@ class DiscordRpcService {
 
   /// Proxies external image URLs onto Discord CDN via external-assets API.
   Future<String?> fetchExternalAsset(String imageUrl) async {
+    if (_isNetworkBlocked) return null;
     if (imageUrl.startsWith('mp:')) return imageUrl;
-    if (!imageUrl.startsWith('http://') && !imageUrl.startsWith('https://')) {
+    if (!isSafeRemoteArtworkUrl(imageUrl)) {
       return null;
     }
     final cached = _externalAssetCache.remove(imageUrl);
@@ -685,10 +712,12 @@ class DiscordRpcService {
     double playbackSpeed = 1.0,
     bool isPlaying = true,
   }) async {
-    if (!_enabled || _token.isEmpty) return;
+    if (_disposed || !_enabled || _token.isEmpty || _isNetworkBlocked) return;
 
+    final epoch = ++_presenceEpoch;
     final nowMs = DateTime.now().millisecondsSinceEpoch;
-    final speed = playbackSpeed > 0 ? playbackSpeed : 1.0;
+    final speed =
+        (playbackSpeed.isFinite && playbackSpeed > 0) ? playbackSpeed : 1.0;
 
     final adjustedPosMs = (position.inMilliseconds / speed).round();
     final startTime = nowMs - adjustedPosMs;
@@ -709,6 +738,7 @@ class DiscordRpcService {
         artUrl.isNotEmpty &&
         isSafeRemoteArtworkUrl(artUrl)) {
       final proxied = await fetchExternalAsset(artUrl);
+      if (_disposed || epoch != _presenceEpoch || _isNetworkBlocked) return;
       if (proxied != null) {
         largeImage = proxied;
       } else {
@@ -756,6 +786,10 @@ class DiscordRpcService {
       'afk': true,
     };
 
+    if (_disposed || epoch != _presenceEpoch || !_enabled || _isNetworkBlocked) {
+      return;
+    }
+
     _lastPresencePayload = presencePayload;
 
     if (!_isConnected) {
@@ -770,6 +804,7 @@ class DiscordRpcService {
 
   /// Clears user activity from Discord presence.
   Future<void> clearPresence() async {
+    ++_presenceEpoch;
     final clearPayload = {
       'since': 0,
       'activities': [],
@@ -859,7 +894,11 @@ class DiscordRpcService {
     final position = state.position;
     final duration = state.duration;
 
-    if (!isPlaying || song == null) {
+    // Privacy/Pure/offline gate: never broadcast Quran recitation or offline/Pure playback.
+    if (!isPlaying ||
+        song == null ||
+        state.isQuranModeEnabled ||
+        _isNetworkBlocked) {
       if (_lastIsPlaying == true) {
         unawaited(clearPresence());
       }
@@ -907,8 +946,12 @@ class DiscordRpcService {
 
   void dispose() {
     _disposed = true;
+    ++_presenceEpoch;
     _playerSub?.cancel();
     _playerSub = null;
     disconnect();
+    if (_ownsClient && !identical(this, instance)) {
+      _httpClient.close();
+    }
   }
 }

@@ -225,8 +225,12 @@ class ArtworkCacheManager {
       int total = 0;
       final entities = await _cacheDir!.list(followLinks: false).toList();
       for (final entity in entities) {
-        if (entity is File) {
-          total += await entity.length();
+        if (entity is File && !entity.path.endsWith('.tmp')) {
+          try {
+            total += await entity.length();
+          } catch (_) {
+            // Concurrent eviction or temp cleanup may remove a file mid-scan.
+          }
         }
       }
       return total;
@@ -306,8 +310,11 @@ class ArtworkCacheManager {
         await Isolate.run(() {
           final dir = Directory(dirPath);
           if (!dir.existsSync()) return;
-          final entities =
-              dir.listSync(followLinks: false).whereType<File>().toList();
+          final entities = dir
+              .listSync(followLinks: false)
+              .whereType<File>()
+              .where((f) => !f.path.endsWith('.tmp'))
+              .toList();
 
           int currentSize = 0;
           final fileList = <({File file, int size, int modifiedMs})>[];
@@ -364,9 +371,13 @@ class ArtworkCacheManager {
   /// Returns a low-quality, compressed URL for online artworks (reduces size from 1MB+ down to ~15KB)
   static String toLowQualityArtworkUrl(String url,
       {int width = 200, int height = 200}) {
+    final uri = Uri.tryParse(url);
+    final host = uri?.host.toLowerCase() ?? '';
     var transformed = url;
-    if (transformed.contains('googleusercontent.com') ||
-        transformed.contains('ggpht.com')) {
+    if (host == 'googleusercontent.com' ||
+        host.endsWith('.googleusercontent.com') ||
+        host == 'ggpht.com' ||
+        host.endsWith('.ggpht.com')) {
       final sizePattern = RegExp(r'=(?:w\d+-h\d+|s\d+)[^?]*');
       if (sizePattern.hasMatch(transformed)) {
         transformed =
@@ -381,7 +392,7 @@ class ArtworkCacheManager {
           transformed = '$transformed=w$width-h$height-l80-rj';
         }
       }
-    } else if (transformed.contains('ytimg.com')) {
+    } else if (host == 'ytimg.com' || host.endsWith('.ytimg.com')) {
       // Use standard default/hqdefault thumbnail instead of maxresdefault for low memory
       transformed =
           transformed.replaceAll('maxresdefault.jpg', 'hqdefault.jpg');

@@ -130,5 +130,79 @@ void main() {
           reason: 'ErrorLogger.log already captures; capturing in the hook '
               'would report every crash to Sentry twice');
     });
+
+    test('redactMap recursively scrubs nested maps, lists, keys, emails, and JWTs',
+        () {
+      const sampleJwt =
+          'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c';
+      final redacted = ErrorLogger.redactMap({
+        'songId': 7,
+        'nested': {
+          'authorization': 'secret-header',
+          'note': 'user a@example.com with $sampleJwt',
+          'items': [
+            {'cookie': 'abc=123'},
+            'access_token=topsecret999',
+          ],
+        },
+      });
+
+      expect(redacted['songId'], 7);
+      final nested = redacted['nested'] as Map<String, dynamic>;
+      expect(nested['authorization'], '[REDACTED_TOKEN]');
+      expect(nested['note'], contains('[REDACTED_EMAIL]'));
+      expect(nested['note'], isNot(contains('SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c')));
+      final items = nested['items'] as List<dynamic>;
+      expect((items[0] as Map<String, dynamic>)['cookie'], '[REDACTED_TOKEN]');
+      expect(items[1], contains('[REDACTED_TOKEN]'));
+    });
+
+    test('redactValue bounds deep nesting without stack overflow', () {
+      var deep = <String, dynamic>{'leaf': 'value'};
+      for (var i = 0; i < 24; i++) {
+        deep = {'child': deep};
+      }
+      final result = ErrorLogger.redactValue(deep);
+      expect(result, isA<Map<String, dynamic>>());
+    });
+
+    test('redactPii scrubs full forward/backslash user paths and JWTs; Sentry payload helpers redact errors',
+        () {
+      const sampleJwt =
+          'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c';
+      final winBackslash = ErrorLogger.redactPii(
+          r'Open C:\Users\alice\Music\private_album\track.flac failed');
+      expect(winBackslash, contains('[REDACTED_USER_PATH]'));
+      expect(winBackslash, isNot(contains('alice')));
+      expect(winBackslash, isNot(contains('private_album')));
+      expect(winBackslash, isNot(contains('track.flac')));
+
+      final winForward = ErrorLogger.redactPii(
+          'Open C:/Users/alice/Desktop/secret_key.json failed');
+      expect(winForward, contains('[REDACTED_USER_PATH]'));
+      expect(winForward, isNot(contains('alice')));
+      expect(winForward, isNot(contains('secret_key.json')));
+
+      final unixPath = ErrorLogger.redactPii('/home/bob/Music/secret.mp3');
+      expect(unixPath, contains('[REDACTED_USER_PATH]'));
+      expect(unixPath, isNot(contains('bob')));
+      expect(unixPath, isNot(contains('secret.mp3')));
+
+      expect(ErrorLogger.redactPii('auth=$sampleJwt'), isNot(contains(sampleJwt)));
+
+      final sanitizedErr = ErrorLogger.sanitizeErrorForReport(
+        Exception(r'token=tok_123 for C:\Users\alice\Downloads\file.mp3'),
+      );
+      expect(sanitizedErr.toString(), isNot(contains('tok_123')));
+      expect(sanitizedErr.toString(), isNot(contains('alice')));
+      expect(sanitizedErr.toString(), contains('[REDACTED_TOKEN]'));
+      expect(sanitizedErr.toString(), contains('[REDACTED_USER_PATH]'));
+
+      final st = StackTrace.fromString(
+          '#0 main (file:///Users/alice/dev/pulsr/lib/secret.dart:42:5)');
+      final sanitizedSt = ErrorLogger.sanitizeStackTrace(st);
+      expect(sanitizedSt.toString(), isNot(contains('alice')));
+      expect(sanitizedSt.toString(), contains('[REDACTED_USER_PATH]'));
+    });
   });
 }

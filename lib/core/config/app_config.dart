@@ -117,12 +117,26 @@ class AppConfig {
     return flavor.toLowerCase();
   }
 
-  static AppEnvironment get environment {
-    final lowerFlavor = effectiveFlavor;
+  /// Resolves [AppEnvironment] from the effective build flavor and runtime
+  /// environment define. Explicit `dev`/`ytm` flavors never escalate to
+  /// `prod` (preventing `isPure` from enabling without a Pure manifest).
+  @visibleForTesting
+  static AppEnvironment resolveEnvironment({
+    required String flavorValue,
+    required String envValue,
+    String? platformFlavorValue,
+  }) {
+    final lowerFlavor =
+        (platformFlavorValue != null && platformFlavorValue.isNotEmpty)
+            ? platformFlavorValue.toLowerCase()
+            : flavorValue.toLowerCase();
     if (lowerFlavor == 'prod') {
       return AppEnvironment.prod;
     }
-    switch (envName.toLowerCase()) {
+    if (lowerFlavor == 'dev' || lowerFlavor == 'ytm') {
+      return AppEnvironment.dev;
+    }
+    switch (envValue.toLowerCase()) {
       case 'prod':
       case 'production':
         return AppEnvironment.prod;
@@ -132,6 +146,12 @@ class AppConfig {
         return AppEnvironment.dev;
     }
   }
+
+  static AppEnvironment get environment => resolveEnvironment(
+        flavorValue: flavor,
+        envValue: envName,
+        platformFlavorValue: appFlavor,
+      );
 
   static bool get isProd => environment == AppEnvironment.prod;
   static bool get isDev => environment == AppEnvironment.dev;
@@ -181,28 +201,43 @@ class AppConfig {
   }
 
   /// Validates that build flavor and runtime environment configuration are aligned.
-  static void validateConfiguration() {
-    final lowerFlavor = effectiveFlavor;
-    if (const bool.hasEnvironment('ENV') &&
-        lowerFlavor == 'prod' &&
-        envName.toLowerCase() == 'dev') {
+  static void validateConfiguration() => validateResolvedConfiguration(
+        flavorValue: effectiveFlavor,
+        envValue: envName,
+        isYtmEnabled: ytmEnabled,
+        hasEnvDefine: const bool.hasEnvironment('ENV'),
+      );
+
+  /// Pure validator backing [validateConfiguration] so all flavor/ENV matrices
+  /// can be verified directly in unit tests.
+  @visibleForTesting
+  static void validateResolvedConfiguration({
+    required String flavorValue,
+    required String envValue,
+    required bool isYtmEnabled,
+    bool hasEnvDefine = true,
+  }) {
+    final lowerFlavor = flavorValue.toLowerCase();
+    final lowerEnv = envValue.toLowerCase();
+    if (hasEnvDefine && lowerFlavor == 'prod' && lowerEnv == 'dev') {
       throw StateError('CRITICAL: Production flavor cannot run with ENV=dev');
     }
-    if (envName.toLowerCase() == 'prod' && lowerFlavor == 'dev') {
-      ErrorLogger.log(
-        'Warning: Running flavor "dev" with ENV=prod. Features may behave as production in development build.',
-        category: 'AppConfig',
+    if ((lowerEnv == 'prod' || lowerEnv == 'production') &&
+        lowerFlavor == 'dev') {
+      throw StateError(
+        'CRITICAL: Flavor "dev" cannot run with ENV=$envValue because a dev '
+        'build retains non-Pure manifest permissions.',
       );
     }
     // Play Store compliance: the dedicated "prod" flavor MUST NOT have YouTube Music enabled
-    if (lowerFlavor == 'prod' && ytmEnabled) {
+    if (lowerFlavor == 'prod' && isYtmEnabled) {
       throw StateError(
         'CRITICAL: Production Play Store builds (flavor "prod") must not enable YouTube Music features (ENABLE_YTM=true). Use flavor "ytm" for YTM builds.',
       );
     }
-    if ((lowerFlavor == 'dev' || lowerFlavor == 'ytm') && !ytmEnabled) {
+    if ((lowerFlavor == 'dev' || lowerFlavor == 'ytm') && !isYtmEnabled) {
       ErrorLogger.log(
-        'Flavor is "$effectiveFlavor" (native NewPipe bridge compiled) but Dart gate ENABLE_YTM is false. Run with --dart-define=ENABLE_YTM=true to activate YTM features.',
+        'Flavor is "$flavorValue" (native NewPipe bridge compiled) but Dart gate ENABLE_YTM is false. Run with --dart-define=ENABLE_YTM=true to activate YTM features.',
         category: 'AppConfig',
       );
     }

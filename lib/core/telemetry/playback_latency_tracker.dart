@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:injectable/injectable.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 
+import '../config/app_config.dart';
 import '../utils/error_logger.dart';
 import 'clock.dart';
 
@@ -164,20 +165,26 @@ class PlaybackLatencyTracker {
       _finishInternal(success: false, failureStage: 'superseded', endTime: now);
     }
     final playId = _generatePlayId(videoId, now);
+    final canUseSentry = AppConfig.isTelemetryAllowed && Sentry.isEnabled;
     ISentrySpan? transaction;
     try {
       transaction = _transactionFactory != null
           ? _transactionFactory!(videoId, now)
-          : Sentry.startTransaction(
-              'playback:$videoId',
-              'playback',
-              description: 'tap-to-audible for $videoId',
-              startTimestamp: now,
-              bindToScope: false,
-            );
-      transaction?.setTag('videoId', videoId);
-      if (quality != null) transaction?.setTag('quality', quality);
-    } catch (_) {
+          : (canUseSentry
+              ? Sentry.startTransaction(
+                  'playback.tap_to_audible',
+                  'playback',
+                  description: 'tap-to-audible latency',
+                  startTimestamp: now,
+                  bindToScope: false,
+                )
+              : null);
+      if (transaction != null && quality != null) {
+        transaction.setTag('quality', quality);
+      }
+    } catch (e, st) {
+      ErrorLogger.log('Failed to start latency transaction',
+          error: e, stackTrace: st, category: 'PlaybackLatency');
       transaction = null;
     }
     final session = _Session(
@@ -203,7 +210,10 @@ class PlaybackLatencyTracker {
   Duration? markStageAt(PlaybackStage stage, DateTime timestamp,
       {Map<String, dynamic>? data}) {
     if (_disposed || _active == null || _active!.closed) return null;
-    return _markInternal(stage, at: timestamp, data: data);
+    final clamped = timestamp.isBefore(_active!.startTime)
+        ? _active!.startTime
+        : timestamp;
+    return _markInternal(stage, at: clamped, data: data);
   }
 
   Duration _markInternal(PlaybackStage stage,
@@ -304,7 +314,7 @@ class PlaybackLatencyTracker {
   PlaybackLatencyReport? finishWithError(Object error, {PlaybackStage? stage}) {
     if (_disposed || _active == null || _active!.closed) return null;
     final now = _clock.now();
-    final stageName = stage?.name ?? error.toString();
+    final stageName = stage?.name ?? ErrorLogger.redactPii(error.toString());
     return _finishInternal(
         success: false, failureStage: stageName, endTime: now);
   }
@@ -316,7 +326,9 @@ class PlaybackLatencyTracker {
   }) {
     final session = _active!;
     session.closed = true;
-    final total = endTime.difference(session.startTime);
+    final effectiveEnd =
+        endTime.isBefore(session.startTime) ? session.startTime : endTime;
+    final total = effectiveEnd.difference(session.startTime);
     final bucket = bucketFor(total);
 
     // Compute stage offsets (from tap) and incremental durations
@@ -328,11 +340,13 @@ class PlaybackLatencyTracker {
     for (final stage in PlaybackStage.values) {
       final t = session.stageTimes[stage];
       if (t != null) {
-        offsets[stage] = t.difference(session.startTime);
+        final rawOffset = t.difference(session.startTime);
+        offsets[stage] = rawOffset.isNegative ? Duration.zero : rawOffset;
         if (prevStage != null && prev != null) {
-          durations[stage] = t.difference(prev);
+          final rawDur = t.difference(prev);
+          durations[stage] = rawDur.isNegative ? Duration.zero : rawDur;
         } else {
-          durations[stage] = t.difference(session.startTime);
+          durations[stage] = offsets[stage]!;
         }
         prev = t;
         prevStage = stage;
@@ -347,7 +361,7 @@ class PlaybackLatencyTracker {
       playId: session.playId,
       videoId: session.videoId,
       startedAt: session.startTime,
-      finishedAt: endTime,
+      finishedAt: effectiveEnd,
       total: total,
       stageOffsets: offsets,
       stageDurations: durations,
@@ -357,13 +371,15 @@ class PlaybackLatencyTracker {
     );
 
     // Emit transaction finish + debug summary
+    final safeFailureStage =
+        failureStage == null ? null : ErrorLogger.redactPii(failureStage);
     try {
       if (session.transaction != null) {
         session.transaction!.setData('totalMs', total.inMilliseconds);
         session.transaction!.setData('bucket', bucket.name);
         session.transaction!.setData('success', success);
-        if (failureStage != null) {
-          session.transaction!.setData('failureStage', failureStage);
+        if (safeFailureStage != null) {
+          session.transaction!.setData('failureStage', safeFailureStage);
         }
         for (final entry in offsets.entries) {
           session.transaction!.setData(
@@ -373,22 +389,24 @@ class PlaybackLatencyTracker {
           status: success ? SpanStatus.ok() : SpanStatus.internalError(),
           endTimestamp: endTime,
         );
-      } else if (!Sentry.isEnabled) {
-        // Ensure breadcrumb for finish
+      } else {
+        // Ensure breadcrumb for finish when no Sentry transaction is active
         ErrorLogger.addBreadcrumb(
           'Playback ${success ? "success" : "failure"} total ${total.inMilliseconds}ms bucket ${bucket.name}',
           category: 'playback.latency',
           data: {
-            'videoId': session.videoId,
             'playId': session.playId,
             'totalMs': total.inMilliseconds,
             'bucket': bucket.name,
             'success': success,
-            if (failureStage != null) 'failureStage': failureStage,
+            if (safeFailureStage != null) 'failureStage': safeFailureStage,
           },
         );
       }
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Failed to emit latency telemetry',
+          error: e, stackTrace: st, category: 'PlaybackLatency');
+    }
 
     _emitSummary(report);
     _history.add(report);

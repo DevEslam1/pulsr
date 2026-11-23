@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:material_ui/material_ui.dart';
 import '../constants/app_radii.dart';
 import '../constants/app_spacing.dart';
@@ -48,12 +50,24 @@ class PulsrResponsiveSheet {
         builder: (ctx) {
           final double effectiveMaxWidth =
               maxWidth ?? PulsrSheetMetrics.dialogMaxWidth(ctx);
+          final media = MediaQuery.of(ctx);
+          final availableHeight = math.max(
+            AppSpacing.s56,
+            media.size.height -
+                media.viewInsets.bottom -
+                media.padding.vertical -
+                AppSpacing.lg,
+          );
+          final double effectiveMaxHeight = math.min(
+            maxHeight ?? PulsrSheetMetrics.dialogMaxHeight(ctx),
+            availableHeight,
+          );
 
           return Center(
             child: ConstrainedBox(
               constraints: BoxConstraints(
                 maxWidth: effectiveMaxWidth,
-                maxHeight: maxHeight ?? PulsrSheetMetrics.dialogMaxHeight(ctx),
+                maxHeight: effectiveMaxHeight,
               ),
               child: Dialog(
                 backgroundColor: Colors.transparent,

@@ -446,7 +446,20 @@ class AudioSessionLog {
     final lines = await _readLines(file);
     if (lines.length <= maxSessions) return;
     final kept = lines.sublist(lines.length - maxSessions);
-    await file.writeAsString('${kept.join('\n')}\n', flush: true);
+    await _atomicWriteString(file, '${kept.join('\n')}\n');
+  }
+
+  Future<void> _atomicWriteString(File target, String contents) async {
+    final tmpFile = File('${target.path}.tmp');
+    try {
+      await tmpFile.writeAsString(contents, flush: true);
+      await tmpFile.rename(target.path);
+    } catch (_) {
+      if (await tmpFile.exists()) {
+        await tmpFile.delete().catchError((_) => tmpFile);
+      }
+      rethrow;
+    }
   }
 
   Future<List<String>> _readLines(File file) async {
@@ -506,7 +519,7 @@ class AudioSessionLog {
           for (final record in records) {
             buffer.writeln(jsonEncode(record.toJson()));
           }
-          await exportFile.writeAsString(buffer.toString(), flush: true);
+          await _atomicWriteString(exportFile, buffer.toString());
           return exportFile;
         } catch (e, st) {
           ErrorLogger.log('Audio session log export failed',

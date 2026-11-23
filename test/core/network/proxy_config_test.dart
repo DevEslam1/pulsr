@@ -205,5 +205,26 @@ void main() {
       expect(restored.latencyMs, 120);
       expect(restored.isWorking, true);
     });
+
+    test('rejects CRLF, whitespace, and semicolons in proxy host and normalizes IPv6 bypass',
+        () {
+      expect(
+        const ProxyConfig(enabled: true, host: 'proxy.local\r\nEvil: 1', port: 8080)
+            .isValid,
+        isFalse,
+      );
+      expect(
+        const ProxyConfig(enabled: true, host: 'proxy.local;bad', port: 8080)
+            .isValid,
+        isFalse,
+      );
+      const cfg = ProxyConfig(
+        enabled: true,
+        host: '93.184.216.34',
+        port: 8080,
+        bypassHosts: '[::1], localhost',
+      );
+      expect(cfg.isBypassed(Uri.parse('http://[::1]:8080/test')), isTrue);
+    });
   });
 }

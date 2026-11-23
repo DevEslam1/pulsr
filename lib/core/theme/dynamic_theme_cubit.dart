@@ -6,12 +6,10 @@ import 'package:material_ui/material_ui.dart';
 import 'package:injectable/injectable.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import 'package:palette_generator/palette_generator.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../data/db/app_database.dart';
 import '../bloc/base_cubit.dart';
-import '../config/app_config.dart';
 import '../constants/app_colors.dart';
-import '../constants/prefs_keys.dart';
+import '../network/network_access_guard.dart';
 import '../network/remote_target_policy.dart';
 import '../services/artwork_cache_manager.dart';
 import '../utils/error_logger.dart';
@@ -214,6 +212,7 @@ class DynamicThemeCubit extends PulsrCubit<DynamicThemeState> {
       required String cacheKey,
       required int token,
       _CachedPalette? expiredFallback}) async {
+    if (isClosed) return;
     // FIX-C01 / H1 FIX: Queue pending request if an extraction is already in flight
     if (_pendingExtraction) {
       _queuedRequest = _QueuedThemeRequest(
@@ -261,14 +260,9 @@ class DynamicThemeCubit extends PulsrCubit<DynamicThemeState> {
                 remoteArtworkUrl,
                 width: 220,
                 height: 220);
-            bool offline = false;
-            try {
-              final prefs = await SharedPreferences.getInstance();
-              offline = prefs.getBool(PrefsKeys.offlineOnlyMode) == true;
-            } catch (_) {}
-            if (AppConfig.isCloudSyncAllowed &&
-                !offline &&
-                RemoteTargetPolicy.isAllowed(lowResUrl)) {
+            final blocked =
+                await NetworkAccessGuard.isBlocked(category: 'DynamicTheme');
+            if (!blocked && RemoteTargetPolicy.isAllowed(lowResUrl)) {
               imageProvider =
                   ResizeImage(NetworkImage(lowResUrl), width: 128, height: 128);
             }
@@ -345,7 +339,9 @@ class DynamicThemeCubit extends PulsrCubit<DynamicThemeState> {
               primary.withValues(alpha: 0.08), AppColors.surface),
         );
 
-        if (_cachedPalettes.length >= _maxCacheSize) {
+        if (_cachedPalettes.containsKey(cacheKey)) {
+          _cachedPalettes.remove(cacheKey);
+        } else if (_cachedPalettes.length >= _maxCacheSize) {
           _cachedPalettes.remove(_cachedPalettes.keys.first);
         }
         _cachedPalettes[cacheKey] = newPalette;

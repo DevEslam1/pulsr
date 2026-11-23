@@ -70,7 +70,7 @@ void main() {
   }
 
   group('notifyPlaybackState broadcast gating', () {
-    test('always broadcasts and skips REST for Quran recitation', () async {
+    test('skips both Android broadcast and REST for Quran recitation', () async {
       await service.notifyPlaybackState(
         id: 1,
         artist: 'Reciter',
@@ -81,7 +81,26 @@ void main() {
         isPlaying: true,
         isQuran: true,
       );
-      expect(methodCalls.single.method, 'broadcastPlaybackState');
+      expect(methodCalls, isEmpty);
+      expect(httpRequests, isEmpty);
+    });
+
+    test('skips Android broadcast when offlineOnlyMode is enabled', () async {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('setting_offline_only_mode', true);
+      await enableLastFm();
+
+      await service.notifyPlaybackState(
+        id: 101,
+        artist: 'Artist',
+        track: 'Track',
+        album: 'Album',
+        durationMs: 200000,
+        positionMs: 120000,
+        isPlaying: true,
+      );
+
+      expect(methodCalls, isEmpty);
       expect(httpRequests, isEmpty);
     });
 
@@ -342,6 +361,104 @@ void main() {
       final prefs = await SharedPreferences.getInstance();
       expect(prefs.getString(ScrobblerService.keyLastFmApiKey), isNull);
       expect(prefs.getString(ScrobblerService.keyLastFmSecret), isNull);
+    });
+  });
+
+  group('HTTP 200 API error handling, Libre.fm signing, and restart detection', () {
+    test('retries HTTP 200 transient JSON error and avoids poisoning dedup key when all fail',
+        () async {
+      final errClient = MockClient((request) async {
+        httpRequests.add(request);
+        return http.Response(jsonEncode({'error': 16, 'message': 'Temporary error'}), 200);
+      });
+      final errService = ScrobblerService(errClient, secure);
+      errService.scrobbleThrottle = Duration.zero;
+      await enableLastFm();
+
+      await errService.notifyPlaybackState(
+        id: 77,
+        artist: 'Artist 77',
+        track: 'Track 77',
+        album: 'Album',
+        durationMs: 200000,
+        positionMs: 120000,
+        isPlaying: true,
+      );
+
+      expect(httpRequests.length, greaterThan(1));
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('last_scrobble_key'), isNull);
+      expect(prefs.getString('scrobbler_offline_queue'), contains('Track 77'));
+    }, timeout: const Timeout(Duration(seconds: 30)));
+
+    test('signs Libre.fm Now Playing and Scrobble requests with api_key and api_sig',
+        () async {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(ScrobblerService.keyLibreFmEnabled, true);
+      await prefs.setString(ScrobblerService.keyLibreFmApiKey, 'libre_key');
+      await prefs.setString(ScrobblerService.keyLibreFmSecret, 'libre_secret');
+      await prefs.setString(
+          ScrobblerService.keyLibreFmSessionKey, 'libre_session');
+
+      await service.notifyPlaybackState(
+        id: 88,
+        artist: 'Libre Artist',
+        track: 'Libre Track',
+        album: 'Libre Album',
+        durationMs: 200000,
+        positionMs: 120000,
+        isPlaying: true,
+      );
+
+      final npReq = httpRequests
+          .where((r) =>
+              r.url.host == 'libre.fm' &&
+              r.body.contains('track.updateNowPlaying'))
+          .toList();
+      final scrobbleReq = httpRequests
+          .where((r) =>
+              r.url.host == 'libre.fm' && r.body.contains('track.scrobble'))
+          .toList();
+
+      expect(npReq, isNotEmpty);
+      expect(npReq.first.body, contains('api_key=libre_key'));
+      expect(npReq.first.body, contains('api_sig='));
+      expect(scrobbleReq, isNotEmpty);
+      expect(scrobbleReq.first.body, contains('api_key=libre_key'));
+      expect(scrobbleReq.first.body, contains('api_sig='));
+    });
+
+    test('same-track restart clears now playing/scrobble lock and re-announces',
+        () async {
+      await enableLastFm();
+
+      await service.notifyPlaybackState(
+        id: 99,
+        artist: 'Loop Artist',
+        track: 'Loop Track',
+        album: 'Album',
+        durationMs: 200000,
+        positionMs: 120000,
+        isPlaying: true,
+      );
+      final firstNpCount = httpRequests
+          .where((r) => r.body.contains('track.updateNowPlaying'))
+          .length;
+      expect(firstNpCount, 1);
+
+      await service.notifyPlaybackState(
+        id: 99,
+        artist: 'Loop Artist',
+        track: 'Loop Track',
+        album: 'Album',
+        durationMs: 200000,
+        positionMs: 1000,
+        isPlaying: true,
+      );
+      final secondNpCount = httpRequests
+          .where((r) => r.body.contains('track.updateNowPlaying'))
+          .length;
+      expect(secondNpCount, 2);
     });
   });
 }

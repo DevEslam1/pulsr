@@ -5,6 +5,7 @@ import 'package:pulsr/services/canvas/apple_music_canvas.dart';
 import 'package:pulsr/services/canvas/canvas_repository.dart';
 import 'package:pulsr/services/canvas/community_canvas.dart';
 import 'package:pulsr/services/canvas/tidal_canvas.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class _FakeCommunity extends CommunityCanvas {
   _FakeCommunity(this.answer);
@@ -43,7 +44,13 @@ class _FakeCache extends CanvasCache {
 }
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   group('CanvasRepository', () {
+    setUp(() {
+      SharedPreferences.setMockInitialValues({});
+    });
+
     test('prefers Community Canvas when available (Source 1)', () async {
       final repo = CanvasRepository(
         cache: _FakeCache(),
