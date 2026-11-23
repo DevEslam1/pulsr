@@ -19,6 +19,7 @@ import '../../../core/widgets/pulsr_dialog.dart';
 import '../../../core/widgets/pulsr_page_pop_scope.dart';
 import '../../../core/widgets/pulsr_segmented_control.dart';
 import '../../../core/widgets/pulsr_toast.dart';
+import '../../../core/widgets/shimmer_skeleton.dart';
 import '../../../data/db/app_database.dart';
 import '../../../domain/repositories/music_repository_interface.dart';
 import '../../player/cubit/player_cubit.dart';
@@ -121,10 +122,10 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
       ..sort((a, b) => b.playCount.compareTo(a.playCount));
     final topSongs = topPlayed.where((s) => s.playCount > 0).take(10).toList();
 
-    // Top artists by total song plays
+    // Top artists by total song plays (scoped by selected time range)
     final Map<String, int> artistPlayCounts = {};
     final Map<String, int> artistTrackCounts = {};
-    for (final s in songs) {
+    for (final s in statsSongs) {
       final artistName = s.artist.trim();
       if (artistName.isEmpty || artistName == 'Unknown Artist') {
         continue;
@@ -300,6 +301,18 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
         ),
         body: BlocBuilder<LibraryCubit, LibraryState>(
           builder: (context, state) {
+            if (_allSongs == null &&
+                _loadError == null &&
+                _musicRepository != null) {
+              return SkeletonList(
+                padding: EdgeInsetsDirectional.fromSTEB(
+                  AppSpacing.s20,
+                  AppSpacing.sm,
+                  AppSpacing.s20,
+                  PulsrLayoutMetrics.scrollBottom(context),
+                ),
+              );
+            }
             final songs = _allSongs ?? state.songs;
             final artists = state.artists;
             final albums = state.albums;

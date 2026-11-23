@@ -104,13 +104,17 @@ class _SmartPlaylistBuilderViewState extends State<_SmartPlaylistBuilderView> {
                 children: [
                   Icon(Icons.auto_awesome_rounded, color: p.accent, size: 22),
                   const SizedBox(width: AppSpacing.xs),
-                  Text(
-                    state.isEditing
-                        ? context.l10n.editPlaylist
-                        : context.l10n.createSmartPlaylist,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: AppFontSize.title),
+                  Expanded(
+                    child: Text(
+                      state.isEditing
+                          ? context.l10n.editPlaylist
+                          : context.l10n.createSmartPlaylist,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: AppFontSize.title),
+                    ),
                   ),
                 ],
               ),
@@ -169,14 +173,20 @@ class _SmartPlaylistBuilderViewState extends State<_SmartPlaylistBuilderView> {
                             return ActionChip(
                               avatar: Icon(Icons.auto_awesome_rounded,
                                   size: 16, color: p.accent),
-                              label: Text(entry.key),
+                              label: Text(_localizedTemplateTitle(
+                                  context.l10n, entry.key)),
                               onPressed: () {
+                                if (_limitError != null) {
+                                  setState(() => _limitError = null);
+                                }
                                 cubit.applyTemplate(entry.value);
                                 _limitController.text =
                                     entry.value.limit?.toString() ?? '';
                                 if (_nameController.text.trim().isEmpty) {
-                                  _nameController.text = entry.key;
-                                  cubit.updateName(entry.key);
+                                  final label = _localizedTemplateTitle(
+                                      context.l10n, entry.key);
+                                  _nameController.text = label;
+                                  cubit.updateName(label);
                                 }
                               },
                             );
@@ -318,11 +328,7 @@ class _SmartPlaylistBuilderViewState extends State<_SmartPlaylistBuilderView> {
                     ...List.generate(state.criteria.rules.length, (index) {
                       final rule = state.criteria.rules[index];
                       return _RuleCard(
-                        // Recreate the row when the rule at this position
-                        // changes so the dropdowns never display the deleted
-                        // neighbour's field/operator.
-                        key: ValueKey(
-                            '$index-${rule.field.name}-${rule.operator.name}'),
+                        key: ValueKey('rule_$index'),
                         rule: rule,
                         onChanged: (updated) =>
                             cubit.updateRule(index, updated),
@@ -368,12 +374,15 @@ class _SmartPlaylistBuilderViewState extends State<_SmartPlaylistBuilderView> {
                                               DropdownButtonFormField<String>(
                                             initialValue: const {
                                               'title',
+                                              'artist',
+                                              'album',
                                               'dateAdded',
                                               'playCount',
                                               'lastPlayed',
                                               'durationMs',
                                               'year',
                                               'rating',
+                                              'bpm',
                                             }.contains(state.criteria.sortBy)
                                                 ? state.criteria.sortBy!
                                                 : 'title',
@@ -396,6 +405,14 @@ class _SmartPlaylistBuilderViewState extends State<_SmartPlaylistBuilderView> {
                                                   value: 'title',
                                                   child: Text(
                                                       context.l10n.titleLabel)),
+                                              DropdownMenuItem(
+                                                  value: 'artist',
+                                                  child: Text(
+                                                      context.l10n.artist)),
+                                              DropdownMenuItem(
+                                                  value: 'album',
+                                                  child: Text(
+                                                      context.l10n.album)),
                                               DropdownMenuItem(
                                                   value: 'dateAdded',
                                                   child: Text(context
@@ -420,6 +437,10 @@ class _SmartPlaylistBuilderViewState extends State<_SmartPlaylistBuilderView> {
                                                   value: 'rating',
                                                   child: Text(
                                                       context.l10n.ruleRating)),
+                                              DropdownMenuItem(
+                                                  value: 'bpm',
+                                                  child: Text(context.l10n
+                                                      .smartCriteriaFieldBpm)),
                                             ],
                                             onChanged: (val) =>
                                                 cubit.setSortBy(val),
@@ -697,6 +718,7 @@ class _RuleCardState extends State<_RuleCard> {
                   child: Semantics(
                     label: context.l10n.smartFieldLabel,
                     child: DropdownButtonFormField<SmartRuleField>(
+                      key: ValueKey('field_${widget.rule.field.name}'),
                       initialValue: widget.rule.field,
                       decoration: InputDecoration(
                         filled: true,
@@ -823,14 +845,18 @@ class _RuleCardState extends State<_RuleCard> {
                 child: TextField(
                   controller: _valueController,
                   onChanged: (val) {
-                    widget.onChanged(widget.rule.copyWith(value: val));
+                    var normalized = val;
+                    if (widget.rule.field == SmartRuleField.durationMs) {
+                      normalized = _parseDurationInput(val);
+                    }
+                    widget.onChanged(widget.rule.copyWith(value: normalized));
                   },
                   keyboardType:
                       (widget.rule.field == SmartRuleField.playCount ||
                               widget.rule.field == SmartRuleField.year ||
                               widget.rule.field == SmartRuleField.decade ||
-                              widget.rule.field == SmartRuleField.durationMs ||
                               widget.rule.field == SmartRuleField.rating ||
+                              widget.rule.field == SmartRuleField.bpm ||
                               widget.rule.operator == SmartOperator.withinDays)
                           ? TextInputType.number
                           : TextInputType.text,
@@ -964,5 +990,32 @@ class _RuleCardState extends State<_RuleCard> {
       default:
         return l.smartPlaylistHintValueDefault;
     }
+  }
+
+  static String _parseDurationInput(String raw) {
+    final trimmed = raw.trim();
+    if (!trimmed.contains(':')) return raw;
+    final parts = trimmed.split(':');
+    if (parts.length == 2) {
+      final m = int.tryParse(parts[0].trim());
+      final s = int.tryParse(parts[1].trim());
+      if (m != null && s != null && m >= 0 && s >= 0 && s < 60) {
+        return ((m * 60 + s) * 1000).toString();
+      }
+    }
+    return raw;
+  }
+}
+
+String _localizedTemplateTitle(AppLocalizations l, String key) {
+  switch (key) {
+    case 'Recently Added':
+      return l.recentlyAdded;
+    case 'Most Played':
+      return l.mostPlayed;
+    case 'Top Rated':
+      return l.ruleRating;
+    default:
+      return key;
   }
 }

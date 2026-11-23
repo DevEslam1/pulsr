@@ -74,10 +74,7 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
       return;
     }
 
-    final downloadCubit = context.read<YtmDownloadCubit?>() ??
-        (getIt.isRegistered<YtmDownloadCubit>()
-            ? getIt<YtmDownloadCubit>()
-            : null);
+    final downloadCubit = context.read<YtmDownloadCubit?>();
     if (downloadCubit == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(context.l10n.downloadErrorDisabled)),
@@ -118,8 +115,8 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
   }
 
   Future<void> _syncYtmLikes(BuildContext context) async {
-    final accountService = getIt<YtmAccountService>();
-    if (!accountService.isLoggedIn) {
+    final libraryCubit = context.read<LibraryCubit>();
+    if (!libraryCubit.isYtmLoggedIn) {
       final success = await YtmWebLoginSheet.show(context);
       if (success != true) return;
     }
@@ -127,7 +124,6 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
     if (!context.mounted) return;
     final messenger = ScaffoldMessenger.of(context);
     final authCubit = context.read<AuthCubit>();
-    final libraryCubit = context.read<LibraryCubit>();
 
     messenger.showSnackBar(
       SnackBar(
@@ -356,23 +352,10 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
                           final authCubit = context.read<AuthCubit>();
 
                           try {
-                            final ytmService = getIt<YtmService>();
-                            var tracks =
-                                await ytmService.getPlaylistTracks(text);
+                            final count = await libraryCubit
+                                .importYtmPlaylistAsFavorites(text);
                             if (!ctx.mounted) return;
-                            if (tracks.isEmpty &&
-                                (text.contains('list=LM') ||
-                                    text.contains('list=LL') ||
-                                    text == 'LM' ||
-                                    text == 'LL')) {
-                              final ytmAccount = getIt<YtmAccountService>();
-                              if (ytmAccount.isLoggedIn) {
-                                tracks = await ytmAccount.fetchLikedSongs();
-                                if (!ctx.mounted) return;
-                              }
-                            }
-
-                            if (tracks.isEmpty) {
+                            if (count == 0) {
                               setSheetState(() {
                                 isLoading = false;
                                 errorText =
@@ -380,10 +363,6 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
                               });
                               return;
                             }
-
-                            final count = await libraryCubit
-                                .importYtmTracksAsFavorites(tracks);
-                            if (!ctx.mounted) return;
                             // A repository failure is reported as -1; keep the
                             // sheet open with an inline error instead of
                             // popping and claiming "Imported -1".

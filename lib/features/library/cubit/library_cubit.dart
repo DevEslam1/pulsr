@@ -1,7 +1,8 @@
 // lib/features/library/cubit/library_cubit.dart
 import 'dart:async';
 import 'dart:isolate';
-import 'package:flutter/foundation.dart' show visibleForTesting;
+import 'package:drift/drift.dart' show Value;
+import 'package:flutter/foundation.dart' show ValueNotifier, visibleForTesting;
 import 'package:fpdart/fpdart.dart';
 import 'package:injectable/injectable.dart';
 import 'package:mutex/mutex.dart';
@@ -13,6 +14,7 @@ import '../../../core/services/library_cache_manager.dart';
 import '../../../core/services/ytm_account_service.dart';
 import '../../../core/services/ytm_service.dart';
 import '../../../core/utils/error_logger.dart';
+import '../../../core/utils/l10n_holder.dart';
 import '../../../core/utils/song_classification.dart';
 import '../../../data/audio/song_rating_store.dart';
 import '../../../data/db/app_database.dart';
@@ -41,6 +43,8 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
   final ToggleFavoriteUseCase _toggleFavoriteUseCase;
   final FolderUseCases _folderUseCases;
   final IMusicRepository? _musicRepository;
+  final YtmService? _ytmService;
+  final YtmAccountService? _ytmAccountService;
 
   StreamSubscription? _songsSub;
   StreamSubscription? _albumsSub;
@@ -62,6 +66,11 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
   int _songsLimit = songsPageSize;
   bool _hasMoreSongs = false;
   bool _isLoadingMoreSongs = false;
+  List<SongsTableData>? _ratingSortedSongs;
+
+  /// True database song count from SQL `COUNT(*)` (distinct from the
+  /// paginated `state.songs.length` window).
+  final ValueNotifier<int?> totalSongCount = ValueNotifier<int?>(null);
 
   /// True when the last songs emission hit the current limit window, i.e.
   /// more rows may exist in the database.
@@ -77,6 +86,8 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
     required ToggleFavoriteUseCase toggleFavoriteUseCase,
     required FolderUseCases folderUseCases,
     IMusicRepository? musicRepository,
+    YtmService? ytmService,
+    YtmAccountService? ytmAccountService,
   })  : _getSongsUseCase = getSongsUseCase,
         _getAlbumsUseCase = getAlbumsUseCase,
         _getArtistsUseCase = getArtistsUseCase,
@@ -89,6 +100,8 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
             (getIt.isRegistered<IMusicRepository>()
                 ? getIt<IMusicRepository>()
                 : null),
+        _ytmService = ytmService,
+        _ytmAccountService = ytmAccountService,
         super(const LibraryState(isLoading: true)) {
     init();
   }
@@ -132,6 +145,9 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
           // true until live database watchers emit their data to prevent
           // other tabs (albums, artists, favorites) from prematurely showing
           // an empty state.
+          if (totalSongCount.value == null && snapshot.totalSongCount > 0) {
+            totalSongCount.value = snapshot.totalSongCount;
+          }
           safeEmit(state.copyWith(
             songs: snapshot.songs,
           ));
@@ -184,16 +200,16 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
     if (resetLimit) {
       _songsLimit = songsPageSize;
       _hasMoreSongs = false;
+      _ratingSortedSongs = null;
     }
     final excluded = await _currentExcludedFolders();
     if (isClosed || t != _songsToken) return;
-    // Top-rated sort is prefs-backed: SQL has no rating column, so watch a
-    // bounded window and sort in Dart. 5000 covers realistic libraries
-    // without holding the full table; pagination is disabled in this mode
-    // and the cap is documented on the sort control.
+    // Top-rated sort is prefs-backed: SQL has no rating column, so load the
+    // sorted rating index and paginate the emitted slice incrementally without
+    // truncating large libraries at 5,000 rows.
     final isRatingSort = state.sortBy == 'rating';
-    const ratingSortCap = 5000;
-    final window = isRatingSort ? ratingSortCap : _songsLimit;
+    final window = isRatingSort ? null : _songsLimit;
+    _refreshTotalSongCount(excluded, token: t);
     _songsSub = autoSub(
       _getSongsUseCase.watchSongs(
         sortBy: isRatingSort ? 'title' : state.sortBy,
@@ -226,9 +242,6 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
               ];
             }
             if (isRatingSort) {
-              _hasMoreSongs = false;
-              _isLoadingMoreSongs = false;
-              final hasHitCap = songs.length >= ratingSortCap;
               final sortedSongs =
                   await _sortByRating(songs, ascending: state.ascending);
               if (isClosed ||
@@ -236,19 +249,30 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
                   emissionSeq != _songsEmissionSeq) {
                 return;
               }
-              // FIX-M02: Emit 5,000-cap notice as informational message rather than error
+              _ratingSortedSongs = sortedSongs;
+              final page = sortedSongs.length > _songsLimit
+                  ? sortedSongs.sublist(0, _songsLimit)
+                  : sortedSongs;
+              _hasMoreSongs = sortedSongs.length > page.length;
+              _isLoadingMoreSongs = false;
+              totalSongCount.value = sortedSongs.length;
               safeEmit(state.copyWith(
-                  songs: List<SongsTableData>.unmodifiable(sortedSongs),
-                  infoMessage: hasHitCap
-                      ? 'Displaying top 5,000 rated songs (maximum limit).'
-                      : null,
+                  songs: List<SongsTableData>.unmodifiable(page),
+                  infoMessage: null,
                   error: null,
                   isLoading: false,
                   isLoadingMore: false));
+              LibraryCacheManager().saveSnapshot(
+                songs: page,
+                totalSongCount: sortedSongs.length,
+                albumCount: state.albums.length,
+                artistCount: state.artists.length,
+              );
               return;
             }
+            _ratingSortedSongs = null;
             // Hitting the cap means the DB may hold more rows.
-            _hasMoreSongs = !isRatingSort && songs.length >= window;
+            _hasMoreSongs = songs.length >= _songsLimit;
             _isLoadingMoreSongs = false;
             if (isClosed ||
                 t != _songsToken ||
@@ -262,6 +286,7 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
                 isLoading: false,
                 isLoadingMore: false));
             if (!_hasMoreSongs) {
+              totalSongCount.value = songs.length;
               LibraryCacheManager().saveSnapshot(
                 songs: songs,
                 totalSongCount: songs.length,
@@ -269,40 +294,71 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
                 artistCount: state.artists.length,
               );
             } else {
-              final repo = _musicRepository ??
-                  (getIt.isRegistered<IMusicRepository>()
-                      ? getIt<IMusicRepository>()
-                      : null);
-              try {
-                repo?.getTotalSongCount(excludedFolders: excluded).then((res) {
-                  final total = res.fold((_) => songs.length, (r) => r);
-                  LibraryCacheManager().saveSnapshot(
-                    songs: songs,
-                    totalSongCount: total,
-                    albumCount: state.albums.length,
-                    artistCount: state.artists.length,
-                  );
-                }).catchError((_) {
-                  LibraryCacheManager().saveSnapshot(
-                    songs: songs,
-                    totalSongCount: songs.length,
-                    albumCount: state.albums.length,
-                    artistCount: state.artists.length,
-                  );
-                });
-              } catch (_) {
-                LibraryCacheManager().saveSnapshot(
-                  songs: songs,
-                  totalSongCount: songs.length,
-                  albumCount: state.albums.length,
-                  artistCount: state.artists.length,
-                );
-              }
+              _refreshTotalSongCount(
+                excluded,
+                token: t,
+                snapshotPage: songs,
+              );
             }
           },
         );
       },
     );
+  }
+
+  void _refreshTotalSongCount(
+    List<String> excluded, {
+    required int token,
+    List<SongsTableData>? snapshotPage,
+  }) {
+    final repo = _musicRepository;
+    if (repo == null) {
+      if (snapshotPage != null) {
+        LibraryCacheManager().saveSnapshot(
+          songs: snapshotPage,
+          totalSongCount: snapshotPage.length,
+          albumCount: state.albums.length,
+          artistCount: state.artists.length,
+        );
+      }
+      return;
+    }
+    try {
+      repo.getTotalSongCount(excludedFolders: excluded).then((res) {
+        if (isClosed || token != _songsToken) return;
+        final total = res.fold(
+          (_) => snapshotPage?.length ?? totalSongCount.value ?? state.songs.length,
+          (r) => r,
+        );
+        totalSongCount.value = total;
+        if (snapshotPage != null) {
+          LibraryCacheManager().saveSnapshot(
+            songs: snapshotPage,
+            totalSongCount: total,
+            albumCount: state.albums.length,
+            artistCount: state.artists.length,
+          );
+        }
+      }).catchError((_) {
+        if (snapshotPage != null) {
+          LibraryCacheManager().saveSnapshot(
+            songs: snapshotPage,
+            totalSongCount: snapshotPage.length,
+            albumCount: state.albums.length,
+            artistCount: state.artists.length,
+          );
+        }
+      });
+    } catch (_) {
+      if (snapshotPage != null) {
+        LibraryCacheManager().saveSnapshot(
+          songs: snapshotPage,
+          totalSongCount: snapshotPage.length,
+          albumCount: state.albums.length,
+          artistCount: state.artists.length,
+        );
+      }
+    }
   }
 
   /// Dart-side top-rated sort (ratings live in SharedPreferences).
@@ -350,8 +406,21 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
   /// listener; no-ops while a page load is in flight or the cap wasn't hit.
   void loadMoreSongs() {
     if (_isLoadingMoreSongs || !_hasMoreSongs || isClosed) return;
-    _isLoadingMoreSongs = true;
     _songsLimit += songsPageSize;
+    final cachedSorted = _ratingSortedSongs;
+    if (state.sortBy == 'rating' && cachedSorted != null) {
+      final page = cachedSorted.length > _songsLimit
+          ? cachedSorted.sublist(0, _songsLimit)
+          : cachedSorted;
+      _hasMoreSongs = cachedSorted.length > page.length;
+      _isLoadingMoreSongs = false;
+      safeEmit(state.copyWith(
+        songs: List<SongsTableData>.unmodifiable(page),
+        isLoadingMore: false,
+      ));
+      return;
+    }
+    _isLoadingMoreSongs = true;
     safeEmit(state.copyWith(isLoadingMore: true));
     _subscribeSongs();
   }
@@ -627,7 +696,8 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
           // in-flight bookkeeping or crash the awaiting UI.
           ErrorLogger.log('Favorite toggle failed for song $songId',
               error: e, stackTrace: st, category: 'LibraryCubit');
-          result = Left(DatabaseFailure('Could not update favorite'));
+          result = Left(DatabaseFailure(
+              L10nHolder.current?.saveFailed ?? 'Could not update favorite'));
         }
 
         if (isClosed || _favoriteOpTokens[songId] != opToken) return;
@@ -670,6 +740,74 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
       if (songLock.refCount == 0 && _favoriteLocks[songId] == songLock) {
         _favoriteLocks.remove(songId);
       }
+    }
+  }
+
+  /// Atomically updates favorite state for every song in [songs].
+  /// Uses a single [AppDatabase] transaction when available so batch
+  /// favorite-all avoids N separate writes and partial failure states.
+  Future<void> setSongsFavorite(
+      List<SongsTableData> songs, bool targetFavorite) async {
+    if (isClosed || songs.isEmpty) return;
+    final targetIds = songs
+        .where((s) => s.isFavorite != targetFavorite)
+        .map((s) => s.id)
+        .toList(growable: false);
+    if (targetIds.isEmpty) return;
+
+    if (getIt.isRegistered<AppDatabase>()) {
+      final db = getIt<AppDatabase>();
+      final idSet = targetIds.toSet();
+      final prevFavorites = state.favorites;
+      final prevSongs = state.songs;
+      for (final id in targetIds) {
+        _pendingFavoriteTargets[id] = targetFavorite;
+      }
+
+      final nextSongs = [
+        for (final s in state.songs)
+          idSet.contains(s.id) ? s.copyWith(isFavorite: targetFavorite) : s,
+      ];
+      final nextFavs = List<SongsTableData>.from(state.favorites);
+      if (targetFavorite) {
+        for (final s in songs) {
+          if (!nextFavs.any((f) => f.id == s.id)) {
+            nextFavs.add(s.copyWith(isFavorite: true));
+          }
+        }
+      } else {
+        nextFavs.removeWhere((f) => idSet.contains(f.id));
+      }
+      safeEmit(state.copyWith(favorites: nextFavs, songs: nextSongs));
+
+      try {
+        await db.transaction(() async {
+          await (db.update(db.songsTable)..where((t) => t.id.isIn(targetIds)))
+              .write(SongsTableCompanion(isFavorite: Value(targetFavorite)));
+        });
+        if (!isClosed) safeEmit(state.copyWith(error: null));
+      } catch (e, st) {
+        ErrorLogger.log('Batch setSongsFavorite failed',
+            error: e, stackTrace: st, category: 'LibraryCubit');
+        if (!isClosed) {
+          safeEmit(state.copyWith(
+            favorites: prevFavorites,
+            songs: prevSongs,
+            error: uiError(
+                L10nHolder.current?.saveFailed ?? 'Could not update favorites'),
+          ));
+        }
+      } finally {
+        for (final id in targetIds) {
+          _pendingFavoriteTargets.remove(id);
+        }
+      }
+      return;
+    }
+
+    for (final id in targetIds) {
+      if (isClosed) return;
+      await toggleFavorite(id);
     }
   }
 
@@ -745,12 +883,16 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
       if (isClosed) return;
       res.fold(
         (failure) => safeEmit(state.copyWith(error: failure)),
-        (songs) => safeEmit(state.copyWith(
+        (songs) {
+          final capNotice = L10nHolder.current != null
+              ? L10nHolder.current!.songsCount(selectAllCap)
+              : 'Selected first $selectAllCap tracks (library exceeds cap)';
+          safeEmit(state.copyWith(
             selectedSongIds: songs.map((s) => s.id).toSet(),
             isMultiSelectMode: true,
-            infoMessage: songs.length >= selectAllCap
-                ? 'Selected first $selectAllCap tracks (library exceeds cap)'
-                : null)),
+            infoMessage: songs.length >= selectAllCap ? capNotice : null,
+          ));
+        },
       );
     } catch (e, st) {
       if (isClosed) return;
@@ -810,8 +952,9 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
             ? getIt<IMusicRepository>()
             : null);
     if (repo == null) {
-      safeEmit(
-          state.copyWith(error: uiError('Delete is unavailable right now')));
+      safeEmit(state.copyWith(
+          error: uiError(L10nHolder.current?.deleteIsUnavailable ??
+              'Delete is unavailable right now')));
       return -1;
     }
     final ids = selected.map((s) => s.id).toList();
@@ -848,18 +991,48 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
     }, (count) => count);
   }
 
+  YtmService? get _resolvedYtmService => _ytmService ??
+      (getIt.isRegistered<YtmService>() ? getIt<YtmService>() : null);
+
+  YtmAccountService? get _resolvedYtmAccountService => _ytmAccountService ??
+      (getIt.isRegistered<YtmAccountService>()
+          ? getIt<YtmAccountService>()
+          : null);
+
+  bool get isYtmLoggedIn => _resolvedYtmAccountService?.isLoggedIn ?? false;
+
+  /// Fetches a public YouTube Music playlist URL/ID (or liked music list `LM`/`LL`
+  /// when signed in) and imports all tracks as favorites.
+  Future<int> importYtmPlaylistAsFavorites(String rawUrl) async {
+    final ytmService = _resolvedYtmService;
+    if (ytmService == null) return -1;
+    var tracks = await ytmService.getPlaylistTracks(rawUrl);
+    if (tracks.isEmpty &&
+        (rawUrl.contains('list=LM') ||
+            rawUrl.contains('list=LL') ||
+            rawUrl == 'LM' ||
+            rawUrl == 'LL')) {
+      final ytmAccount = _resolvedYtmAccountService;
+      if (ytmAccount != null && ytmAccount.isLoggedIn) {
+        tracks = await ytmAccount.fetchLikedSongs();
+      }
+    }
+    if (tracks.isEmpty) return 0;
+    return importYtmTracksAsFavorites(tracks);
+  }
+
   /// Synchronizes private Liked Music from the authenticated YouTube Music web account.
   ///
   /// Success returns the imported count. Failures set [LibraryState.errorMessage]
   /// and rethrow (auth failures as [YtmException] with `isAuth == true`) so the
   /// caller can present session-expired recovery instead of "Synced 0".
   Future<int> syncYtmAccountLikes() async {
-    final accountService = getIt<YtmAccountService>();
-    if (!accountService.isLoggedIn) {
-      safeEmit(
-          state.copyWith(error: uiError('Not signed in to YouTube Music')));
-      throw const YtmException(
-          'SIGN_IN_REQUIRED', 'Not signed in to YouTube Music');
+    final accountService = _resolvedYtmAccountService;
+    if (accountService == null || !accountService.isLoggedIn) {
+      final msg = L10nHolder.current?.ytmSessionExpired ??
+          'Not signed in to YouTube Music';
+      safeEmit(state.copyWith(error: uiError(msg)));
+      throw YtmException('SIGN_IN_REQUIRED', msg);
     }
 
     final List<YtmTrack> tracks;
@@ -870,7 +1043,8 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
           error: e, stackTrace: st, category: 'LibraryCubit');
       if (!isClosed) {
         safeEmit(state.copyWith(
-            error: uiError('Failed to sync YouTube Music likes')));
+            error: uiError(L10nHolder.current?.browseFailedToFetch ??
+                'Failed to sync YouTube Music likes')));
       }
       rethrow;
     }
@@ -879,10 +1053,13 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
     if (count < 0) {
       if (!isClosed) {
         safeEmit(state.copyWith(
-            error: uiError('Failed to import YouTube Music liked songs')));
+            error: uiError(L10nHolder.current?.importFailed ??
+                'Failed to import YouTube Music liked songs')));
       }
-      throw const YtmException(
-          'YTM_IMPORT_FAILED', 'Failed to import liked songs');
+      throw YtmException(
+          'YTM_IMPORT_FAILED',
+          L10nHolder.current?.importFailed ??
+              'Failed to import liked songs');
     }
     return count;
   }
@@ -897,6 +1074,7 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
     _favoritesSub?.cancel();
     _downloadedSub?.cancel();
     _favoriteLocks.clear();
+    totalSongCount.dispose();
     return super.close();
   }
 }

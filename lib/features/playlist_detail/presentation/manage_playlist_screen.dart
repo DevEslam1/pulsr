@@ -581,26 +581,35 @@ class _ManagePlaylistScreenState extends State<ManagePlaylistScreen> {
     final toAdd = _selectedSongIds.difference(_initialSongIds).toList();
     final toRemove = _initialSongIds.difference(_selectedSongIds).toList();
 
-    String? failureMessage;
-    try {
+    Future<void> executeMutations() async {
       if (toAdd.isNotEmpty) {
         final res = await _playlistUseCases.addSongsToPlaylist(
           widget.playlist.id,
           toAdd,
         );
-        failureMessage = res.fold<String?>((f) => f.message, (_) => null);
+        final msg = res.fold<String?>((f) => f.message, (_) => null);
+        if (msg != null) throw _BatchMutationAbort(msg);
       }
 
-      if (failureMessage == null) {
-        for (final songId in toRemove) {
-          final res = await _playlistUseCases.removeSongFromPlaylist(
-            widget.playlist.id,
-            songId,
-          );
-          failureMessage = res.fold<String?>((f) => f.message, (_) => null);
-          if (failureMessage != null) break;
-        }
+      for (final songId in toRemove) {
+        final res = await _playlistUseCases.removeSongFromPlaylist(
+          widget.playlist.id,
+          songId,
+        );
+        final msg = res.fold<String?>((f) => f.message, (_) => null);
+        if (msg != null) throw _BatchMutationAbort(msg);
       }
+    }
+
+    String? failureMessage;
+    try {
+      if (getIt.isRegistered<AppDatabase>()) {
+        await getIt<AppDatabase>().transaction(executeMutations);
+      } else {
+        await executeMutations();
+      }
+    } on _BatchMutationAbort catch (e) {
+      failureMessage = e.message;
     } catch (e) {
       failureMessage = e.toString();
     }
@@ -626,6 +635,11 @@ class _ManagePlaylistScreenState extends State<ManagePlaylistScreen> {
     );
     Navigator.of(context).pop(true);
   }
+}
+
+class _BatchMutationAbort implements Exception {
+  final String message;
+  const _BatchMutationAbort(this.message);
 }
 
 class _ManageSongRow extends StatelessWidget {

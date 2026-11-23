@@ -46,6 +46,7 @@ _Library _library({
       .thenReturn(LibraryState(favorites: favorites, folders: folders));
   when(() => cubit.stream).thenAnswer((_) => const Stream.empty());
   when(() => cubit.toggleFavorite(any())).thenAnswer((_) async {});
+  when(() => cubit.setSongsFavorite(any(), any())).thenAnswer((_) async {});
   return cubit;
 }
 
@@ -57,6 +58,7 @@ void main() {
 
   setUpAll(() {
     registerFallbackValue(createTestSong());
+    registerFallbackValue(<SongsTableData>[]);
   });
 
   setUp(() {
@@ -114,8 +116,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 200));
 
-    verify(() => lib.toggleFavorite(1)).called(1);
-    verify(() => lib.toggleFavorite(2)).called(1);
+    verify(() => lib.setSongsFavorite(any(), true)).called(1);
     expect(find.text(l10n.favorite), findsOneWidget);
 
     await drain(tester);
@@ -142,7 +143,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 200));
 
-    verify(() => lib.toggleFavorite(any())).called(2);
+    verify(() => lib.setSongsFavorite(any(), false)).called(1);
     expect(find.text(l10n.removeFromFavorites), findsOneWidget);
 
     await drain(tester);
@@ -171,7 +172,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 200));
 
-    verify(() => lib.toggleFavorite(any())).called(2);
+    verify(() => lib.setSongsFavorite(any(), false)).called(1);
     expect(find.text(l10n.removeFromFavorites), findsOneWidget);
 
     await drain(tester);
@@ -181,7 +182,7 @@ void main() {
       (tester) async {
     final lib = _library();
     final gate = Completer<void>();
-    when(() => lib.toggleFavorite(any())).thenAnswer((_) async {
+    when(() => lib.setSongsFavorite(any(), any())).thenAnswer((_) async {
       await gate.future;
     });
     await tester.pumpWidget(build(
@@ -198,8 +199,7 @@ void main() {
     gate.complete();
     await drain(tester);
 
-    verify(() => lib.toggleFavorite(1)).called(1);
-    verify(() => lib.toggleFavorite(2)).called(1);
+    verify(() => lib.setSongsFavorite(any(), true)).called(1);
   });
 
   testWidgets('long folder durations format with hours', (tester) async {

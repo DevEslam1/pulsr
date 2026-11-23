@@ -29,6 +29,7 @@ class ArtworkGridScreen extends StatefulWidget {
 
 class _ArtworkGridScreenState extends State<ArtworkGridScreen> {
   double _columnCount = 3.0;
+  double _scaleStartColumns = 3.0;
   final ScrollController _scrollController = ScrollController();
   int _visibleCount = 60;
 
@@ -213,13 +214,14 @@ class _ArtworkGridScreenState extends State<ArtworkGridScreen> {
                 child: ConstrainedBox(
                   constraints: Adaptive.contentConstraints(context),
                   child: GestureDetector(
+                    onScaleStart: (_) => _scaleStartColumns = _columnCount,
                     onScaleUpdate: (details) {
-                      if (details.scale > 1.15 && _columnCount > minCols) {
-                        _updateColumns(_columnCount - 0.05, minCols, maxCols);
-                      } else if (details.scale < 0.85 &&
-                          _columnCount < maxCols) {
-                        _updateColumns(_columnCount + 0.05, minCols, maxCols);
-                      }
+                      if (details.scale <= 0) return;
+                      _updateColumns(
+                        _scaleStartColumns / details.scale,
+                        minCols,
+                        maxCols,
+                      );
                     },
                     child: GridView.builder(
                       controller: _scrollController,

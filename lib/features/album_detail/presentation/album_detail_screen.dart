@@ -78,6 +78,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
   // Recreated on retry only, so rebuilds (sort changes, selection, theme) do
   // not resubscribe to the DB watch stream.
   late Stream<Result<List<SongsTableData>>> _songsStream;
+  Stream<Result<List<AlbumsTableData>>>? _albumsStream;
 
   @override
   void initState() {
@@ -107,6 +108,12 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
 
   void _updateStream() {
     _songsStream = _useCase.watchAlbumSongs(widget.album.id).distinct();
+    try {
+      _albumsStream = _useCase.watchAlbums().distinct();
+    } catch (_) {
+      // Unstubbed in isolated widget tests; falls back to widget.album.
+      _albumsStream = null;
+    }
   }
 
   void _onScroll() {
@@ -206,14 +213,22 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
               : b.durationMs.compareTo(a.durationMs),
         );
       case _AlbumSort.track:
-        if (!_sortAscending) {
-          out.sort((a, b) {
-            final discA = a.discNumber ?? 1;
-            final discB = b.discNumber ?? 1;
-            if (discA != discB) return discB.compareTo(discA);
-            return (b.trackNumber ?? 0).compareTo(a.trackNumber ?? 0);
-          });
-        }
+        final groups = groupAlbumDiscs<SongsTableData>([
+          for (final song in out)
+            AlbumDiscTrack<SongsTableData>(
+              track: song,
+              id: song.id.toString(),
+              title: song.title,
+              discNumber: song.discNumber,
+              trackNumber: song.trackNumber,
+            ),
+        ]);
+        final ordered = <SongsTableData>[
+          for (final g in groups) ...g.tracks,
+        ];
+        out
+          ..clear()
+          ..addAll(_sortAscending ? ordered : ordered.reversed);
         break;
     }
     _cachedRawSongs = songs;
@@ -273,7 +288,6 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
   Widget build(BuildContext context) {
     final p = context.palette;
     final isTablet = Adaptive.isTablet(context);
-    final album = widget.album;
 
     final expandedHeight = isTablet
         ? (MediaQuery.sizeOf(context).height * 0.42).clamp(290.0, 390.0)
@@ -284,7 +298,23 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
     final shouldSplit = PulsrBreakpoint.isLandscape(context) ||
         (Adaptive.isTablet(context) && context.screenWidth >= 800);
 
-    return StreamBuilder<Result<List<SongsTableData>>>(
+    return StreamBuilder<Result<List<AlbumsTableData>>>(
+      stream: _albumsStream,
+      builder: (context, albumSnap) {
+        final liveAlbums = albumSnap.data?.fold(
+              (_) => const <AlbumsTableData>[],
+              (albums) => albums,
+            ) ??
+            const <AlbumsTableData>[];
+        AlbumsTableData album = widget.album;
+        for (final candidate in liveAlbums) {
+          if (candidate.id == widget.album.id) {
+            album = candidate;
+            break;
+          }
+        }
+
+        return StreamBuilder<Result<List<SongsTableData>>>(
       stream: _songsStream,
       builder: (context, snapshot) {
         Widget buildSongsView(List<SongsTableData> rawSongs) {
@@ -308,23 +338,30 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
           // Tablet / landscape: adopt the shared adaptive master-detail split so the
           // horizontal space shows artwork + actions beside the track list.
           if (shouldSplit) {
-            return DetailScaffold(
-              titleText: album.title,
-              bottomNavigationBar:
-                  _buildBulkActionsBar(context, orderedSongs),
-              onRefresh: () async {
-                if (mounted) setState(() {});
-              },
-              hero: _buildSplitHero(
-                context,
-                album,
-                orderedSongs,
-                totalDurationMs: totalDurationMs,
-                hasHiRes: hasHiRes,
-                hasLossless: hasLossless,
-                releaseYear: releaseYear,
+            return PulsrPagePopScope(
+              onPop: _selectedIds.isNotEmpty
+                  ? () {
+                      setState(() => _selectedIds.clear());
+                    }
+                  : null,
+              child: DetailScaffold(
+                titleText: album.title,
+                bottomNavigationBar:
+                    _buildBulkActionsBar(context, orderedSongs),
+                onRefresh: () async {
+                  if (mounted) setState(_updateStream);
+                },
+                hero: _buildSplitHero(
+                  context,
+                  album,
+                  orderedSongs,
+                  totalDurationMs: totalDurationMs,
+                  hasHiRes: hasHiRes,
+                  hasLossless: hasLossless,
+                  releaseYear: releaseYear,
+                ),
+                body: _buildTrackListBody(context, rows),
               ),
-              body: _buildTrackListBody(context, rows),
             );
           }
 
@@ -346,7 +383,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                     color: p.accent,
                     backgroundColor: p.surfaceContainer,
                     onRefresh: () async {
-                      if (mounted) setState(() {});
+                      if (mounted) setState(_updateStream);
                     },
                     child: CustomScrollView(
                       controller: _scrollController,
@@ -595,6 +632,8 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
             (_) => _AlbumErrorView(onRetry: () => setState(_updateStream)),
             buildSongsView,
           ),
+        );
+          },
         );
       },
     );

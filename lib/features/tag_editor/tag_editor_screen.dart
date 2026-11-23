@@ -1,4 +1,6 @@
 // lib/features/tag_editor/tag_editor_screen.dart
+import 'dart:async';
+
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -161,9 +163,44 @@ class _TagEditorViewState extends State<_TagEditorView> {
       scannerService: getIt<MediaScannerService>(),
       metadataSearchService: getIt<MetadataSearchService>(),
     );
+    BuildContext? progressDialogContext;
+    if (mounted) {
+      unawaited(PulsrDialogHelper.showPulsrDialog<void>(
+        context,
+        barrierDismissible: false,
+        title: Text(l10n.partialBatchDetected),
+        content: BlocProvider<TagEditorCubit>.value(
+          value: cubit,
+          child: BlocBuilder<TagEditorCubit, TagEditorState>(
+            builder: (ctx, state) {
+              progressDialogContext = ctx;
+              final pct = state.batchProgress != null
+                  ? '${(state.batchProgress! * 100).toInt()}%'
+                  : '';
+              return Row(
+                children: [
+                  CircularProgressIndicator(
+                    value: state.isBatchMode ? state.batchProgress : null,
+                    color: accentColor,
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: Text(
+                      pct.isNotEmpty
+                          ? '${l10n.tagEditorRetryRemaining(songs.length)} ($pct)'
+                          : l10n.tagEditorRetryRemaining(songs.length),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+        actions: const [],
+      ));
+    }
     try {
       final prefs = await SharedPreferences.getInstance();
-      await cubit.restoreBatchCheckpoint(prefs);
       final loaded = await _awaitInitialLoad(cubit);
       if (!loaded) {
         if (!mounted) return;
@@ -192,11 +229,16 @@ class _TagEditorViewState extends State<_TagEditorView> {
         if (!mounted) return;
         messenger?.clearSnackBars();
         messenger?.showSnackBar(SnackBar(
-          content: Text(l10n.tagsSavedSuccess),
-          backgroundColor: accentColor,
+          content: Text(state.errorMessage ?? l10n.tagsSavedSuccess),
+          backgroundColor:
+              state.errorMessage != null ? errorColor : accentColor,
         ));
       }
     } finally {
+      final dialogCtx = progressDialogContext;
+      if (dialogCtx != null && dialogCtx.mounted) {
+        Navigator.of(dialogCtx).pop();
+      }
       await cubit.close();
     }
   }
@@ -220,6 +262,15 @@ class _TagEditorViewState extends State<_TagEditorView> {
   Widget build(BuildContext context) {
     final p = context.palette;
     return BlocConsumer<TagEditorCubit, TagEditorState>(
+      listenWhen: (previous, current) {
+        final becameSuccess = current.status == TagEditorStatus.success &&
+            previous.status != TagEditorStatus.success;
+        final becameFailure = current.status == TagEditorStatus.failure &&
+            previous.status != TagEditorStatus.failure;
+        final errorChanged =
+            current.error != null && current.error != previous.error;
+        return becameSuccess || becameFailure || errorChanged;
+      },
       listener: (context, state) {
         final messenger = ScaffoldMessenger.maybeOf(context);
         if (messenger == null) return;
@@ -236,6 +287,31 @@ class _TagEditorViewState extends State<_TagEditorView> {
                   backgroundColor: p.error,
                 ),
               );
+            return;
+          }
+          if (state.errorMessage != null && state.errorMessage!.isNotEmpty) {
+            final l10n = context.l10n;
+            PulsrDialogHelper.showPulsrDialog<void>(
+              context,
+              barrierDismissible: false,
+              title: Text(l10n.tagsSavedSuccess),
+              content: Text(state.errorMessage!),
+              actions: [
+                FilledButton(
+                  onPressed: () {
+                    Navigator.of(context, rootNavigator: true).pop();
+                    _allowPop = true;
+                    if (mounted) {
+                      setState(() {});
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (mounted) Navigator.of(context).pop(true);
+                      });
+                    }
+                  },
+                  child: Text(l10n.ok),
+                ),
+              ],
+            );
             return;
           }
           messenger
@@ -484,7 +560,7 @@ class _BatchEditBanner extends StatelessWidget {
   }
 }
 
-class _AutoFetchButton extends StatelessWidget {
+class _AutoFetchButton extends StatefulWidget {
   const _AutoFetchButton({
     required this.state,
     required this.cubit,
@@ -497,69 +573,97 @@ class _AutoFetchButton extends StatelessWidget {
   final bool isSaving;
   final bool isAutoFetching;
 
+  @override
+  State<_AutoFetchButton> createState() => _AutoFetchButtonState();
+}
+
+class _AutoFetchButtonState extends State<_AutoFetchButton> {
+  bool _inFlight = false;
+
   Future<void> _run(BuildContext context) async {
+    if (_inFlight ||
+        widget.cubit.state.isAutoFetching ||
+        widget.isAutoFetching ||
+        widget.isSaving) {
+      return;
+    }
+    setState(() => _inFlight = true);
     final p = context.palette;
     final messenger = ScaffoldMessenger.maybeOf(context);
-    if (state.isBatchMode) {
-      final resolved = await cubit.autoFetchBatchTags();
+    try {
+      if (widget.state.isBatchMode) {
+        final resolved = await widget.cubit.autoFetchBatchTags();
+        if (!context.mounted) return;
+        final message = resolved > 0
+            ? 'Online metadata filled for $resolved track${resolved == 1 ? '' : 's'} (shared fields only)'
+            : context.l10n.noOnlineMetadata;
+        messenger?.clearSnackBars();
+        messenger?.showSnackBar(
+          SnackBar(
+            content: Text(message),
+            backgroundColor: resolved > 0 ? p.accent : null,
+          ),
+        );
+        return;
+      }
+
+      widget.cubit.setAutoFetching(true);
+      final List<OnlineTrackMetadata> matches;
+      try {
+        matches = await widget.cubit.searchOnlineMatches();
+      } finally {
+        if (!widget.cubit.isClosed) {
+          widget.cubit.setAutoFetching(false);
+        }
+      }
       if (!context.mounted) return;
-      final message = resolved > 0
-          ? 'Online metadata filled for $resolved track${resolved == 1 ? '' : 's'} (shared fields only)'
-          : context.l10n.noOnlineMetadata;
-      messenger?.clearSnackBars();
-      messenger?.showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: resolved > 0 ? p.accent : null,
-        ),
+      if (matches.isEmpty) {
+        messenger?.clearSnackBars();
+        messenger?.showSnackBar(
+            SnackBar(content: Text(context.l10n.noOnlineMetadata)));
+        return;
+      }
+
+      if (matches.length == 1) {
+        final ok = await widget.cubit.applyMetadataResult(matches.first);
+        if (ok && context.mounted) {
+          messenger?.clearSnackBars();
+          messenger?.showSnackBar(SnackBar(
+            content: Text(context.l10n.onlineMetadataApplied),
+            backgroundColor: p.accent,
+          ));
+        }
+        return;
+      }
+
+      final selected =
+          await PulsrSheetHelper.showPulsrSheet<OnlineTrackMetadata>(
+        context: context,
+        builder: (ctx) => _MetadataMatchSheet(matches: matches),
       );
-      return;
-    }
 
-    final matches = await cubit.searchOnlineMatches();
-    if (!context.mounted) return;
-    if (matches.isEmpty) {
-      messenger?.clearSnackBars();
-      messenger?.showSnackBar(
-          SnackBar(content: Text(context.l10n.noOnlineMetadata)));
-      return;
-    }
-
-    if (matches.length == 1) {
-      final ok = await cubit.applyMetadataResult(matches.first);
-      if (ok && context.mounted) {
-        messenger?.clearSnackBars();
-        messenger?.showSnackBar(SnackBar(
-          content: Text(context.l10n.onlineMetadataApplied),
-          backgroundColor: p.accent,
-        ));
+      if (selected != null && context.mounted) {
+        final ok = await widget.cubit.applyMetadataResult(selected);
+        if (ok && context.mounted) {
+          messenger?.clearSnackBars();
+          messenger?.showSnackBar(SnackBar(
+            content: Text(context.l10n.onlineMetadataApplied),
+            backgroundColor: p.accent,
+          ));
+        }
       }
-      return;
-    }
-
-    final selected = await PulsrSheetHelper.showPulsrSheet<OnlineTrackMetadata>(
-      context: context,
-      builder: (ctx) => _MetadataMatchSheet(matches: matches),
-    );
-
-    if (selected != null && context.mounted) {
-      final ok = await cubit.applyMetadataResult(selected);
-      if (ok && context.mounted) {
-        messenger?.clearSnackBars();
-        messenger?.showSnackBar(SnackBar(
-          content: Text(context.l10n.onlineMetadataApplied),
-          backgroundColor: p.accent,
-        ));
-      }
+    } finally {
+      if (mounted) setState(() => _inFlight = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
+    final locked = _inFlight || widget.isAutoFetching || widget.isSaving;
     return OutlinedButton.icon(
-      onPressed: (isAutoFetching || isSaving) ? null : () => _run(context),
-      icon: isAutoFetching
+      onPressed: locked ? null : () => _run(context),
+      icon: widget.isAutoFetching
           ? SizedBox(
               width: AppSpacing.md,
               height: 16,
@@ -567,7 +671,7 @@ class _AutoFetchButton extends StatelessWidget {
             )
           : Icon(Icons.auto_awesome_rounded, size: 18, color: p.accent),
       label: Text(
-        isAutoFetching
+        widget.isAutoFetching
             ? context.l10n.browseSearchingOnlineMetadata
             : context.l10n.browseAutoFetchTags,
         style: TextStyle(

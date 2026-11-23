@@ -124,19 +124,83 @@ class SmartRule {
     this.value = '',
   }) : id = id ?? UniqueKey().toString();
 
+  static String _secondsToMsValue(String raw) {
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) return raw;
+    if (trimmed.contains('..')) {
+      final parts = trimmed.split('..');
+      if (parts.length == 2) {
+        final a = num.tryParse(parts[0].trim());
+        final b = num.tryParse(parts[1].trim());
+        if (a != null && b != null) {
+          return '${(a * 1000).round()}..${(b * 1000).round()}';
+        }
+      }
+      return raw;
+    }
+    if (trimmed.contains(',')) {
+      final parts = trimmed.split(',');
+      if (parts.length == 2) {
+        final a = num.tryParse(parts[0].trim());
+        final b = num.tryParse(parts[1].trim());
+        if (a != null && b != null) {
+          return '${(a * 1000).round()},${(b * 1000).round()}';
+        }
+      }
+      return raw;
+    }
+    final sec = num.tryParse(trimmed);
+    return sec != null ? (sec * 1000).round().toString() : raw;
+  }
+
+  static String _msToSecondsValue(String raw) {
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) return raw;
+    if (trimmed.contains('..')) {
+      final parts = trimmed.split('..');
+      if (parts.length == 2) {
+        final a = num.tryParse(parts[0].trim());
+        final b = num.tryParse(parts[1].trim());
+        if (a != null && b != null) {
+          return '${(a ~/ 1000)}..${(b ~/ 1000)}';
+        }
+      }
+      return raw;
+    }
+    if (trimmed.contains(',')) {
+      final parts = trimmed.split(',');
+      if (parts.length == 2) {
+        final a = num.tryParse(parts[0].trim());
+        final b = num.tryParse(parts[1].trim());
+        if (a != null && b != null) {
+          return '${(a ~/ 1000)},${(b ~/ 1000)}';
+        }
+      }
+      return raw;
+    }
+    final ms = num.tryParse(trimmed);
+    return ms != null ? (ms ~/ 1000).toString() : raw;
+  }
+
   domain.SmartRule toDomain() => domain.SmartRule(
         field: field.toDomain(),
         operator: operator.toDomain(),
-        value: value,
+        value: field == SmartRuleField.duration
+            ? _secondsToMsValue(value)
+            : value,
       );
 
-  factory SmartRule.fromDomain(domain.SmartRule domainRule, {String? id}) =>
-      SmartRule(
-        id: id,
-        field: SmartRuleField.fromDomain(domainRule.field),
-        operator: SmartRuleOperator.fromDomain(domainRule.operator),
-        value: domainRule.value,
-      );
+  factory SmartRule.fromDomain(domain.SmartRule domainRule, {String? id}) {
+    final mappedField = SmartRuleField.fromDomain(domainRule.field);
+    return SmartRule(
+      id: id,
+      field: mappedField,
+      operator: SmartRuleOperator.fromDomain(domainRule.operator),
+      value: domainRule.field == domain.SmartRuleField.durationMs
+          ? _msToSecondsValue(domainRule.value)
+          : domainRule.value,
+    );
+  }
 
   bool evaluate(SongsTableData song) {
     final targetValue = switch (field) {

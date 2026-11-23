@@ -2,16 +2,21 @@
 part of '../library_screen.dart';
 
 final RegExp _railAsciiLetter = RegExp(r'^[A-Z]$');
+final RegExp _leadingArticlePattern =
+    RegExp(r'^(?:the|an|a)\s+', caseSensitive: false);
 
-/// Resolves the first list index for an alphabet-rail letter. The '#' entry
-/// buckets every title whose initial is not an ASCII letter (digits, symbols,
-/// non-Latin scripts) instead of only titles literally starting with '#'.
+/// Resolves the first list index for an alphabet-rail letter. Strips leading
+/// English articles ("The", "An", "A") when followed by a remainder, and uses '#'
+/// for every title whose effective initial is not an ASCII letter (digits,
+/// symbols, non-Latin scripts).
 @visibleForTesting
 int libraryRailLetterIndex(String letter, List<SongsTableData> songs) {
   return songs.indexWhere((song) {
-    final title = song.title.trim();
-    if (title.isEmpty) return letter == '#';
-    final initial = title[0].toUpperCase();
+    final trimmed = song.title.trim();
+    if (trimmed.isEmpty) return letter == '#';
+    final stripped = trimmed.replaceFirst(_leadingArticlePattern, '').trim();
+    final effective = stripped.isNotEmpty ? stripped : trimmed;
+    final initial = effective[0].toUpperCase();
     if (letter == '#') return !_railAsciiLetter.hasMatch(initial);
     return initial == letter;
   });

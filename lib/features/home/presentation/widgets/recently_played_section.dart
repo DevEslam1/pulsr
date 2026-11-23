@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:material_ui/material_ui.dart';
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:on_audio_query/on_audio_query.dart';
@@ -18,6 +19,7 @@ import '../../../../core/widgets/shimmer_skeleton.dart';
 import '../../../../core/widgets/staggered_reveal.dart';
 import '../../../../data/db/app_database.dart';
 import '../../../../domain/usecases/get_songs_usecase.dart';
+import '../../../library/cubit/library_cubit.dart';
 import '../../../player/cubit/player_cubit.dart';
 import '../../../player/cubit/player_state.dart';
 import 'home_card_metrics.dart';
@@ -83,6 +85,16 @@ class _RecentlyPlayedSectionState extends State<RecentlyPlayedSection> {
   Timer? _loadMoreTimeoutTimer;
   Stream<Result<List<SongsTableData>>>? _songsStream;
   int? _streamLimit;
+  List<String> _streamExcluded = const [];
+
+  List<String> _readExcludedFolders(BuildContext context) {
+    final folders = context.watch<LibraryCubit?>()?.state.folders;
+    if (folders == null || folders.isEmpty) return const [];
+    return [
+      for (final f in folders)
+        if (f.isExcluded) f.path,
+    ];
+  }
 
   @override
   void didUpdateWidget(covariant RecentlyPlayedSection oldWidget) {
@@ -90,6 +102,7 @@ class _RecentlyPlayedSectionState extends State<RecentlyPlayedSection> {
     if (!identical(oldWidget.getSongsUseCase, widget.getSongsUseCase)) {
       _songsStream = null;
       _streamLimit = null;
+      _streamExcluded = const [];
     }
   }
 
@@ -131,9 +144,14 @@ class _RecentlyPlayedSectionState extends State<RecentlyPlayedSection> {
     List<SongsTableData> visibleSongs,
   ) async {
     var queue = visibleSongs;
+    final excluded = _streamExcluded;
     try {
-      final result =
-          await widget.getSongsUseCase.getRecentlyPlayed(limit: _queueLimit);
+      final result = excluded.isEmpty
+          ? await widget.getSongsUseCase.getRecentlyPlayed(limit: _queueLimit)
+          : await widget.getSongsUseCase.getRecentlyPlayed(
+              limit: _queueLimit,
+              excludedFolders: excluded,
+            );
       final full = result.fold<List<SongsTableData>?>((_) => null, (r) => r);
       if (full != null && full.isNotEmpty) {
         queue = full;
@@ -201,11 +219,19 @@ class _RecentlyPlayedSectionState extends State<RecentlyPlayedSection> {
   Widget build(BuildContext context) {
     final p = context.palette;
     final playerCubit = context.read<PlayerCubit>();
+    final excluded = _readExcludedFolders(context);
 
-    if (_songsStream == null || _streamLimit != _currentLimit) {
+    if (_songsStream == null ||
+        _streamLimit != _currentLimit ||
+        !listEquals(_streamExcluded, excluded)) {
       _streamLimit = _currentLimit;
-      _songsStream = widget.getSongsUseCase
-          .watchRecentlyPlayed(limit: _currentLimit)
+      _streamExcluded = excluded;
+      _songsStream = (excluded.isEmpty
+              ? widget.getSongsUseCase.watchRecentlyPlayed(limit: _currentLimit)
+              : widget.getSongsUseCase.watchRecentlyPlayed(
+                  limit: _currentLimit,
+                  excludedFolders: excluded,
+                ))
           .distinct();
     }
 

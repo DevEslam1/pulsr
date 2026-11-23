@@ -331,17 +331,9 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
                 [])
             .map((p) => YtmAccountPlaylist.fromJson(p as Map<String, dynamic>))
             .toList();
-        var rawCustomList = (data['customPlaylists'] as List<dynamic>? ?? [])
+        final rawCustomList = (data['customPlaylists'] as List<dynamic>? ?? [])
             .map((p) => OnlinePlaylistEntry.fromJson(p as Map<String, dynamic>))
             .toList();
-        // B-19: Validate loaded custom playlists count <= 10 and tracks per playlist <= 50
-        if (rawCustomList.length > 10) {
-          ErrorLogger.log(
-            'Loaded custom playlists exceeded cap of 10 (${rawCustomList.length}), truncating',
-            category: 'PlaylistCubit',
-          );
-          rawCustomList = rawCustomList.take(10).toList();
-        }
         final customPlaylists = rawCustomList.map((entry) {
           if (entry.tracks.length > 50) {
             ErrorLogger.log(
@@ -473,21 +465,18 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
         onTimeout: () => throw TimeoutException('SharedPreferences timeout'),
       );
       if (_disposed || isClosed) return;
-      // Bounded cache: prefs is not a database. Liked tracks capped at 200,
-      // custom playlists at the 10 most recent with 50 tracks each — full
-      // track lists are re-fetched on open, so the cache only needs enough
-      // for instant paint.
+      // Bounded preview cache: prefs is not a database. Liked tracks capped at
+      // 200 and custom playlist previews at 50 tracks each — full track lists
+      // are persisted in Drift and re-fetched on open.
       final onlineValue = onlineState;
       final liked = onlineValue.likedTracks;
       final customs = onlineValue.customPlaylists;
-      final cappedCustoms =
-          customs.length > 10 ? customs.sublist(customs.length - 10) : customs;
       final data = {
         'likedTracks': liked.take(200).map((t) => t.toJson()).toList(),
         'accountPlaylists':
             onlineValue.accountPlaylists.map((p) => p.toJson()).toList(),
         'customPlaylists': [
-          for (final p in cappedCustoms)
+          for (final p in customs)
             () {
               final json = Map<String, dynamic>.from(p.toJson());
               final tracks = (json['tracks'] as List? ?? []);
@@ -1019,16 +1008,18 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
           continue;
         }
 
-        artworkUrl ??= tracks.firstOrNull?.artworkUrl;
-        await repo.cacheOnlinePlaylist(
-          playlistId: job.playlistId,
-          kind: job.kind,
-          title: title,
-          author: author,
-          artworkUrl: artworkUrl,
-          sortOrder: job.sortOrder,
-          tracks: tracks,
-        );
+        if (tracks.isNotEmpty) {
+          artworkUrl ??= tracks.firstOrNull?.artworkUrl;
+          await repo.cacheOnlinePlaylist(
+            playlistId: job.playlistId,
+            kind: job.kind,
+            title: title,
+            author: author,
+            artworkUrl: artworkUrl,
+            sortOrder: job.sortOrder,
+            tracks: tracks,
+          );
+        }
       } on YtmException catch (e, st) {
         ErrorLogger.log(
           'Online library cache failed for ${job.playlistId}: ${e.code}',
@@ -1471,6 +1462,27 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
       ..add(entry);
     _setOnlineState((s) => s.copyWith(customPlaylists: updated));
     unawaited(_saveOnlineCache());
+    unawaited(_restoreCachedOnlinePlaylist(entry));
+  }
+
+  Future<void> _restoreCachedOnlinePlaylist(OnlinePlaylistEntry entry) async {
+    if (!getIt.isRegistered<IMusicRepository>()) return;
+    try {
+      final canonical = canonicalYtmPlaylistId(entry.id);
+      await getIt<IMusicRepository>().cacheOnlinePlaylist(
+        playlistId: canonical.isNotEmpty ? canonical : entry.id,
+        kind: OnlineLibraryKind.custom,
+        title: entry.title,
+        author: entry.uploader,
+        artworkUrl: entry.tracks.firstOrNull?.artworkUrl,
+        tracks: entry.tracks,
+        fullSnapshot: false,
+      );
+      unawaited(syncOnlineLibraryCache());
+    } catch (e, st) {
+      ErrorLogger.log('Failed to restore cached online playlist',
+          error: e, stackTrace: st, category: 'PlaylistCubit');
+    }
   }
 
   /// Resets account-specific online playlist state (liked + account playlists)

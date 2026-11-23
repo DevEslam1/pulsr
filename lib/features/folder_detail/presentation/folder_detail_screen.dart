@@ -114,16 +114,41 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
     }
   }
 
-  List<SongsTableData> _sortedSongs(List<SongsTableData> raw) {
-    if (_sortMode == _FolderSortMode.natural && _sortAscending) {
-      return raw;
+  static int _naturalStringCompare(String a, String b) {
+    final tokenRegex = RegExp(r'\d+|\D+');
+    final aParts = tokenRegex.allMatches(a).map((m) => m.group(0)!).toList();
+    final bParts = tokenRegex.allMatches(b).map((m) => m.group(0)!).toList();
+    final len = aParts.length < bParts.length ? aParts.length : bParts.length;
+    for (var i = 0; i < len; i++) {
+      final pa = aParts[i];
+      final pb = bParts[i];
+      final na = int.tryParse(pa);
+      final nb = int.tryParse(pb);
+      final cmp = (na != null && nb != null)
+          ? na.compareTo(nb)
+          : pa.toLowerCase().compareTo(pb.toLowerCase());
+      if (cmp != 0) return cmp;
     }
+    return aParts.length.compareTo(bParts.length);
+  }
+
+  static String _filenameOf(SongsTableData song) {
+    final normalized = song.path.replaceAll('\\', '/');
+    final slash = normalized.lastIndexOf('/');
+    final base = slash >= 0 ? normalized.substring(slash + 1) : normalized;
+    return base.isNotEmpty ? base : song.title;
+  }
+
+  List<SongsTableData> _sortedSongs(List<SongsTableData> raw) {
     final copy = List<SongsTableData>.from(raw);
     copy.sort((a, b) {
       int cmp;
       switch (_sortMode) {
         case _FolderSortMode.natural:
-          cmp = 0;
+          cmp = _naturalStringCompare(_filenameOf(a), _filenameOf(b));
+          if (cmp == 0) {
+            cmp = a.title.toLowerCase().compareTo(b.title.toLowerCase());
+          }
           break;
         case _FolderSortMode.title:
           cmp = a.title.toLowerCase().compareTo(b.title.toLowerCase());
@@ -140,9 +165,6 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
       }
       return _sortAscending ? cmp : -cmp;
     });
-    if (_sortMode == _FolderSortMode.natural && !_sortAscending) {
-      return copy.reversed.toList();
-    }
     return copy;
   }
 
@@ -238,33 +260,22 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
       if (libraryCubit == null) return;
 
       final allFavorited = _isAllFavorited(songs);
+      final targetFavorite = !allFavorited;
+      final affected = songs.where((s) => s.isFavorite != targetFavorite).toList();
+      if (affected.isNotEmpty) {
+        await libraryCubit.setSongsFavorite(affected, targetFavorite);
+      }
 
-      if (allFavorited) {
-        for (final s in songs) {
-          if (s.isFavorite) {
-            await libraryCubit.toggleFavorite(s.id);
-          }
-        }
-        if (mounted) {
-          PulsrToast.show(
-            context,
-            message: context.l10n.removeFromFavorites,
-            icon: Icons.favorite_border_rounded,
-          );
-        }
-      } else {
-        for (final s in songs) {
-          if (!s.isFavorite) {
-            await libraryCubit.toggleFavorite(s.id);
-          }
-        }
-        if (mounted) {
-          PulsrToast.show(
-            context,
-            message: context.l10n.favorite,
-            icon: Icons.favorite_rounded,
-          );
-        }
+      if (mounted) {
+        PulsrToast.show(
+          context,
+          message: allFavorited
+              ? context.l10n.removeFromFavorites
+              : context.l10n.favorite,
+          icon: allFavorited
+              ? Icons.favorite_border_rounded
+              : Icons.favorite_rounded,
+        );
       }
     } finally {
       _favoriteAllBusy = false;
@@ -859,13 +870,26 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
     );
   }
 
+  static String _normalizeFolderPath(String path) {
+    var normalized = path.replaceAll('\\', '/').toLowerCase().trim();
+    while (normalized.endsWith('/') && normalized.length > 1) {
+      normalized = normalized.substring(0, normalized.length - 1);
+    }
+    return normalized;
+  }
+
   bool _isPathExcluded(String path) {
     try {
       final folders = context.read<LibraryCubit>().state.folders;
-      final normalized = path.replaceAll('\\', '/');
+      final normalized = _normalizeFolderPath(path);
+      if (normalized.isEmpty) return false;
       for (final folder in folders) {
-        if (folder.path.replaceAll('\\', '/') == normalized) {
-          return folder.isExcluded;
+        if (!folder.isExcluded) continue;
+        final excludedNorm = _normalizeFolderPath(folder.path);
+        if (excludedNorm.isEmpty) continue;
+        if (normalized == excludedNorm ||
+            normalized.startsWith('$excludedNorm/')) {
+          return true;
         }
       }
     } catch (_) {}

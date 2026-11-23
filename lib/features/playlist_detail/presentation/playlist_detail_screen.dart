@@ -1,4 +1,5 @@
 // lib/features/playlist_detail/presentation/playlist_detail_screen.dart
+import 'dart:async';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
@@ -17,6 +18,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../core/di/injection.dart';
+import '../../../core/errors/failures.dart';
 import '../../../core/services/playlist_share_service.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
@@ -76,12 +78,14 @@ class PlaylistDetailScreen extends StatefulWidget {
 }
 
 class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
-  PlaylistsTableData get playlist => widget.playlist;
+  PlaylistsTableData? _playlist;
+  PlaylistsTableData get playlist => _playlist ?? widget.playlist;
 
   PlaylistUseCases get _useCases =>
       widget.playlistUseCases ?? getIt<PlaylistUseCases>();
 
   Stream<_PlaylistSongsResult>? _songsStream;
+  StreamSubscription<Result<List<PlaylistsTableData>>>? _playlistMetaSub;
 
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
@@ -93,8 +97,51 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
   int _orderSaveVersion = 0;
 
   @override
+  void initState() {
+    super.initState();
+    _playlist = widget.playlist;
+    _subscribeToPlaylistMeta();
+  }
+
+  void _subscribeToPlaylistMeta() {
+    _playlistMetaSub?.cancel();
+    _playlistMetaSub = null;
+    try {
+      _playlistMetaSub = _useCases.watchPlaylists().listen(
+        (res) {
+          res.fold((_) {}, (list) {
+            final updated =
+                list.where((p) => p.id == widget.playlist.id).firstOrNull;
+            if (!mounted || updated == null) return;
+            final current = playlist;
+            final criteriaChanged = updated.isSmart != current.isSmart ||
+                updated.smartCriteria != current.smartCriteria;
+            if (updated.name == current.name && !criteriaChanged) return;
+            setState(() {
+              _playlist = updated;
+              if (criteriaChanged) {
+                _songsStream = null;
+              }
+            });
+          });
+        },
+        onError: (_) {},
+      );
+    } catch (_) {
+      // Tests may stub watchPlaylistSongs without stubbing watchPlaylists.
+    }
+  }
+
+  @override
   void didUpdateWidget(PlaylistDetailScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.playlist != widget.playlist) {
+      _playlist = widget.playlist;
+    }
+    if (oldWidget.playlistUseCases != widget.playlistUseCases ||
+        oldWidget.playlist.id != widget.playlist.id) {
+      _subscribeToPlaylistMeta();
+    }
     if (oldWidget.playlist.id != widget.playlist.id ||
         oldWidget.playlist.isSmart != widget.playlist.isSmart ||
         oldWidget.playlist.smartCriteria != widget.playlist.smartCriteria ||
@@ -110,6 +157,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
 
   @override
   void dispose() {
+    _playlistMetaSub?.cancel();
     _searchController.dispose();
     super.dispose();
   }

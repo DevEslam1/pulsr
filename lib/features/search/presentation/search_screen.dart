@@ -473,6 +473,16 @@ class _SearchViewState extends State<_SearchView> {
 
   void _openArtist(String name) {
     try {
+      final cubitArtists = context.read<SearchCubit?>()?.artistResults.value;
+      final cubitMatch = cubitArtists
+          ?.where((a) => a.name.toLowerCase() == name.toLowerCase())
+          .firstOrNull;
+      if (cubitMatch != null) {
+        context.push('/artist?id=${cubitMatch.id}', extra: cubitMatch);
+        return;
+      }
+    } catch (_) {}
+    try {
       final lib = context.read<LibraryCubit>().state.artists;
       final match = lib.cast<dynamic>().firstWhere(
           (a) => (a?.name as String?)?.toLowerCase() == name.toLowerCase(),
@@ -490,6 +500,16 @@ class _SearchViewState extends State<_SearchView> {
   }
 
   void _openAlbum(String name) {
+    try {
+      final cubitAlbums = context.read<SearchCubit?>()?.albumResults.value;
+      final cubitMatch = cubitAlbums
+          ?.where((a) => a.title.toLowerCase() == name.toLowerCase())
+          .firstOrNull;
+      if (cubitMatch != null) {
+        context.push('/album?id=${cubitMatch.id}', extra: cubitMatch);
+        return;
+      }
+    } catch (_) {}
     try {
       final lib = context.read<LibraryCubit>().state.albums;
       final match = lib.cast<dynamic>().firstWhere(
@@ -866,20 +886,8 @@ class _SearchViewState extends State<_SearchView> {
     );
   }
 
-  String _filterLabel(BuildContext context, String filter) {
-    switch (filter) {
-      case 'All':
-        return context.l10n.all;
-      case 'Songs':
-        return context.l10n.songs;
-      case 'Artists':
-        return context.l10n.artists;
-      case 'Albums':
-        return context.l10n.albums;
-      default:
-        return filter;
-    }
-  }
+  String _filterLabel(BuildContext context, String filter) =>
+      _localizedFilterLabel(context, filter);
 
   Widget _buildBody(
       BuildContext context, PulsrPalette p, bool showOnline, int tab) {
@@ -1008,12 +1016,35 @@ class _LocalResults extends StatelessWidget {
     final cubit = context.read<SearchCubit>();
     final player = context.read<PlayerCubit>();
     final pending = cubit.isDebouncing;
+    final artistNotifier = _safeArtistResults(cubit);
+    final albumNotifier = _safeAlbumResults(cubit);
+    return ListenableBuilder(
+      listenable: Listenable.merge([
+        if (artistNotifier != null) artistNotifier,
+        if (albumNotifier != null) albumNotifier,
+      ]),
+      builder: (context, _) {
+    final directArtists = artistNotifier?.value ?? const <ArtistsTableData>[];
+    final directAlbums = albumNotifier?.value ?? const <AlbumsTableData>[];
+    final filter = state.selectedFilter;
+    final derived = _deriveEntities(state.results);
+    final allArtists = (filter == 'All' || filter == 'Artists')
+        ? _mergeArtistEntities(directArtists, derived.artists)
+        : const <_DerivedEntity>[];
+    final allAlbums = (filter == 'All' || filter == 'Albums')
+        ? _mergeAlbumEntities(directAlbums, derived.albums)
+        : const <_DerivedEntity>[];
+    final artists = allArtists.take(10).toList();
+    final albums = allAlbums.take(10).toList();
+    final hasAnyEntityMatch = artists.isNotEmpty || albums.isNotEmpty;
 
-    if ((state.isLoading || pending) && state.results.isEmpty) {
+    if ((state.isLoading || pending) &&
+        state.results.isEmpty &&
+        !hasAnyEntityMatch) {
       return const SkeletonList(padding: EdgeInsets.only(top: AppSpacing.xs));
     }
     final error = state.errorMessage;
-    if (error != null && state.results.isEmpty) {
+    if (error != null && state.results.isEmpty && !hasAnyEntityMatch) {
       return PulsrEmptyState(
         icon: Icons.error_outline_rounded,
         title: context.l10n.somethingWentWrong,
@@ -1023,7 +1054,7 @@ class _LocalResults extends StatelessWidget {
         onPrimaryAction: cubit.retry,
       );
     }
-    if (state.results.isEmpty) {
+    if (state.results.isEmpty && !hasAnyEntityMatch) {
       return PulsrEmptyState(
         icon: Icons.search_off_rounded,
         title: context.l10n.noResultsFound,
@@ -1033,15 +1064,6 @@ class _LocalResults extends StatelessWidget {
         onPrimaryAction: onClear,
       );
     }
-
-    final filter = state.selectedFilter;
-    final entities = _deriveEntities(state.results);
-    final artists = (filter == 'All' || filter == 'Artists')
-        ? entities.artists.take(10).toList()
-        : const <_DerivedEntity>[];
-    final albums = (filter == 'All' || filter == 'Albums')
-        ? entities.albums.take(10).toList()
-        : const <_DerivedEntity>[];
 
     return RefreshIndicator(
       color: p.accent,
@@ -1059,7 +1081,7 @@ class _LocalResults extends StatelessWidget {
                 context: context,
                 icon: Icons.person_rounded,
                 title: context.l10n.artists,
-                count: entities.artists.length,
+                count: allArtists.length,
                 isLoading: false,
                 p: p,
               ),
@@ -1079,7 +1101,7 @@ class _LocalResults extends StatelessWidget {
                 context: context,
                 icon: Icons.album_rounded,
                 title: context.l10n.albums,
-                count: entities.albums.length,
+                count: allAlbums.length,
                 isLoading: false,
                 p: p,
               ),
@@ -1093,36 +1115,38 @@ class _LocalResults extends StatelessWidget {
               ),
             ),
           ],
-          SliverToBoxAdapter(
-            child: _buildSectionHeader(
-              context: context,
-              icon: Icons.music_note_rounded,
-              title: context.l10n.songs,
-              count: state.results.length,
-              isLoading: state.isLoading,
-              p: p,
+          if (state.results.isNotEmpty || !hasAnyEntityMatch) ...[
+            SliverToBoxAdapter(
+              child: _buildSectionHeader(
+                context: context,
+                icon: Icons.music_note_rounded,
+                title: context.l10n.songs,
+                count: state.results.length,
+                isLoading: state.isLoading,
+                p: p,
+              ),
             ),
-          ),
-          SliverList(
-            delegate: SliverChildBuilderDelegate(
-              (context, index) {
-                final song = state.results[index];
-                return HighlightedSongTile(
-                  song: song,
-                  query: state.query,
-                  subtitleOverride: '${song.artist} • ${song.album}',
-                  onTap: () {
-                    cubit.commitQuery();
-                    cubit.recordPlayedSong(song);
-                    player.playSong(song, queue: state.results);
-                  },
-                  onMorePressed: () =>
-                      SongOptionsSheet.show(context, song: song),
-                );
-              },
-              childCount: state.results.length,
+            SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (context, index) {
+                  final song = state.results[index];
+                  return HighlightedSongTile(
+                    song: song,
+                    query: state.query,
+                    subtitleOverride: '${song.artist} • ${song.album}',
+                    onTap: () {
+                      cubit.commitQuery();
+                      cubit.recordPlayedSong(song);
+                      player.playSong(song, queue: state.results);
+                    },
+                    onMorePressed: () =>
+                        SongOptionsSheet.show(context, song: song),
+                  );
+                },
+                childCount: state.results.length,
+              ),
             ),
-          ),
+          ],
           SliverToBoxAdapter(
             child: ValueListenableBuilder<bool>(
               valueListenable: cubit.hasMoreResults,
@@ -1140,21 +1164,104 @@ class _LocalResults extends StatelessWidget {
         ],
       ),
     );
+      },
+    );
   }
 }
 
 class _DerivedEntity {
   final String name;
   final int songId;
+  final int? artistId;
   final int? albumId;
   final String? artworkUrl;
+  final ArtworkType artworkType;
 
   const _DerivedEntity({
     required this.name,
     required this.songId,
+    this.artistId,
     this.albumId,
     this.artworkUrl,
+    this.artworkType = ArtworkType.AUDIO,
   });
+}
+
+ValueNotifier<List<ArtistsTableData>>? _safeArtistResults(SearchCubit cubit) {
+  try {
+    return cubit.artistResults;
+  } catch (_) {
+    return null;
+  }
+}
+
+ValueNotifier<List<AlbumsTableData>>? _safeAlbumResults(SearchCubit cubit) {
+  try {
+    return cubit.albumResults;
+  } catch (_) {
+    return null;
+  }
+}
+
+List<_DerivedEntity> _mergeArtistEntities(
+  List<ArtistsTableData> direct,
+  List<_DerivedEntity> derived,
+) {
+  if (direct.isEmpty) return derived;
+  final derivedByName = {
+    for (final e in derived) e.name.toLowerCase(): e,
+  };
+  final merged = <_DerivedEntity>[];
+  final seen = <String>{};
+  for (final a in direct) {
+    final name = a.name.trim();
+    if (name.isEmpty || !seen.add(name.toLowerCase())) continue;
+    final fromSongs = derivedByName[name.toLowerCase()];
+    merged.add(_DerivedEntity(
+      name: name,
+      songId: fromSongs?.songId ?? a.id,
+      artistId: a.id,
+      albumId: fromSongs?.albumId,
+      artworkUrl: a.artworkUri ?? fromSongs?.artworkUrl,
+      artworkType: fromSongs != null ? ArtworkType.AUDIO : ArtworkType.ARTIST,
+    ));
+  }
+  for (final e in derived) {
+    if (seen.add(e.name.toLowerCase())) {
+      merged.add(e);
+    }
+  }
+  return merged;
+}
+
+List<_DerivedEntity> _mergeAlbumEntities(
+  List<AlbumsTableData> direct,
+  List<_DerivedEntity> derived,
+) {
+  if (direct.isEmpty) return derived;
+  final derivedByName = {
+    for (final e in derived) e.name.toLowerCase(): e,
+  };
+  final merged = <_DerivedEntity>[];
+  final seen = <String>{};
+  for (final al in direct) {
+    final name = al.title.trim();
+    if (name.isEmpty || !seen.add(name.toLowerCase())) continue;
+    final fromSongs = derivedByName[name.toLowerCase()];
+    merged.add(_DerivedEntity(
+      name: name,
+      songId: fromSongs?.songId ?? al.id,
+      albumId: al.id,
+      artworkUrl: al.artworkUri ?? fromSongs?.artworkUrl,
+      artworkType: fromSongs != null ? ArtworkType.AUDIO : ArtworkType.ALBUM,
+    ));
+  }
+  for (final e in derived) {
+    if (seen.add(e.name.toLowerCase())) {
+      merged.add(e);
+    }
+  }
+  return merged;
 }
 
 ({List<_DerivedEntity> artists, List<_DerivedEntity> albums}) _deriveEntities(
@@ -1250,7 +1357,7 @@ class _EntityRail extends StatelessWidget {
                           id: item.songId,
                           remoteUrl: item.artworkUrl,
                           albumId: item.albumId,
-                          type: ArtworkType.AUDIO,
+                          type: item.artworkType,
                           size: 56,
                           borderRadius: round ? 28 : 14,
                         ),
@@ -1331,16 +1438,51 @@ class _UnifiedSearchResultsState extends State<_UnifiedSearchResults> {
       builder: (context, local) {
         return BlocBuilder<YtmSearchCubit, YtmSearchState>(
           builder: (context, ytm) {
-            final localPending = context.read<SearchCubit>().isDebouncing;
-            final onlinePending = context.read<YtmSearchCubit>().isDebouncing;
+            final localCubit = context.read<SearchCubit>();
+            final ytmCubit = context.read<YtmSearchCubit>();
+            final artistNotifier = _safeArtistResults(localCubit);
+            final albumNotifier = _safeAlbumResults(localCubit);
+            return ListenableBuilder(
+              listenable: Listenable.merge([
+                if (artistNotifier != null) artistNotifier,
+                if (albumNotifier != null) albumNotifier,
+              ]),
+              builder: (context, _) {
+            final localPending = localCubit.isDebouncing;
+            final onlinePending = ytmCubit.isDebouncing;
             final localDone = !local.isLoading && !localPending;
             final onlineDone = isOffline || (!ytm.isLoading && !onlinePending);
             final onlineEmpty = isOffline ||
                 (ytm.results.isEmpty && ytm.hasSearched && !onlinePending);
 
+            final localSongs = local.results;
+            final localShown = _expandLocal
+                ? localSongs
+                : localSongs.take(_localPreview).toList();
+            final onlineTracks = ytm.results;
+            final onlineSongs = [for (final t in onlineTracks) t.toSongData()];
+            final onlineShown = _expandOnline
+                ? onlineSongs.length
+                : onlineSongs.length.clamp(0, _onlinePreview);
+
+            final filter = local.selectedFilter;
+            final directArtists = artistNotifier?.value ?? const [];
+            final directAlbums = albumNotifier?.value ?? const [];
+            final entities = _deriveEntities(localSongs);
+            final allArtists = (filter == 'All' || filter == 'Artists')
+                ? _mergeArtistEntities(directArtists, entities.artists)
+                : const <_DerivedEntity>[];
+            final allAlbums = (filter == 'All' || filter == 'Albums')
+                ? _mergeAlbumEntities(directAlbums, entities.albums)
+                : const <_DerivedEntity>[];
+            final artists = allArtists.take(8).toList();
+            final albums = allAlbums.take(8).toList();
+            final hasAnyLocalEntity = artists.isNotEmpty || albums.isNotEmpty;
+
             if (localDone &&
                 onlineDone &&
                 local.results.isEmpty &&
+                !hasAnyLocalEntity &&
                 onlineEmpty &&
                 ytm.errorMessage == null &&
                 local.errorMessage == null) {
@@ -1354,32 +1496,13 @@ class _UnifiedSearchResultsState extends State<_UnifiedSearchResults> {
               );
             }
 
-            final localSongs = local.results;
-            final localShown = _expandLocal
-                ? localSongs
-                : localSongs.take(_localPreview).toList();
-            final onlineTracks = ytm.results;
-            final onlineSongs = [for (final t in onlineTracks) t.toSongData()];
-            final onlineShown = _expandOnline
-                ? onlineSongs.length
-                : onlineSongs.length.clamp(0, _onlinePreview);
-
-            final filter = local.selectedFilter;
-            final entities = _deriveEntities(localSongs);
-            final artists = (filter == 'All' || filter == 'Artists')
-                ? entities.artists.take(8).toList()
-                : const <_DerivedEntity>[];
-            final albums = (filter == 'All' || filter == 'Albums')
-                ? entities.albums.take(8).toList()
-                : const <_DerivedEntity>[];
-
             final localPaneChildren = <Widget>[
               if (artists.isNotEmpty) ...[
                 _buildSectionHeader(
                   context: context,
                   icon: Icons.person_rounded,
                   title: context.l10n.artists,
-                  count: entities.artists.length,
+                  count: allArtists.length,
                   isLoading: false,
                   p: p,
                 ),
@@ -1396,7 +1519,7 @@ class _UnifiedSearchResultsState extends State<_UnifiedSearchResults> {
                   context: context,
                   icon: Icons.album_rounded,
                   title: context.l10n.albums,
-                  count: entities.albums.length,
+                  count: allAlbums.length,
                   isLoading: false,
                   p: p,
                 ),
@@ -1502,7 +1625,7 @@ class _UnifiedSearchResultsState extends State<_UnifiedSearchResults> {
                   context: context,
                   errorMessage:
                       resolveUiErrorMessage(context, ytm.errorMessage!),
-                  onRetry: context.read<YtmSearchCubit>().retry,
+                  onRetry: context.read<YtmSearchCubit>().retryAfterCooldown,
                   p: p,
                 )
               else if (onlineTracks.isEmpty &&
@@ -1521,15 +1644,16 @@ class _UnifiedSearchResultsState extends State<_UnifiedSearchResults> {
                     query: widget.query,
                     subtitleOverride: onlineTracks[i].artist,
                     onTap: () {
+                      context.read<YtmSearchCubit>().commitQuery();
                       context
                           .read<SearchCubit>()
                           .recordPlayedSong(onlineSongs[i]);
                       player.playSong(onlineSongs[i], queue: onlineSongs);
                     },
-                    onLongPress: () => SongOptionsSheet.show(
-                      context,
-                      song: onlineSongs[i],
-                    ),
+                    onLongPress: () =>
+                        _showOnlineTrackActions(context, onlineSongs[i], p),
+                    onMorePressed: () =>
+                        _showOnlineTrackActions(context, onlineSongs[i], p),
                     trailing: YtmDownloadButton(song: onlineSongs[i]),
                   ),
                 if (onlineSongs.length > _onlinePreview)
@@ -1538,8 +1662,39 @@ class _UnifiedSearchResultsState extends State<_UnifiedSearchResults> {
                     onPressed: () =>
                         setState(() => _expandOnline = !_expandOnline),
                   ),
+                if (ytm.loadMoreFailed)
+                  Center(
+                    child: TextButton.icon(
+                      onPressed: () => context.read<YtmSearchCubit>().loadMore(),
+                      icon: const Icon(Icons.refresh_rounded, size: 18),
+                      label: Text(context.l10n.retry),
+                    ),
+                  )
+                else if (ytm.isLoading && onlineTracks.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                    child: Center(
+                      child: PulsrProgressBar.circular(
+                        size: 20,
+                        strokeWidth: 2.2,
+                        color: p.accent,
+                      ),
+                    ),
+                  ),
               ],
             ];
+
+            bool handleOnlineScroll(ScrollNotification notification) {
+              final ytmCubit = context.read<YtmSearchCubit>();
+              if (notification.metrics.extentAfter < 400 &&
+                  ytmCubit.hasMore &&
+                  !ytm.isLoading &&
+                  !ytm.loadMoreFailed &&
+                  (_expandOnline || onlineTracks.length <= _onlinePreview)) {
+                unawaited(ytmCubit.loadMore());
+              }
+              return false;
+            }
 
             Future<void> handleRefresh() async {
               if (!isOffline) {
@@ -1552,14 +1707,14 @@ class _UnifiedSearchResultsState extends State<_UnifiedSearchResults> {
                 Adaptive.isTabletLandscape(context);
 
             if (isSplit) {
-              return RefreshIndicator(
-                color: p.accent,
-                backgroundColor: p.surfaceContainer,
-                onRefresh: handleRefresh,
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: RefreshIndicator(
+                      color: p.accent,
+                      backgroundColor: p.surfaceContainer,
+                      onRefresh: () => context.read<SearchCubit>().refresh(),
                       child: ListView(
                         physics: const AlwaysScrollableScrollPhysics(
                           parent: BouncingScrollPhysics(),
@@ -1573,27 +1728,37 @@ class _UnifiedSearchResultsState extends State<_UnifiedSearchResults> {
                         children: localPaneChildren,
                       ),
                     ),
-                    VerticalDivider(
-                      color: p.hairline,
-                      width: 1,
-                      thickness: 1,
-                    ),
-                    Expanded(
-                      child: ListView(
-                        physics: const AlwaysScrollableScrollPhysics(
-                          parent: BouncingScrollPhysics(),
+                  ),
+                  VerticalDivider(
+                    color: p.hairline,
+                    width: 1,
+                    thickness: 1,
+                  ),
+                  Expanded(
+                    child: RefreshIndicator(
+                      color: p.accent,
+                      backgroundColor: p.surfaceContainer,
+                      onRefresh: () => isOffline
+                          ? Future<void>.value()
+                          : context.read<YtmSearchCubit>().retry(),
+                      child: NotificationListener<ScrollNotification>(
+                        onNotification: handleOnlineScroll,
+                        child: ListView(
+                          physics: const AlwaysScrollableScrollPhysics(
+                            parent: BouncingScrollPhysics(),
+                          ),
+                          keyboardDismissBehavior:
+                              ScrollViewKeyboardDismissBehavior.onDrag,
+                          padding: EdgeInsets.only(
+                            bottom: PulsrLayoutMetrics.scrollBottom(context),
+                            top: AppSpacing.xxs,
+                          ),
+                          children: onlinePaneChildren,
                         ),
-                        keyboardDismissBehavior:
-                            ScrollViewKeyboardDismissBehavior.onDrag,
-                        padding: EdgeInsets.only(
-                          bottom: PulsrLayoutMetrics.scrollBottom(context),
-                          top: AppSpacing.xxs,
-                        ),
-                        children: onlinePaneChildren,
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               );
             }
 
@@ -1601,28 +1766,33 @@ class _UnifiedSearchResultsState extends State<_UnifiedSearchResults> {
               color: p.accent,
               backgroundColor: p.surfaceContainer,
               onRefresh: handleRefresh,
-              child: ListView(
-                physics: const AlwaysScrollableScrollPhysics(
-                  parent: BouncingScrollPhysics(),
-                ),
-                keyboardDismissBehavior:
-                    ScrollViewKeyboardDismissBehavior.onDrag,
-                padding: EdgeInsets.only(
-                  bottom: PulsrLayoutMetrics.scrollBottom(context),
-                  top: AppSpacing.xxs,
-                ),
-                children: [
-                  ...localPaneChildren,
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.md,
-                      vertical: AppSpacing.sm,
-                    ),
-                    child: Divider(color: p.hairline, height: 1),
+              child: NotificationListener<ScrollNotification>(
+                onNotification: handleOnlineScroll,
+                child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(
+                    parent: BouncingScrollPhysics(),
                   ),
-                  ...onlinePaneChildren,
-                ],
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
+                  padding: EdgeInsets.only(
+                    bottom: PulsrLayoutMetrics.scrollBottom(context),
+                    top: AppSpacing.xxs,
+                  ),
+                  children: [
+                    ...localPaneChildren,
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.md,
+                        vertical: AppSpacing.sm,
+                      ),
+                      child: Divider(color: p.hairline, height: 1),
+                    ),
+                    ...onlinePaneChildren,
+                  ],
+                ),
               ),
+            );
+              },
             );
           },
         );
@@ -1938,6 +2108,25 @@ Widget _buildRecentSectionHeader({
       ],
     ),
   );
+}
+
+String _localizedFilterLabel(BuildContext context, String filter) {
+  switch (filter) {
+    case 'All':
+      return context.l10n.all;
+    case 'Songs':
+      return context.l10n.songs;
+    case 'Artists':
+      return context.l10n.artists;
+    case 'Albums':
+      return context.l10n.albums;
+    case 'FLAC':
+      return context.l10n.browseFlac;
+    case 'Lossless':
+      return context.l10n.browseLossless;
+    default:
+      return filter;
+  }
 }
 
 String _localizedTag(BuildContext context, String tag) {

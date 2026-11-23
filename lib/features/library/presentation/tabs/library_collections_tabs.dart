@@ -474,8 +474,10 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
           buildWhen: (prev, curr) => prev.folders.length != curr.folders.length,
           builder: (context, state) {
             final count = state.folders.length;
-            final countLabel = count == 1
-                ? '1 ${context.l10n.folders.toLowerCase().replaceAll('s', '')}'
+            final isEnglish =
+                Localizations.localeOf(context).languageCode == 'en';
+            final countLabel = count == 1 && isEnglish
+                ? '1 folder'
                 : '$count ${context.l10n.folders.toLowerCase()}';
             return _buildLayoutToggleHeader(
               context,
@@ -703,6 +705,9 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
       state.years,
       _tabSortFor('years'),
     );
+    if (years.isEmpty && state.errorMessage != null) {
+      return _buildLibraryErrorState(context, state);
+    }
     if (years.isEmpty) {
       if (state.isLoading) {
         return SkeletonList(

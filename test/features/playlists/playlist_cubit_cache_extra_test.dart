@@ -57,7 +57,7 @@ void main() {
   OnlinePlaylistEntry entry(String id, {List<YtmTrack> tracks = const []}) =>
       OnlinePlaylistEntry(id: id, title: id, uploader: 'u', tracks: tracks);
 
-  test('the persisted cache keeps only the 10 most recent custom playlists',
+  test('the persisted cache preserves more than 10 custom playlists',
       () async {
     final cubit = create();
     for (var i = 0; i < 12; i++) {
@@ -67,10 +67,9 @@ void main() {
 
     final cache = await savedCache();
     final customs = cache['customPlaylists'] as List;
-    expect(customs.length, 10);
-    // The 2 oldest (c0, c1) were dropped.
+    expect(customs.length, 12);
     final ids = customs.map((e) => e['id']).toList();
-    expect(ids, isNot(contains('c0')));
+    expect(ids, contains('c0'));
     expect(ids, contains('c11'));
 
     await cubit.close();

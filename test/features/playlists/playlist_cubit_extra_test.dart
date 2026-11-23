@@ -301,7 +301,7 @@ void main() {
       await cubit.close();
     });
 
-    test('truncates more than ten custom playlists', () async {
+    test('preserves more than ten custom playlists when loading cache', () async {
       final customs = [
         for (var i = 0; i < 12; i++)
           OnlinePlaylistEntry(
@@ -314,7 +314,7 @@ void main() {
       });
       final cubit = create();
       await cubit.loadOnlineCacheForTesting();
-      expect(cubit.onlineState.customPlaylists.length, 10);
+      expect(cubit.onlineState.customPlaylists.length, 12);
       await cubit.close();
     });
 

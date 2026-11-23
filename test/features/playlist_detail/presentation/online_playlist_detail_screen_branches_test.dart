@@ -14,7 +14,6 @@ import 'package:pulsr/core/services/ytm_account_service.dart';
 import 'package:pulsr/core/services/ytm_service.dart';
 import 'package:pulsr/data/db/app_database.dart';
 import 'package:pulsr/domain/models/ytm_track.dart';
-import 'package:pulsr/domain/repositories/music_repository_interface.dart';
 import 'package:pulsr/domain/usecases/playlist_usecases.dart';
 import 'package:pulsr/features/library/cubit/library_cubit.dart';
 import 'package:pulsr/features/library/cubit/library_state.dart';
@@ -35,8 +34,6 @@ class _Download extends Mock implements YtmDownloadCubit {}
 class _Playlists extends Mock implements PlaylistUseCases {}
 
 class _Library extends Mock implements LibraryCubit {}
-
-class _Repo extends Mock implements IMusicRepository {}
 
 const _tracks = [
   YtmTrack(
@@ -77,6 +74,8 @@ void main() {
         .thenAnswer((_) => const Stream<LibraryState>.empty());
     when(() => library.importYtmTracksAsFavorites(any()))
         .thenAnswer((_) async => 0);
+    when(() => playlists.ensureSongPersisted(any()))
+        .thenAnswer((_) async => const Right(101));
     when(() => playlists.createPlaylist(any()))
         .thenAnswer((_) async => const Right(9));
     when(() => playlists.addSongsToPlaylist(any(), any()))
@@ -191,16 +190,18 @@ void main() {
     expect(find.textContaining('local track skipped'), findsWidgets);
   });
 
-  testWidgets('save-to-pulsr creates a local playlist', (tester) async {
+  testWidgets('save-to-pulsr creates a local playlist without marking favorites',
+      (tester) async {
     getIt.registerSingleton<PlaylistUseCases>(playlists);
     await pump(tester, title: 'Saved Mix', initialTracks: _tracks);
 
     await tester.tap(find.text('Save to Pulsr'));
     await tester.pumpAndSettle();
 
-    verify(() => library.importYtmTracksAsFavorites(any())).called(1);
+    verify(() => playlists.ensureSongPersisted(any())).called(1);
+    verifyNever(() => library.importYtmTracksAsFavorites(any()));
     verify(() => playlists.createPlaylist('Saved Mix')).called(1);
-    verify(() => playlists.addSongsToPlaylist(9, any())).called(1);
+    verify(() => playlists.addSongsToPlaylist(9, [101])).called(1);
   });
 
   testWidgets('save-to-pulsr reports a create failure', (tester) async {
@@ -239,8 +240,8 @@ void main() {
 
   testWidgets('save-to-pulsr reports an import failure without creating',
       (tester) async {
-    when(() => library.importYtmTracksAsFavorites(any()))
-        .thenAnswer((_) async => -1);
+    when(() => playlists.ensureSongPersisted(any()))
+        .thenAnswer((_) async => const Left(DatabaseFailure('persist fail')));
     getIt.registerSingleton<PlaylistUseCases>(playlists);
     await pump(tester, title: 'Bad Mix', initialTracks: _tracks);
 
@@ -253,25 +254,8 @@ void main() {
 
   testWidgets('save-to-pulsr resolves already-downloaded row ids',
       (tester) async {
-    final repo = _Repo();
-    when(() => repo.getFavorites()).thenAnswer((_) async => Right([
-          SongsTableData(
-            id: 555,
-            title: 'Downloaded',
-            artist: 'Artist One',
-            album: '',
-            durationMs: 1000,
-            path: '/music/downloaded.mp3',
-            isFavorite: true,
-            isMissing: false,
-            playCount: 0,
-            lastPositionMs: 0,
-            source: 'local',
-            isDownloaded: true,
-            remoteId: 'v1',
-          ),
-        ]));
-    getIt.registerSingleton<IMusicRepository>(repo);
+    when(() => playlists.ensureSongPersisted(any()))
+        .thenAnswer((_) async => const Right(555));
     getIt.registerSingleton<PlaylistUseCases>(playlists);
     await pump(tester, title: 'Saved Mix', initialTracks: _tracks);
 

@@ -37,6 +37,7 @@ _Library _library({List<SongsTableData> favorites = const []}) {
   when(() => cubit.state).thenReturn(LibraryState(favorites: favorites));
   when(() => cubit.stream).thenAnswer((_) => const Stream.empty());
   when(() => cubit.toggleFavorite(any())).thenAnswer((_) async {});
+  when(() => cubit.setSongsFavorite(any(), any())).thenAnswer((_) async {});
   when(() => cubit.toggleFolderExclusion(any()))
       .thenAnswer((_) async => const Right<AppFailure, void>(null));
   return cubit;
@@ -49,6 +50,7 @@ void main() {
 
   setUpAll(() {
     registerFallbackValue(createTestSong());
+    registerFallbackValue(<SongsTableData>[]);
   });
 
   setUp(() {

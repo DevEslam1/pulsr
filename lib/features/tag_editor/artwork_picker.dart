@@ -78,6 +78,10 @@ class ArtworkPicker extends StatelessWidget {
                                 fit: BoxFit.cover,
                                 width: 150,
                                 height: 150,
+                                errorBuilder: (_, __, ___) => Center(
+                                  child: Icon(Icons.music_note_rounded,
+                                      size: 64, color: p.textSecondary),
+                                ),
                               )
                             : CachedArtwork(
                                 id: songId,
@@ -94,17 +98,21 @@ class ArtworkPicker extends StatelessWidget {
                   ),
                 ),
               ),
-              InkWell(
-                onTap: onPick,
-                borderRadius: AppRadii.full,
-                child: Container(
-                  padding: const EdgeInsets.all(AppSpacing.sm),
-                  decoration: BoxDecoration(
-                    color: p.accent.withAlpha(200),
-                    shape: BoxShape.circle,
+              Semantics(
+                button: true,
+                label: context.l10n.changeCover,
+                child: InkWell(
+                  onTap: onPick,
+                  borderRadius: AppRadii.full,
+                  child: Container(
+                    padding: const EdgeInsets.all(AppSpacing.sm),
+                    decoration: BoxDecoration(
+                      color: p.accent.withAlpha(200),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.camera_alt_rounded,
+                        color: Colors.white, size: 28),
                   ),
-                  child: const Icon(Icons.camera_alt_rounded,
-                      color: Colors.white, size: 28),
                 ),
               ),
             ],

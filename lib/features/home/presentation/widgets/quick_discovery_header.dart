@@ -656,7 +656,7 @@ class QuickDiscoveryHeader extends StatelessWidget {
         (
           icon: Icons.calendar_month_rounded,
           label: context.l10n.decades,
-          onTap: () => context.push('/year'),
+          onTap: () => context.push('/library?tab=years'),
         ),
         if (showYtm)
           (
