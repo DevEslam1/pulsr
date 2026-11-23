@@ -16,11 +16,12 @@ const (
 // SafeConn wraps *websocket.Conn with a bounded send queue and mutex to prevent concurrent writes
 // and avoid unconstrained goroutine creation on broadcasts.
 type SafeConn struct {
-	mu        sync.Mutex
-	conn      *websocket.Conn
-	sendQueue chan interface{}
-	done      chan struct{}
-	closeOnce sync.Once
+	mu            sync.Mutex
+	conn          *websocket.Conn
+	sendQueue     chan interface{}
+	done          chan struct{}
+	closeOnce     sync.Once
+	closeConnOnce sync.Once
 }
 
 func NewSafeConn(conn *websocket.Conn) *SafeConn {
@@ -33,8 +34,21 @@ func NewSafeConn(conn *websocket.Conn) *SafeConn {
 	return sc
 }
 
+func (s *SafeConn) closeUnderlying() error {
+	var err error
+	s.closeConnOnce.Do(func() {
+		err = s.conn.Close()
+	})
+	return err
+}
+
 func (s *SafeConn) writePump() {
 	for {
+		select {
+		case <-s.done:
+			return
+		default:
+		}
 		select {
 		case msg, ok := <-s.sendQueue:
 			if !ok {
@@ -71,7 +85,9 @@ func (s *SafeConn) WriteJSON(v interface{}) error {
 	case s.sendQueue <- v:
 		return nil
 	default:
-		// Queue full: drop frame non-blockingly to protect server from slow client head-of-line blocking
+		// Close slow connections on overflow rather than silently dropping frames
+		// and leaving the client permanently desynchronized.
+		_ = s.Close()
 		return errors.New("send queue full")
 	}
 }
@@ -84,13 +100,25 @@ func (s *SafeConn) CloseWithJSON(v interface{}) error {
 	var err error
 	s.closeOnce.Do(func() {
 		close(s.done)
-		s.mu.Lock()
-		if v != nil {
+		if v == nil {
+			// Close the underlying net.Conn directly without taking s.mu so a
+			// stalled writePump immediately aborts instead of blocking callers.
+			err = s.closeUnderlying()
+			return
+		}
+		// Flush the final payload without blocking callers on s.mu if writePump is
+		// stuck on a slow socket; bound the wait by writeWait.
+		go func() {
+			timer := time.AfterFunc(writeWait, func() {
+				_ = s.closeUnderlying()
+			})
+			s.mu.Lock()
+			timer.Stop()
 			_ = s.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			_ = s.conn.WriteJSON(v)
-		}
-		err = s.conn.Close()
-		s.mu.Unlock()
+			_ = s.closeUnderlying()
+			s.mu.Unlock()
+		}()
 	})
 	return err
 }
@@ -146,15 +174,19 @@ func (h *Hub) Detach(code, memberId string, sc *SafeConn) bool {
 }
 
 func (h *Hub) DropParty(code string) {
+	h.DropPartyWithBye(code, nil)
+}
+
+// DropPartyWithBye removes code from the hub and closes every socket in the
+// room, optionally flushing a final bye frame before closing.
+func (h *Hub) DropPartyWithBye(code string, byePayload interface{}) {
 	h.mu.Lock()
 	room := h.sockets[code]
 	delete(h.sockets, code)
 	h.mu.Unlock()
 
-	if room != nil {
-		for _, sc := range room {
-			_ = sc.Close()
-		}
+	for _, sc := range room {
+		_ = sc.CloseWithJSON(byePayload)
 	}
 }
 
