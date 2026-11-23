@@ -145,4 +145,35 @@ class DownloadServiceRobolectricTest {
         assertEquals(null, org.robolectric.Shadows.shadowOf(context).nextStartedService)
         controller.destroy()
     }
+
+    @Test
+    fun releaseJobDisposesNotificationAndStateWithoutFiringCompletion() {
+        val controller = Robolectric.buildService(DownloadService::class.java).create()
+        val service = controller.get()
+        service.onStartCommand(startIntent(service, "v-rel"), 0, 1)
+
+        val releaseIntent = Intent(service, DownloadService::class.java).apply {
+            action = DownloadService.ACTION_RELEASE
+            putExtra(DownloadService.EXTRA_VIDEO_ID, "v-rel")
+        }
+        service.onStartCommand(releaseIntent, 0, 2)
+
+        assertTrue("releaseJob must NOT trigger onDownloadCompletedListener", completed.isEmpty())
+        assertTrue("releaseJob must NOT trigger onDownloadCancelledListener", cancelled.isEmpty())
+        assertTrue("releaseJob tombstones released job id", DownloadService.isTombstoned("v-rel"))
+
+        // While service is live, releaseJob posts directly to activeInstance on the main looper.
+        val context = RuntimeEnvironment.getApplication()
+        DownloadService.releaseJob(context, "v-rel-live")
+        org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
+        assertTrue(DownloadService.isTombstoned("v-rel-live"))
+        assertTrue(completed.isEmpty())
+
+        // After service destruction, releaseJob dispatches ACTION_RELEASE via startService.
+        controller.destroy()
+        DownloadService.releaseJob(context, "v-rel-api")
+        val started = org.robolectric.Shadows.shadowOf(context).nextStartedService
+        assertEquals(DownloadService.ACTION_RELEASE, started?.action)
+        assertEquals("v-rel-api", started?.getStringExtra(DownloadService.EXTRA_VIDEO_ID))
+    }
 }

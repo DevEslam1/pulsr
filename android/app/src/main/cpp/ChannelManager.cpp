@@ -23,8 +23,31 @@ void ChannelManager::setSampleRate(double sampleRate) {
     maxDelaySamples_ = std::clamp(
         static_cast<int>(sr * (MAX_DELAY_MS / 1000.0)) + 1, 1,
         MAX_DELAY_SAMPLES);
-    // Buffers are preallocated; only the logical window changes.
-    reset();
+    // Buffers are preallocated; clear stale delay history while preserving
+    // active trim targets and recalculating per-channel delays for the new rate.
+    rampingDown_ = false;
+    for (int ch = 0; ch < MAX_CHANNELS; ++ch) {
+        std::fill(delayLines_[ch].begin(), delayLines_[ch].end(), 0.0f);
+        writeIndex_[ch] = 0;
+        delayRampStep_[ch] = 0.0f;
+        delayRampRemaining_[ch] = 0;
+        if (params_.enabled) {
+            const double delayMs =
+                std::clamp(static_cast<double>(params_.delayMs[ch]), 0.0, MAX_DELAY_MS);
+            delaySamples_[ch] = std::clamp(
+                static_cast<int>(delayMs * 0.001 * sampleRate_), 0,
+                maxDelaySamples_);
+            smoothedDelaySamples_[ch] = static_cast<float>(delaySamples_[ch]);
+            currentGain_[ch] = targetGain_[ch];
+        } else {
+            delaySamples_[ch] = 0;
+            smoothedDelaySamples_[ch] = 0.0f;
+            targetGain_[ch] = 1.0f;
+            currentGain_[ch] = 1.0f;
+        }
+        gainStep_[ch] = 0.0f;
+        rampRemaining_[ch] = 0;
+    }
 }
 
 void ChannelManager::resetChannelState(int channel) {

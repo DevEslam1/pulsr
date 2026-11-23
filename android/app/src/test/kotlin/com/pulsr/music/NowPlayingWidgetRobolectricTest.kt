@@ -70,6 +70,43 @@ class NowPlayingWidgetRobolectricTest {
     }
 
     @Test
+    fun untrustedBroadcastWithoutTokenIsRejectedEvenWithinAppProcess() {
+        NowPlayingWidget.getWidgetToken(context)
+        val widget = NowPlayingWidget()
+        val isTrusted = NowPlayingWidget::class.java.getDeclaredMethod(
+            "isTrustedWidgetAction",
+            Context::class.java,
+            Intent::class.java,
+        ).apply { isAccessible = true }
+        val untrustedMissingToken = Intent(NowPlayingWidget.ACTION_PLAY_PAUSE)
+        assertFalse(
+            "H-01: self-permission must never bypass token verification for missing-token broadcasts",
+            isTrusted.invoke(widget, context, untrustedMissingToken) as Boolean,
+        )
+
+        widget.onReceive(context, untrustedMissingToken)
+        assertNotNull(
+            "Rejected missing-token broadcast must trigger safe refresh instead of acting on playback",
+            NowPlayingWidget.pendingUpdateRunnable,
+        )
+    }
+
+    @Test
+    fun validTokenBroadcastPassesValidationWithoutSchedulingSelfHealRefresh() {
+        val validToken = NowPlayingWidget.getWidgetToken(context)
+        val widget = NowPlayingWidget()
+        val isTrusted = NowPlayingWidget::class.java.getDeclaredMethod(
+            "isTrustedWidgetAction",
+            Context::class.java,
+            Intent::class.java,
+        ).apply { isAccessible = true }
+        val authenticBroadcast = Intent(NowPlayingWidget.ACTION_PLAY_PAUSE).apply {
+            putExtra(NowPlayingWidget.EXTRA_WIDGET_TOKEN, validToken)
+        }
+        assertTrue(isTrusted.invoke(widget, context, authenticBroadcast) as Boolean)
+    }
+
+    @Test
     fun allFiveWidgetLayoutsInflateAndBindMetadataSafely() {
         val prefs = context.getSharedPreferences("HomeWidgetPreferences", Context.MODE_PRIVATE)
         prefs.edit()

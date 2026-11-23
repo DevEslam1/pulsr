@@ -208,6 +208,7 @@ private:
     std::vector<float> directRingL_;
     std::vector<float> directRingR_;
     int directPos_ = 0;
+    int lastDirectTaps_ = 0;
 
     // Predelay circular buffer
     std::vector<float> predelayRingL_;

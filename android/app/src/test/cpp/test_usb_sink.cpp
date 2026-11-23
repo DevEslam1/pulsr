@@ -1546,6 +1546,32 @@ int main() {
         Access::stopPull(sink);
     }
 
+    // M-12: Concurrent Close() + controlMutex_ status/geometry accessors must
+    // never deadlock even while worker shutdown runs (controlMutex_ unlocked
+    // around worker_.join()).
+    {
+        using Access = pulsr::UsbAudioSinkTestAccess;
+        auto& sink = UsbAudioSink::instance();
+        Access::prepare(sink, 4, 32, 4096, 0);
+        std::atomic<bool> done{false};
+        std::thread reader([&]() {
+            int calls = 0;
+            while (!done.load(std::memory_order_acquire) && calls < 500) {
+                (void)sink.GetClockStatus();
+                (void)sink.GetBufferedMs();
+                (void)sink.GetBufferedMsFast();
+                (void)sink.IsExclusive();
+                ++calls;
+            }
+        });
+        for (int i = 0; i < 20; ++i) {
+            sink.Close();
+        }
+        done.store(true, std::memory_order_release);
+        reader.join();
+        check(!sink.IsActive(), "Concurrent Close() + clock status inspection finishes cleanly without deadlock");
+    }
+
     if (gFailures != 0) {
         std::cout << "[FAIL] " << gFailures << " USB sink check(s) failed." << std::endl;
         return 1;

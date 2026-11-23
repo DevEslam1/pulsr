@@ -163,6 +163,10 @@ class PulsrEnginePlugins private constructor(
             }
         }
 
+        @JvmStatic
+        fun find(engine: FlutterEngine): PulsrEnginePlugins? =
+            synchronized(lock) { byEngine[engine] }
+
         private fun remove(engine: FlutterEngine) {
             synchronized(lock) {
                 byEngine.remove(engine)

@@ -290,6 +290,16 @@ class YtDownloadPlugin : FlutterPlugin, MethodCallHandler {
                     result.success(false)
                 }
             }
+            // C-05: release an active foreground slot on failure/cancel without emitting 100%.
+            "releaseDownloadJob" -> {
+                val videoId = call.argument<String>("videoId") ?: ""
+                try {
+                    DownloadService.releaseJob(currentContext, videoId)
+                    result.success(true)
+                } catch (e: Exception) {
+                    result.success(false)
+                }
+            }
             "stopDownloadForeground" -> {
                 try {
                     DownloadService.stop(currentContext)

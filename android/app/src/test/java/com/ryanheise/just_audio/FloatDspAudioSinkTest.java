@@ -751,6 +751,7 @@ public class FloatDspAudioSinkTest {
     public void directUsbBackpressureStallsWithoutAdvancingOrDroppingEditedFrames()
             throws Exception {
         final int[] calls = {0};
+        final List<Float> deliveredToUsb = new ArrayList<>();
         NativeDspAudioProcessor processor = new NativeDspAudioProcessor() {
             @Override boolean isNativeAvailableForConfiguration() { return true; }
             @Override boolean isBitPerfectNative() { return true; }
@@ -761,6 +762,9 @@ public class FloatDspAudioSinkTest {
                 calls[0]++;
                 if (calls[0] == 1) {
                     return DIRECT_USB_RETRY;
+                }
+                for (int i = 0; i < frames * channels; i++) {
+                    deliveredToUsb.add(buffer.getFloat(i * 4));
                 }
                 return -frames;
             }
@@ -783,13 +787,11 @@ public class FloatDspAudioSinkTest {
         assertTrue("retry after backpressure must emit exact remaining post-delay frames",
                 wrapper.handleBuffer(pcm, 1000L, 1));
         assertEquals(6, pcm.position());
-        assertEquals(1, sink.writeCount);
-        ByteBuffer emitted = ByteBuffer.allocate(sink.accepted.size()).order(ByteOrder.LITTLE_ENDIAN);
-        for (byte b : sink.accepted) emitted.put(b);
-        emitted.flip();
-        assertEquals(8, emitted.remaining());
-        assertEquals(222.0f / 32768.0f, emitted.getFloat(), 1e-6f);
-        assertEquals(333.0f / 32768.0f, emitted.getFloat(), 1e-6f);
+        // Direct USB exclusively owns the hardware clock and suppresses delegate AudioTrack writes.
+        assertEquals(0, sink.writeCount);
+        assertEquals(2, deliveredToUsb.size());
+        assertEquals(222.0f / 32768.0f, deliveredToUsb.get(0), 1e-6f);
+        assertEquals(333.0f / 32768.0f, deliveredToUsb.get(1), 1e-6f);
 
         wrapper.reset();
         processor.release();
@@ -1231,6 +1233,123 @@ public class FloatDspAudioSinkTest {
         ByteBuffer actual = ByteBuffer.wrap(processor.raw).order(ByteOrder.LITTLE_ENDIAN);
         assertEquals(8192, actual.getShort());
         assertEquals(-8192, actual.getShort());
+        processor.release();
+    }
+
+    @Test
+    public void handleDiscontinuityResetsUsbClockAndGaplessRateChangeRebasesPositionUs()
+            throws Exception {
+        final NativeDecision processor = new NativeDecision() {
+            @Override boolean isUsbExclusiveActive() { return true; }
+            @Override public double getUsbBufferedMs() { return 0.0; }
+            @Override int processNativeBlock(ByteBuffer floatBytes, int frames, int channels,
+                    ByteBuffer gains, ByteBuffer source, int offset, int depth, int rate) {
+                super.processNativeBlock(floatBytes, frames, channels, gains, source, offset, depth, rate);
+                return frames;
+            }
+        };
+        processor.perfect = false;
+        processor.setFloatOutput(true);
+        final FakeSink delegate = new FakeSink();
+        final FloatDspAudioSink wrapper = new FloatDspAudioSink(delegate, processor, true, false, true);
+        wrapper.play();
+
+        // Track 1 @ 48 kHz: feed 4800 frames (100_000 us).
+        wrapper.configure(source(48000, 1, C.ENCODING_PCM_FLOAT), 0, null);
+        final ByteBuffer t1 = ByteBuffer.allocateDirect(4800 * 4).order(ByteOrder.nativeOrder());
+        for (int i = 0; i < 4800; i++) t1.putFloat(0.1f);
+        t1.flip();
+        assertTrue(wrapper.handleBuffer(t1, 1_000_000L, 1));
+        assertEquals(1_100_000L, wrapper.getCurrentPositionUs(false));
+
+        // Gapless sample-rate switch to 96 kHz must accumulate prior 100_000 us and not
+        // misinterpret prior frames at 96 kHz. Feed 9600 frames (another 100_000 us).
+        wrapper.configure(source(96000, 1, C.ENCODING_PCM_FLOAT), 0, null);
+        final ByteBuffer t2 = ByteBuffer.allocateDirect(9600 * 4).order(ByteOrder.nativeOrder());
+        for (int i = 0; i < 9600; i++) t2.putFloat(0.1f);
+        t2.flip();
+        assertTrue(wrapper.handleBuffer(t2, 1_100_000L, 1));
+        assertEquals(1_200_000L, wrapper.getCurrentPositionUs(false));
+
+        // handleDiscontinuity clears USB accumulated clock state cleanly.
+        wrapper.handleDiscontinuity();
+        assertEquals(AudioSink.CURRENT_POSITION_NOT_SET, wrapper.getCurrentPositionUs(false));
+
+        wrapper.reset();
+        processor.release();
+    }
+
+    @Test
+    public void transferPendingFromPcm16DefaultToFloatWidensSamplesCorrectly() throws Exception {
+        final FakeProcessor oldProc = new FakeProcessor();
+        oldProc.output = new AudioFormat(48000, 1, C.ENCODING_PCM_FLOAT);
+        final FakeSink oldDelegate = new FakeSink();
+        oldDelegate.consumption.add(new int[] {0, 0}); // Force pendingOutput retention
+        final FloatDspAudioSink oldWrapper = new FloatDspAudioSink(oldDelegate, oldProc, true, true, false);
+        oldWrapper.configure(source(48000, 1, C.ENCODING_PCM_16BIT), 0, null);
+
+        final ByteBuffer floatOutOld = ByteBuffer.allocateDirect(8).order(ByteOrder.nativeOrder());
+        floatOutOld.putFloat(0.5f).putFloat(-0.5f).flip();
+        oldProc.nextOutput = floatOutOld;
+
+        final ByteBuffer pcm16 = ByteBuffer.allocateDirect(4).order(ByteOrder.LITTLE_ENDIAN);
+        pcm16.putShort((short) 16384).putShort((short) -16384).flip();
+        assertFalse(oldWrapper.handleBuffer(pcm16, 1000L, 1));
+
+        final FakeProcessor newProc = new FakeProcessor();
+        newProc.output = new AudioFormat(48000, 1, C.ENCODING_PCM_FLOAT);
+        final FakeSink newDelegate = new FakeSink();
+        final FloatDspAudioSink replacement = new FloatDspAudioSink(newDelegate, newProc, true, false, false);
+        replacement.configure(source(48000, 1, C.ENCODING_PCM_16BIT), 0, null);
+
+        oldWrapper.transferPendingTo(replacement);
+        assertTrue(replacement.handleBuffer(pcm16, 1000L, 1));
+
+        final byte[] written = acceptedBytes(newDelegate);
+        assertEquals("2 widened float samples must occupy 8 bytes", 8, written.length);
+        final ByteBuffer floatOut = ByteBuffer.wrap(written).order(ByteOrder.nativeOrder());
+        assertEquals(0.5f, floatOut.getFloat(), 1e-3f);
+        assertEquals(-0.5f, floatOut.getFloat(), 1e-3f);
+
+        oldWrapper.reset();
+        replacement.reset();
+    }
+
+    @Test
+    public void directUsbBackpressureStashesAndReplaysPcmWithoutDroppingFrames() throws Exception {
+        final boolean[] forceBackpressure = {true};
+        final int[] deliveredFrames = {0};
+        final NativeDecision processor = new NativeDecision() {
+            @Override boolean isUsbExclusiveActive() { return true; }
+            @Override int processNativeBlock(ByteBuffer floatBytes, int frames, int channels,
+                    ByteBuffer gains, ByteBuffer source, int offset, int depth, int rate) {
+                if (forceBackpressure[0]) {
+                    return NativeDspAudioProcessor.DIRECT_USB_RETRY;
+                }
+                deliveredFrames[0] += frames;
+                return frames;
+            }
+        };
+        processor.perfect = false;
+        processor.setFloatOutput(true);
+        final FakeSink delegate = new FakeSink();
+        final FloatDspAudioSink wrapper = new FloatDspAudioSink(delegate, processor, true, false, true);
+        wrapper.play();
+        wrapper.configure(source(48000, 1, C.ENCODING_PCM_FLOAT), 0, null);
+
+        final ByteBuffer block = ByteBuffer.allocateDirect(16).order(ByteOrder.nativeOrder());
+        block.putFloat(0.2f).putFloat(0.4f).putFloat(-0.4f).putFloat(-0.2f).flip();
+
+        // First write encounters DIRECT_USB_RETRY: input advances into pendingDirectUsbRetryPcm and sink returns false.
+        assertFalse(wrapper.handleBuffer(block, 5000L, 1));
+        assertEquals(0, deliveredFrames[0]);
+
+        // Clearing backpressure drains pendingDirectUsbRetryPcm without duplicating or losing the 4 frames.
+        forceBackpressure[0] = false;
+        assertTrue(wrapper.handleBuffer(block, 5000L, 1));
+        assertEquals(4, deliveredFrames[0]);
+
+        wrapper.reset();
         processor.release();
     }
 }

@@ -23,6 +23,7 @@ public:
     void setEnabled(bool enabled) { enabled_ = enabled; }
     bool isEnabled() const { return enabled_; }
     bool isRamping() const {
+        if (!hasResponse_) return smoothedEnabledMix_ >= 1e-4f;
         return (!enabled_ && smoothedEnabledMix_ >= 1e-4f) ||
                (enabled_ && smoothedEnabledMix_ < 0.9999f) ||
                (filterCrossfadeProgress_ < 1.0f);
@@ -103,7 +104,7 @@ private:
     float historyR_[FIR_TAPS * 2] = {};
     int historyIdx_ = 0;  // Circular buffer write position
 
-    static constexpr int PHASE_DELAY_TAPS = FIR_TAPS / 2;
+    static constexpr int PHASE_DELAY_TAPS = (FIR_TAPS - 1) / 2;
     float phaseDelayL_[PHASE_DELAY_TAPS] = {};
     float phaseDelayR_[PHASE_DELAY_TAPS] = {};
     int phaseDelayIdx_ = 0;

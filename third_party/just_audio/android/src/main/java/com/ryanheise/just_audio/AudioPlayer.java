@@ -906,7 +906,7 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
                     }
                 }
                 boolean effective = enabled && isAaudioOutputSupported();
-                if (effective && !aaudioOutputEnabled) {
+                if (effective && (!aaudioOutputEnabled || changed)) {
                     // Library availability alone says nothing about whether this
                     // device grants the requested sharing mode. Probe a real stream
                     // on a dedicated single-thread executor before accepting.

@@ -485,4 +485,55 @@ public class AudioPlayerLifecycleTest {
                 org.mockito.ArgumentMatchers.nullable(String.class),
                 org.mockito.ArgumentMatchers.isNull());
     }
+
+    @Test
+    public void dspSetAaudioOutputSharedToExclusiveReProbesInsteadOfShortCircuiting() {
+        final List<Boolean> probedExclusives = new ArrayList<>();
+        final AudioPlayer player = new AudioPlayer(
+                RuntimeEnvironment.getApplication(),
+                mock(BinaryMessenger.class),
+                "lifecycle-aaudio-reprobe-" + (++nextId),
+                null,
+                null,
+                null,
+                false,
+                false) {
+            @Override
+            boolean isAaudioOutputSupported() {
+                return true;
+            }
+
+            @Override
+            boolean probeAaudioOutput(int sampleRate, int channels, int targetBufferMs,
+                    boolean preferExclusive) {
+                probedExclusives.add(preferExclusive);
+                return true;
+            }
+        };
+
+        // 1. Enable AAudio in shared mode.
+        final Map<String, Object> sharedArgs = new HashMap<>();
+        sharedArgs.put("enabled", true);
+        sharedArgs.put("preferExclusive", false);
+        sharedArgs.put("targetBufferMs", 20);
+        final MethodChannel.Result res1 = mock(MethodChannel.Result.class);
+        player.onMethodCall(new MethodCall("dspSetAaudioOutput", sharedArgs), res1);
+        org.robolectric.shadows.ShadowLooper.idleMainLooper();
+        verify(res1).success(true);
+
+        // 2. Toggle shared -> exclusive while already enabled must re-probe with preferExclusive=true.
+        final Map<String, Object> exclArgs = new HashMap<>();
+        exclArgs.put("enabled", true);
+        exclArgs.put("preferExclusive", true);
+        exclArgs.put("targetBufferMs", 20);
+        final MethodChannel.Result res2 = mock(MethodChannel.Result.class);
+        player.onMethodCall(new MethodCall("dspSetAaudioOutput", exclArgs), res2);
+        org.robolectric.shadows.ShadowLooper.idleMainLooper();
+        verify(res2).success(true);
+
+        assertEquals(2, probedExclusives.size());
+        assertEquals(Boolean.FALSE, probedExclusives.get(0));
+        assertEquals(Boolean.TRUE, probedExclusives.get(1));
+        player.dispose();
+    }
 }

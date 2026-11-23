@@ -1503,6 +1503,101 @@ static void testConvolutionReverbSurroundToggleCrossfade() {
     std::cout << "PASS: ConvolutionReverb 5.1 surround toggle crossfade verified click-free." << std::endl;
 }
 
+static void testM12EmptyProfileRampingAndSurroundViperDdc() {
+    std::cout << "Testing ArbitraryResponseEq / ViperDdc empty-profile guard, phase delay, and 5.1 ViperDDC..." << std::endl;
+
+    // 1. ArbitraryResponseEq symmetric linear-phase group delay is (FIR_TAPS - 1) / 2 = 2047
+    //    and matches surround dry delay across stereo + surround channels.
+    {
+        ArbitraryResponseEq arb;
+        arb.setSampleRate(48000.0);
+        const bool loadedLinear = arb.loadGraphicEqString("GraphicEq: 20 0; 1000 0; 20000 0", true);
+        assert(loadedLinear && "Linear-phase flat GraphicEq profile must parse cleanly");
+        arb.setEnabled(true);
+        const int totalFrames = 4096;
+        const int ch = 6;
+        // First settle enable ramp so dry/wet mix hits 1.0 cleanly.
+        std::vector<float> warmup(1024 * ch, 0.0f);
+        for (int b = 0; b < 32; ++b) {
+            arb.processInterleaved(warmup.data(), 1024, ch);
+        }
+        std::vector<float> impulse(totalFrames * ch, 0.0f);
+        for (int c = 0; c < ch; ++c) impulse[c] = 1.0f;
+        arb.processInterleaved(impulse.data(), totalFrames, ch);
+
+        auto peakFrameForCh = [&](int channel) {
+            int bestIdx = -1;
+            float bestVal = -1.0f;
+            for (int f = 0; f < totalFrames; ++f) {
+                float a = std::abs(impulse[f * ch + channel]);
+                if (a > bestVal) { bestVal = a; bestIdx = f; }
+            }
+            return bestIdx;
+        };
+        const int stereoPeak = peakFrameForCh(0);
+        const int surroundPeak = peakFrameForCh(2);
+        // Flat linear-phase delay is (FIR_TAPS - 1) * 0.5 = 2047.5, so energy splits symmetrically across [2047, 2048],
+        // while SURROUND_DRY_DELAY = (FIR_TAPS - 1) / 2 = 2047 aligns surround to sample 2047 (and not 2048).
+        assert((stereoPeak == 2047 || stereoPeak == 2048) &&
+               "Linear-phase ArbitraryResponseEq group delay must center on 2047.5");
+        assert(std::abs(impulse[2047 * ch] - impulse[2048 * ch]) < 1e-3f &&
+               "Linear-phase flat kernel must split energy symmetrically at taps 2047 and 2048");
+        assert(surroundPeak == 2047 && "Surround dry delay must match PHASE_DELAY_TAPS (2047 samples)");
+
+        // When switching linearPhase -> minimum-phase during crossfade, phaseDelayL_/R_ aligns the
+        // minimum-phase output to sample 2047 (not 2048) with zero undelayed sample-0 leakage.
+        const bool loadedMin = arb.loadGraphicEqString("GraphicEq: 20 0; 1000 0; 20000 0", false);
+        assert(loadedMin);
+        std::vector<float> cfImpulse(totalFrames * ch, 0.0f);
+        for (int c = 0; c < ch; ++c) cfImpulse[c] = 1.0f;
+        arb.processInterleaved(cfImpulse.data(), 64, ch); // mid-crossfade block
+        assert(std::abs(cfImpulse[0]) < 1e-3f &&
+               "Crossfading linear->min phase must phase-align min-phase path instead of leaking at sample 0");
+    }
+
+    // 2. Empty/unloaded ArbitraryResponseEq & ViperDdc must report !isRamping() even across enable/disable toggles.
+    {
+        ArbitraryResponseEq arb;
+        arb.setSampleRate(48000.0);
+        arb.setEnabled(true);
+        assert(!arb.isRamping() && "Empty ArbitraryResponseEq must not report ramping on enable");
+        arb.setEnabled(false);
+        assert(!arb.isRamping() && "Empty ArbitraryResponseEq must not report ramping on disable");
+
+        ViperDdc ddc;
+        ddc.setSampleRate(48000.0);
+        ddc.setEnabled(true);
+        assert(!ddc.isRamping() && "Empty ViperDdc must not report ramping on enable");
+        ddc.setEnabled(false);
+        assert(!ddc.isRamping() && "Empty ViperDdc must not report ramping on disable");
+    }
+
+    // 3. Active ViperDdc in 6-channel (5.1) interleaved processing must filter surround channels 2..5 too.
+    {
+        ViperDdc ddc;
+        ddc.setSampleRate(48000.0);
+        // -6 dB low-shelf/attenuating biquad at DC/440Hz
+        ddc.loadVdcString("SR_48000\n0.5, 0.0, 0.0, 0.0, 0.0\n");
+        ddc.setEnabled(true);
+
+        const int block = 256;
+        const int ch = 6;
+        std::vector<float> buf(block * ch, 0.8f);
+        for (int iter = 0; iter < 30; ++iter) {
+            std::fill(buf.begin(), buf.end(), 0.8f);
+            ddc.processInterleaved(buf.data(), block, ch);
+        }
+        // After enable ramp settles (~20ms -> 30 blocks = 160ms), every channel 0..5 should approach 0.4f.
+        for (int c = 0; c < ch; ++c) {
+            float sample = buf[(block - 1) * ch + c];
+            assert(std::abs(sample - 0.4f) < 0.02f &&
+                   "ViperDdc multichannel processing must filter all surround channels");
+        }
+    }
+
+    std::cout << "PASS: M-12 ArbitraryResponseEq & ViperDdc fixes verified." << std::endl;
+}
+
 int main() {
     std::cout << "Running DSP effects C++ unit tests..." << std::endl;
     testConvolutionReverbUnityGain();
@@ -1529,6 +1624,7 @@ int main() {
     testStereoWidthPerSampleRampAndNanScrub();
     testLiveProgUtf8Lexer();
     testConvolutionReverbSurroundToggleCrossfade();
+    testM12EmptyProfileRampingAndSurroundViperDdc();
     std::cout << "All DSP effects C++ tests passed successfully!" << std::endl;
     return 0;
 }

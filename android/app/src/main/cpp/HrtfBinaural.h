@@ -162,6 +162,10 @@ public:
     static bool parseWavHrir(const uint8_t* data, size_t size,
                              std::vector<float>& outL, std::vector<float>& outR,
                              int& outChannels, double& outSampleRate);
+    static bool parseWavHrirQuad(const uint8_t* data, size_t size,
+                                 std::vector<float>& outLL, std::vector<float>& outLR,
+                                 std::vector<float>& outRL, std::vector<float>& outRR,
+                                 int& outChannels, double& outSampleRate);
 
     // Default HRIR synthesizer (anechoic head-shadow + pinna ITD/ILD model)
     static HrirQuad synthesizeDefaultHrir(double azimuthDeg, double elevationDeg,
@@ -197,6 +201,8 @@ private:
     std::atomic<int> readySlot_{-1};
     std::atomic<int> activeSlotAtomic_{-1};
     std::atomic<int> oldSlotAtomic_{-1};
+    std::atomic<uint64_t> resetGen_{0};
+    uint64_t lastResetGen_{0};
 
     // Render-thread mirrors of the slot indices. Written only by the render
     // thread (applyPrepared / processFrame).

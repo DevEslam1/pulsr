@@ -592,9 +592,10 @@ bool HrtfBinaural::parseSofaNetCdf3(const uint8_t* data, size_t size, SofaDatase
     return true;
 }
 
-bool HrtfBinaural::parseWavHrir(const uint8_t* data, size_t size,
-                               std::vector<float>& outL, std::vector<float>& outR,
-                               int& outChannels, double& outSampleRate) {
+bool HrtfBinaural::parseWavHrirQuad(const uint8_t* data, size_t size,
+                                     std::vector<float>& outLL, std::vector<float>& outLR,
+                                     std::vector<float>& outRL, std::vector<float>& outRR,
+                                     int& outChannels, double& outSampleRate) {
     if (!data || size < 44) return false;
     if (std::memcmp(data, "RIFF", 4) != 0 || std::memcmp(data + 8, "WAVE", 4) != 0) return false;
 
@@ -628,7 +629,9 @@ bool HrtfBinaural::parseWavHrir(const uint8_t* data, size_t size,
             dataPtr = data + offset;
             dataLen = std::min<size_t>(chunkSize, size - offset);
         }
-        offset += ((chunkSize + 1) & ~1U);
+        const uint64_t paddedChunk = (static_cast<uint64_t>(chunkSize) + 1ULL) & ~1ULL;
+        if (paddedChunk > size - offset) break;
+        offset += static_cast<size_t>(paddedChunk);
     }
 
     if (!dataPtr || channels < 2 || sampleRate == 0) return false;
@@ -639,33 +642,58 @@ bool HrtfBinaural::parseWavHrir(const uint8_t* data, size_t size,
     if (numFrames <= 0) return false;
     numFrames = std::min(numFrames, MAX_HRIR_TAPS);
 
-    outL.resize(numFrames);
-    outR.resize(numFrames);
+    outLL.resize(numFrames);
+    outLR.resize(numFrames);
+    if (channels >= 4) {
+        outRL.resize(numFrames);
+        outRR.resize(numFrames);
+    } else {
+        outRL.clear();
+        outRR.clear();
+    }
     outChannels = channels;
     outSampleRate = static_cast<double>(sampleRate);
 
+    auto decodeSample = [&](const uint8_t* ptr, float& outVal) -> bool {
+        if (format == 3 && bitsPerSample == 32) {
+            outVal = readLeFloat(ptr);
+            return true;
+        }
+        if (format == 1 && bitsPerSample == 16) {
+            outVal = readLeInt16(ptr) / 32768.0f;
+            return true;
+        }
+        if (format == 1 && bitsPerSample == 24) {
+            const int32_t v = (static_cast<int32_t>(ptr[0]) << 8) |
+                              (static_cast<int32_t>(ptr[1]) << 16) |
+                              (static_cast<int32_t>(static_cast<int8_t>(ptr[2])) << 24);
+            outVal = v / 2147483648.0f;
+            return true;
+        }
+        return false;
+    };
+
     for (int i = 0; i < numFrames; ++i) {
         const uint8_t* samplePtr = dataPtr + i * channels * bytesPerSample;
-        if (format == 3 && bitsPerSample == 32) { // IEEE float
-            outL[i] = readLeFloat(samplePtr);
-            outR[i] = readLeFloat(samplePtr + 4);
-        } else if (format == 1 && bitsPerSample == 16) { // PCM 16
-            outL[i] = readLeInt16(samplePtr) / 32768.0f;
-            outR[i] = readLeInt16(samplePtr + 2) / 32768.0f;
-        } else if (format == 1 && bitsPerSample == 24) { // PCM 24
-            int32_t vL = (static_cast<int32_t>(samplePtr[0]) << 8) |
-                         (static_cast<int32_t>(samplePtr[1]) << 16) |
-                         (static_cast<int32_t>(static_cast<int8_t>(samplePtr[2])) << 24);
-            int32_t vR = (static_cast<int32_t>(samplePtr[3]) << 8) |
-                         (static_cast<int32_t>(samplePtr[4]) << 16) |
-                         (static_cast<int32_t>(static_cast<int8_t>(samplePtr[5])) << 24);
-            outL[i] = vL / 2147483648.0f;
-            outR[i] = vR / 2147483648.0f;
-        } else {
+        if (!decodeSample(samplePtr, outLL[i]) ||
+            !decodeSample(samplePtr + bytesPerSample, outLR[i])) {
             return false;
+        }
+        if (channels >= 4) {
+            if (!decodeSample(samplePtr + 2 * bytesPerSample, outRL[i]) ||
+                !decodeSample(samplePtr + 3 * bytesPerSample, outRR[i])) {
+                return false;
+            }
         }
     }
     return true;
+}
+
+bool HrtfBinaural::parseWavHrir(const uint8_t* data, size_t size,
+                               std::vector<float>& outL, std::vector<float>& outR,
+                               int& outChannels, double& outSampleRate) {
+    std::vector<float> unusedRL, unusedRR;
+    return parseWavHrirQuad(data, size, outL, outR, unusedRL, unusedRR, outChannels, outSampleRate);
 }
 
 HrirQuad HrtfBinaural::synthesizeDefaultHrir(double azimuthDeg, double elevationDeg,
@@ -694,7 +722,9 @@ void HrtfBinaural::setSampleRate(double sampleRate) {
     if (std::abs(engineSampleRate_.load(std::memory_order_relaxed) - sampleRate) < 0.01) return;
     prepare(targetAzimuthDeg_.load(std::memory_order_relaxed),
             targetElevationDeg_.load(std::memory_order_relaxed), sampleRate);
-    reset();
+    // Defer buffer/filter state reset to the render thread so control-side rate
+    // changes cannot race process()/processInterleaved().
+    resetGen_.fetch_add(1, std::memory_order_release);
 }
 
 void HrtfBinaural::setEnabled(bool enabled) {
@@ -882,26 +912,31 @@ void HrtfBinaural::publishSlotLocked(int slot) {
 
 void HrtfBinaural::applyPrepared() {
     const int ready = readySlot_.load(std::memory_order_acquire);
-    if (ready < 0 || ready >= kHrirSlotCount) return;
-
-    const int previousActive = activeSlot_;
-    activeSlot_ = ready;
-    oldSlot_ = previousActive;
-    // Crossfade only while the convolver is audible. While disabled the mix is
-    // zero, so switching slots immediately avoids leaving a phantom ramp (and a
-    // needless limiter/latency excursion) after a geometry change.
-    const bool fadeIn = previousActive >= 0 && previousActive != ready &&
-                        enabled_.load(std::memory_order_relaxed);
-    crossfadeProgress_ = fadeIn ? 0.0f : 1.0f;
-    // Publish active/old BEFORE clearing ready: the control writer reads ready
-    // first, so it can never mistake this slot for free in the window between
-    // claiming it and publishing the indices.
-    activeSlotAtomic_.store(activeSlot_, std::memory_order_release);
-    oldSlotAtomic_.store(oldSlot_, std::memory_order_release);
-    int expected = ready;
-    readySlot_.compare_exchange_strong(expected, -1,
-                                       std::memory_order_acq_rel,
-                                       std::memory_order_acquire);
+    if (ready >= 0 && ready < kHrirSlotCount) {
+        const int previousActive = activeSlot_;
+        activeSlot_ = ready;
+        oldSlot_ = previousActive;
+        // Crossfade only while the convolver is audible. While disabled the mix is
+        // zero, so switching slots immediately avoids leaving a phantom ramp (and a
+        // needless limiter/latency excursion) after a geometry change.
+        const bool fadeIn = previousActive >= 0 && previousActive != ready &&
+                            enabled_.load(std::memory_order_relaxed);
+        crossfadeProgress_ = fadeIn ? 0.0f : 1.0f;
+        // Publish active/old BEFORE clearing ready: the control writer reads ready
+        // first, so it can never mistake this slot for free in the window between
+        // claiming it and publishing the indices.
+        activeSlotAtomic_.store(activeSlot_, std::memory_order_release);
+        oldSlotAtomic_.store(oldSlot_, std::memory_order_release);
+        int expected = ready;
+        readySlot_.compare_exchange_strong(expected, -1,
+                                           std::memory_order_acq_rel,
+                                           std::memory_order_acquire);
+    }
+    const uint64_t pendingReset = resetGen_.load(std::memory_order_acquire);
+    if (pendingReset != lastResetGen_) {
+        reset();
+        lastResetGen_ = pendingReset;
+    }
 }
 
 bool HrtfBinaural::loadSofaFile(const std::string& path) {
@@ -1045,22 +1080,28 @@ bool HrtfBinaural::loadWavHrir(const std::string& path) {
 }
 
 bool HrtfBinaural::loadWavHrirMemory(const uint8_t* data, size_t size) {
-    std::vector<float> wavL, wavR;
+    std::vector<float> wavLL, wavLR, wavRL, wavRR;
     int channels = 0;
     double wavSr = 48000.0;
-    if (!parseWavHrir(data, size, wavL, wavR, channels, wavSr)) return false;
+    if (!parseWavHrirQuad(data, size, wavLL, wavLR, wavRL, wavRR, channels, wavSr)) return false;
 
     auto source = std::make_shared<HrirQuad>();
-    source->taps = std::min<int>(static_cast<int>(wavL.size()), MAX_HRIR_TAPS);
+    source->taps = std::min<int>(static_cast<int>(wavLL.size()), MAX_HRIR_TAPS);
     source->sampleRate = wavSr;
     source->azimuthDeg = targetAzimuthDeg_.load(std::memory_order_relaxed);
     source->elevationDeg = targetElevationDeg_.load(std::memory_order_relaxed);
 
-    source->hLL.assign(wavL.begin(), wavL.begin() + source->taps);
-    source->hLR.assign(wavR.begin(), wavR.begin() + source->taps);
-    // Mirror for symmetric virtual stereo pair
-    source->hRR = source->hLL;
-    source->hRL = source->hLR;
+    source->hLL.assign(wavLL.begin(), wavLL.begin() + source->taps);
+    source->hLR.assign(wavLR.begin(), wavLR.begin() + source->taps);
+    if (channels >= 4 && static_cast<int>(wavRL.size()) >= source->taps &&
+        static_cast<int>(wavRR.size()) >= source->taps) {
+        source->hRL.assign(wavRL.begin(), wavRL.begin() + source->taps);
+        source->hRR.assign(wavRR.begin(), wavRR.begin() + source->taps);
+    } else {
+        // Mirror for symmetric virtual stereo pair
+        source->hRR = source->hLL;
+        source->hRL = source->hLR;
+    }
 
     std::lock_guard<std::mutex> lock(prepareMutex_);
     customIrSource_ = std::move(source);

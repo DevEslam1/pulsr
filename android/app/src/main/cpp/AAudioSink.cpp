@@ -198,7 +198,11 @@ bool AAudioSink::TryOpen(aaudio_sharing_mode_t sharing,
 
     AAudioOpenState live{};
     CommitOpenState(/*startSucceeded=*/true, staged, live);
-    bytesPerFrame_ = frameBytes;
+    bytesPerFrame_.store(frameBytes, std::memory_order_release);
+    activeSampleRate_.store(config_.sampleRate, std::memory_order_release);
+    activeChannelCount_.store(config_.channelCount, std::memory_order_release);
+    activeEncoding_.store(static_cast<int32_t>(config_.encoding), std::memory_order_release);
+    activeTargetBufferMs_.store(config_.targetBufferMs, std::memory_order_release);
     exclusive_.store(exclusive, std::memory_order_release);
     // Publish the unity-only verdicts for THIS stream. Only an exclusive open
     // can honour them, so a bit-perfect request that ended up on a SHARED rung
@@ -210,6 +214,7 @@ bool AAudioSink::TryOpen(aaudio_sharing_mode_t sharing,
     readBase_.store(live.readBase, std::memory_order_relaxed);
     readOffset_.store(live.readOffset, std::memory_order_relaxed);
     lastXRunCount_.store(live.lastXRunCount, std::memory_order_relaxed);
+    governorLastXRunCount_.store(live.lastXRunCount, std::memory_order_relaxed);
     initialBufferFrames_.store(live.initialBufferFrames, std::memory_order_release);
     {
         const int64_t nowMs = std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -255,8 +260,13 @@ bool AAudioSink::OpenLocked(const Config& config, std::string* error,
     // to every rung so a rebuild keeps framesWritten_ continuous.
     recoveryAttempts_ = 0;
     config_ = config;
-    bytesPerFrame_ =
+    const int32_t frameBytes =
         ContainerBytesPerFrame(config_.encoding, config_.channelCount);
+    bytesPerFrame_.store(frameBytes, std::memory_order_release);
+    activeSampleRate_.store(config_.sampleRate, std::memory_order_release);
+    activeChannelCount_.store(config_.channelCount, std::memory_order_release);
+    activeEncoding_.store(static_cast<int32_t>(config_.encoding), std::memory_order_release);
+    activeTargetBufferMs_.store(config_.targetBufferMs, std::memory_order_release);
     // Only an explicit bit-perfect request implies unity gain; preferExclusive
     // keeps its historical EXCLUSIVE-only ladder without forcing unity. The
     // unity verdict itself is published by TryOpen() once the stream's sharing
@@ -271,7 +281,7 @@ bool AAudioSink::OpenLocked(const Config& config, std::string* error,
         if (error != nullptr) *error = lastError_;
         return false;
     }
-    if (bytesPerFrame_ <= 0 || config_.sampleRate <= 0 ||
+    if (frameBytes <= 0 || config_.sampleRate <= 0 ||
         config_.channelCount <= 0 || config_.channelCount > 8) {
         lastError_ = "invalid config";
         if (error != nullptr) *error = lastError_;
@@ -398,7 +408,7 @@ bool AAudioSink::RecoverDisconnected() {
 }
 
 void AAudioSink::CloseLocked(bool waitForWriters, bool drainTail) {
-    AAudioStream* st = stream_.exchange(nullptr, std::memory_order_acq_rel);
+    AAudioStream* st = stream_.exchange(nullptr, std::memory_order_seq_cst);
     if (st != nullptr) {
         // This stream was the sink the engines were shaping for; the next one
         // (usually the Java fallback) decides its own depth. Registry, not the
@@ -432,11 +442,11 @@ void AAudioSink::CloseLocked(bool waitForWriters, bool drainTail) {
         // Request stop immediately so any in-flight write unblocks without blocking Close
         AAudioStream_requestStop(st);
         // Wait for any in-flight lock-free queries to finish before closing
-        while (activeReaders_.load(std::memory_order_acquire) > 0) {
+        while (activeReaders_.load(std::memory_order_seq_cst) > 0) {
             std::this_thread::yield();
         }
         if (waitForWriters) {
-            while (activeWriters_.load(std::memory_order_acquire) > 0) {
+            while (activeWriters_.load(std::memory_order_seq_cst) > 0) {
                 std::this_thread::yield();
             }
         }
@@ -451,33 +461,34 @@ void AAudioSink::CloseLocked(bool waitForWriters, bool drainTail) {
 }
 
 void AAudioSink::Close() {
-    releasing_.store(true, std::memory_order_release);
+    releasing_.store(true, std::memory_order_seq_cst);
     std::lock_guard<std::mutex> lock(streamMutex_);
     CloseLocked();
-    releasing_.store(false, std::memory_order_release);
+    releasing_.store(false, std::memory_order_seq_cst);
 }
 
 int32_t AAudioSink::Write(const uint8_t* data, int32_t sizeBytes) {
-    if (bytesPerFrame_ <= 0) return -1;
-    if (sizeBytes < 0 || (sizeBytes % bytesPerFrame_) != 0) return -1;
-
-    // Register as an in-flight writer *before* checking releasing_ so
-    // CloseLocked() cannot observe zero writers and close the stream while we
-    // are about to enter (check-then-increment TOCTOU).
-    activeWriters_.fetch_add(1, std::memory_order_acquire);
+    // Register as an in-flight writer *before* checking releasing_ (Dekker seq_cst
+    // barrier) so CloseLocked() cannot observe zero writers and close the stream
+    // while we are about to enter.
+    activeWriters_.fetch_add(1, std::memory_order_seq_cst);
     struct WriterGuard {
         std::atomic<int32_t>& ref;
-        ~WriterGuard() { ref.fetch_sub(1, std::memory_order_release); }
+        ~WriterGuard() { ref.fetch_sub(1, std::memory_order_seq_cst); }
     } guard{activeWriters_};
 
-    if (releasing_.load(std::memory_order_acquire) ||
+    if (releasing_.load(std::memory_order_seq_cst) ||
         flushing_.load(std::memory_order_acquire)) {
         return 0;
     }
 
+    const int32_t frameBytes = bytesPerFrame_.load(std::memory_order_acquire);
+    if (frameBytes <= 0) return -1;
+    if (sizeBytes < 0 || (sizeBytes % frameBytes) != 0) return -1;
+
     if (recovery_.isDisconnected()) {
         std::unique_lock<std::mutex> lock(streamMutex_, std::try_to_lock);
-        if (!lock.owns_lock() || releasing_.load(std::memory_order_acquire) ||
+        if (!lock.owns_lock() || releasing_.load(std::memory_order_seq_cst) ||
             flushing_.load(std::memory_order_acquire)) {
             return -1;
         }
@@ -500,9 +511,17 @@ int32_t AAudioSink::Write(const uint8_t* data, int32_t sizeBytes) {
     // and framesWritten_ / Flush() rebase synchronization.
     std::lock_guard<std::mutex> writeLock(writeMutex_);
 
-    AAudioStream* st = stream_.load(std::memory_order_acquire);
-    if (st == nullptr || releasing_.load(std::memory_order_acquire) ||
+    AAudioStream* st = stream_.load(std::memory_order_seq_cst);
+    if (st == nullptr || releasing_.load(std::memory_order_seq_cst) ||
         flushing_.load(std::memory_order_acquire)) {
+        return -1;
+    }
+    const int32_t writeFrameBytes = bytesPerFrame_.load(std::memory_order_acquire);
+    const int32_t channels = activeChannelCount_.load(std::memory_order_acquire);
+    const Encoding encoding =
+        static_cast<Encoding>(activeEncoding_.load(std::memory_order_acquire));
+    if (writeFrameBytes <= 0 || channels <= 0 || sizeBytes < 0 ||
+        (sizeBytes % writeFrameBytes) != 0) {
         return -1;
     }
 
@@ -535,16 +554,16 @@ int32_t AAudioSink::Write(const uint8_t* data, int32_t sizeBytes) {
     int32_t maxChunkFrames = 0;
 
     if (applyVol) {
-        if (volumeScratch_.size() >= static_cast<size_t>(bytesPerFrame_)) {
+        if (volumeScratch_.size() >= static_cast<size_t>(writeFrameBytes)) {
             scratchPtr = volumeScratch_.data();
-            maxChunkFrames = static_cast<int32_t>(volumeScratch_.size() / bytesPerFrame_);
+            maxChunkFrames = static_cast<int32_t>(volumeScratch_.size() / writeFrameBytes);
         } else {
             scratchPtr = stackScratch;
-            maxChunkFrames = static_cast<int32_t>(sizeof(stackScratch) / bytesPerFrame_);
+            maxChunkFrames = static_cast<int32_t>(sizeof(stackScratch) / writeFrameBytes);
         }
     }
 
-    const int32_t totalFrames = sizeBytes / bytesPerFrame_;
+    const int32_t totalFrames = sizeBytes / writeFrameBytes;
     int32_t framesLeft = totalFrames;
     const uint8_t* inCursor = data;
     int retries = 0;
@@ -554,9 +573,9 @@ int32_t AAudioSink::Write(const uint8_t* data, int32_t sizeBytes) {
     constexpr int kMaxRetries = 3;
 
     while (framesLeft > 0) {
-        if (releasing_.load(std::memory_order_acquire) ||
+        if (releasing_.load(std::memory_order_seq_cst) ||
             flushing_.load(std::memory_order_acquire) ||
-            stream_.load(std::memory_order_acquire) == nullptr) {
+            stream_.load(std::memory_order_seq_cst) == nullptr) {
             break;
         }
 
@@ -565,7 +584,7 @@ int32_t AAudioSink::Write(const uint8_t* data, int32_t sizeBytes) {
 
         if (applyVol && maxChunkFrames > 0) {
             framesToWrite = std::min(framesLeft, maxChunkFrames);
-            const int32_t chunkBytes = framesToWrite * bytesPerFrame_;
+            const int32_t chunkBytes = framesToWrite * writeFrameBytes;
             std::memcpy(scratchPtr, inCursor, static_cast<size_t>(chunkBytes));
 
             // Spread the ramp over the whole call, not per chunk: a 16 ms call
@@ -580,11 +599,10 @@ int32_t AAudioSink::Write(const uint8_t* data, int32_t sizeBytes) {
                 (curVol - rampStart) * static_cast<float>(framesDone + framesToWrite) /
                     static_cast<float>(totalFrames);
 
-            if (config_.encoding == Encoding::Float) {
+            if (encoding == Encoding::Float) {
                 float* f = reinterpret_cast<float*>(scratchPtr);
                 const float step =
                     (gainEnd - gainStart) / static_cast<float>(framesToWrite);
-                const int32_t channels = config_.channelCount;
                 float gain = gainStart;
                 for (int32_t fr = 0; fr < framesToWrite; ++fr) {
                     // One gain per frame keeps the channels of a frame
@@ -593,29 +611,29 @@ int32_t AAudioSink::Write(const uint8_t* data, int32_t sizeBytes) {
                     for (int32_t c = 0; c < channels; ++c) frame[c] *= gain;
                     gain += step;
                 }
-            } else if (config_.encoding == Encoding::Int16) {
+            } else if (encoding == Encoding::Int16) {
                 ApplyI16VolumeRamp(reinterpret_cast<int16_t*>(scratchPtr), framesToWrite,
-                                   config_.channelCount, gainStart, gainEnd, sinkDither_);
-            } else if (config_.encoding == Encoding::I24Packed) {
-                ApplyI24PackedVolumeRamp(scratchPtr, framesToWrite, config_.channelCount,
+                                   channels, gainStart, gainEnd, sinkDither_);
+            } else if (encoding == Encoding::I24Packed) {
+                ApplyI24PackedVolumeRamp(scratchPtr, framesToWrite, channels,
                                          gainStart, gainEnd, sinkDither_);
-            } else if (config_.encoding == Encoding::Int32) {
+            } else if (encoding == Encoding::Int32) {
                 ApplyI32VolumeRamp(reinterpret_cast<int32_t*>(scratchPtr), framesToWrite,
-                                   config_.channelCount, gainStart, gainEnd, sinkDither_);
+                                   channels, gainStart, gainEnd, sinkDither_);
             }
             writeSrc = scratchPtr;
         }
 
         aaudio_result_t w = AAudioStream_write(st, writeSrc, framesToWrite, kWriteTimeoutNs);
         if (w > 0) {
-            inCursor += w * bytesPerFrame_;
+            inCursor += w * writeFrameBytes;
             framesLeft -= w;
             framesWritten_.fetch_add(w, std::memory_order_relaxed);
             retries = 0;
         } else if (w == AAUDIO_ERROR_TIMEOUT) {
             // A write timeout only delays this block; it is not evidence of an
             // underrun. Buffer growth is driven exclusively by real xruns in
-            // XRunDelta(), otherwise a briefly busy device ratchets latency up
+            // UpdateBufferGovernor(), otherwise a briefly busy device ratchets latency up
             // permanently.
             if (++retries >= kMaxRetries) break;
             continue;  // loop re-checks releasing_ so Close() is never blocked
@@ -641,14 +659,13 @@ int32_t AAudioSink::Write(const uint8_t* data, int32_t sizeBytes) {
                   (static_cast<float>(writtenFrames) / static_cast<float>(totalFrames));
     }
 
-    // Feed the buffer governor from the writer thread. XRunDelta() is the only
-    // adaptation trigger: real underruns grow the buffer, a quiet stream
-    // shrinks it back. Write timeouts must not affect the buffer size.
-    (void)XRunDelta();
+    // Feed the buffer governor from the writer thread independently of XRunDelta()
+    // telemetry so writing audio never swallows xrun counts from Java callers.
+    UpdateBufferGovernor(st);
 
     const int32_t framesWritten = totalFrames - framesLeft;
     if (framesWritten > 0) {
-        return framesWritten * bytesPerFrame_;
+        return framesWritten * writeFrameBytes;
     }
     if (framesLeft == 0) {
         return sizeBytes;
@@ -821,10 +838,10 @@ bool AAudioSink::SetBitPerfect(bool bitPerfect, bool dop) {
 }
 
 int64_t AAudioSink::FramesRead() const {
-    activeReaders_.fetch_add(1, std::memory_order_acquire);
-    AAudioStream* st = stream_.load(std::memory_order_acquire);
+    activeReaders_.fetch_add(1, std::memory_order_seq_cst);
+    AAudioStream* st = stream_.load(std::memory_order_seq_cst);
     int64_t result = 0;
-    if (st != nullptr && !releasing_.load(std::memory_order_acquire)) {
+    if (st != nullptr && !releasing_.load(std::memory_order_seq_cst)) {
         const int64_t read = AAudioStream_getFramesRead(st);
         const int64_t base = readBase_.load(std::memory_order_relaxed);
         result = readOffset_.load(std::memory_order_relaxed) + (read > base ? read - base : 0);
@@ -833,7 +850,7 @@ int64_t AAudioSink::FramesRead() const {
         // to prevent hasPendingData drain loops from hanging indefinitely (B6)
         result = FramesWritten();
     }
-    activeReaders_.fetch_sub(1, std::memory_order_release);
+    activeReaders_.fetch_sub(1, std::memory_order_seq_cst);
     return result;
 }
 
@@ -845,26 +862,26 @@ int64_t AAudioSink::FramesWritten() const {
 }
 
 bool AAudioSink::HasPendingData() const {
-    AAudioStream* st = stream_.load(std::memory_order_acquire);
-    if (st == nullptr || releasing_.load(std::memory_order_acquire)) {
+    AAudioStream* st = stream_.load(std::memory_order_seq_cst);
+    if (st == nullptr || releasing_.load(std::memory_order_seq_cst)) {
         return false;
     }
     return FramesWritten() > FramesRead();
 }
 
 int32_t AAudioSink::XRunCount() const {
-    activeReaders_.fetch_add(1, std::memory_order_acquire);
-    AAudioStream* st = stream_.load(std::memory_order_acquire);
+    activeReaders_.fetch_add(1, std::memory_order_seq_cst);
+    AAudioStream* st = stream_.load(std::memory_order_seq_cst);
     int32_t xruns = 0;
-    if (st != nullptr && !releasing_.load(std::memory_order_acquire)) {
+    if (st != nullptr && !releasing_.load(std::memory_order_seq_cst)) {
         xruns = AAudioStream_getXRunCount(st);
     }
-    activeReaders_.fetch_sub(1, std::memory_order_release);
+    activeReaders_.fetch_sub(1, std::memory_order_seq_cst);
     return xruns;
 }
 
 void AAudioSink::CheckAndAdaptBuffer(AAudioStream* st) const {
-    if (st == nullptr || releasing_.load(std::memory_order_acquire)) return;
+    if (st == nullptr || releasing_.load(std::memory_order_seq_cst)) return;
     const int32_t currentSize = AAudioStream_getBufferSizeInFrames(st);
     const int32_t capacity = AAudioStream_getBufferCapacityInFrames(st);
     const int32_t burst = AAudioStream_getFramesPerBurst(st);
@@ -874,91 +891,94 @@ void AAudioSink::CheckAndAdaptBuffer(AAudioStream* st) const {
     const int32_t step = std::max(burst * 2, burst);
     const int32_t newSize = std::min(currentSize + step, capacity);
     if (newSize > currentSize) {
-        const int32_t applied = AAudioStream_setBufferSizeInFrames(st, newSize);
-        LOGI("AAudio adaptive governor: expanded buffer: %d -> %d frames (capacity=%d)",
-             currentSize, applied, capacity);
+        (void)AAudioStream_setBufferSizeInFrames(st, newSize);
+    }
+}
+
+void AAudioSink::UpdateBufferGovernor(AAudioStream* st) const {
+    if (st == nullptr || releasing_.load(std::memory_order_seq_cst)) return;
+    const int32_t cur = AAudioStream_getXRunCount(st);
+    const int32_t prev = governorLastXRunCount_.exchange(cur, std::memory_order_relaxed);
+    const int32_t delta = cur > prev ? (cur - prev) : 0;
+    const int64_t nowMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now().time_since_epoch()).count();
+    if (delta > 0) {
+        lastXRunTimestampMs_.store(nowMs, std::memory_order_release);
+        CheckAndAdaptBuffer(st);
+    } else {
+        // Slow shrink-back: after 30 s with no underruns, give back two
+        // bursts, at most once per 30 s, never below the initial size.
+        const int64_t lastXRun = lastXRunTimestampMs_.load(std::memory_order_acquire);
+        const int64_t lastShrink = lastShrinkTimestampMs_.load(std::memory_order_acquire);
+        if (lastXRun > 0 && nowMs - lastXRun >= 30000 && nowMs - lastShrink >= 30000) {
+            lastShrinkTimestampMs_.store(nowMs, std::memory_order_release);
+            ShrinkBufferIfStable(st);
+        }
     }
 }
 
 int32_t AAudioSink::XRunDelta() const {
-    activeReaders_.fetch_add(1, std::memory_order_acquire);
-    AAudioStream* st = stream_.load(std::memory_order_acquire);
+    activeReaders_.fetch_add(1, std::memory_order_seq_cst);
+    AAudioStream* st = stream_.load(std::memory_order_seq_cst);
     int32_t delta = 0;
-    if (st != nullptr && !releasing_.load(std::memory_order_acquire)) {
+    if (st != nullptr && !releasing_.load(std::memory_order_seq_cst)) {
         const int32_t cur = AAudioStream_getXRunCount(st);
         const int32_t prev = lastXRunCount_.exchange(cur, std::memory_order_relaxed);
         delta = cur > prev ? (cur - prev) : 0;
-        const int64_t nowMs = std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::steady_clock::now().time_since_epoch()).count();
-        if (delta > 0) {
-            lastXRunTimestampMs_.store(nowMs, std::memory_order_release);
-            CheckAndAdaptBuffer(st);
-        } else {
-            // Slow shrink-back: after 30 s with no underruns, give back two
-            // bursts, at most once per 30 s, never below the initial size.
-            const int64_t lastXRun = lastXRunTimestampMs_.load(std::memory_order_acquire);
-            const int64_t lastShrink = lastShrinkTimestampMs_.load(std::memory_order_acquire);
-            if (lastXRun > 0 && nowMs - lastXRun >= 30000 && nowMs - lastShrink >= 30000) {
-                lastShrinkTimestampMs_.store(nowMs, std::memory_order_release);
-                ShrinkBufferIfStable(st);
-            }
-        }
     }
-    activeReaders_.fetch_sub(1, std::memory_order_release);
+    activeReaders_.fetch_sub(1, std::memory_order_seq_cst);
     return delta;
 }
 
 void AAudioSink::ShrinkBufferIfStable(AAudioStream* st) const {
-    if (st == nullptr || releasing_.load(std::memory_order_acquire)) return;
+    if (st == nullptr || releasing_.load(std::memory_order_seq_cst)) return;
     const int32_t currentSize = AAudioStream_getBufferSizeInFrames(st);
     const int32_t burst = AAudioStream_getFramesPerBurst(st);
     const int32_t initial = initialBufferFrames_.load(std::memory_order_acquire);
     if (burst <= 0 || currentSize <= initial) return;
     const int32_t newSize = std::max(initial, currentSize - burst * 2);
     if (newSize >= currentSize) return;
-    const int32_t applied = AAudioStream_setBufferSizeInFrames(st, newSize);
-    if (applied > 0 && applied < currentSize) {
-        LOGI("AAudio adaptive governor: shrunk buffer: %d -> %d frames (initial=%d)",
-             currentSize, applied, initial);
-    }
+    (void)AAudioStream_setBufferSizeInFrames(st, newSize);
 }
 
 int32_t AAudioSink::BufferCapacityFrames() const {
-    activeReaders_.fetch_add(1, std::memory_order_acquire);
-    AAudioStream* st = stream_.load(std::memory_order_acquire);
+    activeReaders_.fetch_add(1, std::memory_order_seq_cst);
+    AAudioStream* st = stream_.load(std::memory_order_seq_cst);
     int32_t cap = 0;
-    if (st != nullptr && !releasing_.load(std::memory_order_acquire)) {
+    if (st != nullptr && !releasing_.load(std::memory_order_seq_cst)) {
         cap = AAudioStream_getBufferCapacityInFrames(st);
     }
-    activeReaders_.fetch_sub(1, std::memory_order_release);
+    activeReaders_.fetch_sub(1, std::memory_order_seq_cst);
     return cap;
 }
 
 int32_t AAudioSink::DeviceId() const {
-    activeReaders_.fetch_add(1, std::memory_order_acquire);
-    AAudioStream* st = stream_.load(std::memory_order_acquire);
-    const int32_t id = st != nullptr && !releasing_.load(std::memory_order_acquire)
+    activeReaders_.fetch_add(1, std::memory_order_seq_cst);
+    AAudioStream* st = stream_.load(std::memory_order_seq_cst);
+    const int32_t id = st != nullptr && !releasing_.load(std::memory_order_seq_cst)
         ? AAudioStream_getDeviceId(st) : 0;
-    activeReaders_.fetch_sub(1, std::memory_order_release);
+    activeReaders_.fetch_sub(1, std::memory_order_seq_cst);
     return id;
 }
 
 int32_t AAudioSink::FramesPerBurst() const {
-    activeReaders_.fetch_add(1, std::memory_order_acquire);
-    AAudioStream* st = stream_.load(std::memory_order_acquire);
+    activeReaders_.fetch_add(1, std::memory_order_seq_cst);
+    AAudioStream* st = stream_.load(std::memory_order_seq_cst);
     int32_t burst = 0;
-    if (st != nullptr && !releasing_.load(std::memory_order_acquire)) {
+    if (st != nullptr && !releasing_.load(std::memory_order_seq_cst)) {
         burst = AAudioStream_getFramesPerBurst(st);
     }
-    activeReaders_.fetch_sub(1, std::memory_order_release);
+    activeReaders_.fetch_sub(1, std::memory_order_seq_cst);
     return burst;
 }
 
 int64_t AAudioSink::GetTimestampLatencyFrames() const {
-    activeReaders_.fetch_add(1, std::memory_order_acquire);
-    AAudioStream* st = stream_.load(std::memory_order_acquire);
+    activeReaders_.fetch_add(1, std::memory_order_seq_cst);
+    AAudioStream* st = stream_.load(std::memory_order_seq_cst);
     int64_t latency = 0;
-    if (st != nullptr && !releasing_.load(std::memory_order_acquire)) {
+    const int32_t sr = activeSampleRate_.load(std::memory_order_acquire);
+    const int32_t effSr = sr > 0 ? sr : 48000;
+    if (st != nullptr && !releasing_.load(std::memory_order_seq_cst)) {
         int64_t framePosition = 0;
         int64_t timeNanoseconds = 0;
         aaudio_result_t res = AAudioStream_getTimestamp(st, CLOCK_MONOTONIC, &framePosition, &timeNanoseconds);
@@ -967,9 +987,8 @@ int64_t AAudioSink::GetTimestampLatencyFrames() const {
             clock_gettime(CLOCK_MONOTONIC, &ts);
             const int64_t nowNs = static_cast<int64_t>(ts.tv_sec) * 1000000000LL + ts.tv_nsec;
             const int64_t elapsedNs = nowNs - timeNanoseconds;
-            const int32_t sr = config_.sampleRate > 0 ? config_.sampleRate : 48000;
             const int64_t elapsedFrames = (elapsedNs > 0)
-                ? static_cast<int64_t>(static_cast<double>(elapsedNs) * 1e-9 * sr)
+                ? static_cast<int64_t>(static_cast<double>(elapsedNs) * 1e-9 * effSr)
                 : 0;
             const int64_t dacPos = framePosition + elapsedFrames;
             const int64_t netWritten = FramesWritten();
@@ -982,14 +1001,16 @@ int64_t AAudioSink::GetTimestampLatencyFrames() const {
             latency = -static_cast<int64_t>(AAudioStream_getBufferCapacityInFrames(st));
         }
     } else {
-        latency = -static_cast<int64_t>((static_cast<int64_t>(config_.sampleRate) * std::max(config_.targetBufferMs, 20)) / 1000);
+        const int32_t targetMs = activeTargetBufferMs_.load(std::memory_order_acquire);
+        latency = -static_cast<int64_t>((static_cast<int64_t>(effSr) * std::max(targetMs, 20)) / 1000);
     }
-    activeReaders_.fetch_sub(1, std::memory_order_release);
+    activeReaders_.fetch_sub(1, std::memory_order_seq_cst);
     return latency;
 }
 
 double AAudioSink::GetOutputLatencyMs() const {
-    const int32_t sr = config_.sampleRate > 0 ? config_.sampleRate : 48000;
+    const int32_t rawSr = activeSampleRate_.load(std::memory_order_acquire);
+    const int32_t sr = rawSr > 0 ? rawSr : 48000;
     const int64_t latencyFrames = GetTimestampLatencyFrames();
     if (latencyFrames < 0) {
         const int64_t cap = -latencyFrames;

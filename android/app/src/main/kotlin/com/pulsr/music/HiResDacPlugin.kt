@@ -33,6 +33,12 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         private const val METHOD_CHANNEL = "com.pulsr.music/hires_dac"
         private const val EVENT_CHANNEL = "com.pulsr.music/hires_dac_events"
         private const val REQUEST_CODE_BT_CONNECT = 9876
+        private val VALID_TARGET_SAMPLE_RATES = setOf(
+            0, 8000, 11025, 12000, 16000, 22050, 24000, 32000,
+            44100, 48000, 88200, 96000, 176400, 192000,
+            352800, 384000, 705600, 768000,
+        )
+        private val VALID_TARGET_BIT_DEPTHS = setOf(0, 16, 24, 32)
 
         internal fun clearMixerOwnership(clear: () -> Any?, release: () -> Unit): Boolean {
             val confirmed = try { clear() == true } catch (_: Throwable) { false }
@@ -232,6 +238,7 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         probeHandler.postDelayed(deviceChangeDebounce, 200L)
     }
 
+    private val bitPerfectLock = Any()
     @Volatile private var bitPerfectRequested: Boolean = false
     @Volatile private var directRouteFallbackActive: Boolean = false
     @Volatile private var mixerAttributesApplied: Boolean = false
@@ -333,12 +340,16 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
             override fun onReceive(context: Context?, intent: Intent?) {
                 when (intent?.action) {
                     UsbManager.ACTION_USB_DEVICE_DETACHED -> {
-                        if (bitPerfectRequested || directRouteFallbackActive) {
-                            bitPerfectRequested = false
-                            directRouteFallbackActive = false
-                            try { applyBitPerfectMode(false) } catch (_: Exception) {}
+                        probeHandler.post {
+                            synchronized(bitPerfectLock) {
+                                if (bitPerfectRequested || directRouteFallbackActive) {
+                                    bitPerfectRequested = false
+                                    directRouteFallbackActive = false
+                                    try { applyBitPerfectMode(false) } catch (_: Exception) {}
+                                }
+                                lastBitPerfectReason = null
+                            }
                         }
-                        lastBitPerfectReason = null
                         invalidateDirectFormatsCache()
                         invalidateDsdProbeCache()
                         scheduleDeviceChange()
@@ -470,8 +481,11 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
             "setBitPerfectMode" -> {
                 val enabled = call.argument<Boolean>("enabled") ?: false
                 runOnProbeThread(result, "BIT_PERFECT_MODE_FAILED", "Failed to apply bit-perfect mode") {
-                    val success = applyBitPerfectMode(enabled)
-                    if (success) bitPerfectRequested = enabled && !directRouteFallbackActive
+                    val success = synchronized(bitPerfectLock) {
+                        val applied = applyBitPerfectMode(enabled)
+                        if (applied) bitPerfectRequested = enabled && !directRouteFallbackActive
+                        applied
+                    }
                     notifyDeviceChange()
                     success
                 }
@@ -479,8 +493,11 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
             "setBitPerfectModeDetailed" -> {
                 val enabled = call.argument<Boolean>("enabled") ?: false
                 runOnProbeThread(result, "BIT_PERFECT_MODE_FAILED", "Failed to apply bit-perfect mode") {
-                    val success = applyBitPerfectMode(enabled)
-                    if (success) bitPerfectRequested = enabled && !directRouteFallbackActive
+                    val (success, reason) = synchronized(bitPerfectLock) {
+                        val applied = applyBitPerfectMode(enabled)
+                        if (applied) bitPerfectRequested = enabled && !directRouteFallbackActive
+                        applied to lastBitPerfectReason
+                    }
                     notifyDeviceChange()
                     // Rebuild instead of reading the cached map: the route and sink
                     // state just changed, so a cached copy would describe the mode
@@ -488,7 +505,7 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
                     val details = getAudioOutputDetails(forceRefresh = true)
                     mapOf(
                         "success" to success,
-                        "reason" to lastBitPerfectReason,
+                        "reason" to reason,
                         "sinkBitDepth" to details["sinkBitDepth"],
                         "sinkSampleRate" to details["sinkSampleRate"],
                     )
@@ -590,10 +607,16 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
                     audioManager?.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
                         ?.firstOrNull { it.id == id }
                 }
-                if (target != null && !isUsbOutputType(target.type) &&
-                    (bitPerfectRequested || directRouteFallbackActive || mixerAttributesApplied)) {
-                    applyBitPerfectMode(false)
-                    notifyDeviceChange()
+                if (target != null && !isUsbOutputType(target.type)) {
+                    val cleared = synchronized(bitPerfectLock) {
+                        if (bitPerfectRequested || directRouteFallbackActive || mixerAttributesApplied) {
+                            applyBitPerfectMode(false)
+                            true
+                        } else {
+                            false
+                        }
+                    }
+                    if (cleared) notifyDeviceChange()
                 }
                 val response = applyPreferredOutputDevice(deviceId)
                 if (response["success"] != true || deviceId == null ||
@@ -605,8 +628,10 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
             }
             "clearOutputDevice" -> {
                 ++routeRequestGeneration
-                if (bitPerfectRequested || directRouteFallbackActive || mixerAttributesApplied) {
-                    applyBitPerfectMode(false)
+                synchronized(bitPerfectLock) {
+                    if (bitPerfectRequested || directRouteFallbackActive || mixerAttributesApplied) {
+                        applyBitPerfectMode(false)
+                    }
                 }
                 val cleared = com.ryanheise.just_audio.PulsrOutputRouting.select(null)
                 if (cleared) {
@@ -672,37 +697,53 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         "setTargetOutputFormat", "configureTargetAudio" -> {
                 val sampleRate = call.argument<Int>("sampleRate") ?: 0
                 val bitDepth = call.argument<Int>("bitDepth") ?: 0
-                if (sampleRate !in setOf(0, 44100, 48000, 88200, 96000, 176400, 192000, 352800, 384000, 705600, 768000) ||
-                    bitDepth !in setOf(0, 16, 24, 32)) {
+                if (sampleRate !in VALID_TARGET_SAMPLE_RATES ||
+                    bitDepth !in VALID_TARGET_BIT_DEPTHS) {
                     result.error("INVALID_FORMAT", "Unsupported target sample rate or bit depth", null)
                     return
                 }
-                if (!bitPerfectRequested && (sampleRate != 0 || bitDepth != 0)) {
-                    result.success(false)
-                    return
-                }
-                val previousRate = targetSampleRate
-                val previousDepth = targetBitDepth
-                if (previousRate == sampleRate && previousDepth == bitDepth && mixerAttributesApplied) {
-                    result.success(true)
-                    return
-                }
-                targetSampleRate = sampleRate
-                targetBitDepth = bitDepth
-                if (!bitPerfectRequested) {
-                    notifyDeviceChange()
-                    result.success(true)
-                    return
+                synchronized(bitPerfectLock) {
+                    if (!bitPerfectRequested && (sampleRate != 0 || bitDepth != 0)) {
+                        result.success(false)
+                        return
+                    }
+                    if (targetSampleRate == sampleRate &&
+                        targetBitDepth == bitDepth &&
+                        mixerAttributesApplied) {
+                        result.success(true)
+                        return
+                    }
                 }
                 runOnProbeThread(result, "TARGET_FORMAT_FAILED", "Failed to apply target output format") {
-                    val applied = applyBitPerfectMode(true)
-                    if (!applied) {
-                        targetSampleRate = previousRate
-                        targetBitDepth = previousDepth
-                        applyBitPerfectMode(true)
+                    var shouldNotify = false
+                    val outcome = synchronized(bitPerfectLock) {
+                        if (!bitPerfectRequested && (sampleRate != 0 || bitDepth != 0)) {
+                            return@synchronized false
+                        }
+                        val previousRate = targetSampleRate
+                        val previousDepth = targetBitDepth
+                        if (previousRate == sampleRate && previousDepth == bitDepth && mixerAttributesApplied) {
+                            return@synchronized true
+                        }
+                        targetSampleRate = sampleRate
+                        targetBitDepth = bitDepth
+                        if (!bitPerfectRequested) {
+                            shouldNotify = true
+                            return@synchronized true
+                        }
+                        val applied = applyBitPerfectMode(true)
+                        if (!applied) {
+                            targetSampleRate = previousRate
+                            targetBitDepth = previousDepth
+                            applyBitPerfectMode(true)
+                        }
+                        shouldNotify = true
+                        applied
                     }
-                    notifyDeviceChange()
-                    applied
+                    if (shouldNotify) {
+                        notifyDeviceChange()
+                    }
+                    outcome
                 }
             }
             else -> result.notImplemented()

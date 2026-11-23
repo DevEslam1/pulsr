@@ -312,8 +312,8 @@ public:
             ? static_cast<int>(status & 0xff) : 0;
     }
 
-    int sampleRate() const { return sampleRate_; }
-    int channels() const { return channels_; }
+    int sampleRate() const { return sampleRate_.load(std::memory_order_acquire); }
+    int channels() const { return channels_.load(std::memory_order_acquire); }
 
 private:
     UsbAudioSink() = default;
@@ -454,14 +454,17 @@ private:
     uint8_t dopMarkerPhase_ = kDopMarkerA;
     std::atomic<uint64_t> rawPcmStatus_{0}; // delivery epoch in high bits, depth in low byte
     std::atomic<uint64_t> deliveryEpoch_{0};
-    // Open/Close/Abandon plus the status getters; never render/worker.
-    // Mutable so the const status getter can serialise with control teardown.
+    // Lifecycle serialization (Open/Close/Abandon) so worker_.join() can run
+    // with controlMutex_ released while preventing concurrent Open/Close races.
+    mutable std::mutex lifecycleMutex_;
+    // Protects shared stream buffers/teardown state against status getters;
+    // never held across blocking worker_.join().
     mutable std::mutex controlMutex_;
     bool sinkDepthPublished_ = false;
 
     // Requested shape of the live stream (UsbRenderMode). Reset on teardown so
     // a stale mode cannot colour the status of the next stream.
-    int renderMode_ = 0;
+    std::atomic<int> renderMode_{0};
     // SetStreamTuning() values, applied by the next Open().
     int tunedTransferSizeBytes_ = 0;
     int tunedBufferMs_ = 0;
@@ -508,10 +511,10 @@ private:
     int endpoint_ = 0;
     int interfaceNumber_ = -1;
     int altSetting_ = 0;
-    int sampleRate_ = 48000;
-    int channels_ = 2;
-    int bytesPerSample_ = 2;  // wire subslot bytes
-    int validBitDepth_ = 16;
+    std::atomic<int> sampleRate_{48000};
+    std::atomic<int> channels_{2};
+    std::atomic<int> bytesPerSample_{2};  // wire subslot bytes
+    std::atomic<int> validBitDepth_{16};
     // TPDF state for the packing step. Persists across blocks on purpose: a
     // per-call state would restart the sequence every block and make the dither
     // noise periodic, which is a tonal artifact instead of a noise floor.
@@ -522,7 +525,7 @@ private:
     UsbGapFader gapFader_;
     bool claimed_ = false;
 
-    int packetsPerUrb_ = 8;
+    std::atomic<int> packetsPerUrb_{8};
     int bytesPerPacket_ = 0;
     int bytesPerUrb_ = 0;
 
@@ -534,12 +537,12 @@ private:
     // (== sampleRate_ until a feedback sample arrives). Atomic because the
     // status getter reads it from the control/JNI side while the worker steers.
     uint64_t frameAccumulator_ = 0;
-    int serviceIntervalUs_ = 0;
+    std::atomic<int> serviceIntervalUs_{0};
     int maxFramesPerPacket_ = 0;
     std::atomic<int> feedbackRatePerSec_{0};
 
     // Async feedback IN endpoint (0 => DAC has no feedback endpoint).
-    int feedbackEndpoint_ = 0;
+    std::atomic<int> feedbackEndpoint_{0};
     int feedbackPacketSize_ = 0;
     int feedbackPacketsPerUrb_ = 0;
     int numFeedbackUrbs_ = 0;
@@ -559,7 +562,7 @@ private:
     std::vector<int> urbRawDepth_;
     std::vector<uint64_t> urbDeliveryEpoch_;
     size_t urbStride_ = 0;
-    int numUrbs_ = 0;
+    std::atomic<int> numUrbs_{0};
 
     // Lock-free single-producer single-consumer (SPSC) frame ring buffer.
     // Audio thread produces; USB worker thread consumes. Wait-free for audio thread.

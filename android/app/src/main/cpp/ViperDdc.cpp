@@ -104,18 +104,15 @@ void ViperDdc::setSampleRate(double sampleRate) {
 }
 
 void ViperDdc::reset() {
-    for (auto& sec : activeSections_) {
-        sec.v1L = 0.0; sec.v2L = 0.0;
-        sec.v1R = 0.0; sec.v2R = 0.0;
-    }
-    for (auto& sec : sections441_) {
-        sec.v1L = 0.0; sec.v2L = 0.0;
-        sec.v1R = 0.0; sec.v2R = 0.0;
-    }
-    for (auto& sec : sections480_) {
-        sec.v1L = 0.0; sec.v2L = 0.0;
-        sec.v1R = 0.0; sec.v2R = 0.0;
-    }
+    auto zeroSections = [](std::vector<Section>& secs) {
+        for (auto& sec : secs) {
+            std::fill(std::begin(sec.v1), std::end(sec.v1), 0);
+            std::fill(std::begin(sec.v2), std::end(sec.v2), 0);
+        }
+    };
+    zeroSections(activeSections_);
+    zeroSections(sections441_);
+    zeroSections(sections480_);
     crossfadeSections_.clear();
     sectionCrossfadeProgress_ = 1.0f;
     smoothedEnabledMix_ = (enabled_ && !activeSections_.empty()) ? 1.0f : 0.0f;
@@ -262,10 +259,10 @@ void ViperDdc::updateActiveSections() {
         const size_t oldSize = crossfadeSections_.size();
         activeSections_.assign(target->begin(), target->end());
         for (size_t s = 0; s < activeSections_.size() && s < oldSize; ++s) {
-            activeSections_[s].v1L = crossfadeSections_[s].v1L;
-            activeSections_[s].v2L = crossfadeSections_[s].v2L;
-            activeSections_[s].v1R = crossfadeSections_[s].v1R;
-            activeSections_[s].v2R = crossfadeSections_[s].v2R;
+            for (int c = 0; c < MAX_CHANNELS; ++c) {
+                activeSections_[s].v1[c] = crossfadeSections_[s].v1[c];
+                activeSections_[s].v2[c] = crossfadeSections_[s].v2[c];
+            }
         }
     } else {
         activeSections_.clear();
@@ -312,7 +309,7 @@ void ViperDdc::applyParams(const ViperDdcParamSet& params) {
 
 namespace {
 #if defined(PULSR_F32_BIQUADS)
-inline void filterDdcStereo(std::vector<ViperDdc::Section>& sections, float& l, float& r) {
+inline void filterDdcSample(std::vector<ViperDdc::Section>& sections, int ch, float& x) {
     for (auto& sec : sections) {
         const float a1_f = static_cast<float>(sec.a1);
         const float a2_f = static_cast<float>(sec.a2);
@@ -320,45 +317,27 @@ inline void filterDdcStereo(std::vector<ViperDdc::Section>& sections, float& l, 
         const float b1_f = static_cast<float>(sec.b1);
         const float b2_f = static_cast<float>(sec.b2);
 
-        float wL = l - a1_f * sec.v1L - a2_f * sec.v2L;
-        float yL = b0_f * wL + b1_f * sec.v1L + b2_f * sec.v2L;
-        if (!std::isfinite(wL) || !std::isfinite(yL)) {
-            sec.v1L = 0.0f; sec.v2L = 0.0f; wL = 0.0f; yL = 0.0f;
+        float w = x - a1_f * sec.v1[ch] - a2_f * sec.v2[ch];
+        float y = b0_f * w + b1_f * sec.v1[ch] + b2_f * sec.v2[ch];
+        if (!std::isfinite(w) || !std::isfinite(y)) {
+            sec.v1[ch] = 0.0f; sec.v2[ch] = 0.0f; w = 0.0f; y = 0.0f;
         }
-        if (std::abs(wL) < 1e-30f) wL = 0.0f;
-        sec.v2L = sec.v1L; sec.v1L = wL;
-        l = yL;
-
-        float wR = r - a1_f * sec.v1R - a2_f * sec.v2R;
-        float yR = b0_f * wR + b1_f * sec.v1R + b2_f * sec.v2R;
-        if (!std::isfinite(wR) || !std::isfinite(yR)) {
-            sec.v1R = 0.0f; sec.v2R = 0.0f; wR = 0.0f; yR = 0.0f;
-        }
-        if (std::abs(wR) < 1e-30f) wR = 0.0f;
-        sec.v2R = sec.v1R; sec.v1R = wR;
-        r = yR;
+        if (std::abs(w) < 1e-30f) w = 0.0f;
+        sec.v2[ch] = sec.v1[ch]; sec.v1[ch] = w;
+        x = y;
     }
 }
 #else
-inline void filterDdcStereo(std::vector<ViperDdc::Section>& sections, double& l, double& r) {
+inline void filterDdcSample(std::vector<ViperDdc::Section>& sections, int ch, double& x) {
     for (auto& sec : sections) {
-        double wL = l - sec.a1 * sec.v1L - sec.a2 * sec.v2L;
-        double yL = sec.b0 * wL + sec.b1 * sec.v1L + sec.b2 * sec.v2L;
-        if (!std::isfinite(wL) || !std::isfinite(yL)) {
-            sec.v1L = 0.0; sec.v2L = 0.0; wL = 0.0; yL = 0.0;
+        double w = x - sec.a1 * sec.v1[ch] - sec.a2 * sec.v2[ch];
+        double y = sec.b0 * w + sec.b1 * sec.v1[ch] + sec.b2 * sec.v2[ch];
+        if (!std::isfinite(w) || !std::isfinite(y)) {
+            sec.v1[ch] = 0.0; sec.v2[ch] = 0.0; w = 0.0; y = 0.0;
         }
-        if (std::abs(wL) < 1e-30) wL = 0.0;
-        sec.v2L = sec.v1L; sec.v1L = wL;
-        l = yL;
-
-        double wR = r - sec.a1 * sec.v1R - sec.a2 * sec.v2R;
-        double yR = sec.b0 * wR + sec.b1 * sec.v1R + sec.b2 * sec.v2R;
-        if (!std::isfinite(wR) || !std::isfinite(yR)) {
-            sec.v1R = 0.0; sec.v2R = 0.0; wR = 0.0; yR = 0.0;
-        }
-        if (std::abs(wR) < 1e-30) wR = 0.0;
-        sec.v2R = sec.v1R; sec.v1R = wR;
-        r = yR;
+        if (std::abs(w) < 1e-30) w = 0.0;
+        sec.v2[ch] = sec.v1[ch]; sec.v1[ch] = w;
+        x = y;
     }
 }
 #endif
@@ -366,7 +345,7 @@ inline void filterDdcStereo(std::vector<ViperDdc::Section>& sections, double& l,
 
 void ViperDdc::process(float* L, float* R, int frames) {
     const float targetEnabledMix = (enabled_ && !activeSections_.empty()) ? 1.0f : 0.0f;
-    if (!enabled_ && smoothedEnabledMix_ < 1e-4f) return;
+    if (targetEnabledMix <= 0.0f && smoothedEnabledMix_ < 1e-4f) return;
     if (!L || !R || frames <= 0) return;
 
     // Asymmetric smoothing: fast cut (15ms) on disable, smooth ramp (25ms) on enable
@@ -393,7 +372,8 @@ void ViperDdc::process(float* L, float* R, int frames) {
         double curL = std::isfinite(inL) ? static_cast<double>(inL) : 0.0;
         double curR = std::isfinite(inR) ? static_cast<double>(inR) : 0.0;
 #endif
-        filterDdcStereo(activeSections_, curL, curR);
+        filterDdcSample(activeSections_, 0, curL);
+        filterDdcSample(activeSections_, 1, curR);
         float wetL = static_cast<float>(curL);
         float wetR = static_cast<float>(curR);
 
@@ -405,7 +385,8 @@ void ViperDdc::process(float* L, float* R, int frames) {
             double oldL = std::isfinite(inL) ? static_cast<double>(inL) : 0.0;
             double oldR = std::isfinite(inR) ? static_cast<double>(inR) : 0.0;
 #endif
-            filterDdcStereo(crossfadeSections_, oldL, oldR);
+            filterDdcSample(crossfadeSections_, 0, oldL);
+            filterDdcSample(crossfadeSections_, 1, oldR);
             const float cfAngle = sectionCrossfadeProgress_ * (static_cast<float>(M_PI) * 0.5f);
             const float oldW = std::cos(cfAngle);
             const float newW = std::sin(cfAngle);
@@ -442,7 +423,7 @@ void ViperDdc::process(float* L, float* R, int frames) {
 
 void ViperDdc::processInterleaved(float* buffer, int frames, int channels) {
     const float targetEnabledMix = (enabled_ && !activeSections_.empty()) ? 1.0f : 0.0f;
-    if (!enabled_ && smoothedEnabledMix_ < 1e-4f) return;
+    if (targetEnabledMix <= 0.0f && smoothedEnabledMix_ < 1e-4f) return;
     if (!buffer || frames <= 0 || channels < 1) return;
 
     // Asymmetric smoothing: fast cut (15ms) on disable, smooth ramp (25ms) on enable
@@ -457,44 +438,17 @@ void ViperDdc::processInterleaved(float* buffer, int frames, int channels) {
     float currentEnabledMix = startEnabledMix;
 
     const float crossfadeStep = 1.0f / static_cast<float>(sampleRate_ * 0.020);
+    const int activeChannels = std::min(channels, MAX_CHANNELS);
 
     for (int i = 0; i < frames; ++i) {
-        const float inL = buffer[i * channels];
-        const float inR = (channels > 1) ? buffer[i * channels + 1] : inL;
-
-#if defined(PULSR_F32_BIQUADS)
-        float curL = std::isfinite(inL) ? inL : 0.0f;
-        float curR = std::isfinite(inR) ? inR : 0.0f;
-#else
-        double curL = std::isfinite(inL) ? static_cast<double>(inL) : 0.0;
-        double curR = std::isfinite(inR) ? static_cast<double>(inR) : 0.0;
-#endif
-        filterDdcStereo(activeSections_, curL, curR);
-        float wetL = static_cast<float>(curL);
-        float wetR = static_cast<float>(curR);
-
-        if (sectionCrossfadeProgress_ < 1.0f && !crossfadeSections_.empty()) {
-#if defined(PULSR_F32_BIQUADS)
-            float oldL = std::isfinite(inL) ? inL : 0.0f;
-            float oldR = std::isfinite(inR) ? inR : 0.0f;
-#else
-            double oldL = std::isfinite(inL) ? static_cast<double>(inL) : 0.0;
-            double oldR = std::isfinite(inR) ? static_cast<double>(inR) : 0.0;
-#endif
-            filterDdcStereo(crossfadeSections_, oldL, oldR);
+        const bool crossfading = sectionCrossfadeProgress_ < 1.0f && !crossfadeSections_.empty();
+        float oldW = 0.0f;
+        float newW = 1.0f;
+        if (crossfading) {
             const float cfAngle = sectionCrossfadeProgress_ * (static_cast<float>(M_PI) * 0.5f);
-            const float oldW = std::cos(cfAngle);
-            const float newW = std::sin(cfAngle);
-            wetL = oldW * static_cast<float>(oldL) + newW * wetL;
-            wetR = oldW * static_cast<float>(oldR) + newW * wetR;
-            sectionCrossfadeProgress_ = std::min(1.0f, sectionCrossfadeProgress_ + crossfadeStep);
-            if (sectionCrossfadeProgress_ >= 1.0f) {
-                crossfadeSections_.clear();
-            }
+            oldW = std::cos(cfAngle);
+            newW = std::sin(cfAngle);
         }
-
-        if (!std::isfinite(wetL)) wetL = 0.0f;
-        if (!std::isfinite(wetR)) wetR = 0.0f;
 
         // Equal-power crossfading for wet/dry enable/disable
         float dryW, wetW;
@@ -510,9 +464,34 @@ void ViperDdc::processInterleaved(float* buffer, int frames, int channels) {
             wetW = std::sin(angle);
         }
 
-        buffer[i * channels] = dryW * inL + wetW * wetL;
-        if (channels > 1) {
-            buffer[i * channels + 1] = dryW * inR + wetW * wetR;
+        const int baseIdx = i * channels;
+        for (int ch = 0; ch < activeChannels; ++ch) {
+            const float inSample = buffer[baseIdx + ch];
+#if defined(PULSR_F32_BIQUADS)
+            float cur = std::isfinite(inSample) ? inSample : 0.0f;
+#else
+            double cur = std::isfinite(inSample) ? static_cast<double>(inSample) : 0.0;
+#endif
+            filterDdcSample(activeSections_, ch, cur);
+            float wet = static_cast<float>(cur);
+            if (crossfading) {
+#if defined(PULSR_F32_BIQUADS)
+                float old = std::isfinite(inSample) ? inSample : 0.0f;
+#else
+                double old = std::isfinite(inSample) ? static_cast<double>(inSample) : 0.0;
+#endif
+                filterDdcSample(crossfadeSections_, ch, old);
+                wet = oldW * static_cast<float>(old) + newW * wet;
+            }
+            if (!std::isfinite(wet)) wet = 0.0f;
+            buffer[baseIdx + ch] = dryW * inSample + wetW * wet;
+        }
+
+        if (crossfading) {
+            sectionCrossfadeProgress_ = std::min(1.0f, sectionCrossfadeProgress_ + crossfadeStep);
+            if (sectionCrossfadeProgress_ >= 1.0f) {
+                crossfadeSections_.clear();
+            }
         }
         currentEnabledMix += mixStep;
     }
