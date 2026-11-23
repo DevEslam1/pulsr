@@ -59,11 +59,14 @@ class _UpdateDialogState extends State<UpdateDialog> {
         setState(() {
           _downloading = false;
           _downloadedFile = file;
+          if (file == null) {
+            _errorMessage = context.l10n.somethingWentWrong;
+          }
         });
 
         // If file downloaded successfully on Android, trigger install automatically
         if (file != null && Platform.isAndroid) {
-          await AppUpdateService.instance.installApk(file);
+          await _installFile(file);
         }
       }
     } catch (e) {
@@ -79,7 +82,24 @@ class _UpdateDialogState extends State<UpdateDialog> {
   Future<void> _installDownloaded() async {
     final file = _downloadedFile;
     if (file != null) {
-      await AppUpdateService.instance.installApk(file);
+      await _installFile(file);
+    }
+  }
+
+  Future<void> _installFile(File file) async {
+    try {
+      final started = await AppUpdateService.instance.installApk(file);
+      if (!started && mounted) {
+        setState(() {
+          _errorMessage = context.l10n.somethingWentWrong;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = e.toString().replaceFirst('Exception: ', '');
+        });
+      }
     }
   }
 
@@ -269,45 +289,50 @@ class _UpdateDialogState extends State<UpdateDialog> {
                 ],
 
                 // Action buttons
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    TextButton(
-                      onPressed: () {
-                        if (_downloading) {
-                          AppUpdateService.instance.cancelDownload();
-                        }
-                        Navigator.of(context).pop();
-                      },
-                      child: Text(
-                        context.l10n.updateLater,
-                        style: TextStyle(color: p.textSecondary),
-                      ),
-                    ),
-                    const SizedBox(width: AppSpacing.sm),
-                    if (_downloadedFile != null) ...[
-                      FilledButton.icon(
-                        style: FilledButton.styleFrom(
-                          backgroundColor: p.accent,
-                          foregroundColor: p.onAccent,
+                SizedBox(
+                  width: double.infinity,
+                  child: Wrap(
+                    alignment: WrapAlignment.end,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: AppSpacing.sm,
+                    runSpacing: AppSpacing.xs,
+                    children: [
+                      TextButton(
+                        onPressed: () {
+                          if (_downloading) {
+                            AppUpdateService.instance.cancelDownload();
+                          }
+                          Navigator.of(context).pop();
+                        },
+                        child: Text(
+                          context.l10n.updateLater,
+                          style: TextStyle(color: p.textSecondary),
                         ),
-                        onPressed: _installDownloaded,
-                        icon:
-                            const Icon(Icons.install_mobile_rounded, size: 18),
-                        label: Text(context.l10n.updateInstallNow),
                       ),
-                    ] else if (!_downloading) ...[
-                      FilledButton.icon(
-                        style: FilledButton.styleFrom(
-                          backgroundColor: p.accent,
-                          foregroundColor: p.onAccent,
+                      if (_downloadedFile != null) ...[
+                        FilledButton.icon(
+                          style: FilledButton.styleFrom(
+                            backgroundColor: p.accent,
+                            foregroundColor: p.onAccent,
+                          ),
+                          onPressed: _installDownloaded,
+                          icon: const Icon(Icons.install_mobile_rounded,
+                              size: 18),
+                          label: Text(context.l10n.updateInstallNow),
                         ),
-                        onPressed: _startDownload,
-                        icon: const Icon(Icons.download_rounded, size: 18),
-                        label: Text(context.l10n.updateDownloadAndInstall),
-                      ),
+                      ] else if (!_downloading) ...[
+                        FilledButton.icon(
+                          style: FilledButton.styleFrom(
+                            backgroundColor: p.accent,
+                            foregroundColor: p.onAccent,
+                          ),
+                          onPressed: _startDownload,
+                          icon: const Icon(Icons.download_rounded, size: 18),
+                          label: Text(context.l10n.updateDownloadAndInstall),
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ],
             ),

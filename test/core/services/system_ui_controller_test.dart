@@ -1,7 +1,9 @@
 // test/core/services/system_ui_controller_test.dart
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:pulsr/core/services/system_ui_controller.dart';
+import 'package:pulsr/core/widgets/pulsr_modal_tracker.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -69,6 +71,24 @@ void main() {
       SystemUiController.instance.invalidate();
       expect(systemUiCalls.length, greaterThan(countBefore));
       expect(SystemUiController.instance.isImmersive, isTrue);
+    });
+
+    test('route pop/removal cleans up route-bound and now_playing requesters',
+        () {
+      final observer = PulsrModalObserver();
+      final route = MaterialPageRoute<void>(
+        settings: const RouteSettings(name: '/now-playing'),
+        builder: (_) => const SizedBox.shrink(),
+      );
+      SystemUiController.instance
+          .requestImmersive('custom_player_overlay', route: route);
+      SystemUiController.instance.syncMode(owner: 'karaoke', immersive: true);
+      expect(SystemUiController.instance.isImmersive, isTrue);
+      expect(SystemUiController.instance.activeRequesterCount, 2);
+
+      observer.didPop(route, null);
+      expect(SystemUiController.instance.isImmersive, isFalse);
+      expect(SystemUiController.instance.activeRequesterCount, 0);
     });
   });
 }

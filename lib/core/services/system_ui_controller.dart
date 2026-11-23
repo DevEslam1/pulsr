@@ -19,17 +19,42 @@ class SystemUiController {
   );
 
   final Set<String> _immersiveRequesters = <String>{};
+  final Map<Object, Set<String>> _routeRequesters = <Object, Set<String>>{};
   bool? _currentImmersiveApplied;
 
-  /// Requests immersive mode for a specific owner/screen.
-  void requestImmersive(String requesterId) {
+  void _bindRoute(Object? route, String requesterId) {
+    if (route == null) return;
+    _routeRequesters.putIfAbsent(route, () => <String>{}).add(requesterId);
+  }
+
+  void _unbindRequester(String requesterId) {
+    _routeRequesters.removeWhere((_, ids) {
+      ids.remove(requesterId);
+      return ids.isEmpty;
+    });
+  }
+
+  /// Requests immersive mode for a specific owner/screen, optionally bound to
+  /// a [route] or lifecycle token so popping that route releases it cleanly.
+  void requestImmersive(String requesterId, {Object? route}) {
     _immersiveRequesters.add(requesterId);
+    _bindRoute(route, requesterId);
     _apply();
   }
 
   /// Releases immersive mode for a specific owner/screen.
   void releaseImmersive(String requesterId) {
     _immersiveRequesters.remove(requesterId);
+    _unbindRequester(requesterId);
+    _apply();
+  }
+
+  /// Releases every immersive requester associated with [route] (called by
+  /// [PulsrModalObserver] on route pop/remove/replace).
+  void releaseForRoute(Object route) {
+    final ids = _routeRequesters.remove(route);
+    if (ids == null || ids.isEmpty) return;
+    _immersiveRequesters.removeAll(ids);
     _apply();
   }
 
@@ -41,11 +66,17 @@ class SystemUiController {
   }
 
   /// Directly set immersive state based on orientation/conditions for an owner.
-  void syncMode({required String owner, required bool immersive}) {
+  void syncMode({
+    required String owner,
+    required bool immersive,
+    Object? route,
+  }) {
     if (immersive) {
       _immersiveRequesters.add(owner);
+      _bindRoute(route, owner);
     } else {
       _immersiveRequesters.remove(owner);
+      _unbindRequester(owner);
     }
     _apply();
   }
@@ -67,8 +98,12 @@ class SystemUiController {
   bool get isImmersive => _currentImmersiveApplied ?? false;
 
   @visibleForTesting
+  int get activeRequesterCount => _immersiveRequesters.length;
+
+  @visibleForTesting
   void resetForTesting() {
     _immersiveRequesters.clear();
+    _routeRequesters.clear();
     _currentImmersiveApplied = null;
   }
 }

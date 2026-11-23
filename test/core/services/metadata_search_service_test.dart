@@ -9,7 +9,13 @@ import 'package:pulsr/core/services/metadata_search_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   group('MetadataSearchService Tests', () {
+    setUp(() {
+      SharedPreferences.setMockInitialValues({});
+    });
+
     test(
         'searchMetadata parses iTunes response and upgrades artwork resolution',
         () async {

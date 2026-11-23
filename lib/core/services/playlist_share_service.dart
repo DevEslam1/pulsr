@@ -31,8 +31,9 @@ class SharedPlaylistBundle {
         appVersion: json['appVersion'] as String? ?? '1.0.0',
         exportTimestamp: (json['exportTimestamp'] as num?)?.toInt() ?? 0,
         tracks: (json['tracks'] as List<dynamic>?)
-                ?.whereType<Map<String, dynamic>>()
-                .map((e) {
+                ?.whereType<Map>()
+                .map((raw) {
+              final e = Map<String, dynamic>.from(raw);
               final src = e['source'] as String?;
               final String validSource;
               if (src == SongSource.youtube || src == SongSource.local) {
@@ -88,13 +89,13 @@ class PlaylistShareService {
 
   /// Computes the nesting depth of a JSON object tree.
   static int computeDepth(Object? object, [int currentDepth = 1]) {
-    if (currentDepth > 5) return currentDepth;
+    if (currentDepth > maxRawNestingDepth) return currentDepth;
     if (object is Map) {
       var maxChild = currentDepth;
       for (final value in object.values) {
         final d = computeDepth(value, currentDepth + 1);
         if (d > maxChild) maxChild = d;
-        if (maxChild > 5) return maxChild;
+        if (maxChild > maxRawNestingDepth) return maxChild;
       }
       return maxChild;
     } else if (object is List) {
@@ -102,7 +103,7 @@ class PlaylistShareService {
       for (final item in object) {
         final d = computeDepth(item, currentDepth + 1);
         if (d > maxChild) maxChild = d;
-        if (maxChild > 5) return maxChild;
+        if (maxChild > maxRawNestingDepth) return maxChild;
       }
       return maxChild;
     }

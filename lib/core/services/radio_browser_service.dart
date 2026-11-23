@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 
 import '../../domain/models/radio_station.dart';
 import '../config/app_config.dart';
+import '../network/network_access_guard.dart';
 import '../utils/error_logger.dart';
 
 typedef HostLookup = Future<List<String>> Function(String host);
@@ -99,6 +100,9 @@ class RadioBrowserService {
     String? tag,
     int limit = _maxResults,
   }) async {
+    if (await NetworkAccessGuard.isBlocked(category: 'RadioBrowser')) {
+      return const [];
+    }
     return _executeWithFallback((endpoint) async {
       final params = <String, String>{
         'limit': '${limit.clamp(1, _maxResults)}',
@@ -178,6 +182,9 @@ class RadioBrowserService {
   /// Increments the station's vote count in the global directory. Returns true
   /// when the directory confirms the vote (`{"ok": true, ...}`).
   Future<bool> voteForStation(String stationUuid) async {
+    if (await NetworkAccessGuard.isBlocked(category: 'RadioBrowser')) {
+      return false;
+    }
     final uuid = stationUuid.trim();
     if (!_stationUuidPattern.hasMatch(uuid)) return false;
 
@@ -214,37 +221,52 @@ class RadioBrowserService {
   /// servers rejecting byte ranges.
   Future<bool> isReachable(String url,
       {Duration timeout = _probeTimeout}) async {
+    if (await NetworkAccessGuard.isBlocked(category: 'RadioBrowser')) {
+      return false;
+    }
     if (!RadioStation.isHttpUrl(url)) return false;
     final parsedUri = Uri.tryParse(url);
     if (parsedUri == null) return false;
-    Uri currentUri = parsedUri;
 
     // Defense against DNS rebinding: verify host and resolved IP addresses
     final initialSafe = await RadioStation.isSafeHost(
-      currentUri.host,
+      parsedUri.host,
       lookup: _hostLookup,
     );
     if (!initialSafe) return false;
 
+    return _probeStreamUrl(parsedUri, timeout, useRange: true);
+  }
+
+  Future<bool> _probeStreamUrl(
+    Uri uri,
+    Duration timeout, {
+    required bool useRange,
+  }) async {
+    var currentUri = uri;
     for (var redirectCount = 0; redirectCount <= 3; redirectCount++) {
-      // Primary probe: Ranged GET with ICY metadata (0 bytes audio consumed)
       try {
         final request = http.Request('GET', currentUri)
           ..headers['Icy-MetaData'] = '1'
-          ..headers['Range'] = 'bytes=0-0'
-          ..headers['User-Agent'] = 'Pulsr/${AppConfig.appVersion} (radio directory)'
+          ..headers['User-Agent'] =
+              'Pulsr/${AppConfig.appVersion} (radio directory)'
           ..followRedirects = false;
+        if (useRange) {
+          request.headers['Range'] = 'bytes=0-0';
+        }
         final response = await _client.send(request).timeout(timeout);
         final status = response.statusCode;
         await response.stream.listen((_) {}, onError: (_) {}).cancel();
 
-        if (status >= 300 && status < 400 && response.headers.containsKey('location')) {
+        if (status >= 300 &&
+            status < 400 &&
+            response.headers.containsKey('location')) {
           if (redirectCount == 3) return false;
           final location = response.headers['location']!;
           final nextUri = currentUri.resolve(location);
-          final nextUrl = nextUri.toString();
-          if (!RadioStation.isHttpUrl(nextUrl)) return false;
-          final isSafe = await RadioStation.isSafeHost(nextUri.host, lookup: _hostLookup);
+          if (!RadioStation.isHttpUrl(nextUri.toString())) return false;
+          final isSafe =
+              await RadioStation.isSafeHost(nextUri.host, lookup: _hostLookup);
           if (!isSafe) return false;
           currentUri = nextUri;
           continue;
@@ -254,55 +276,20 @@ class RadioBrowserService {
           return true;
         }
 
-        // If server rejected byte-ranges (416 Range Not Satisfiable, 400 Bad Request,
-        // 405 Method Not Allowed), execute fallback probe without Range header.
-        if (status == 416 || status == 400 || status == 405) {
-          return await _fallbackProbe(currentUri, timeout);
+        // If server rejected byte-ranges (416 Range Not Satisfiable, 400 Bad
+        // Request, 405 Method Not Allowed), retry without Range header.
+        if (useRange && (status == 416 || status == 400 || status == 405)) {
+          return await _probeStreamUrl(currentUri, timeout, useRange: false);
         }
         return false;
       } catch (e, st) {
-        // If the ranged request was rejected at socket/transport level,
-        // attempt fallback probe before declaring unreachable.
-        final fallbackOk = await _fallbackProbe(currentUri, timeout);
-        if (fallbackOk) return true;
-
-        ErrorLogger.log('Radio stream probe failed',
-            error: e, stackTrace: st, category: 'RadioBrowser');
-        return false;
-      }
-    }
-    return false;
-  }
-
-  /// Fallback probe without Range header for Icecast/HLS servers that reject byte ranges.
-  /// Follows at most 3 redirects while validating each hop against SSRF.
-  /// Immediately cancels the stream subscription after reading the response headers.
-  Future<bool> _fallbackProbe(Uri uri, Duration timeout) async {
-    var currentUri = uri;
-    for (var redirectCount = 0; redirectCount <= 3; redirectCount++) {
-      try {
-        final request = http.Request('GET', currentUri)
-          ..headers['Icy-MetaData'] = '1'
-          ..headers['User-Agent'] = 'Pulsr/${AppConfig.appVersion} (radio directory)'
-          ..followRedirects = false;
-        final response = await _client.send(request).timeout(timeout);
-        final status = response.statusCode;
-        await response.stream.listen((_) {}, onError: (_) {}).cancel();
-
-        if (status >= 300 && status < 400 && response.headers.containsKey('location')) {
-          if (redirectCount == 3) return false;
-          final location = response.headers['location']!;
-          final nextUri = currentUri.resolve(location);
-          final nextUrl = nextUri.toString();
-          if (!RadioStation.isHttpUrl(nextUrl)) return false;
-          final isSafe = await RadioStation.isSafeHost(nextUri.host, lookup: _hostLookup);
-          if (!isSafe) return false;
-          currentUri = nextUri;
-          continue;
+        if (useRange) {
+          final fallbackOk =
+              await _probeStreamUrl(currentUri, timeout, useRange: false);
+          if (fallbackOk) return true;
+          ErrorLogger.log('Radio stream probe failed',
+              error: e, stackTrace: st, category: 'RadioBrowser');
         }
-
-        return status >= 200 && status < 300;
-      } catch (_) {
         return false;
       }
     }

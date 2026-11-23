@@ -156,9 +156,11 @@ class CueParser {
         return null;
       }
 
+      const maxMetadataBlockBytes = 4 * 1024 * 1024;
+      final fileLength = await raf.length();
       int sampleRate = 44100;
       bool isLast = false;
-      while (!isLast) {
+      while (!isLast && (await raf.position()) < fileLength) {
         final blockHeader = await raf.read(4);
         if (blockHeader.length < 4) break;
         isLast = (blockHeader[0] & 0x80) != 0;
@@ -166,34 +168,50 @@ class CueParser {
         final length =
             (blockHeader[1] << 16) | (blockHeader[2] << 8) | blockHeader[3];
 
+        final pos = await raf.position();
+        if (length < 0 || length > fileLength - pos) {
+          break;
+        }
+
         if (blockType == 0) {
           // STREAMINFO block: extract 20-bit sample rate at bytes 10..12
-          final blockData = await raf.read(length);
-          if (blockData.length >= 13) {
-            final parsedRate = (blockData[10] << 12) |
-                (blockData[11] << 4) |
-                (blockData[12] >> 4);
-            if (parsedRate > 0) {
-              sampleRate = parsedRate;
+          if (length > maxMetadataBlockBytes) {
+            await raf.setPosition(pos + length);
+          } else {
+            final blockData = await raf.read(length);
+            if (blockData.length >= 13) {
+              final parsedRate = (blockData[10] << 12) |
+                  (blockData[11] << 4) |
+                  (blockData[12] >> 4);
+              if (parsedRate > 0) {
+                sampleRate = parsedRate;
+              }
             }
           }
         } else if (blockType == 4) {
           // VORBIS_COMMENT block
-          final blockData = await raf.read(length);
-          if (blockData.length == length) {
-            final cue = _findCueInVorbisComment(blockData);
-            if (cue != null) return cue;
+          if (length > maxMetadataBlockBytes) {
+            await raf.setPosition(pos + length);
+          } else {
+            final blockData = await raf.read(length);
+            if (blockData.length == length) {
+              final cue = _findCueInVorbisComment(blockData);
+              if (cue != null) return cue;
+            }
           }
         } else if (blockType == 5) {
           // CUESHEET block
-          final blockData = await raf.read(length);
-          if (blockData.length == length) {
-            final cue =
-                _parseFlacCuesheetBlock(blockData, sampleRate: sampleRate);
-            if (cue != null) return cue;
+          if (length > maxMetadataBlockBytes) {
+            await raf.setPosition(pos + length);
+          } else {
+            final blockData = await raf.read(length);
+            if (blockData.length == length) {
+              final cue =
+                  _parseFlacCuesheetBlock(blockData, sampleRate: sampleRate);
+              if (cue != null) return cue;
+            }
           }
         } else {
-          final pos = await raf.position();
           await raf.setPosition(pos + length);
         }
       }
@@ -314,6 +332,7 @@ class CueParser {
       final wave = ascii.decode(riffHeader.sublist(8, 12), allowInvalid: true);
       if (magic != 'RIFF' || wave != 'WAVE') return null;
 
+      const maxWavMetadataChunkBytes = 4 * 1024 * 1024;
       final fileLength = await file.length();
       int sampleRate = 44100;
 
@@ -327,26 +346,36 @@ class CueParser {
             (chunkHeader[6] << 16) |
             (chunkHeader[7] << 24);
 
+        final cur = await raf.position();
+        if (chunkSize < 0 || chunkSize > fileLength - cur) {
+          break;
+        }
+
         if (chunkId == 'fmt ' && chunkSize >= 16) {
           final fmtData = await raf.read(16);
           if (fmtData.length >= 8) {
-            sampleRate = fmtData[4] |
+            final parsedRate = fmtData[4] |
                 (fmtData[5] << 8) |
                 (fmtData[6] << 16) |
                 (fmtData[7] << 24);
+            if (parsedRate > 0) {
+              sampleRate = parsedRate;
+            }
           }
           if (chunkSize > 16) {
-            final cur = await raf.position();
-            await raf.setPosition(cur + (chunkSize - 16));
+            await raf.setPosition(cur + chunkSize);
           }
         } else if (chunkId == 'cue ' && chunkSize >= 4) {
-          final cueData = await raf.read(chunkSize);
-          if (cueData.length == chunkSize) {
-            final cue = _parseWavCueChunk(cueData, sampleRate);
-            if (cue != null) return cue;
+          if (chunkSize > maxWavMetadataChunkBytes) {
+            await raf.setPosition(cur + chunkSize);
+          } else {
+            final cueData = await raf.read(chunkSize);
+            if (cueData.length == chunkSize) {
+              final cue = _parseWavCueChunk(cueData, sampleRate);
+              if (cue != null) return cue;
+            }
           }
         } else {
-          final cur = await raf.position();
           await raf.setPosition(cur + chunkSize);
         }
         if (chunkSize.isOdd) {

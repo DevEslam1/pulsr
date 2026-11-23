@@ -1,7 +1,6 @@
 // lib/core/errors/error_message_resolver.dart
 import 'package:flutter/widgets.dart';
 import '../../l10n/generated/app_localizations.dart';
-import '../utils/l10n_extensions.dart';
 import '../utils/l10n_holder.dart';
 
 /// Localizes English-only error strings emitted by cubits and services (which
@@ -11,12 +10,7 @@ import '../utils/l10n_holder.dart';
 /// Unknown or changed literals pass through untouched, so the UI never breaks
 /// when a new message appears before a key exists for it.
 String resolveUiErrorMessage(BuildContext context, String message) {
-  AppLocalizations? l10n;
-  try {
-    l10n = context.l10n;
-  } catch (_) {
-    l10n = L10nHolder.current;
-  }
+  final l10n = AppLocalizations.of(context) ?? L10nHolder.current;
   if (l10n == null) return message;
 
   switch (message) {
@@ -245,12 +239,7 @@ class ErrorMessageResolver {
   const ErrorMessageResolver._();
 
   static String resolveUserFriendly(BuildContext context, Object error) {
-    AppLocalizations? l10n;
-    try {
-      l10n = context.l10n;
-    } catch (_) {
-      l10n = L10nHolder.current;
-    }
+    final l10n = AppLocalizations.of(context) ?? L10nHolder.current;
 
     final raw = error.toString().toLowerCase();
     if (raw.contains('socketexception') ||

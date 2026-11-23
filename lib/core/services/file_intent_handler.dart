@@ -8,8 +8,10 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:injectable/injectable.dart';
 import 'package:path/path.dart' as p;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../config/app_config.dart';
 import '../constants/audio_formats.dart';
+import '../constants/prefs_keys.dart';
 import '../di/injection.dart';
 import '../errors/failures.dart';
 import '../router/app_router.dart';
@@ -79,8 +81,10 @@ class FileIntentHandler {
           }
         } else if (call.method == 'onMediaStoreChanged') {
           try {
-            final scanner = getIt<MediaScannerService>();
-            await scanner.scanDeviceLibrary(incremental: true);
+            if (getIt.isRegistered<MediaScannerService>()) {
+              final scanner = getIt<MediaScannerService>();
+              await scanner.scanDeviceLibrary(incremental: true);
+            }
           } catch (e, st) {
             ErrorLogger.log('Media store rescan failed',
                 error: e, stackTrace: st, category: 'FileIntentHandler');
@@ -188,8 +192,30 @@ class FileIntentHandler {
 
   Future<void> _handleYouTubeLink(String videoId) async {
     final context = rootNavigatorKey.currentContext;
+    if (!AppConfig.ytmEnabled || !AppConfig.isCloudSyncAllowed) {
+      return;
+    }
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (prefs.getBool(PrefsKeys.offlineOnlyMode) == true) {
+        if (context != null && context.mounted) {
+          ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+            SnackBar(
+              content: Text(context.l10n.homeOfflineNotice),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+        return;
+      }
+    } catch (_) {
+      // Fail closed if offline preference cannot be verified on external links.
+      return;
+    }
+    if (!getIt.isRegistered<YtmService>()) return;
+
     if (context != null && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
         SnackBar(
           content: Text(context.l10n.openingYtmTrack),
           duration: Duration(seconds: 2),
@@ -222,7 +248,7 @@ class FileIntentHandler {
           error: e, stackTrace: st, category: 'FileIntentHandler');
       final ctx = rootNavigatorKey.currentContext;
       if (ctx != null && ctx.mounted) {
-        ScaffoldMessenger.of(ctx).showSnackBar(
+        ScaffoldMessenger.maybeOf(ctx)?.showSnackBar(
           SnackBar(
             content: Text(ctx.l10n.fileIntentLoadTrackFailed(e.toString())),
             behavior: SnackBarBehavior.floating,
@@ -409,8 +435,10 @@ class FileIntentHandler {
       }
 
       final videoId = extractYouTubeVideoId(uriOrPath);
-      if (videoId != null && AppConfig.ytmEnabled) {
-        await _handleYouTubeLink(videoId);
+      if (videoId != null) {
+        if (AppConfig.ytmEnabled && AppConfig.isCloudSyncAllowed) {
+          await _handleYouTubeLink(videoId);
+        }
         return;
       }
 
@@ -427,7 +455,7 @@ class FileIntentHandler {
     } catch (e, st) {
       final context = rootNavigatorKey.currentContext;
       if (context != null && context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
           SnackBar(
             content: Text(context.l10n.formatNotSupported),
             behavior: SnackBarBehavior.floating,
@@ -534,25 +562,29 @@ class FileIntentHandler {
 
   /// Decodes and normalises an incoming path/URI for local file access.
   static String _decodeLocalPath(String uriOrPath) {
-    String cleanPath;
-    try {
-      cleanPath = Uri.decodeFull(uriOrPath);
-    } catch (_) {
-      cleanPath = uriOrPath;
-    }
-    if (cleanPath.startsWith('file://')) {
+    if (uriOrPath.startsWith('file://')) {
       try {
-        final parsed = Uri.parse(cleanPath);
+        final parsed = Uri.parse(uriOrPath);
         if (parsed.scheme == 'file' && parsed.path.isNotEmpty) {
-          cleanPath = parsed.path;
-        } else {
-          cleanPath = cleanPath.replaceFirst('file://', '');
+          // Decode percent-escapes AFTER URI parsing so `%23` (#) and `%3F` (?)
+          // in filenames are not truncated as fragment/query delimiters.
+          return Uri.decodeComponent(parsed.path);
         }
       } catch (_) {
-        cleanPath = cleanPath.replaceFirst('file://', '');
+        // Fall through to literal fallback below.
+      }
+      final stripped = uriOrPath.replaceFirst('file://', '');
+      try {
+        return Uri.decodeFull(stripped);
+      } catch (_) {
+        return stripped;
       }
     }
-    return cleanPath;
+    try {
+      return Uri.decodeFull(uriOrPath);
+    } catch (_) {
+      return uriOrPath;
+    }
   }
 
   Future<SongsTableData?> _resolveSongForUri(
@@ -607,7 +639,7 @@ class FileIntentHandler {
 
         final context = rootNavigatorKey.currentContext;
         if (context != null && context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          ScaffoldMessenger.maybeOf(context)?.showSnackBar(
             SnackBar(
               content: Text(context.l10n.formatNotSupported),
               behavior: SnackBarBehavior.floating,

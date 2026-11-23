@@ -637,6 +637,21 @@ class AudioConflicts {
   }) =>
       bitPerfectOutput && bypassDspOnBitPerfect && device?.isBluetooth != true;
 
+  static String? _commonDspChainBlocker({
+    required bool aaudioEnabled,
+    required bool dsdDopActive,
+  }) {
+    if (aaudioEnabled) {
+      return L10nHolder.current?.conflictAaudioDirect ??
+          'Disabled: AAudio Direct is ON — it bypasses the ExoPlayer DSP chain (EQ, speed/pitch, silence skip, crossfade). Turn it off to re-enable DSP.';
+    }
+    if (dsdDopActive) {
+      return L10nHolder.current?.conflictDsdDop ??
+          'Disabled: DSD over PCM (DoP) is playing — any DSP or gain would corrupt the DoP carrier. Switch DSD output to PCM to re-enable DSP.';
+    }
+    return null;
+  }
+
   /// Bit-perfect bypass disables all native DSP, virtualizer and software gain.
   ///
   /// AAudio Direct bypasses the same DSP chain, and a live DSD-over-PCM carrier
@@ -649,14 +664,11 @@ class AudioConflicts {
     bool aaudioEnabled = false,
     bool dsdDopActive = false,
   }) {
-    if (aaudioEnabled) {
-      return L10nHolder.current?.conflictAaudioDirect ??
-          'Disabled: AAudio Direct is ON — it bypasses the ExoPlayer DSP chain (EQ, speed/pitch, silence skip, crossfade). Turn it off to re-enable DSP.';
-    }
-    if (dsdDopActive) {
-      return L10nHolder.current?.conflictDsdDop ??
-          'Disabled: DSD over PCM (DoP) is playing — any DSP or gain would corrupt the DoP carrier. Switch DSD output to PCM to re-enable DSP.';
-    }
+    final shared = _commonDspChainBlocker(
+      aaudioEnabled: aaudioEnabled,
+      dsdDopActive: dsdDopActive,
+    );
+    if (shared != null) return shared;
     if (!dspBypassActive(
       bitPerfectOutput: bitPerfectOutput,
       bypassDspOnBitPerfect: bypassDspOnBitPerfect,
@@ -675,7 +687,14 @@ class AudioConflicts {
     required bool bitPerfectOutput,
     required bool bypassDspOnBitPerfect,
     required AudioOutputInfo? device,
+    bool aaudioEnabled = false,
+    bool dsdDopActive = false,
   }) {
+    final shared = _commonDspChainBlocker(
+      aaudioEnabled: aaudioEnabled,
+      dsdDopActive: dsdDopActive,
+    );
+    if (shared != null) return shared;
     if (!dspBypassActive(
       bitPerfectOutput: bitPerfectOutput,
       bypassDspOnBitPerfect: bypassDspOnBitPerfect,
@@ -693,7 +712,14 @@ class AudioConflicts {
     required bool bitPerfectOutput,
     required bool bypassDspOnBitPerfect,
     required AudioOutputInfo? device,
+    bool aaudioEnabled = false,
+    bool dsdDopActive = false,
   }) {
+    final shared = _commonDspChainBlocker(
+      aaudioEnabled: aaudioEnabled,
+      dsdDopActive: dsdDopActive,
+    );
+    if (shared != null) return shared;
     if (!dspBypassActive(
       bitPerfectOutput: bitPerfectOutput,
       bypassDspOnBitPerfect: bypassDspOnBitPerfect,
@@ -1059,7 +1085,7 @@ class AudioConflicts {
       return L10nHolder.current?.conflictBtBitPerfectUnsupported ??
           'Cannot enable: Bluetooth transcodes (SBC/AAC/LDAC/LC3) — bit-perfect only on a USB DAC.';
     }
-    final reason = device.bitPerfectFailureReason;
+    final reason = device.bitPerfectFailureReason?.trim().toLowerCase();
     if (reason == null || !_hardBitPerfectFailures.contains(reason)) {
       return null;
     }
@@ -1068,7 +1094,8 @@ class AudioConflicts {
 
   /// Maps a native bit-perfect rejection reason code to a user message.
   static String? bitPerfectReasonMessage(String? reason) {
-    switch (reason) {
+    final normalized = reason?.trim().toLowerCase();
+    switch (normalized) {
       case 'requires_android_14_for_usb':
       case 'requires_android_14':
         return L10nHolder.current?.conflictRequiresAndroid14 ??

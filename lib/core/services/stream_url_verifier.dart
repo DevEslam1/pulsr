@@ -4,6 +4,9 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
+import '../config/app_config.dart';
+import '../network/remote_target_policy.dart';
+
 /// Verdict of one cheap pre-flight request against a resolved media URL.
 enum StreamUrlProbeStatus {
   /// The CDN answered 2xx: the URL serves bytes right now.
@@ -89,12 +92,18 @@ class StreamUrlVerifier {
   static const List<int> rejectedStatuses = [401, 403, 404, 410];
 
   /// Shared by every instance so a probe reuses an existing connection instead
-  /// of paying a fresh TCP/TLS handshake. Created under the app's
-  /// [HttpOverrides], so the user's proxy configuration applies.
-  static final HttpClient _client = HttpClient()
+  /// of paying a fresh TCP/TLS handshake. Recreated cleanly via [resetClient]
+  /// if HTTP overrides or proxy settings change.
+  static HttpClient? _clientInstance;
+  static HttpClient get _client => _clientInstance ??= HttpClient()
     ..connectionTimeout = timeout
     ..idleTimeout = const Duration(seconds: 15)
     ..maxConnectionsPerHost = 4;
+
+  static void resetClient() {
+    _clientInstance?.close(force: true);
+    _clientInstance = null;
+  }
 
   /// In-flight probes keyed by URL, shared across instances so two sources for
   /// the same track cannot send two probes for the same URL.
@@ -116,6 +125,11 @@ class StreamUrlVerifier {
     String? referer,
     String? cookie,
   }) {
+    if (!AppConfig.isCloudSyncAllowed) {
+      return Future<StreamUrlProbe>.value(
+        const StreamUrlProbe.unknown('pure_mode'),
+      );
+    }
     if (!isProbeable(url)) {
       return Future<StreamUrlProbe>.value(const StreamUrlProbe.ok());
     }
@@ -136,11 +150,13 @@ class StreamUrlVerifier {
 
   /// Whether [url] is a YouTube media CDN endpoint worth probing.
   ///
-  /// Only verified YouTube/Google CDN domains answer the question this class
-  /// asks. Anything else returns [StreamUrlProbe.ok] untouched.
+  /// Only verified HTTP(S) YouTube/Google CDN domains answer the question this
+  /// class asks. Anything else returns [StreamUrlProbe.ok] untouched.
   static bool isProbeable(String url) {
     final uri = Uri.tryParse(url);
     if (uri == null) return false;
+    final scheme = uri.scheme.toLowerCase();
+    if (scheme != 'https' && scheme != 'http') return false;
     final host = uri.host.toLowerCase();
     if (host == 'googlevideo.com' || host.endsWith('.googlevideo.com')) {
       return true;
@@ -188,27 +204,55 @@ class StreamUrlVerifier {
 
     HttpClientRequest? request;
     try {
-      final uri = Uri.tryParse(url);
-      if (uri == null || uri.host.isEmpty) {
+      final initialUri = Uri.tryParse(url);
+      if (initialUri == null || initialUri.host.isEmpty) {
         return const StreamUrlProbe.unknown('bad_url');
       }
-      request = await _client.getUrl(uri).timeout(timeout);
-      // One byte is enough to make the CDN validate the signature, and it keeps
-      // the probe's cost off the metered connection budget of the track.
-      request.headers.set(HttpHeaders.rangeHeader, 'bytes=0-1');
-      if (userAgent != null && userAgent.isNotEmpty) {
-        request.headers.set(HttpHeaders.userAgentHeader, userAgent);
+      var currentUri = initialUri;
+
+      const maxRedirects = 3;
+      for (var hop = 0; hop <= maxRedirects; hop++) {
+        request = await _client.getUrl(currentUri).timeout(timeout);
+        request.followRedirects = false;
+        // One byte is enough to make the CDN validate the signature, and it keeps
+        // the probe's cost off the metered connection budget of the track.
+        request.headers.set(HttpHeaders.rangeHeader, 'bytes=0-1');
+        if (userAgent != null && userAgent.isNotEmpty) {
+          request.headers.set(HttpHeaders.userAgentHeader, userAgent);
+        }
+        if (referer != null && referer.isNotEmpty) {
+          request.headers.set(HttpHeaders.refererHeader, referer);
+        }
+        if (cookie != null &&
+            cookie.isNotEmpty &&
+            isProbeable(currentUri.toString())) {
+          request.headers.set(HttpHeaders.cookieHeader, cookie);
+        }
+        final response = await request.close().timeout(timeout);
+        final status = response.statusCode;
+
+        if (status >= 300 &&
+            status < 400 &&
+            response.headers.value(HttpHeaders.locationHeader) != null) {
+          final location = response.headers.value(HttpHeaders.locationHeader)!;
+          await _discardBody(response);
+          if (hop == maxRedirects) {
+            return const StreamUrlProbe.unknown('too_many_redirects');
+          }
+          final nextUri = currentUri.resolve(location);
+          if (!isProbeable(nextUri.toString()) ||
+              !await RemoteTargetPolicy.isSafeHost(nextUri.host)) {
+            return const StreamUrlProbe.unknown('blocked_redirect');
+          }
+          currentUri = nextUri;
+          continue;
+        }
+
+        final verdict = verdictForStatus(status);
+        await _discardBody(response);
+        return verdict;
       }
-      if (referer != null && referer.isNotEmpty) {
-        request.headers.set(HttpHeaders.refererHeader, referer);
-      }
-      if (cookie != null && cookie.isNotEmpty && isProbeable(url)) {
-        request.headers.set(HttpHeaders.cookieHeader, cookie);
-      }
-      final response = await request.close().timeout(timeout);
-      final verdict = verdictForStatus(response.statusCode);
-      await _discardBody(response);
-      return verdict;
+      return const StreamUrlProbe.unknown('too_many_redirects');
     } on TimeoutException {
       _abortQuietly(request);
       return const StreamUrlProbe.unknown('timeout');

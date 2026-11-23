@@ -6,8 +6,15 @@ import 'package:http/testing.dart';
 import 'package:pulsr/services/canvas/apple_music_canvas.dart';
 import 'package:pulsr/services/canvas/community_canvas.dart';
 import 'package:pulsr/services/canvas/tidal_canvas.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+  });
+
   group('CommunityCanvas', () {
     test('fetches manifest and matches track', () async {
       final mockClient = MockClient((request) async {

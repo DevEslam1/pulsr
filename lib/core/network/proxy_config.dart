@@ -38,7 +38,15 @@ class ProxyConfig {
     this.bypassHosts = 'localhost, 127.0.0.1',
   });
 
-  bool get isValid => host.trim().isNotEmpty && port > 0 && port <= 65535;
+  static final RegExp _unsafeHostChars = RegExp(r'[\s;\r\n]');
+
+  bool get isValid {
+    final trimmed = host.trim();
+    return trimmed.isNotEmpty &&
+        !_unsafeHostChars.hasMatch(trimmed) &&
+        port > 0 &&
+        port <= 65535;
+  }
 
   bool get hasAuth => username.trim().isNotEmpty;
 
@@ -48,12 +56,21 @@ class ProxyConfig {
       .where((s) => s.isNotEmpty)
       .toList();
 
+  static String _normalizeHost(String raw) {
+    final lower = raw.trim().toLowerCase();
+    if (lower.startsWith('[') && lower.endsWith(']')) {
+      return lower.substring(1, lower.length - 1).trim();
+    }
+    return lower;
+  }
+
   static bool _isLocalhost(String host) =>
       host == 'localhost' || host == '127.0.0.1' || host == '::1';
 
   bool isBypassed(Uri uri) {
-    final host = uri.host.toLowerCase();
-    for (final pattern in bypassList) {
+    final host = _normalizeHost(uri.host);
+    for (final rawPattern in bypassList) {
+      final pattern = _normalizeHost(rawPattern);
       if (pattern == host) return true;
       if (pattern.startsWith('*.')) {
         final domain = pattern.substring(2);

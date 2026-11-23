@@ -233,5 +233,70 @@ void main() {
       expect(duplicates.first.songs.length, 2);
       expect(duplicates.first.reason, l10n.dupReasonTitleArtist(2));
     });
+
+    test('filters out non-local sources and prevents empty-album/zero-duration false positives',
+        () async {
+      final nonLocalA = SongsTableData(
+        id: 100,
+        title: 'Stream Track',
+        artist: 'Artist',
+        album: 'Album',
+        path: 'ytmusic://abc',
+        durationMs: 180000,
+        source: SongSource.youtube,
+        isFavorite: false,
+        isMissing: false,
+        isDownloaded: false,
+        playCount: 0,
+        lastPositionMs: 0,
+      );
+      final nonLocalB = SongsTableData(
+        id: 101,
+        title: 'Stream Track',
+        artist: 'Artist',
+        album: 'Album',
+        path: 'ytmusic://abc2',
+        durationMs: 180000,
+        source: SongSource.youtube,
+        isFavorite: false,
+        isMissing: false,
+        isDownloaded: false,
+        playCount: 0,
+        lastPositionMs: 0,
+      );
+      final emptyZeroA = _testSong(
+        id: 102,
+        title: 'Track',
+        artist: 'Unknown',
+        album: '',
+        durationMs: 0,
+        path: '/local/a.mp3',
+      );
+      final emptyZeroB = _testSong(
+        id: 103,
+        title: 'Track',
+        artist: 'Unknown',
+        album: '',
+        durationMs: 0,
+        path: '/local/b.mp3',
+      );
+      final mixedZeroTimed = _testSong(
+        id: 104,
+        title: 'Track',
+        artist: 'Unknown',
+        album: 'Album A',
+        durationMs: 180000,
+        path: '/local/c.mp3',
+      );
+
+      final duplicates = await service.findDuplicates([
+        nonLocalA,
+        nonLocalB,
+        emptyZeroA,
+        emptyZeroB,
+        mixedZeroTimed,
+      ]);
+      expect(duplicates, isEmpty);
+    });
   });
 }

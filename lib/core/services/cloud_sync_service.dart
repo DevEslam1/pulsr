@@ -83,8 +83,34 @@ class CloudSyncService {
 
   static void recordLocalFavoriteModified(String stableOrRemoteId,
       [int? timestampMs]) {
+    if (stableOrRemoteId.isEmpty) return;
     _localModifiedFavorites[stableOrRemoteId] =
         timestampMs ?? DateTime.now().millisecondsSinceEpoch;
+    _persistLocalModifiedFavoritesAsync();
+  }
+
+  /// Computes the canonical cloud-sync stable id for [song].
+  static String stableSongIdFor(SongsTableData song) {
+    if (song.remoteId != null && song.remoteId!.isNotEmpty) {
+      return 'yt_${song.remoteId}';
+    }
+    final raw =
+        '${song.path}|${song.title.trim().toLowerCase()}|${song.artist.trim().toLowerCase()}';
+    return sha256.convert(utf8.encode(raw)).toString();
+  }
+
+  /// Records a local favorite mutation for [song] under every identifier key
+  /// that [_downloadAndMergeCloudData] may check during LWW reconciliation.
+  static void recordSongFavoriteModified(SongsTableData song,
+      [int? timestampMs]) {
+    final ts = timestampMs ?? DateTime.now().millisecondsSinceEpoch;
+    _localModifiedFavorites[stableSongIdFor(song)] = ts;
+    _localModifiedFavorites[song.id.toString()] = ts;
+    final remoteId = song.remoteId;
+    if (remoteId != null && remoteId.isNotEmpty) {
+      _localModifiedFavorites[remoteId] = ts;
+      _localModifiedFavorites['yt_$remoteId'] = ts;
+    }
     _persistLocalModifiedFavoritesAsync();
   }
 
@@ -136,9 +162,12 @@ class CloudSyncService {
     this._authService,
     this._repository,
     this._db,
-  );
+  ) {
+    _authService.registerSignOutHook(resetSessionState);
+  }
 
   static const String _keyLastSync = 'cloud_sync_last_timestamp';
+  static const String _keyLastSyncedUid = 'cloud_sync_last_uid';
   static const String _keySyncFavorites = 'cloud_sync_favorites_enabled';
   static const String _keySyncPlaylists = 'cloud_sync_playlists_enabled';
   static const String _keyDeviceId = 'cloud_sync_device_id';
@@ -159,6 +188,15 @@ class CloudSyncService {
   String? _lastSyncedUid;
 
   Future<void> resetSessionState() async {
+    final pendingPersist = _localModifiedPersistChain;
+    if (pendingPersist != null) {
+      try {
+        await pendingPersist;
+      } catch (e, st) {
+        ErrorLogger.log('Pending local-modified persist failed before reset',
+            error: e, stackTrace: st, category: 'CloudSync');
+      }
+    }
     _localModifiedFavorites.clear();
     _localModifiedLoaded = false;
     _localModifiedPersistChain = null;
@@ -174,8 +212,21 @@ class CloudSyncService {
       await prefs.remove(_keyUploadedFavoriteIds);
       await prefs.remove(_keyUploadedPlaylistIds);
       await prefs.remove(_keyUploadedPlaylistSongs);
-    } catch (_) {
-      // Best-effort: pure-Dart tests run without a platform SP binding.
+      await prefs.remove(_keyLastSync);
+      await prefs.remove(_keyLastSyncedUid);
+      final keysToRemove = prefs
+          .getKeys()
+          .where((k) =>
+              k.startsWith('sync_pl_') ||
+              k.startsWith('sync_cloud_pl_'))
+          .toList(growable: false);
+      for (final key in keysToRemove) {
+        await prefs.remove(key);
+      }
+    } catch (e, st) {
+      // Best-effort: pure-Dart tests may run without a platform SP binding.
+      ErrorLogger.log('Failed to clear cloud sync session prefs',
+          error: e, stackTrace: st, category: 'CloudSync');
     }
   }
 
@@ -228,13 +279,28 @@ class CloudSyncService {
 
   static const String _keySyncedHashes = 'cloud_sync_hashes_cache';
 
-  String _stableSongId(SongsTableData song) {
-    if (song.remoteId != null && song.remoteId!.isNotEmpty) {
-      return 'yt_${song.remoteId}';
+  String _stableSongId(SongsTableData song) => stableSongIdFor(song);
+
+  static bool _isFilesystemOrContentPath(String rawPath) {
+    final path = rawPath.trim();
+    if (path.isEmpty) return false;
+    final lower = path.toLowerCase();
+    if (path.startsWith('/') ||
+        path.startsWith(r'\') ||
+        lower.startsWith('file:') ||
+        lower.startsWith('content:')) {
+      return true;
     }
-    final raw =
-        '${song.path}|${song.title.trim().toLowerCase()}|${song.artist.trim().toLowerCase()}';
-    return sha256.convert(utf8.encode(raw)).toString();
+    return RegExp(r'^[a-zA-Z]:[/\\]').hasMatch(path);
+  }
+
+  static bool isPrivateLocalPath(SongsTableData song) {
+    if (_isFilesystemOrContentPath(song.path)) return true;
+    if (song.remoteId != null && song.remoteId!.isNotEmpty) return false;
+    final lower = song.path.trim().toLowerCase();
+    return !lower.startsWith('http://') &&
+        !lower.startsWith('https://') &&
+        !lower.startsWith('ytmusic://');
   }
 
   String _stablePlaylistId(PlaylistsTableData pl,
@@ -351,17 +417,19 @@ class CloudSyncService {
     // even if prefs/account state linger from another flavor.
     if (!AppConfig.isCloudSyncAllowed) return false;
     // User-facing Offline-only mode: never sync even in network builds.
-    try {
-      final prefs = await _getPrefs();
-      if (prefs.getBool(PrefsKeys.offlineOnlyMode) == true) return false;
-    } catch (_) {}
+    final prefs = await _getPrefs();
+    if (prefs.getBool(PrefsKeys.offlineOnlyMode) == true) return false;
     final user = _authService.currentUser;
     if (user == null) return false;
 
-    if (_lastSyncedUid != null && _lastSyncedUid != user.uid) {
+    final persistedUid = _lastSyncedUid ?? prefs.getString(_keyLastSyncedUid);
+    if (persistedUid != null &&
+        persistedUid.isNotEmpty &&
+        persistedUid != user.uid) {
       await resetSessionState();
     }
     _lastSyncedUid = user.uid;
+    await prefs.setString(_keyLastSyncedUid, user.uid);
 
     // Fall back to the persisted per-scope toggles when the caller does not
     // pass explicit values, so the dashboard switches actually gate syncing.
@@ -504,8 +572,8 @@ class CloudSyncService {
         }
 
         final ref = favCollection.doc(docId);
-        // Privacy: hash local file paths, keep remoteId for YTM (path is PII)
-        final isLocalPath = song.path.startsWith('/') && song.remoteId == null;
+        // Privacy: hash local/Windows/content paths, keep remoteId for YTM (path is PII)
+        final isLocalPath = isPrivateLocalPath(song);
         final sanitizedPath = isLocalPath ? null : song.path;
         final pathHash = isLocalPath
             ? sha256.convert(utf8.encode(song.path)).toString()
@@ -616,8 +684,7 @@ class CloudSyncService {
           final fullKey = '${plDocId}_$songDocId';
 
           if (_syncedDocHashes[fullKey] != sHash) {
-            final isLocalSongPath =
-                song.path.startsWith('/') && song.remoteId == null;
+            final isLocalSongPath = isPrivateLocalPath(song);
             currentBatch.set(
                 plDoc.collection('songs').doc(songDocId),
                 {
@@ -718,20 +785,143 @@ class CloudSyncService {
     return !commitFailed;
   }
 
+  @visibleForTesting
+  Future<void> downloadAndMergeCloudDataForTesting(
+    DocumentReference userDoc, {
+    required bool syncFavorites,
+    required bool syncPlaylists,
+  }) =>
+      _downloadAndMergeCloudData(
+        userDoc,
+        syncFavorites: syncFavorites,
+        syncPlaylists: syncPlaylists,
+      );
+
+  int? _maxLocalFavoriteTimestamp({
+    String? docId,
+    String? remoteId,
+    SongsTableData? match,
+  }) {
+    int? best;
+    void consider(String? candidateKey) {
+      if (candidateKey == null || candidateKey.isEmpty) return;
+      final ts = _localModifiedFavorites[candidateKey];
+      if (ts != null && (best == null || ts > best!)) {
+        best = ts;
+      }
+    }
+
+    consider(docId);
+    consider(remoteId);
+    if (remoteId != null && remoteId.isNotEmpty) {
+      consider('yt_$remoteId');
+    }
+    if (match != null) {
+      consider(_stableSongId(match));
+      consider(match.id.toString());
+    }
+    return best;
+  }
+
+  Future<SongsTableData> _upsertCloudYtmTrack({
+    required String remoteId,
+    required String title,
+    required String artist,
+    required int durationMs,
+    String? remoteArtworkUrl,
+    bool markFavorite = false,
+  }) async {
+    final track = YtmTrack(
+      videoId: remoteId,
+      title: title,
+      artist: artist,
+      duration: Duration(milliseconds: durationMs),
+      artworkUrl: remoteArtworkUrl,
+    );
+    final songData = track.toSongData();
+    await _db.into(_db.songsTable).insert(
+          SongsTableCompanion(
+            id: Value(songData.id),
+            title: Value(songData.title),
+            artist: Value(songData.artist),
+            album: Value(songData.album),
+            durationMs: Value(songData.durationMs),
+            path: Value(songData.path),
+            source: const Value(SongSource.youtube),
+            isFavorite: Value(markFavorite),
+            remoteId: Value(remoteId),
+            remoteArtworkUrl: Value(remoteArtworkUrl),
+          ),
+          mode: InsertMode.insertOrIgnore,
+        );
+
+    final existing = await (_db.select(_db.songsTable)
+          ..where((t) => t.id.equals(songData.id) | t.remoteId.equals(remoteId))
+          ..limit(1))
+        .getSingleOrNull();
+    if (existing == null) {
+      return songData;
+    }
+
+    final needsFavorite = markFavorite && !existing.isFavorite;
+    final needsArtwork = remoteArtworkUrl != null &&
+        remoteArtworkUrl.isNotEmpty &&
+        (existing.remoteArtworkUrl == null ||
+            existing.remoteArtworkUrl!.isEmpty);
+    if (needsFavorite || needsArtwork) {
+      await (_db.update(_db.songsTable)
+            ..where((t) => t.id.equals(existing.id)))
+          .write(SongsTableCompanion(
+        isFavorite: needsFavorite ? const Value(true) : const Value.absent(),
+        remoteArtworkUrl:
+            needsArtwork ? Value(remoteArtworkUrl) : const Value.absent(),
+      ));
+      return (_db.select(_db.songsTable)
+            ..where((t) => t.id.equals(existing.id)))
+          .getSingle();
+    }
+    return existing;
+  }
+
+  void _indexSongInMaps(
+    SongsTableData song, {
+    required Map<String, SongsTableData> byStableId,
+    required Map<String, SongsTableData> byRemoteId,
+    Map<(String, String), SongsTableData>? byTitleArtist,
+    String? extraDocId,
+  }) {
+    byStableId[_stableSongId(song)] = song;
+    if (extraDocId != null && extraDocId.isNotEmpty) {
+      byStableId[extraDocId] = song;
+    }
+    final rid = song.remoteId;
+    if (rid != null && rid.isNotEmpty) {
+      byRemoteId[rid] = song;
+    }
+    if (byTitleArtist != null) {
+      byTitleArtist[(song.title.toLowerCase(), song.artist.toLowerCase())] =
+          song;
+    }
+  }
+
   Future<void> _downloadAndMergeCloudData(
     DocumentReference userDoc, {
     required bool syncFavorites,
     required bool syncPlaylists,
   }) async {
+    await _getPrefs();
+    final initialLastSync = lastSyncTime;
+
     // 1. Merge Favorites
     if (syncFavorites) {
       await _ensureLocalModifiedFavoritesLoaded();
-      final lastSync = lastSyncTime;
       Query<Map<String, dynamic>> favQuery = userDoc.collection('favorites');
-      if (lastSync != null) {
+      if (initialLastSync != null) {
         // Delta reads with 7-day tombstone window
-        final deltaThreshold = lastSync.subtract(const Duration(days: 7));
-        favQuery = favQuery.where('modifiedAt', isGreaterThan: Timestamp.fromDate(deltaThreshold));
+        final deltaThreshold =
+            initialLastSync.subtract(const Duration(days: 7));
+        favQuery = favQuery.where('modifiedAt',
+            isGreaterThan: Timestamp.fromDate(deltaThreshold));
       }
       final favSnapshot = await favQuery.get();
       final favItems = <Map<String, dynamic>>[];
@@ -739,8 +929,9 @@ class CloudSyncService {
         for (final doc in favSnapshot.docs) {
           favItems.add({...doc.data(), '__docId': doc.id});
         }
-      } else {
-        // Legacy document fallback
+      } else if (initialLastSync == null) {
+        // Legacy document fallback runs only on initial sync when favorites
+        // collection itself has no entries.
         final favDoc = await userDoc.collection('sync').doc('favorites').get();
         if (favDoc.exists && favDoc.data() != null) {
           final legacyItems = (favDoc.data()!['items'] as List<dynamic>?) ?? [];
@@ -779,10 +970,14 @@ class CloudSyncService {
           }
 
           // LWW check: never let stale cloud state override newer local change
-          final key = docId ?? remoteId ?? '';
-          final localModTime = _localModifiedFavorites[key];
+          final localModTime = _maxLocalFavoriteTimestamp(
+            docId: docId,
+            remoteId: remoteId,
+            match: match,
+          );
           final cloudTime = extractCloudTimestamp(item);
-          if (!shouldCloudWin(cloudTimestamp: cloudTime, localTimestamp: localModTime)) {
+          if (!shouldCloudWin(
+              cloudTimestamp: cloudTime, localTimestamp: localModTime)) {
             continue;
           }
 
@@ -803,29 +998,20 @@ class CloudSyncService {
                   .write(const SongsTableCompanion(isFavorite: Value(true)));
             }
           } else if (remoteId != null && remoteId.isNotEmpty) {
-            final track = YtmTrack(
-              videoId: remoteId,
+            final inserted = await _upsertCloudYtmTrack(
+              remoteId: remoteId,
               title: title,
               artist: artist,
-              duration: Duration(milliseconds: durationMs),
-              artworkUrl: remoteArtworkUrl,
+              durationMs: durationMs,
+              remoteArtworkUrl: remoteArtworkUrl,
+              markFavorite: true,
             );
-            final songData = track.toSongData();
-            await _db.into(_db.songsTable).insert(
-                  SongsTableCompanion(
-                    id: Value(songData.id),
-                    title: Value(songData.title),
-                    artist: Value(songData.artist),
-                    album: Value(songData.album),
-                    durationMs: Value(songData.durationMs),
-                    path: Value(songData.path),
-                    source: const Value(SongSource.youtube),
-                    isFavorite: const Value(true),
-                    remoteId: Value(remoteId),
-                    remoteArtworkUrl: Value(remoteArtworkUrl),
-                  ),
-                  mode: InsertMode.insertOrReplace,
-                );
+            _indexSongInMaps(
+              inserted,
+              byStableId: localByStableId,
+              byRemoteId: localByRemoteId,
+              extraDocId: docId,
+            );
           }
         }
       });
@@ -836,7 +1022,8 @@ class CloudSyncService {
       final plSnapshot = await userDoc.collection('playlists').get();
       final existingPlaylistsRes = await _repository.getPlaylists();
       final existingPlaylists =
-          existingPlaylistsRes.fold((l) => <PlaylistsTableData>[], (r) => r);
+          existingPlaylistsRes.fold((l) => <PlaylistsTableData>[], (r) => r)
+              .toList();
       final prefs = await _getPrefs();
       final deviceId = await getDeviceId();
       final playlistSongsAll = await _db.select(_db.songsTable).get();
@@ -891,13 +1078,6 @@ class CloudSyncService {
             }
           }
 
-          // Playlist merge is additive (it only creates missing playlists and
-          // adds missing songs; it never renames or deletes). Local playlists
-          // carry no modification timestamp, so the old `createdAt`-vs-cloud
-          // `modifiedAt` comparison could wrongly skip a merge for a recently
-          // created local playlist. There is nothing destructive to guard
-          // against here, so always merge.
-
           if (pl == null) {
             final createRes = await _repository.createPlaylist(name);
             final newId = createRes.fold((l) => null, (r) => r);
@@ -906,6 +1086,7 @@ class CloudSyncService {
                     ..where((t) => t.id.equals(newId)))
                   .getSingleOrNull();
               if (pl != null) {
+                existingPlaylists.add(pl);
                 await prefs.setString('sync_pl_stable_id_${pl.id}', cloudSyncId);
                 await prefs.setInt('sync_cloud_pl_$cloudSyncId', pl.id);
               }
@@ -924,6 +1105,9 @@ class CloudSyncService {
               final isDeleted = sItem['deleted'] == true;
 
               SongsTableData? match = localByStableId[sDoc.id];
+              if (remoteId != null && remoteId.isNotEmpty) {
+                match ??= localByRemoteId[remoteId];
+              }
               if (isDeleted) {
                 if (match != null) {
                   await _repository.removeSongFromPlaylist(pl.id, match.id);
@@ -933,9 +1117,6 @@ class CloudSyncService {
 
               if (title.isEmpty) continue;
 
-              if (remoteId != null && remoteId.isNotEmpty) {
-                match ??= localByRemoteId[remoteId];
-              }
               match ??= localByTitleArtist[(
                 title.toLowerCase(),
                 artist.toLowerCase()
@@ -943,29 +1124,21 @@ class CloudSyncService {
 
               int? songId = match?.id;
               if (songId == null && remoteId != null && remoteId.isNotEmpty) {
-                final track = YtmTrack(
-                  videoId: remoteId,
+                final inserted = await _upsertCloudYtmTrack(
+                  remoteId: remoteId,
                   title: title,
                   artist: artist,
-                  duration: Duration(milliseconds: durationMs),
-                  artworkUrl: remoteArtworkUrl,
+                  durationMs: durationMs,
+                  remoteArtworkUrl: remoteArtworkUrl,
                 );
-                final songData = track.toSongData();
-                await _db.into(_db.songsTable).insert(
-                      SongsTableCompanion(
-                        id: Value(songData.id),
-                        title: Value(songData.title),
-                        artist: Value(songData.artist),
-                        album: Value(songData.album),
-                        durationMs: Value(songData.durationMs),
-                        path: Value(songData.path),
-                        source: const Value(SongSource.youtube),
-                        remoteId: Value(remoteId),
-                        remoteArtworkUrl: Value(remoteArtworkUrl),
-                      ),
-                      mode: InsertMode.insertOrReplace,
-                    );
-                songId = songData.id;
+                _indexSongInMaps(
+                  inserted,
+                  byStableId: localByStableId,
+                  byRemoteId: localByRemoteId,
+                  byTitleArtist: localByTitleArtist,
+                  extraDocId: sDoc.id,
+                );
+                songId = inserted.id;
               }
 
               if (songId != null) {
@@ -974,8 +1147,8 @@ class CloudSyncService {
             }
           }
         }
-      } else {
-        // Legacy document fallback
+      } else if (initialLastSync == null) {
+        // Legacy document fallback (only on initial sync)
         final plLegacyDoc =
             await userDoc.collection('sync').doc('playlists').get();
         if (plLegacyDoc.exists && plLegacyDoc.data() != null) {
@@ -996,6 +1169,9 @@ class CloudSyncService {
                 pl = await (_db.select(_db.playlistsTable)
                       ..where((t) => t.id.equals(newId)))
                     .getSingleOrNull();
+                if (pl != null) {
+                  existingPlaylists.add(pl);
+                }
               }
             }
 
@@ -1013,42 +1189,38 @@ class CloudSyncService {
 
                 SongsTableData? match;
                 if (remoteId != null && remoteId.isNotEmpty) {
-                  match = await (_db.select(_db.songsTable)
-                        ..where((t) => t.remoteId.equals(remoteId)))
-                      .getSingleOrNull();
+                  match = localByRemoteId[remoteId] ??
+                      await (_db.select(_db.songsTable)
+                            ..where((t) => t.remoteId.equals(remoteId)))
+                          .getSingleOrNull();
                 }
-                match ??= await (_db.select(_db.songsTable)
-                      ..where((t) =>
-                          t.title.lower().equals(title.toLowerCase()) &
-                          t.artist.lower().equals(artist.toLowerCase()))
-                      ..limit(1))
-                    .getSingleOrNull();
+                match ??= localByTitleArtist[(
+                      title.toLowerCase(),
+                      artist.toLowerCase()
+                    )] ??
+                    await (_db.select(_db.songsTable)
+                          ..where((t) =>
+                              t.title.lower().equals(title.toLowerCase()) &
+                              t.artist.lower().equals(artist.toLowerCase()))
+                          ..limit(1))
+                        .getSingleOrNull();
 
                 int? songId = match?.id;
                 if (songId == null && remoteId != null && remoteId.isNotEmpty) {
-                  final track = YtmTrack(
-                    videoId: remoteId,
+                  final inserted = await _upsertCloudYtmTrack(
+                    remoteId: remoteId,
                     title: title,
                     artist: artist,
-                    duration: Duration(milliseconds: durationMs),
-                    artworkUrl: remoteArtworkUrl,
+                    durationMs: durationMs,
+                    remoteArtworkUrl: remoteArtworkUrl,
                   );
-                  final songData = track.toSongData();
-                  await _db.into(_db.songsTable).insert(
-                        SongsTableCompanion(
-                          id: Value(songData.id),
-                          title: Value(songData.title),
-                          artist: Value(songData.artist),
-                          album: Value(songData.album),
-                          durationMs: Value(songData.durationMs),
-                          path: Value(songData.path),
-                          source: const Value(SongSource.youtube),
-                          remoteId: Value(remoteId),
-                          remoteArtworkUrl: Value(remoteArtworkUrl),
-                        ),
-                        mode: InsertMode.insertOrReplace,
-                      );
-                  songId = songData.id;
+                  _indexSongInMaps(
+                    inserted,
+                    byStableId: localByStableId,
+                    byRemoteId: localByRemoteId,
+                    byTitleArtist: localByTitleArtist,
+                  );
+                  songId = inserted.id;
                 }
 
                 if (songId != null) {

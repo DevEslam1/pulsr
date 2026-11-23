@@ -2,12 +2,11 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:injectable/injectable.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../data/db/app_database.dart';
 import '../../domain/repositories/music_repository_interface.dart';
-import '../config/app_config.dart';
-import '../constants/prefs_keys.dart';
 import '../di/injection.dart';
+import '../network/network_access_guard.dart';
+import '../network/remote_target_policy.dart';
 import '../utils/error_logger.dart';
 
 class _ArtworkRateLimiter {
@@ -65,13 +64,8 @@ class MissingArtworkService {
   /// Returns null immediately when offline-only mode is enabled.
   Future<String?> fetchArtworkForAlbum(String albumTitle, String artistName,
       {int maxRetries = 2}) async {
-    try {
-      if (!AppConfig.isCloudSyncAllowed) return null;
-      final prefs = await SharedPreferences.getInstance();
-      if (prefs.getBool(PrefsKeys.offlineOnlyMode) == true) return null;
-    } catch (e, st) {
-      ErrorLogger.log('Failed to read offline-only preference for artwork',
-          error: e, stackTrace: st, category: 'MissingArtwork');
+    if (await NetworkAccessGuard.isBlocked(category: 'MissingArtwork')) {
+      return null;
     }
     for (int attempt = 0; attempt <= maxRetries; attempt++) {
       await _rateLimiter.acquire();
@@ -95,7 +89,8 @@ class MissingArtworkService {
           if (results != null && results.isNotEmpty) {
             final first = results.first;
             final rawUrl = first['artworkUrl100'] as String?;
-            if (rawUrl != null) {
+            if (rawUrl != null &&
+                RemoteTargetPolicy.isAllowed(rawUrl, requireHttps: true)) {
               // Replace 100x100 with 600x600 HD artwork
               return rawUrl.replaceAll('100x100bb.jpg', '600x600bb.jpg');
             }
@@ -152,13 +147,8 @@ class MissingArtworkService {
   Future<int> fetchAndPersistMissingArtwork({
     void Function(int processed, int total)? onProgress,
   }) async {
-    try {
-      if (!AppConfig.isCloudSyncAllowed) return 0;
-      final prefs = await SharedPreferences.getInstance();
-      if (prefs.getBool(PrefsKeys.offlineOnlyMode) == true) return 0;
-    } catch (e, st) {
-      ErrorLogger.log('Failed to read offline-only preference for artwork',
-          error: e, stackTrace: st, category: 'MissingArtwork');
+    if (await NetworkAccessGuard.isBlocked(category: 'MissingArtwork')) {
+      return 0;
     }
 
     if (!getIt.isRegistered<IMusicRepository>()) return 0;

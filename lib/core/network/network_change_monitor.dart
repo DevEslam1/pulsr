@@ -34,6 +34,7 @@ class NetworkChangeMonitor {
   List<ConnectivityResult>? _lastResults;
   Timer? _debounce;
   bool _started = false;
+  int _lifecycleEpoch = 0;
 
   /// Fires on every debounced network-path change.
   Stream<void> get onNetworkChanged => _controller.stream;
@@ -41,6 +42,7 @@ class NetworkChangeMonitor {
   Future<void> start() async {
     if (_started) return;
     _started = true;
+    final epoch = ++_lifecycleEpoch;
     if (_controller.isClosed) {
       _controller = StreamController<void>.broadcast();
     }
@@ -49,10 +51,13 @@ class NetworkChangeMonitor {
     } catch (_) {
       _lastResults = null;
     }
-    if (!_started || _controller.isClosed) return;
+    if (!_started || epoch != _lifecycleEpoch || _controller.isClosed) return;
     await _sub?.cancel();
     _nativeChannel.setMethodCallHandler(_onNativeCall);
-    _sub = _connectivity.onConnectivityChanged.listen(_onResults);
+    _sub = _connectivity.onConnectivityChanged.listen(
+      _onResults,
+      onError: (_) {},
+    );
   }
 
   Future<void> _onNativeCall(MethodCall call) async {
@@ -92,6 +97,7 @@ class NetworkChangeMonitor {
 
   Future<void> dispose() async {
     _started = false;
+    ++_lifecycleEpoch;
     _debounce?.cancel();
     _debounce = null;
     _nativeChannel.setMethodCallHandler(null);

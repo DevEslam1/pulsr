@@ -2,6 +2,7 @@
 import 'dart:convert';
 
 import 'package:injectable/injectable.dart';
+import 'package:mutex/mutex.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../domain/models/quran_mode_profile.dart';
@@ -19,6 +20,8 @@ class QuranModeService {
   static const String _keyAlwaysOnRadio = 'quran_mode_always_on_radio';
 
   QuranModeService();
+
+  final Mutex _tuningMutex = Mutex();
 
   Future<bool> isAlwaysOnRadio() async {
     final prefs = await SharedPreferences.getInstance();
@@ -92,25 +95,26 @@ class QuranModeService {
   }
 
   Future<void> setStyleTuning(
-      QuranReciterStyle style, QuranStyleTuning tuning) async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_keyStyleTunings);
-    final values = <String, dynamic>{};
-    if (raw != null && raw.isNotEmpty) {
-      try {
-        final decoded = jsonDecode(raw);
-        if (decoded is Map) values.addAll(Map<String, dynamic>.from(decoded));
-      } on FormatException {
-        // Corrupt optional tuning must not block Quran Mode.
-      }
-    }
-    if (tuning.isEmpty) {
-      values.remove(style.name);
-    } else {
-      values[style.name] = tuning.toJson();
-    }
-    await prefs.setString(_keyStyleTunings, jsonEncode(values));
-  }
+      QuranReciterStyle style, QuranStyleTuning tuning) =>
+      _tuningMutex.protect(() async {
+        final prefs = await SharedPreferences.getInstance();
+        final raw = prefs.getString(_keyStyleTunings);
+        final values = <String, dynamic>{};
+        if (raw != null && raw.isNotEmpty) {
+          try {
+            final decoded = jsonDecode(raw);
+            if (decoded is Map) values.addAll(Map<String, dynamic>.from(decoded));
+          } on FormatException {
+            // Corrupt optional tuning must not block Quran Mode.
+          }
+        }
+        if (tuning.isEmpty) {
+          values.remove(style.name);
+        } else {
+          values[style.name] = tuning.toJson();
+        }
+        await prefs.setString(_keyStyleTunings, jsonEncode(values));
+      });
 
   /// The saved profile, or null when Quran Mode was off at last exit.
   Future<QuranModeProfile?> loadActiveProfile() async {

@@ -124,10 +124,10 @@ void main() {
       expect(lines.single.timestamp, Duration.zero);
     });
 
-    test('lines shorter than 50ms apart merge as translations', () {
+    test('near-identical lines within 10ms merge as translations', () {
       const lrc = '''
 [00:10.00]Original line
-[00:10.03]Translated line
+[00:10.01]Translated line
 [00:20.00]Next line
 ''';
       final result = LrcParser.parseWithMetadata(lrc);
@@ -135,6 +135,16 @@ void main() {
       expect(result.lines[0].text, 'Original line');
       expect(result.lines[0].translation, 'Translated line');
       expect(result.lines[1].translation, isNull);
+    });
+
+    test('lines >10ms apart (e.g. 30ms) remain separate lines', () {
+      const lrc = '''
+[00:10.00]First line
+[00:10.03]Second line
+''';
+      final result = LrcParser.parseWithMetadata(lrc);
+      expect(result.lines, hasLength(2));
+      expect(result.lines.every((l) => l.translation == null), isTrue);
     });
 
     test('identical text is not merged, larger gaps are not merged', () {
@@ -557,6 +567,40 @@ void main() {
       final secondResult = await second;
       expect(firstResult, isNotNull);
       expect(identical(firstResult, secondResult), isTrue);
+    });
+
+    test('three-part <mm:ss:ms> word timestamps parse without line-start collapse',
+        () {
+      const lrc = '[00:10.00]<00:10:250>Alpha <00:11:500>Beta';
+      final lines = LrcParser.parse(lrc);
+      expect(lines.single.words, hasLength(2));
+      expect(lines.single.words[0].startMs, 10250);
+      expect(lines.single.words[0].endMs, 11500);
+      expect(lines.single.words[1].startMs, 11500);
+    });
+
+    test('resolveLyrics skips negative cache when lrclibService is null',
+        () async {
+      final first = await LrcParser.resolveLyrics(
+        '/missing/offline_first.mp3',
+        songId: 720099,
+        trackTitle: 'Song',
+        artist: 'Artist',
+        lrclibService: null,
+      );
+      expect(first, isNull);
+      expect(LrcParser.hasCachedLyrics(songId: 720099), isFalse);
+
+      final fake = _FakeLrclib()..result = _syncedResult();
+      final second = await LrcParser.resolveLyrics(
+        '/missing/offline_first.mp3',
+        songId: 720099,
+        trackTitle: 'Song',
+        artist: 'Artist',
+        lrclibService: fake,
+      );
+      expect(second, same(fake.result));
+      expect(fake.calls, 1);
     });
   });
 }

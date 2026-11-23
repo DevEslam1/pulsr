@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
@@ -7,6 +8,7 @@ import '../../data/scanner/media_scanner_service.dart';
 
 class RestoreDetectionService {
   static const String _tokenFileName = 'app_instance_token';
+  static Future<bool>? _inFlightCheck;
 
   static int computeCrc32(String input) {
     final bytes = utf8.encode(input);
@@ -21,6 +23,19 @@ class RestoreDetectionService {
   }
 
   static Future<bool> checkAndHandleRestore(
+      MediaScannerService scannerService) {
+    final existing = _inFlightCheck;
+    if (existing != null) return existing;
+    final future = _checkAndHandleRestoreImpl(scannerService);
+    _inFlightCheck = future;
+    return future.whenComplete(() {
+      if (identical(_inFlightCheck, future)) {
+        _inFlightCheck = null;
+      }
+    });
+  }
+
+  static Future<bool> _checkAndHandleRestoreImpl(
       MediaScannerService scannerService) async {
     try {
       final docDir = await getApplicationDocumentsDirectory();
@@ -40,14 +55,20 @@ class RestoreDetectionService {
               validToken = true;
             }
           }
-        } catch (_) {}
+        } catch (e, st) {
+          ErrorLogger.log('Failed reading app_instance_token',
+              error: e, stackTrace: st, category: 'Restore');
+        }
       }
 
       if (!validToken) {
-        // Create token file with CRC32 checksum so subsequent launches know this instance is established
+        // Atomic write via temp + rename so a crash mid-write cannot corrupt
+        // the token and trigger a spurious full library rescan on relaunch.
         final now = DateTime.now().toIso8601String();
         final tokenWithCrc = '$now|${computeCrc32(now)}';
-        await tokenFile.writeAsString(tokenWithCrc);
+        final tempFile = File('${docDir.path}/$_tokenFileName.tmp');
+        await tempFile.writeAsString(tokenWithCrc, flush: true);
+        await tempFile.rename(tokenFile.path);
 
         if (isOnboardingCompleted) {
           // Restored from backup without local database!

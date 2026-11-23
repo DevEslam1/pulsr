@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
@@ -5,6 +6,7 @@ import 'dart:isolate';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart' show visibleForTesting;
 import '../../data/audio/audio_effects_channel.dart';
+import '../utils/error_logger.dart';
 
 /// Outcome of a custody verification, and the ONLY thing the UI may present as a
 /// claim about output integrity.
@@ -325,6 +327,7 @@ class ChainOfCustodyService {
 
   final AudioEffectsChannel _effectsChannel;
   final ContentHasher _hashContents;
+  Future<void>? _verifyChainLock;
 
   ChainOfCustodyService({
     AudioEffectsChannel? effectsChannel,
@@ -332,19 +335,25 @@ class ChainOfCustodyService {
   })  : _effectsChannel = effectsChannel ?? AudioEffectsChannel(),
         _hashContents = contentHasher ?? hashFileContents;
 
+  /// Streams a file through SHA-256 on the caller's isolate (used inside
+  /// existing background isolates to avoid nested isolate spawns).
+  static Future<String?> hashFileContentsInline(
+      String path, int sizeBytes) async {
+    if (sizeBytes > maxHashableBytes) return null;
+    final collector = _DigestCollector();
+    final input = sha256.startChunkedConversion(collector);
+    await for (final chunk in File(path).openRead()) {
+      input.add(chunk);
+    }
+    input.close();
+    return collector.digest?.toString();
+  }
+
   /// Streams a file through SHA-256 on a worker isolate, so a 40 MB FLAC never
   /// costs the UI thread its frame budget and the whole file never sits in RAM.
   static Future<String?> hashFileContents(String path, int sizeBytes) async {
     if (sizeBytes > maxHashableBytes) return null;
-    return Isolate.run(() async {
-      final collector = _DigestCollector();
-      final input = sha256.startChunkedConversion(collector);
-      await for (final chunk in File(path).openRead()) {
-        input.add(chunk);
-      }
-      input.close();
-      return collector.digest?.toString();
-    });
+    return Isolate.run(() => hashFileContentsInline(path, sizeBytes));
   }
 
   /// Builds a report from engine configuration only — no capture, so the verdict
@@ -382,7 +391,53 @@ class ChainOfCustodyService {
   ///
   /// Requires running playback — an idle engine produces no blocks and therefore
   /// no window, which is reported as unverified rather than guessed at.
+  /// Concurrent calls are serialized so capture windows never collide.
   Future<ChainOfCustodyReport> verifyChain({
+    required String trackId,
+    required String trackTitle,
+    String? filePath,
+    String? trackUri,
+    List<int>? fileHeaderBytes,
+    String decoderCodec = 'Unknown',
+    int sourceSampleRate = 44100,
+    int sourceBitDepth = 16,
+    int frames = defaultWindowFrames,
+    Duration timeout = defaultCollectTimeout,
+    bool hashFile = true,
+    String? directBypassPath,
+  }) async {
+    final prev = _verifyChainLock;
+    final current = Completer<void>();
+    _verifyChainLock = current.future;
+    if (prev != null) {
+      await prev;
+    }
+    try {
+      return await _verifyChainSerialized(
+        trackId: trackId,
+        trackTitle: trackTitle,
+        filePath: filePath,
+        trackUri: trackUri,
+        fileHeaderBytes: fileHeaderBytes,
+        decoderCodec: decoderCodec,
+        sourceSampleRate: sourceSampleRate,
+        sourceBitDepth: sourceBitDepth,
+        frames: frames,
+        timeout: timeout,
+        hashFile: hashFile,
+        directBypassPath: directBypassPath,
+      );
+    } finally {
+      if (!current.isCompleted) {
+        current.complete();
+      }
+      if (identical(_verifyChainLock, current.future)) {
+        _verifyChainLock = null;
+      }
+    }
+  }
+
+  Future<ChainOfCustodyReport> _verifyChainSerialized({
     required String trackId,
     required String trackTitle,
     String? filePath,
@@ -432,7 +487,8 @@ class ChainOfCustodyService {
             }
           }
         } catch (error) {
-          limitations.add('contentHashFailed:$error');
+          limitations.add(
+              'contentHashFailed:${ErrorLogger.redactPii(error.toString())}');
         }
       }
     }
@@ -468,14 +524,28 @@ class ChainOfCustodyService {
           limitations.add('captureUnsupported:unsupportedPlatform');
         }
       } else {
-        measurement = await _awaitWindow(timeout);
-        if (measurement == null) {
-          await _effectsChannel.cancelCustodyWindow();
-          limitations.add('noCaptureWindow:playbackIdleOrEngineUnloaded');
-        }
-        final refreshedReport = await _effectsChannel.getChainOfCustodyReport();
-        if (refreshedReport.isNotEmpty) {
-          finalReport = refreshedReport;
+        var windowCompleted = false;
+        try {
+          measurement = await _awaitWindow(timeout);
+          if (measurement == null) {
+            limitations.add('noCaptureWindow:playbackIdleOrEngineUnloaded');
+          } else {
+            windowCompleted = true;
+          }
+          final refreshedReport =
+              await _effectsChannel.getChainOfCustodyReport();
+          if (refreshedReport.isNotEmpty) {
+            finalReport = refreshedReport;
+          }
+        } finally {
+          if (!windowCompleted) {
+            try {
+              await _effectsChannel.cancelCustodyWindow();
+            } catch (e, st) {
+              ErrorLogger.log('Failed to cancel custody window',
+                  error: e, stackTrace: st, category: 'ChainOfCustody');
+            }
+          }
         }
       }
     }
@@ -497,11 +567,11 @@ class ChainOfCustodyService {
     );
   }
 
-  /// Polls for the window to fill. 60 ms keeps the wait off the frame budget while
-  /// staying well inside one block of playback at common buffer sizes.
+  /// Polls for the window to fill using monotonic elapsed time. 60 ms keeps the
+  /// wait off the frame budget while staying well inside one block of playback.
   Future<CustodyMeasurement?> _awaitWindow(Duration timeout) async {
-    final deadline = DateTime.now().add(timeout);
-    while (DateTime.now().isBefore(deadline)) {
+    final stopwatch = Stopwatch()..start();
+    while (stopwatch.elapsed < timeout) {
       final window = await _effectsChannel.collectCustodyWindow();
       if (window['available'] == true) {
         return CustodyMeasurement.fromWindowMap(window);

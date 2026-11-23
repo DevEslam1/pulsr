@@ -276,13 +276,30 @@ Future<AbxReportArtifact> exportAbxReport(
       'pulsr-abx-report-${report.exportedAt.toUtc().millisecondsSinceEpoch}.json';
   await directory.create(recursive: true);
   final file = File('${directory.path}${Platform.pathSeparator}$name');
-  await file.writeAsString(jsonText, flush: true);
+  final tmpFile = File('${file.path}.tmp');
+  try {
+    await tmpFile.writeAsString(jsonText, flush: true);
+    try {
+      await tmpFile.rename(file.path);
+    } on FileSystemException {
+      await tmpFile.copy(file.path);
+      await tmpFile.delete().catchError((_) => tmpFile);
+    }
+  } catch (_) {
+    if (await tmpFile.exists()) {
+      await tmpFile.delete().catchError((_) => tmpFile);
+    }
+    rethrow;
+  }
 
   final decoded = jsonDecode(await file.readAsString()) as Map<String, dynamic>;
   final trials = decoded['trials'] as List<dynamic>?;
   if (decoded['kind'] != AbxReport.reportKind ||
       trials == null ||
       trials.length != report.totalTrials) {
+    if (await file.exists()) {
+      await file.delete().catchError((_) => file);
+    }
     throw StateError('ABX report round-trip verification failed for $name');
   }
 

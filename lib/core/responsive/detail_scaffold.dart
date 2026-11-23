@@ -129,7 +129,10 @@ class DetailScaffold extends StatelessWidget {
           ),
 
           // Foldable hinge or divider
-          if (hinge != null)
+          if (hinge != null &&
+              hinge.bounds.width > 0 &&
+              hinge.bounds.height > hinge.bounds.width &&
+              hinge.bounds.width < MediaQuery.sizeOf(context).width)
             SizedBox(width: hinge.bounds.width)
           else
             VerticalDivider(width: 1, thickness: 1, color: p.hairline),
@@ -163,7 +166,7 @@ class DetailScaffold extends StatelessWidget {
                   parent: BouncingScrollPhysics()),
               children: [
                 hero,
-                body!,
+                body ?? const SizedBox.shrink(),
               ],
             );
 

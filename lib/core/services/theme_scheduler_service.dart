@@ -11,8 +11,8 @@ class ThemeSchedulerService {
   Stream<bool> get isNightStream => _isNightSubject.stream;
 
   void updateScheduleHours({int start = 19, int end = 6}) {
-    startHour = start;
-    endHour = end;
+    startHour = start.clamp(0, 23);
+    endHour = end.clamp(0, 23);
   }
 
   void startScheduler(void Function(bool isNight) onThemeChange) {

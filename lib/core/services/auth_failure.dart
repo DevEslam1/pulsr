@@ -120,7 +120,9 @@ class AuthFailure extends AppError {
         text.contains('network error') ||
         text.contains('socketexception') ||
         text.contains('failed host lookup') ||
-        text.contains('connection')) {
+        RegExp(
+          r'\b(?:connection\s+(?:refused|reset|closed|aborted|timed\s+out|failed)|internet connection|network is unreachable)\b',
+        ).hasMatch(text)) {
       return AuthFailure(
         code: 'AUTH_NETWORK',
         userMessage: 'Network error. Check your internet connection.',
@@ -130,7 +132,7 @@ class AuthFailure extends AppError {
         stackTrace: stackTrace,
       );
     }
-    if (text.contains('apiexception') && text.contains('10')) {
+    if (RegExp(r'apiexception:\s*10\b').hasMatch(text)) {
       return AuthFailure(
         code: 'AUTH_GOOGLE_CONFIG',
         userMessage:

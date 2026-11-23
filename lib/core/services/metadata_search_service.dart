@@ -6,9 +6,8 @@ import 'package:http/http.dart' as http;
 import 'package:injectable/injectable.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../config/app_config.dart';
-import '../constants/prefs_keys.dart';
+import '../network/network_access_guard.dart';
 import '../network/remote_target_policy.dart';
 import '../utils/error_logger.dart';
 
@@ -40,6 +39,8 @@ class MetadataSearchService {
 
   final http.Client _httpClient;
   final bool _ownsClient;
+  DateTime? _lastMusicBrainzQueryAt;
+  int _tempArtSeq = 0;
 
   MetadataSearchService([http.Client? httpClient])
       : _httpClient = httpClient ?? http.Client(),
@@ -64,13 +65,8 @@ class MetadataSearchService {
     String? artist,
     String? album,
   }) async {
-    try {
-      if (!AppConfig.isCloudSyncAllowed) return const [];
-      final prefs = await SharedPreferences.getInstance();
-      if (prefs.getBool(PrefsKeys.offlineOnlyMode) == true) return const [];
-    } catch (e, st) {
-      ErrorLogger.log('Failed to read offline-only preference for metadata',
-          error: e, stackTrace: st, category: 'MetadataSearch');
+    if (await NetworkAccessGuard.isBlocked(category: 'MetadataSearch')) {
+      return const [];
     }
     final results = <OnlineTrackMetadata>[];
 
@@ -142,6 +138,15 @@ class MetadataSearchService {
     // their etiquette — single query per search, 10s timeout.
     if (results.isEmpty && title.trim().isNotEmpty) {
       try {
+        // Enforce MusicBrainz 1 req/s etiquette rate limit.
+        if (_lastMusicBrainzQueryAt != null) {
+          final elapsed = DateTime.now().difference(_lastMusicBrainzQueryAt!);
+          if (elapsed < const Duration(seconds: 1)) {
+            await Future.delayed(const Duration(seconds: 1) - elapsed);
+          }
+        }
+        _lastMusicBrainzQueryAt = DateTime.now();
+
         final query = [
           'recording:"${_escapeLucene(title)}"',
           if (artist != null &&
@@ -216,11 +221,9 @@ class MetadataSearchService {
   }
 
   Future<String?> downloadArtworkToTemp(String url) async {
-    if (!AppConfig.isCloudSyncAllowed) return null;
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      if (prefs.getBool(PrefsKeys.offlineOnlyMode) == true) return null;
-    } catch (_) {}
+    if (await NetworkAccessGuard.isBlocked(category: 'MetadataSearch')) {
+      return null;
+    }
 
     if (!RemoteTargetPolicy.isAllowed(url)) return null;
 
@@ -287,10 +290,19 @@ class MetadataSearchService {
       if (bytes.isNotEmpty) {
         final dir = await getTemporaryDirectory();
         final fileName =
-            'auto_art_${DateTime.now().millisecondsSinceEpoch}.jpg';
-        final file = File(p.join(dir.path, fileName));
-        await file.writeAsBytes(bytes);
-        return file.path;
+            'auto_art_${DateTime.now().millisecondsSinceEpoch}_${_tempArtSeq++}.jpg';
+        final targetFile = File(p.join(dir.path, fileName));
+        final tmpFile = File('${targetFile.path}.tmp');
+        try {
+          await tmpFile.writeAsBytes(bytes, flush: true);
+          await tmpFile.rename(targetFile.path);
+        } catch (_) {
+          if (await tmpFile.exists()) {
+            await tmpFile.delete().catchError((_) => tmpFile);
+          }
+          rethrow;
+        }
+        return targetFile.path;
       }
     } catch (e, st) {
       ErrorLogger.log('Failed to download auto artwork: $url',

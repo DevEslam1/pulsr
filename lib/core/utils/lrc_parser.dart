@@ -137,7 +137,7 @@ class LrcParser {
       if (merged.isNotEmpty &&
           (cur.timestamp.inMilliseconds - merged.last.timestamp.inMilliseconds)
                   .abs() <=
-              50 &&
+              10 &&
           merged.last.translation == null &&
           cur.text != merged.last.text) {
         merged[merged.length - 1] = merged.last.copyWith(translation: cur.text);
@@ -161,12 +161,21 @@ class LrcParser {
     int parseTime(String tag) {
       final clean = tag.replaceAll(RegExp(r'[<>]'), '');
       final parts = clean.split(':');
-      if (parts.length == 2) {
+      if (parts.length == 2 || parts.length == 3) {
         final min = int.tryParse(parts[0]) ?? 0;
-        final secParts = parts[1].split(RegExp(r'[.,]'));
-        final sec = int.tryParse(secParts[0]) ?? 0;
-        final frac = secParts.length > 1
-            ? (int.tryParse(secParts[1].padRight(3, '0').substring(0, 3)) ?? 0)
+        final String secRaw;
+        final String fracRaw;
+        if (parts.length == 3) {
+          secRaw = parts[1];
+          fracRaw = parts[2];
+        } else {
+          final secParts = parts[1].split(RegExp(r'[.,]'));
+          secRaw = secParts[0];
+          fracRaw = secParts.length > 1 ? secParts[1] : '';
+        }
+        final sec = int.tryParse(secRaw) ?? 0;
+        final frac = fracRaw.isNotEmpty
+            ? (int.tryParse(fracRaw.padRight(3, '0').substring(0, 3)) ?? 0)
             : 0;
         final total = min * 60000 + sec * 1000 + frac + offsetMs;
         return total < 0 ? 0 : total;
@@ -293,6 +302,9 @@ class LrcParser {
     return result;
   }
 
+  static const int _maxLrcFileBytes = 5 * 1024 * 1024;
+  static int _cacheGeneration = 0;
+
   /// Helper to read a file and parse as LRC, returning null if file missing or
   /// content doesn't contain synced timestamps.
   static Future<List<LyricsLine>?> _tryParseLrcFile(
@@ -300,6 +312,7 @@ class LrcParser {
     try {
       final file = File(path);
       if (!await file.exists()) return null;
+      if (await file.length() > _maxLrcFileBytes) return null;
       final bytes = await file.readAsBytes();
       final content = decodeLrcBytes(bytes);
       final lines = parse(content, source: source);
@@ -352,7 +365,8 @@ class LrcParser {
       for (final genericName in ['lyrics.lrc', 'Lyrics.lrc', 'lyrics.txt']) {
         final genericLrc =
             File('${parentDir.path}${Platform.pathSeparator}$genericName');
-        if (await genericLrc.exists()) {
+        if (await genericLrc.exists() &&
+            await genericLrc.length() <= _maxLrcFileBytes) {
           try {
             final bytes = await genericLrc.readAsBytes();
             final content = decodeLrcBytes(bytes);
@@ -435,15 +449,18 @@ class LrcParser {
 
   /// Invalidates memory and disk cache for a song so it can be re-fetched.
   static void invalidateCache({int? songId, String? path}) {
+    _cacheGeneration++;
     if (songId != null) {
       final key = 'song_$songId';
       _lyricsCache.remove(key);
       _negativeCacheTimes.remove(key);
+      _inFlightResolves.remove(key);
       unawaited(_deleteFromDiskCache(key));
     }
     if (path != null && path.isNotEmpty) {
       _lyricsCache.remove(path);
       _negativeCacheTimes.remove(path);
+      _inFlightResolves.remove(path);
       unawaited(_deleteFromDiskCache(path));
     }
   }
@@ -588,13 +605,20 @@ class LrcParser {
 
   static Future<void> _writeToDiskCache(
       String cacheKey, LyricsResult result) async {
+    File? tmpFile;
     try {
       final dir = await _getDiskCacheDir();
       if (dir == null) return;
       final file = File('${dir.path}/${_diskCacheKey(cacheKey)}.json');
+      tmpFile = File('${file.path}.tmp');
       final payload = encodeDiskCachePayload(result);
-      await file.writeAsString(jsonEncode(payload), flush: true);
+      await tmpFile.writeAsString(jsonEncode(payload), flush: true);
+      await tmpFile.rename(file.path);
     } catch (e) {
+      if (tmpFile != null && await tmpFile.exists()) {
+        final cleanup = tmpFile;
+        await cleanup.delete().catchError((_) => cleanup);
+      }
       // Disk-full / quota / permission — log once, never crash playback.
       ErrorLogger.log('Lyrics disk cache write failed',
           error: e, category: 'Lyrics');
@@ -639,7 +663,9 @@ class LrcParser {
   }
 
   static void _putMemCache(String key, LyricsResult? result) {
-    if (_lyricsCache.length >= _maxCacheSize) {
+    if (_lyricsCache.containsKey(key)) {
+      _lyricsCache.remove(key);
+    } else if (_lyricsCache.length >= _maxCacheSize) {
       final evictedKey = _lyricsCache.keys.first;
       _lyricsCache.remove(evictedKey);
       _negativeCacheTimes.remove(evictedKey);
@@ -707,7 +733,9 @@ class LrcParser {
     try {
       return await future;
     } finally {
-      _inFlightResolves.remove(cacheKey);
+      if (identical(_inFlightResolves[cacheKey], future)) {
+        _inFlightResolves.remove(cacheKey);
+      }
     }
   }
 
@@ -720,15 +748,20 @@ class LrcParser {
     int? durationSec,
     LrclibLyricsClient? lrclibService,
   }) async {
+    final startGen = _cacheGeneration;
     // Check persistent disk cache before external searching or network lookups
     final diskCached = await _readFromDiskCache(cacheKey);
     if (diskCached != null) {
-      if (_lyricsCache.length >= _maxCacheSize) {
-        final evictedKey = _lyricsCache.keys.first;
-        _lyricsCache.remove(evictedKey);
-        _negativeCacheTimes.remove(evictedKey);
+      if (startGen == _cacheGeneration) {
+        if (_lyricsCache.containsKey(cacheKey)) {
+          _lyricsCache.remove(cacheKey);
+        } else if (_lyricsCache.length >= _maxCacheSize) {
+          final evictedKey = _lyricsCache.keys.first;
+          _lyricsCache.remove(evictedKey);
+          _negativeCacheTimes.remove(evictedKey);
+        }
+        _lyricsCache[cacheKey] = diskCached;
       }
-      _lyricsCache[cacheKey] = diskCached;
       return diskCached;
     }
 
@@ -798,9 +831,11 @@ class LrcParser {
       resolved = LyricsResult(lines: embeddedPlainFallback, source: src);
     }
 
-    // Cache the result (including null to avoid repeated failing lookups, with TTL)
-    // Only cache negative null if online resolution was attempted (trackTitle != null)
-    if (resolved != null || (trackTitle != null && trackTitle.isNotEmpty)) {
+    // Cache the result (cache negative null only when online lookup ran)
+    final onlineAttempted =
+        lrclibService != null && trackTitle != null && trackTitle.isNotEmpty;
+    if (startGen == _cacheGeneration &&
+        (resolved != null || onlineAttempted)) {
       // Proactively sweep expired negative entries so the map can't grow
       // across a long session of misses.
       if (_negativeCacheTimes.length > _maxCacheSize) {
@@ -815,23 +850,15 @@ class LrcParser {
   }
 
   /// Invalidate lyrics cache for a specific song
-  static void invalidateSong({int? songId, String? path}) {
-    if (songId != null) {
-      _lyricsCache.remove('song_$songId');
-      _negativeCacheTimes.remove('song_$songId');
-      unawaited(_deleteFromDiskCache('song_$songId'));
-    }
-    if (path != null) {
-      _lyricsCache.remove(path);
-      _negativeCacheTimes.remove(path);
-      unawaited(_deleteFromDiskCache(path));
-    }
-  }
+  static void invalidateSong({int? songId, String? path}) =>
+      invalidateCache(songId: songId, path: path);
 
   /// Clear the lyrics cache (e.g. on tag edit or rescan)
   static void clearCache() {
+    _cacheGeneration++;
     _lyricsCache.clear();
     _negativeCacheTimes.clear();
+    _inFlightResolves.clear();
     unawaited(_clearDiskCache());
   }
 }

@@ -46,5 +46,28 @@ void main() {
         );
       }
     });
+
+    test('dev/ytm flavor with ENV=prod never escalates to prod environment', () {
+      expect(
+        AppConfig.resolveEnvironment(flavorValue: 'dev', envValue: 'prod'),
+        AppEnvironment.dev,
+      );
+      expect(
+        AppConfig.resolveEnvironment(flavorValue: 'ytm', envValue: 'prod'),
+        AppEnvironment.dev,
+      );
+      expect(
+        AppConfig.resolveEnvironment(flavorValue: 'prod', envValue: 'dev'),
+        AppEnvironment.prod,
+      );
+      expect(
+        () => AppConfig.validateResolvedConfiguration(
+          flavorValue: 'dev',
+          envValue: 'prod',
+          isYtmEnabled: false,
+        ),
+        throwsStateError,
+      );
+    });
   });
 }

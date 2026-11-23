@@ -10,6 +10,7 @@
 import 'dart:convert';
 
 import 'package:injectable/injectable.dart';
+import 'package:mutex/mutex.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../domain/services/smart_audio_plan.dart';
@@ -50,6 +51,8 @@ class SmartAudioEqLink {
 
 @lazySingleton
 class SmartAudioService {
+  final Mutex _linksMutex = Mutex();
+
   Future<SmartAudioMode> getMode() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -74,9 +77,16 @@ class SmartAudioService {
       final prefs = await SharedPreferences.getInstance();
       final raw = prefs.getString(PrefsKeys.smartAudioAutoEqLinks);
       if (raw == null || raw.isEmpty) return {};
-      final decoded = json.decode(raw) as Map<String, dynamic>;
-      return decoded.map((k, v) =>
-          MapEntry(k, SmartAudioEqLink.fromJson(v as Map<String, dynamic>)));
+      final decoded = json.decode(raw);
+      if (decoded is! Map) return {};
+      final result = <String, SmartAudioEqLink>{};
+      for (final entry in decoded.entries) {
+        if (entry.value is Map) {
+          result['${entry.key}'] = SmartAudioEqLink.fromJson(
+              Map<String, dynamic>.from(entry.value as Map));
+        }
+      }
+      return result;
     } catch (e, st) {
       ErrorLogger.log('Failed to load smart audio AutoEQ links',
           error: e, stackTrace: st, category: 'SmartAudioService');
@@ -94,18 +104,19 @@ class SmartAudioService {
     required String deviceLabel,
     required String profileId,
     double score = 1.0,
-  }) async {
-    final links = await getAutoEqLinks();
-    links[deviceKey] = SmartAudioEqLink(
-      deviceKey: deviceKey,
-      deviceLabel: deviceLabel,
-      profileId: profileId,
-      score: score,
-    );
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-      PrefsKeys.smartAudioAutoEqLinks,
-      json.encode(links.map((k, v) => MapEntry(k, v.toJson()))),
-    );
-  }
+  }) =>
+      _linksMutex.protect(() async {
+        final links = await getAutoEqLinks();
+        links[deviceKey] = SmartAudioEqLink(
+          deviceKey: deviceKey,
+          deviceLabel: deviceLabel,
+          profileId: profileId,
+          score: score,
+        );
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(
+          PrefsKeys.smartAudioAutoEqLinks,
+          json.encode(links.map((k, v) => MapEntry(k, v.toJson()))),
+        );
+      });
 }

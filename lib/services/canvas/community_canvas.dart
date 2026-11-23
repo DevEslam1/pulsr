@@ -1,6 +1,8 @@
 // lib/services/canvas/community_canvas.dart
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../../core/network/network_access_guard.dart';
+import '../../core/network/remote_target_policy.dart';
 import '../../core/utils/error_logger.dart';
 import 'canvas_artwork.dart';
 
@@ -98,6 +100,9 @@ class CommunityCanvas {
   }
 
   Future<List<_CommunityEntry>> _getManifest() async {
+    if (await NetworkAccessGuard.isBlocked(category: 'CommunityCanvas')) {
+      return const [];
+    }
     final now = DateTime.now();
     if (_entries.isNotEmpty &&
         _fetchedAt != null &&
@@ -133,7 +138,11 @@ class CommunityCanvas {
               final artist = obj['artist']?.toString() ?? '';
               final album = obj['album']?.toString() ?? '';
               final url = obj['url']?.toString() ?? '';
-              if (song.isEmpty || artist.isEmpty || url.isEmpty) return null;
+              if (song.isEmpty ||
+                  artist.isEmpty ||
+                  !RemoteTargetPolicy.isAllowed(url)) {
+                return null;
+              }
               return _CommunityEntry(
                 song: song,
                 artist: artist,

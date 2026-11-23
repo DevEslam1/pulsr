@@ -1,6 +1,7 @@
 // lib/services/canvas/tidal_canvas.dart
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../../core/network/network_access_guard.dart';
 import '../../core/utils/error_logger.dart';
 import 'canvas_artwork.dart';
 
@@ -150,6 +151,9 @@ class TidalCanvas {
   }
 
   Future<String?> _get(String url) async {
+    if (await NetworkAccessGuard.isBlocked(category: 'TidalCanvas')) {
+      return null;
+    }
     try {
       final uri = Uri.parse(url);
       final response = await _client.get(

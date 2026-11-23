@@ -20,11 +20,13 @@ class CoachMarkService {
 
   /// Session gate: true if any coach mark has been displayed in this process session.
   static bool sessionCoachMarkShown = false;
+  static bool _isEvaluating = false;
 
   /// Resets the session gate (primarily for unit tests).
   @visibleForTesting
   static void resetSession() {
     sessionCoachMarkShown = false;
+    _isEvaluating = false;
   }
 
   /// Core evaluator: verifies session and persistence gates, then displays the coach mark.
@@ -36,16 +38,25 @@ class CoachMarkService {
     IconData icon = Icons.lightbulb_rounded,
     SharedPreferences? customPrefs,
   }) async {
-    if (sessionCoachMarkShown) return false;
+    if (sessionCoachMarkShown || _isEvaluating) return false;
+    _isEvaluating = true;
 
-    final prefs = customPrefs ?? await SharedPreferences.getInstance();
-    if (prefs.getBool(prefsKey) == true) return false;
+    try {
+      final prefs = customPrefs ?? await SharedPreferences.getInstance();
+      if (sessionCoachMarkShown || prefs.getBool(prefsKey) == true) {
+        return false;
+      }
+      if (!context.mounted) return false;
 
-    // Claim session and persist encounter before showing so race conditions cannot double-fire
-    sessionCoachMarkShown = true;
-    await prefs.setBool(prefsKey, true);
+      // Claim session and persist encounter only while mounted so an unmounted
+      // context never permanently suppresses the coach mark before display.
+      sessionCoachMarkShown = true;
+      await prefs.setBool(prefsKey, true);
+    } finally {
+      _isEvaluating = false;
+    }
 
-    if (!context.mounted) return true;
+    if (!context.mounted) return false;
 
     await PulsrSheetHelper.showPulsrSheet<void>(
       context: context,

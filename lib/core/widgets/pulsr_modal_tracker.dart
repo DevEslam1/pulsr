@@ -1,5 +1,7 @@
 // lib/core/widgets/pulsr_modal_tracker.dart
 import 'package:material_ui/material_ui.dart';
+import '../router/safe_navigation.dart';
+import '../services/system_ui_controller.dart';
 import 'pulsr_dock_tracker.dart';
 
 /// {@category DesignSystem}
@@ -38,15 +40,29 @@ class PulsrModalObserver extends NavigatorObserver {
 
   @override
   void didPop(Route route, Route? previousRoute) {
-    if (_isModal(route)) PulsrModalTracker.pop();
-    if (_isNowPlaying(route)) PulsrDockTracker.setNowPlayingOpen(false);
+    if (_isModal(route)) {
+      PulsrModalTracker.pop();
+    } else {
+      PulsrSafePush.clearDebounce();
+    }
+    SystemUiController.instance.releaseForRoute(route);
+    if (_isNowPlaying(route)) {
+      PulsrDockTracker.setNowPlayingOpen(false);
+      SystemUiController.instance.releaseImmersive('now_playing');
+      SystemUiController.instance.releaseImmersive('karaoke');
+    }
     super.didPop(route, previousRoute);
   }
 
   @override
   void didRemove(Route route, Route? previousRoute) {
     if (_isModal(route)) PulsrModalTracker.pop();
-    if (_isNowPlaying(route)) PulsrDockTracker.setNowPlayingOpen(false);
+    SystemUiController.instance.releaseForRoute(route);
+    if (_isNowPlaying(route)) {
+      PulsrDockTracker.setNowPlayingOpen(false);
+      SystemUiController.instance.releaseImmersive('now_playing');
+      SystemUiController.instance.releaseImmersive('karaoke');
+    }
     super.didRemove(route, previousRoute);
   }
 
@@ -54,8 +70,13 @@ class PulsrModalObserver extends NavigatorObserver {
   void didReplace({Route? newRoute, Route? oldRoute}) {
     if (oldRoute != null && _isModal(oldRoute)) PulsrModalTracker.pop();
     if (newRoute != null && _isModal(newRoute)) PulsrModalTracker.push();
+    if (oldRoute != null) {
+      SystemUiController.instance.releaseForRoute(oldRoute);
+    }
     if (oldRoute != null && _isNowPlaying(oldRoute)) {
       PulsrDockTracker.setNowPlayingOpen(false);
+      SystemUiController.instance.releaseImmersive('now_playing');
+      SystemUiController.instance.releaseImmersive('karaoke');
     }
     if (newRoute != null && _isNowPlaying(newRoute)) {
       PulsrDockTracker.setNowPlayingOpen(true);

@@ -169,6 +169,7 @@ List<double> _extractPcmPeaksTask(_WaveformParams params) {
       }
 
       final count = params.count;
+      if (count <= 0) return const [];
       final headerOffset = pcmInfo.dataOffset;
       final dataLength = pcmInfo.dataLength;
       final bucketSize = (dataLength / count).floor();
@@ -265,6 +266,7 @@ class WaveformGenerator {
     String? filePath,
     int count = 60,
   }) {
+    if (count <= 0) return const [];
     final cacheKey = '${songId}_$count';
 
     // 1. Check LRU Cache
@@ -294,6 +296,8 @@ class WaveformGenerator {
     String? filePath,
     int count = 60,
   }) async {
+    if (count <= 0) return const [];
+    if (count <= 0) return const [];
     final cacheKey = '${songId}_$count';
     if (_cache.containsKey(cacheKey)) {
       final cached = _cache.remove(cacheKey)!;
@@ -319,7 +323,9 @@ class WaveformGenerator {
           songId: songId, filePath: filePath, count: count);
     }
 
-    if (_cache.length >= _maxCacheSize) {
+    if (_cache.containsKey(cacheKey)) {
+      _cache.remove(cacheKey);
+    } else if (_cache.length >= _maxCacheSize) {
       _cache.remove(_cache.keys.first);
     }
     _cache[cacheKey] = result;

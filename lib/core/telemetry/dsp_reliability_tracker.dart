@@ -167,18 +167,21 @@ class DspReliabilityTracker {
   bool get isInitialized => _initialized;
 
   bool _initialized = false;
+  bool _disposed = false;
   Future<void>? _initFuture;
   // Serializes preference writes so rapid counter increments cannot land out
   // of order (a slower earlier write overwriting a newer snapshot on disk).
   Future<void> _saveChain = Future<void>.value();
 
   Future<void> ensureInitialized() {
+    if (_disposed) return Future<void>.value();
     return _initFuture ??= _loadFromPrefs();
   }
 
   Future<void> _loadFromPrefs() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      if (_disposed) return;
       final raw = prefs.getString(prefsKey);
       if (raw != null && raw.isNotEmpty) {
         final decoded = jsonDecode(raw);
@@ -194,10 +197,13 @@ class DspReliabilityTracker {
       _counters = const DspReliabilityCounters.zero();
     } finally {
       _initialized = true;
-      if (_streamController.isClosed) {
-        _streamController = StreamController<DspReliabilityCounters>.broadcast();
+      if (!_disposed && identical(_instance, this)) {
+        if (_streamController.isClosed) {
+          _streamController =
+              StreamController<DspReliabilityCounters>.broadcast();
+        }
+        _streamController.add(_counters);
       }
-      _streamController.add(_counters);
     }
   }
 
@@ -291,11 +297,13 @@ class DspReliabilityTracker {
   }
 
   Future<void> resetCounters() async {
+    if (_disposed) return;
     _counters = const DspReliabilityCounters.zero();
     await _notifyAndSave();
   }
 
   Future<void> _notifyAndSave() {
+    if (_disposed) return Future<void>.value();
     if (_streamController.isClosed) {
       _streamController = StreamController<DspReliabilityCounters>.broadcast();
     }
@@ -305,6 +313,7 @@ class DspReliabilityTracker {
   }
 
   void dispose() {
+    _disposed = true;
     if (!_streamController.isClosed) {
       _streamController.close();
     }

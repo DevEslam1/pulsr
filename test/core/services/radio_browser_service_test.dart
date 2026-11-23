@@ -5,9 +5,16 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:pulsr/core/services/radio_browser_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   group('RadioBrowserService', () {
+    setUp(() {
+      SharedPreferences.setMockInitialValues({});
+    });
+
     test('maps valid stations, rejects unsafe URLs and dedupes', () async {
       final requested = <Uri>[];
       final client = MockClient((request) async {

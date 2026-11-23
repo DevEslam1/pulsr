@@ -138,5 +138,38 @@ void main() {
       );
       expect(RadioStationStore.isQuranStation(hussaryStation), isTrue);
     });
+
+    test('resolves curated cur-quran-tarteel artwork and retries after corrupt JSON load',
+        () async {
+      expect(
+        RadioStationStore.resolveArtworkForStation(
+          id: 'cur-quran-tarteel',
+          name: 'إذاعة تراتيل قصيرة متميزة',
+          url: 'https://example.com/tarteel',
+        ),
+        isNotNull,
+      );
+
+      SharedPreferences.setMockInitialValues({
+        RadioStationStore.prefsKey: '{"not": "a list"}',
+      });
+      RadioStationStore.resetForTesting();
+      final store = RadioStationStore();
+      await store.ready;
+      expect(store.loadFailed, isTrue);
+
+      SharedPreferences.setMockInitialValues({
+        RadioStationStore.prefsKey: jsonEncode([
+          {
+            'id': 'recovered-1',
+            'name': 'Recovered',
+            'url': 'https://example.com/ok',
+          }
+        ]),
+      });
+      await store.load();
+      expect(store.loadFailed, isFalse);
+      expect(store.list.single.id, 'recovered-1');
+    });
   });
 }

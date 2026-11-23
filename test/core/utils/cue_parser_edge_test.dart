@@ -489,5 +489,34 @@ FILE "album.flac" FLAC
       );
       expect(await CueParser.extractEmbeddedCueSheet(file.path), isNull);
     });
+
+    test('corrupt oversized WAV cue chunkSize (1 GiB) returns null without OOM',
+        () async {
+      final corruptWav = <int>[
+        ...ascii.encode('RIFF'),
+        ..._le32(64),
+        ...ascii.encode('WAVE'),
+        ...ascii.encode('cue '),
+        ..._le32(0x40000000),
+        0,
+        0,
+        0,
+        0,
+      ];
+      final file = writeFile('corrupt_huge_cue.wav', corruptWav);
+      expect(await CueParser.extractEmbeddedCueSheet(file.path), isNull);
+    });
+
+    test('corrupt oversized FLAC metadata block returns null without OOM',
+        () async {
+      final corruptFlac = <int>[
+        ...utf8.encode('fLaC'),
+        0x80 | 4, // last block, VORBIS_COMMENT
+        0xFF, 0xFF, 0xFF, // ~16 MiB length on a tiny file
+        1, 2, 3, 4,
+      ];
+      final file = writeFile('corrupt_huge_flac.flac', corruptFlac);
+      expect(await CueParser.extractEmbeddedCueSheet(file.path), isNull);
+    });
   });
 }

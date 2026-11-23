@@ -269,6 +269,22 @@ void main() {
       expect(RadioStation.isHttpUrl('https://stream.example.org/live'), isTrue);
       expect(RadioStation.isHttpUrl('ytmusic://abc'), isFalse);
     });
+
+    test('blocks host:port local names and compressed IPv6 link-local/loopback forms',
+        () {
+      expect(RemoteTargetPolicy.isUnsafeHost('localhost:80'), isTrue);
+      expect(RemoteTargetPolicy.isUnsafeHost('[::1]:8080'), isTrue);
+      expect(RemoteTargetPolicy.isUnsafeHost('0:0:0:0:0:0:0:1'), isTrue);
+      expect(RemoteTargetPolicy.isUnsafeHost('fe80:0:0:0::1'), isTrue);
+      expect(
+        RemoteTargetPolicy.isAllowed('https://localhost:80/api'),
+        isFalse,
+      );
+      expect(
+        RemoteTargetPolicy.isAllowed('https://[fe80::1]/api'),
+        isFalse,
+      );
+    });
   });
 }
 

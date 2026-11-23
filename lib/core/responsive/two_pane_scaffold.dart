@@ -87,6 +87,11 @@ class PulsrTwoPaneScaffold extends StatelessWidget {
             masterWidth ?? (totalWidth * listWidthRatio).clamp(280.0, 480.0);
         final computedMasterWidth = baseMaster.clamp(0.0, maxAllowedMaster);
 
+        final hasVerticalHinge = hinge != null &&
+            hinge.bounds.width > 0 &&
+            hinge.bounds.height > hinge.bounds.width &&
+            hinge.bounds.width < totalWidth;
+
         Widget body = Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -94,7 +99,7 @@ class PulsrTwoPaneScaffold extends StatelessWidget {
               width: computedMasterWidth,
               child: effectiveMaster,
             ),
-            if (hinge != null && hinge.bounds.width > 0)
+            if (hasVerticalHinge)
               SizedBox(width: hinge.bounds.width)
             else if (showDivider)
               VerticalDivider(width: 1, thickness: 1, color: p.hairline),

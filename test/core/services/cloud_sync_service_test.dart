@@ -1,5 +1,6 @@
 // test/core/services/cloud_sync_service_test.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -8,6 +9,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/services/auth_service.dart';
 import 'package:pulsr/core/services/cloud_sync_service.dart';
 import 'package:pulsr/data/db/app_database.dart';
+import 'package:pulsr/domain/models/ytm_track.dart';
 import 'package:pulsr/domain/repositories/music_repository_interface.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -32,6 +34,14 @@ class _MockWriteBatch extends Mock implements WriteBatch {}
 // ignore: subtype_of_sealed_class
 class _FakeDocRef extends Fake
     implements DocumentReference<Map<String, dynamic>> {}
+
+// ignore: subtype_of_sealed_class
+class _MockQuerySnapshot extends Mock
+    implements QuerySnapshot<Map<String, dynamic>> {}
+
+// ignore: subtype_of_sealed_class
+class _MockQueryDocSnapshot extends Mock
+    implements QueryDocumentSnapshot<Map<String, dynamic>> {}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -198,6 +208,118 @@ void main() {
 
       expect(ok, isFalse);
       verify(() => batch.commit()).called(1);
+    });
+  });
+
+  group('C-02 & C-03 upsert and session isolation regressions', () {
+    test(
+        'download merge upserts existing cloud track without FK cascade wiping playlist entries',
+        () async {
+      await db.customStatement('PRAGMA foreign_keys = ON;');
+
+      const track = YtmTrack(
+        videoId: 'vid_dup_c02',
+        title: 'Local Cached Song',
+        artist: 'Local Artist',
+        duration: Duration(seconds: 200),
+      );
+      final songData = track.toSongData();
+
+      await db.into(db.songsTable).insert(
+            SongsTableCompanion.insert(
+              id: Value(songData.id),
+              title: songData.title,
+              artist: Value(songData.artist),
+              album: const Value('Local Album'),
+              durationMs: Value(songData.durationMs),
+              path: 'ytmusic://other_stale_path',
+              source: const Value(SongSource.youtube),
+              isFavorite: const Value(false),
+            ),
+          );
+      final playlistId = await db.into(db.playlistsTable).insert(
+            PlaylistsTableCompanion.insert(name: 'My Keep Playlist'),
+          );
+      await db.into(db.playlistEntriesTable).insert(
+            PlaylistEntriesTableCompanion.insert(
+              playlistId: playlistId,
+              songId: songData.id,
+              orderIndex: 0,
+            ),
+          );
+
+      final userDoc = _MockDocRef();
+      final favColl = _MockCollRef();
+      final querySnap = _MockQuerySnapshot();
+      final docSnap = _MockQueryDocSnapshot();
+      when(() => userDoc.collection('favorites')).thenReturn(favColl);
+      when(() => favColl.get()).thenAnswer((_) async => querySnap);
+      when(() => querySnap.docs).thenReturn([docSnap]);
+      when(() => docSnap.id).thenReturn('cloud_fav_doc');
+      when(() => docSnap.data()).thenReturn({
+        'remoteId': 'vid_dup_c02',
+        'title': 'Cloud Title',
+        'artist': 'Cloud Artist',
+        'durationMs': 200000,
+        'remoteArtworkUrl': 'https://img.example/cover.jpg',
+        'modifiedAt': Timestamp.fromDate(DateTime.now()),
+      });
+
+      await service.downloadAndMergeCloudDataForTesting(
+        userDoc,
+        syncFavorites: true,
+        syncPlaylists: false,
+      );
+
+      final songs = await db.select(db.songsTable).get();
+      expect(songs, hasLength(1));
+      expect(songs.single.id, songData.id);
+      expect(songs.single.isFavorite, isTrue);
+
+      final entries = await db.select(db.playlistEntriesTable).get();
+      expect(entries, hasLength(1));
+      expect(entries.single.songId, songData.id);
+      expect(entries.single.playlistId, playlistId);
+    });
+
+    test('UID change on syncAll resets stale session state and persists new UID',
+        () async {
+      SharedPreferences.setMockInitialValues({
+        'cloud_sync_last_uid': 'uid-previous',
+        'cloud_sync_hashes_cache': '{"users/uid-previous/favorites/1":"abc"}',
+        'cloud_sync_uploaded_favorite_ids': ['fav-1'],
+        'cloud_sync_favorites_enabled': false,
+        'cloud_sync_playlists_enabled': false,
+      });
+
+      final user = MockUser();
+      when(() => user.uid).thenReturn('uid-next');
+      when(() => auth.currentUser).thenReturn(user);
+
+      final ok = await service.syncAll();
+      expect(ok, isTrue);
+
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('cloud_sync_last_uid'), 'uid-next');
+      expect(prefs.getString('cloud_sync_hashes_cache'), isNull);
+      expect(prefs.getStringList('cloud_sync_uploaded_favorite_ids'), isNull);
+    });
+
+    test('AuthService signOut invokes registered CloudSyncService resetSessionState',
+        () async {
+      SharedPreferences.setMockInitialValues({
+        'cloud_sync_last_uid': 'uid-active',
+        'cloud_sync_hashes_cache': '{"k":"v"}',
+      });
+      final authSvc = AuthService();
+      final syncWithHook = CloudSyncService(authSvc, repository, db);
+      expect(syncWithHook, isNotNull);
+
+      await authSvc.signOut();
+
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('cloud_sync_last_uid'), isNull);
+      expect(prefs.getString('cloud_sync_hashes_cache'), isNull);
     });
   });
 }

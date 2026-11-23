@@ -31,13 +31,30 @@ Future<CustodyCertificateArtifact> exportCustodyCertificate(
       '${report.verifiedAt.toUtc().millisecondsSinceEpoch}.json';
   await directory.create(recursive: true);
   final file = File(directory.path + Platform.pathSeparator + name);
-  await file.writeAsString(jsonText, flush: true);
+  final tmpFile = File('${file.path}.tmp');
+  try {
+    await tmpFile.writeAsString(jsonText, flush: true);
+    try {
+      await tmpFile.rename(file.path);
+    } on FileSystemException {
+      await tmpFile.copy(file.path);
+      await tmpFile.delete().catchError((_) => tmpFile);
+    }
+  } catch (_) {
+    if (await tmpFile.exists()) {
+      await tmpFile.delete().catchError((_) => tmpFile);
+    }
+    rethrow;
+  }
 
   // Round-trip guard: an artifact whose embedded digest no longer matches its own
   // fields was not written correctly, and must not be handed out as evidence.
   final decoded = jsonDecode(await file.readAsString()) as Map<String, dynamic>;
   final writtenDigest = decoded['certificateSha256'] as String?;
   if (writtenDigest != report.certificateSha256) {
+    if (await file.exists()) {
+      await file.delete().catchError((_) => file);
+    }
     throw StateError(
         'Certificate digest mismatch (expected ${report.certificateSha256}, '
         'artifact carries $writtenDigest)');

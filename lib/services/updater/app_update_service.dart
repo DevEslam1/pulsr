@@ -8,26 +8,43 @@ import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 
 import '../../core/config/app_config.dart';
-import '../../core/utils/l10n_extensions.dart';
 import '../../core/constants/channels.dart';
+import '../../core/network/network_access_guard.dart';
+import '../../core/network/remote_target_policy.dart';
 import '../../core/utils/error_logger.dart';
+import '../../core/utils/l10n_extensions.dart';
 import 'update_dialog.dart';
 
 /// Parsed SemVer representation.
 class ParsedVersion {
   final List<int> parts;
   final bool isPreRelease;
+  final List<String> preReleaseTags;
 
-  const ParsedVersion(this.parts, this.isPreRelease);
+  const ParsedVersion(
+    this.parts,
+    this.isPreRelease, [
+    this.preReleaseTags = const [],
+  ]);
 
   static ParsedVersion parse(String raw) {
     final clean =
         raw.trim().replaceFirst(RegExp(r'^v', caseSensitive: false), '');
-    final dash = clean.indexOf('-');
-    final base = dash >= 0 ? clean.substring(0, dash) : clean;
+    // Strip +build metadata first per SemVer 2.0.0 so `1.2.3+5` parses cleanly.
+    final plus = clean.indexOf('+');
+    final withoutBuild = plus >= 0 ? clean.substring(0, plus) : clean;
+    final dash = withoutBuild.indexOf('-');
+    final base = dash >= 0 ? withoutBuild.substring(0, dash) : withoutBuild;
     final isPre = dash >= 0;
+    final preTags = isPre
+        ? withoutBuild
+            .substring(dash + 1)
+            .split('.')
+            .where((t) => t.isNotEmpty)
+            .toList()
+        : const <String>[];
     final parts = base.split('.').map((p) => int.tryParse(p) ?? 0).toList();
-    return ParsedVersion(parts, isPre);
+    return ParsedVersion(parts, isPre, preTags);
   }
 
   static bool isNewer(String latest, String current) {
@@ -40,8 +57,27 @@ class ParsedVersion {
       final b = i < c.parts.length ? c.parts[i] : 0;
       if (a != b) return a > b;
     }
-    // A stable release outranks a pre-release of the same numbers (e.g. 1.0.0 vs 1.0.0-beta)
-    return c.isPreRelease && !l.isPreRelease;
+    if (l.isPreRelease != c.isPreRelease) {
+      // A stable release outranks a pre-release of the same numbers (1.0.0 > 1.0.0-beta).
+      return c.isPreRelease && !l.isPreRelease;
+    }
+    if (!l.isPreRelease) return false;
+    final tagMax = l.preReleaseTags.length > c.preReleaseTags.length
+        ? l.preReleaseTags.length
+        : c.preReleaseTags.length;
+    for (int i = 0; i < tagMax; i++) {
+      if (i >= c.preReleaseTags.length) return true;
+      if (i >= l.preReleaseTags.length) return false;
+      final aTag = l.preReleaseTags[i];
+      final bTag = c.preReleaseTags[i];
+      if (aTag == bTag) continue;
+      final aNum = int.tryParse(aTag);
+      final bNum = int.tryParse(bTag);
+      if (aNum != null && bNum != null) return aNum > bNum;
+      if (aNum != null || bNum != null) return bNum != null;
+      return aTag.compareTo(bTag) > 0;
+    }
+    return false;
   }
 }
 
@@ -134,7 +170,7 @@ class AppUpdateService {
   static final AppUpdateService instance = AppUpdateService._internal();
 
   AppUpdateService._internal({http.Client? client})
-      : _client = client ?? http.Client();
+      : _injectedClient = client;
 
   factory AppUpdateService({http.Client? client}) {
     if (client != null) {
@@ -153,12 +189,16 @@ class AppUpdateService {
   static const Duration requestTimeout = Duration(seconds: 15);
   static const Duration streamChunkTimeout = Duration(seconds: 30);
 
-  final http.Client _client;
+  final http.Client? _injectedClient;
+  http.Client? _ownedClient;
+  http.Client get _client => _injectedClient ?? (_ownedClient ??= http.Client());
+
   String _repo = defaultRepo;
   bool _isChecking = false;
   bool _isDownloading = false;
   bool _cancelDownload = false;
   Future<File?>? _activeDownloadFuture;
+  String? _activeDownloadKey;
 
   String get repo => _repo;
   bool get isChecking => _isChecking;
@@ -196,6 +236,7 @@ class AppUpdateService {
   /// Checks GitHub releases API for newer app version.
   Future<UpdateInfo?> check({String? currentVersionOverride}) async {
     if (_isChecking) return null;
+    if (await NetworkAccessGuard.isBlocked(category: 'Updater')) return null;
     _isChecking = true;
 
     try {
@@ -242,9 +283,16 @@ class AppUpdateService {
     Directory? cacheDirectoryOverride,
     Duration? chunkTimeoutOverride,
   }) {
+    final downloadKey = '${info.version}|${info.apkUrl ?? ''}';
     if (_isDownloading && _activeDownloadFuture != null) {
-      return _activeDownloadFuture!;
+      if (_activeDownloadKey == downloadKey) {
+        return _activeDownloadFuture!;
+      }
+      throw StateError(
+        'Another update download (${_activeDownloadKey ?? 'active'}) is already in progress.',
+      );
     }
+    _activeDownloadKey = downloadKey;
     final future = _performDownloadApk(
       info,
       onProgress: onProgress,
@@ -261,6 +309,9 @@ class AppUpdateService {
     Directory? cacheDirectoryOverride,
     Duration? chunkTimeoutOverride,
   }) async {
+    if (await NetworkAccessGuard.isBlocked(category: 'Updater')) {
+      throw StateError('App updates are disabled in offline or Pure mode.');
+    }
     final apkUrl = info.apkUrl?.trim();
     if (apkUrl == null || apkUrl.isEmpty) {
       throw StateError(
@@ -274,13 +325,11 @@ class AppUpdateService {
       );
     }
     final expectedSha256 = UpdateInfo._normalizeSha256(info.sha256);
-    if (info.sha256 != null &&
-        info.sha256!.trim().isNotEmpty &&
-        expectedSha256 == null) {
+    if (expectedSha256 == null) {
       throw ArgumentError.value(
         info.sha256,
         'sha256',
-        'Invalid SHA-256 digest format.',
+        'Release must provide a valid SHA-256 digest before downloading APK.',
       );
     }
 
@@ -288,6 +337,7 @@ class AppUpdateService {
     _cancelDownload = false;
     IOSink? sink;
     File? targetFile;
+    File? tempFile;
     var completedSuccessfully = false;
 
     try {
@@ -310,18 +360,59 @@ class AppUpdateService {
 
       final safeVersion = sanitizeVersionForFilename(info.version);
       targetFile = File('${updatesDir.path}/pulsr-$safeVersion.apk');
+      tempFile = File('${targetFile.path}.tmp');
 
-      final request = http.Request('GET', Uri.parse(apkUrl));
-      final response = await _client.send(request).timeout(requestTimeout);
+      var currentUri = Uri.parse(apkUrl);
+      if (!await RemoteTargetPolicy.isSafeHost(currentUri.host)) {
+        throw ArgumentError.value(
+          apkUrl,
+          'apkUrl',
+          'APK download host resolved to a private or disallowed address.',
+        );
+      }
 
+      http.StreamedResponse? response;
+      const maxRedirects = 5;
+      for (var hop = 0; hop <= maxRedirects; hop++) {
+        final request = http.Request('GET', currentUri)..followRedirects = false;
+        final candidate = await _client.send(request).timeout(requestTimeout);
+        final status = candidate.statusCode;
+
+        if (status >= 300 &&
+            status < 400 &&
+            candidate.headers.containsKey('location')) {
+          await candidate.stream.listen((_) {}, onError: (_) {}).cancel();
+          if (hop == maxRedirects) {
+            throw const HttpException('Too many redirects downloading APK');
+          }
+          final nextUri = currentUri.resolve(candidate.headers['location']!);
+          final nextUrl = nextUri.toString();
+          if (!isAllowedApkUrl(nextUrl) ||
+              !await RemoteTargetPolicy.isSafeHost(nextUri.host)) {
+            throw StateError(
+              'Blocked APK redirect to untrusted target: ${nextUri.host}',
+            );
+          }
+          currentUri = nextUri;
+          continue;
+        }
+
+        response = candidate;
+        break;
+      }
+
+      if (response == null) {
+        throw const HttpException('No HTTP response received while fetching APK');
+      }
       if (response.statusCode != 200) {
+        await response.stream.listen((_) {}, onError: (_) {}).cancel();
         throw HttpException(
             'HTTP download failed with code ${response.statusCode}');
       }
 
       final totalBytes = response.contentLength ?? 0;
       int receivedBytes = 0;
-      sink = targetFile.openWrite();
+      sink = tempFile.openWrite();
       final chunkTimeout = chunkTimeoutOverride ?? streamChunkTimeout;
 
       await for (final chunk in response.stream.timeout(chunkTimeout)) {
@@ -345,16 +436,15 @@ class AppUpdateService {
         return null;
       }
 
-      if (expectedSha256 != null) {
-        final bytes = await targetFile.readAsBytes();
-        final actualSha256 = sha256.convert(bytes).toString().toLowerCase();
-        if (actualSha256 != expectedSha256) {
-          throw StateError(
-            'APK SHA-256 checksum mismatch (expected $expectedSha256, got $actualSha256)',
-          );
-        }
+      final bytes = await tempFile.readAsBytes();
+      final actualSha256 = sha256.convert(bytes).toString().toLowerCase();
+      if (actualSha256 != expectedSha256) {
+        throw StateError(
+          'APK SHA-256 checksum mismatch (expected $expectedSha256, got $actualSha256)',
+        );
       }
 
+      await tempFile.rename(targetFile.path);
       completedSuccessfully = true;
       return targetFile;
     } catch (e, st) {
@@ -371,17 +461,21 @@ class AppUpdateService {
       } catch (e) {
         ErrorLogger.logSwallowed('AppUpdateService.closeSink', e);
       }
-      if (!completedSuccessfully && targetFile != null) {
-        try {
-          if (await targetFile.exists()) {
-            await targetFile.delete();
+      if (!completedSuccessfully) {
+        for (final file in [tempFile, targetFile]) {
+          if (file == null) continue;
+          try {
+            if (await file.exists()) {
+              await file.delete();
+            }
+          } catch (e) {
+            ErrorLogger.logSwallowed('AppUpdateService.deletePartialApk', e);
           }
-        } catch (e) {
-          ErrorLogger.logSwallowed('AppUpdateService.deletePartialApk', e);
         }
       }
       _isDownloading = false;
       _activeDownloadFuture = null;
+      _activeDownloadKey = null;
     }
   }
 
@@ -446,6 +540,7 @@ class AppUpdateService {
 
   void dispose() {
     cancelDownload();
-    _client.close();
+    _ownedClient?.close();
+    _ownedClient = null;
   }
 }
