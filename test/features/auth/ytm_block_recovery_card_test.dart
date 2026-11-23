@@ -48,23 +48,52 @@ void main() {
     await tester.pump(const Duration(milliseconds: 50));
     final controller = wireWebViewController(tester, fake);
     final params = webViewParams(tester);
+    for (var attempt = 0; attempt < 3; attempt++) {
+      params.onLoadStop?.call(
+          controller, WebUri('https://accounts.google.com/signin/blocked'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    return controller;
+  }
+
+  testWidgets('auto-ladder advances twice before rendering recovery card',
+      (tester) async {
+    await tester.pumpWidget(ytmHost(const YtmWebLoginSheet()));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    final controller = wireWebViewController(tester, fake);
+    final params = webViewParams(tester);
+
+    // Block 1: automatic switch to Safari Mobile (card remains hidden).
     params.onLoadStop?.call(
         controller, WebUri('https://accounts.google.com/signin/blocked'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
-    return controller;
-  }
+    final firstSettingsCount = fake.setSettingsCount;
+    expect(firstSettingsCount, greaterThanOrEqualTo(1));
+    expect(find.text('Google is blocking this sign-in'), findsNothing);
 
-  testWidgets('a blocked sign-in URL renders the recovery card',
-      (tester) async {
-    await pumpBlocked(tester);
+    // Block 2: automatic switch to Firefox Desktop (card still hidden).
+    params.onLoadStop?.call(
+        controller, WebUri('https://accounts.google.com/signin/blocked'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(fake.setSettingsCount, greaterThan(firstSettingsCount));
+    expect(find.text('Google is blocking this sign-in'), findsNothing);
+
+    // Block 3: auto ladder exhausted -> recovery card appears.
+    params.onLoadStop?.call(
+        controller, WebUri('https://accounts.google.com/signin/blocked'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
     expect(find.text('Google is blocking this sign-in'), findsOneWidget);
     expect(find.text('Sign in with Google TV (no captcha)'), findsOneWidget);
     expect(find.text('Retry'), findsOneWidget);
     expect(find.text('More recovery options'), findsOneWidget);
     await tester.tap(find.text('More recovery options'));
     await tester.pumpAndSettle();
-    expect(find.text('Try Safari Mobile'), findsOneWidget);
+    expect(find.text('Try Chrome Desktop'), findsOneWidget);
     expect(find.text('Open YouTube Music web directly'), findsOneWidget);
     expect(find.text('Import Cookies / Token Manually'), findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());
@@ -88,7 +117,7 @@ void main() {
     await pumpBlocked(tester);
     await tester.tap(find.text('More recovery options'));
     await tester.pumpAndSettle();
-    final target = find.text('Try Safari Mobile');
+    final target = find.text('Try Chrome Desktop');
     await tester.ensureVisible(target);
     await tester.pump();
     await tester.tap(target);
@@ -147,6 +176,19 @@ void main() {
     final params = webViewParams(tester);
     params.onLoadStop?.call(
         controller, WebUri('https://accounts.google.com/v3/signin/identifier'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+
+    // Page-text block triggers automatic recovery rung 1 (settings change).
+    expect(fake.setSettingsCount, greaterThanOrEqualTo(1));
+
+    // Exhaust remaining ladder steps via blocked redirects -> shows card.
+    params.onLoadStop?.call(
+        controller, WebUri('https://accounts.google.com/signin/blocked'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    params.onLoadStop?.call(
+        controller, WebUri('https://accounts.google.com/signin/blocked'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
 

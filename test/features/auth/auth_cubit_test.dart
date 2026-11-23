@@ -315,6 +315,27 @@ void main() {
       await cubit.close();
       await controller.close();
     });
+
+    test('awaiting syncNow joins an already active sync future', () async {
+      final syncCompleter = Completer<bool>();
+      when(() => auth.signInWithGoogle()).thenAnswer((_) async => user);
+      when(() => cloud.syncAll()).thenAnswer((_) => syncCompleter.future);
+
+      final cubit = build();
+      final firstCall = cubit.signInWithGoogle();
+      await settle();
+
+      var secondReturned = false;
+      final joinedCall = cubit.syncNow().then((_) => secondReturned = true);
+      await settle();
+      expect(secondReturned, isFalse);
+
+      syncCompleter.complete(true);
+      await Future.wait([firstCall, joinedCall]);
+      expect(secondReturned, isTrue);
+      verify(() => cloud.syncAll()).called(1);
+      await cubit.close();
+    });
   });
 
   group('signOut', () {

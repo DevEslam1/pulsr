@@ -95,14 +95,18 @@ void main() {
     return controller;
   }
 
-  testWidgets('a blocked sign-in URL presents the recovery card',
+  testWidgets('a blocked sign-in URL presents the recovery card after retries',
       (tester) async {
     await pumpSheet(tester);
-    await fire(tester, (c) {
-      final params = webViewParams(tester);
+    final params = webViewParams(tester);
+    final c = params.controllerFromPlatform!(fake) as InAppWebViewController;
+    params.onWebViewCreated?.call(c);
+    for (var i = 0; i < 3; i++) {
       params.onLoadStop
           ?.call(c, WebUri('https://accounts.google.com/v3/signin/blocked'));
-    });
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+    }
 
     expect(find.byIcon(Icons.gpp_bad_rounded), findsOneWidget);
     expect(find.byIcon(Icons.tv_rounded), findsWidgets);
@@ -115,16 +119,20 @@ void main() {
   testWidgets('recovery card identity switch re-navigates with a new UA',
       (tester) async {
     await pumpSheet(tester);
-    await fire(tester, (c) {
-      final params = webViewParams(tester);
+    final params = webViewParams(tester);
+    final c = params.controllerFromPlatform!(fake) as InAppWebViewController;
+    params.onWebViewCreated?.call(c);
+    for (var i = 0; i < 3; i++) {
       params.onLoadStop
           ?.call(c, WebUri('https://accounts.google.com/v3/signin/blocked'));
-    });
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+    }
 
-    // Default identity is mobile -> the switch offers Safari Mobile.
+    // After exhausting mobile -> safariMobile -> desktop, card offers Chrome Desktop.
     await tester.tap(find.text('More recovery options'));
     await tester.pumpAndSettle();
-    final switchBtn = find.byIcon(Icons.phone_iphone_rounded);
+    final switchBtn = find.byIcon(Icons.desktop_windows_rounded);
     await tester.ensureVisible(switchBtn);
     await tester.pump();
     await tester.tap(switchBtn);
@@ -141,11 +149,15 @@ void main() {
   testWidgets('recovery card manual retry re-navigates to sign-in',
       (tester) async {
     await pumpSheet(tester);
-    await fire(tester, (c) {
-      final params = webViewParams(tester);
+    final params = webViewParams(tester);
+    final c = params.controllerFromPlatform!(fake) as InAppWebViewController;
+    params.onWebViewCreated?.call(c);
+    for (var i = 0; i < 3; i++) {
       params.onLoadStop
           ?.call(c, WebUri('https://accounts.google.com/v3/signin/blocked'));
-    });
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+    }
 
     final retryBtn = find.text('Retry');
     await tester.ensureVisible(retryBtn.first);

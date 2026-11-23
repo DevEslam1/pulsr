@@ -16,8 +16,13 @@ import '../../search/presentation/search_screen.dart';
 /// regressions.
 class YtmSearchScreen extends StatelessWidget {
   final String? initialQuery;
+  final bool autofocus;
 
-  const YtmSearchScreen({super.key, this.initialQuery});
+  const YtmSearchScreen({
+    super.key,
+    this.initialQuery,
+    this.autofocus = true,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -25,7 +30,7 @@ class YtmSearchScreen extends StatelessWidget {
       child: SearchScreen(
         initialQuery: initialQuery,
         initialScope: SearchScope.online,
-        autofocus: true,
+        autofocus: autofocus,
         showBackButton: true,
         enableOnlineOverride: true,
       ),

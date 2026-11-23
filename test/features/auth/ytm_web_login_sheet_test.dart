@@ -201,4 +201,15 @@ void main() {
     expect(find.byType(YtmWebLoginSheet), findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());
   });
+
+  testWidgets('rejects untrusted initialUrl and falls back safely',
+      (tester) async {
+    await pumpSheet(tester, initialUrl: 'javascript:alert(1)');
+    final params = webViewParams(tester);
+    expect(
+      params.initialUrlRequest?.url.toString(),
+      startsWith('https://accounts.google.com/v3/signin/identifier'),
+    );
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
 }

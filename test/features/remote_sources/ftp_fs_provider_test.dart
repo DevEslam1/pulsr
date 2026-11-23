@@ -22,6 +22,7 @@ class _FakeFtpServer {
     this.holdDataUntilClientCloses = false,
     this.closeControlOnFirstList = false,
     this.malformedListing = false,
+    this.emptyListing = false,
     this.malformedControlReplyOnce = false,
     this.failFirstConnection = false,
   });
@@ -35,6 +36,7 @@ class _FakeFtpServer {
   final bool holdDataUntilClientCloses;
   final bool closeControlOnFirstList;
   final bool malformedListing;
+  final bool emptyListing;
   final bool malformedControlReplyOnce;
   final bool failFirstConnection;
 
@@ -136,6 +138,8 @@ class _FakeFtpServer {
         _reply(socket, '150 Here comes the directory listing');
         if (malformedListing) {
           await _writeData(const <int>[0xff, 0xfe, 0x0a]);
+        } else if (emptyListing) {
+          await _writeData(const <int>[]);
         } else {
           await _writeData(utf8.encode(listing));
         }
@@ -630,6 +634,32 @@ void main() {
       expect((results[1] as RemoteEntry?)?.sizeBytes, 4);
       expect((results[2] as List<RemoteEntry>).length, 2);
       expect((results[3] as RemoteEntry?)?.sizeBytes, 4);
+    });
+
+    test('genuine empty LIST skips NLST fallback', () async {
+      await start(_FakeFtpServer(emptyListing: true));
+
+      final entries = await provider.list('');
+
+      expect(entries, isEmpty);
+      expect(server.commands, contains('LIST'));
+      expect(server.commands, isNot(contains('NLST')));
+    });
+
+    test('rejects CR, LF, and NUL in paths before sending any FTP command',
+        () async {
+      await start(_FakeFtpServer());
+
+      await expectLater(
+        provider.openRead('song.mp3\r\nDELE other').toList(),
+        throwsA(isA<RemoteProtocolError>()),
+      );
+      await expectLater(
+        provider.list('Albums%0a%0dCWD /'),
+        throwsA(isA<RemoteProtocolError>()),
+      );
+      expect(server.commands, isNot(contains('RETR')));
+      expect(server.commands, isNot(contains('LIST')));
     });
   });
 }

@@ -130,19 +130,53 @@ extension _YtmBlockRecoveryCard on _YtmWebLoginSheetState {
   }
 
   /// Entry point when Google blocks the embedded browser.
-  /// Shows the manual recovery card directly so the user is in control and
-  /// never trapped in an automatic reload/wipe loop.
-  void _handleGoogleBlock() {
-    if (!mounted || widget.isBrowseMode) return;
+  /// Advances through the bounded [GoogleBlockRecovery] identity ladder before
+  /// exposing the manual recovery card once automatic retries are exhausted.
+  Future<void> _handleGoogleBlock() async {
+    if (!mounted || _disposed || widget.isBrowseMode) return;
     // Already recovering or showing recovery options.
     if (_blockStatus != null || _blockExhausted) return;
 
-    debugPrint(
-        '[YtmWebLogin] Google block detected — presenting recovery options.');
+    final step = _blockRecovery.onBlocked();
+    if (step == null) {
+      debugPrint(
+          '[YtmWebLogin] Google block detected — presenting recovery options.');
+      _setStateSafe(() {
+        _blockExhausted = true;
+        _blockStatus = null;
+      });
+      return;
+    }
+
+    final nextIdentity = step.nextIdentity;
+    _uaIdentityOverride = nextIdentity;
+    final isDesktop = nextIdentity == BrowserIdentity.desktop ||
+        nextIdentity == BrowserIdentity.chromeDesktop;
     _setStateSafe(() {
-      _blockExhausted = true;
-      _blockStatus = null;
+      _blockStatus =
+          context.l10n.reloadingIdentity(_identityLabel(nextIdentity));
     });
+    await _clearWebViewCookiesAndCache();
+    if (!mounted || _disposed) return;
+
+    await _applyWebViewIdentity(
+      _webViewController,
+      userAgent: _uaFor(nextIdentity),
+      contentMode: isDesktop
+          ? UserPreferredContentMode.DESKTOP
+          : UserPreferredContentMode.MOBILE,
+    );
+    if (!mounted || _disposed) return;
+
+    _blockCooldownStopwatch
+      ..reset()
+      ..start();
+    await _navigateTo(widget.isBrowseMode
+        ? 'https://music.youtube.com'
+        : _YtmWebLoginSheetState.googleSignInUrl);
+    if (mounted && !_disposed) {
+      _setStateSafe(() => _blockStatus = null);
+    }
   }
 
   /// Pushes a user-agent (and optionally a content mode) onto the live WebView

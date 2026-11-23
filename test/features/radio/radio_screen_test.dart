@@ -296,5 +296,101 @@ void main() {
     expect(oldIndex, isNonNegative);
     expect(recentIndex, lessThan(oldIndex));
   });
+
+  testWidgets(
+      'sorting by recent places unplayed stations last in both sort directions',
+      (tester) async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final playedOld = RadioStation.create(
+      name: 'Older Station',
+      url: 'https://older.example.com/live',
+      lastPlayed: now - 50000,
+    );
+    final playedNew = RadioStation.create(
+      name: 'Newer Station',
+      url: 'https://newer.example.com/live',
+      lastPlayed: now,
+    );
+    final neverPlayed = RadioStation.create(
+      name: 'Never Played Station',
+      url: 'https://never.example.com/live',
+    );
+    SharedPreferences.setMockInitialValues({
+      RadioStationStore.prefsKey: jsonEncode([
+        neverPlayed.toJson(),
+        playedOld.toJson(),
+        playedNew.toJson(),
+      ]),
+    });
+
+    await tester.pumpWidget(_buildTestApp(
+      child: const RadioScreen(),
+      playerCubit: mockPlayerCubit,
+    ));
+    await tester.pumpAndSettle();
+
+    await RadioStationStore.setRadioSort(sortBy: 'recent', ascending: true);
+    await tester.pumpAndSettle();
+
+    List<String> listNames() => tester
+        .widgetList<ListTile>(find.byType(ListTile))
+        .map((t) => (t.title as dynamic)?.text)
+        .whereType<String>()
+        .toList();
+
+    var names = listNames();
+    expect(names.indexOf('Older Station'), lessThan(names.indexOf('Newer Station')));
+    expect(names.last, 'Never Played Station');
+
+    await RadioStationStore.setRadioSort(sortBy: 'recent', ascending: false);
+    await tester.pumpAndSettle();
+
+    names = listNames();
+    expect(names.indexOf('Newer Station'), lessThan(names.indexOf('Older Station')));
+    expect(names.last, 'Never Played Station');
+  });
+
+  testWidgets('editing a curated station preserves its id and rejects empty name',
+      (tester) async {
+    final curated = RadioStation(
+      id: 'cur-quran-cairo',
+      name: 'Cairo Quran',
+      url: 'https://cairo.example.com/live',
+      genre: 'Quran',
+      lastPlayed: 123456,
+    );
+    SharedPreferences.setMockInitialValues({
+      RadioStationStore.prefsKey: jsonEncode([curated.toJson()]),
+    });
+
+    await tester.pumpWidget(_buildTestApp(
+      child: const RadioScreen(),
+      playerCubit: mockPlayerCubit,
+    ));
+    await tester.pumpAndSettle();
+
+    await tester.longPress(find.byType(ListTile).first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Edit'));
+    await tester.pumpAndSettle();
+
+    final nameField = find.widgetWithText(TextField, 'Station name');
+    await tester.enterText(nameField, '   ');
+    await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+    await tester.pump();
+
+    expect(find.text('Name is required.'), findsOneWidget);
+
+    await tester.enterText(nameField, 'Cairo Quran Updated');
+    await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+    await tester.pumpAndSettle();
+
+    final saved = RadioStationStore()
+        .list
+        .firstWhere((s) => s.id == 'cur-quran-cairo');
+    expect(saved.id, 'cur-quran-cairo');
+    expect(saved.name, 'Cairo Quran Updated');
+    expect(saved.lastPlayed, 123456);
+  });
 }
 

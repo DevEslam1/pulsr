@@ -29,22 +29,24 @@ List<RemoteEntry> parseWebDavMultiStatus(
     if (block == null) continue;
     final href = _textOf(block, 'href');
     if (href == null || href.isEmpty) continue;
+    final propSource = _successfulPropSource(block);
+    if (propSource == null) continue;
     final relative = _relativeFromHref(href, rootPath);
     if (relative == null) continue;
     if (!keepSelf && relative.toLowerCase() == wanted) continue;
     final name = relative.isEmpty ? '/' : relative.split('/').last;
     if (name.isEmpty) continue;
-    final resourceType = _innerOf(block, 'resourcetype') ?? '';
+    final resourceType = _innerOf(propSource, 'resourcetype') ?? '';
     final isDirectory = _collectionTag.hasMatch(resourceType);
-    final size = int.tryParse(_textOf(block, 'getcontentlength') ?? '');
+    final size = int.tryParse(_textOf(propSource, 'getcontentlength') ?? '');
     entries.add(
       RemoteEntry(
         path: relative,
         name: name,
         isDirectory: isDirectory,
         sizeBytes: isDirectory ? null : size,
-        modifiedAt: _parseHttpDate(_textOf(block, 'getlastmodified')),
-        etag: _normalizeEtag(_textOf(block, 'getetag')),
+        modifiedAt: _parseHttpDate(_textOf(propSource, 'getlastmodified')),
+        etag: _normalizeEtag(_textOf(propSource, 'getetag')),
       ),
     );
   }
@@ -57,11 +59,47 @@ final RegExp _responseBlock = RegExp(
   caseSensitive: false,
   dotAll: true,
 );
+final RegExp _propstatBlock = RegExp(
+  r'<(?:[A-Za-z_][\w.\-]*:)?propstat\b[^>]*>(.*?)</(?:[A-Za-z_][\w.\-]*:)?propstat\s*>',
+  caseSensitive: false,
+  dotAll: true,
+);
 final RegExp _cdata = RegExp(r'^<!\[CDATA\[(.*?)\]\]>$', dotAll: true);
 final RegExp _collectionTag = RegExp(
   r'<(?:[A-Za-z_][\w.\-]*:)?collection\b',
   caseSensitive: false,
 );
+final RegExp _httpStatusCode = RegExp(r'\b(\d{3})\b');
+final RegExp _xmlEntity = RegExp(r'&(?:lt|gt|quot|apos|amp|#\d+|#x[0-9a-fA-F]+);');
+
+/// Returns the concatenated 2xx `<propstat>` XML fragments inside a `<response>`,
+/// or `null` when `<status>` rejects the response (403/404/etc.).
+String? _successfulPropSource(String block) {
+  final propstats = _propstatBlock
+      .allMatches(block)
+      .map((match) => match.group(1))
+      .whereType<String>()
+      .toList();
+  if (propstats.isEmpty) {
+    final responseStatus = _textOf(block, 'status');
+    return _isSuccessStatus(responseStatus) ? block : null;
+  }
+  final ok = <String>[];
+  for (final propstat in propstats) {
+    if (_isSuccessStatus(_textOf(propstat, 'status'))) {
+      ok.add(propstat);
+    }
+  }
+  return ok.isEmpty ? null : ok.join('\n');
+}
+
+bool _isSuccessStatus(String? statusText) {
+  if (statusText == null || statusText.trim().isEmpty) return true;
+  final match = _httpStatusCode.firstMatch(statusText);
+  if (match == null) return false;
+  final code = int.tryParse(match.group(1)!) ?? 0;
+  return code >= 200 && code < 300;
+}
 
 String? _relativeFromHref(String href, String rootPath) {
   var raw = href.trim();
@@ -93,7 +131,9 @@ String? _relativeFromHref(String href, String rootPath) {
     }
     decoded = decoded.substring(root.length);
   }
-  return _stripSlashes(decoded);
+  final stripped = _stripSlashes(decoded);
+  if (stripped.split('/').any((segment) => segment == '..')) return null;
+  return stripped;
 }
 
 String _stripSlashes(String value) {
@@ -127,13 +167,32 @@ String? _textOf(String block, String tag) {
 
 String _decodeEntities(String value) {
   if (!value.contains('&')) return value;
-  return value
-      .replaceAll('&lt;', '<')
-      .replaceAll('&gt;', '>')
-      .replaceAll('&quot;', '"')
-      .replaceAll('&apos;', "'")
-      .replaceAll('&#39;', "'")
-      .replaceAll('&amp;', '&');
+  return value.replaceAllMapped(_xmlEntity, (match) {
+    final token = match.group(0)!;
+    switch (token) {
+      case '&lt;':
+        return '<';
+      case '&gt;':
+        return '>';
+      case '&quot;':
+        return '"';
+      case '&apos;':
+        return "'";
+      case '&amp;':
+        return '&';
+      default:
+        final isHex = token.startsWith('&#x');
+        final digits = token.substring(isHex ? 3 : 2, token.length - 1);
+        final codePoint = int.tryParse(digits, radix: isHex ? 16 : 10);
+        if (codePoint == null ||
+            codePoint <= 0 ||
+            codePoint > 0x10FFFF ||
+            (codePoint >= 0xD800 && codePoint <= 0xDFFF)) {
+          return token;
+        }
+        return String.fromCharCode(codePoint);
+    }
+  });
 }
 
 DateTime? _parseHttpDate(String? raw) {

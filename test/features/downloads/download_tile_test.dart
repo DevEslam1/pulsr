@@ -3,6 +3,8 @@
 // Exercises every DownloadStatus variant (icons/labels/progress), artwork vs
 // status-icon leading, cancel button, popup-menu actions, error row, and the
 // title/size fallbacks.
+import 'dart:async';
+
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -300,5 +302,54 @@ void main() {
     await tester.pumpAndSettle();
 
     verifyNever(() => cubit.deleteDownload(any()));
+  });
+
+  testWidgets('cancel awaits completion before showing retry toast and skips toast on failure',
+      (tester) async {
+    final completer = Completer<void>();
+    when(() => cubit.cancelDownload('vid1')).thenAnswer((_) => completer.future);
+
+    await pumpTile(tester, _task(status: DownloadStatus.downloading));
+
+    await tester.tap(find.byIcon(Icons.close_rounded));
+    await tester.pump();
+    expect(find.text(l10n.retry), findsNothing);
+
+    when(() => cubit.state).thenReturn(
+      DownloadsState(
+        tasks: {'vid1': _task(status: DownloadStatus.downloading)},
+      ),
+    );
+    completer.complete();
+    await tester.pump();
+    expect(find.text(l10n.retry), findsNothing);
+
+    when(() => cubit.cancelDownload('vid1')).thenAnswer((_) async {});
+    when(() => cubit.state).thenReturn(const DownloadsState());
+    await tester.tap(find.byIcon(Icons.close_rounded));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text(l10n.retry), findsOneWidget);
+  });
+
+  testWidgets('delete skips songDeleted toast when delete fails', (tester) async {
+    when(() => cubit.deleteDownload('vid1')).thenAnswer((_) async {
+      when(() => cubit.state).thenReturn(
+        DownloadsState(
+          tasks: {'vid1': _task(status: DownloadStatus.complete)},
+        ),
+      );
+    });
+
+    await pumpTile(tester, _task(status: DownloadStatus.complete));
+
+    await tester.tap(find.byIcon(Icons.more_vert_rounded));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(l10n.delete));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, l10n.delete));
+    await tester.pumpAndSettle();
+
+    expect(find.text(l10n.songDeleted), findsNothing);
   });
 }

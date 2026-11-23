@@ -558,5 +558,93 @@ void main() {
       expect(replacement.statCount, 1);
       expect(provider.statCount, 1, reason: 'the old provider is not consulted');
     });
+
+    test('serves audio MIME type and 416 for unsatisfiable range on empty file',
+        () async {
+      provider.files['Music/empty.flac'] = const <int>[];
+
+      final fullReq = await client.getUrl(
+        server.uriFor(_source(), 'Music/a.mp3'),
+      );
+      final fullRes = await fullReq.close();
+      await fullRes.drain<void>();
+      expect(fullRes.headers.contentType?.mimeType, 'audio/mpeg');
+
+      final rangeReq = await client.getUrl(
+        server.uriFor(_source(), 'Music/empty.flac'),
+      );
+      rangeReq.headers.set(HttpHeaders.rangeHeader, 'bytes=0-10');
+      final rangeRes = await rangeReq.close();
+      await rangeRes.drain<void>();
+      expect(rangeRes.headers.contentType?.mimeType, 'audio/flac');
+      expect(rangeRes.statusCode, HttpStatus.requestedRangeNotSatisfiable);
+      expect(rangeRes.headers.value(HttpHeaders.contentRangeHeader), 'bytes */0');
+    });
   });
+
+  group('truncation and pinning', () {
+    late Directory tempDir;
+
+    setUp(() async {
+      tempDir = await Directory.systemTemp.createTemp('pulsr_srv_trunc_');
+    });
+
+    tearDown(() async {
+      if (await tempDir.exists()) await tempDir.delete(recursive: true);
+    });
+
+    test('truncated upstream stream is not committed to cache and pin: true pins on commit',
+        () async {
+      final cache = RemoteCacheStore(
+        directoryProvider: () async => tempDir,
+        maxBytes: 12,
+      );
+      final truncating = _TruncatingProvider(_source(), expectedSize: 10);
+      final srv = RemoteStreamServer(cache: cache);
+      await srv.registerProvider(truncating);
+      await srv.start();
+      final client = HttpClient();
+      try {
+        // First: truncated stream (returns 4 of 10 bytes) must NOT commit.
+        final req = await client.getUrl(srv.uriFor(_source(), 'Music/trunc.mp3'));
+        final res = await req.close();
+        try {
+          await res.drain<void>();
+        } on HttpException {
+          // Server drops the socket so player sees an error instead of EOF.
+        }
+        expect(await cache.contains(_source().id, 'Music/trunc.mp3'), isFalse);
+
+        // Second: complete pinned stream pins atomically on commit.
+        final okProvider = _FakeProvider(_source(), <String, List<int>>{
+          'Music/keep.mp3': List<int>.filled(8, 7),
+          'Music/drop.mp3': List<int>.filled(8, 9),
+        });
+        await srv.registerProvider(okProvider);
+        final keepUri = srv.uriFor(_source(), 'Music/keep.mp3', pin: true);
+        await (await (await client.getUrl(keepUri)).close()).drain<void>();
+        final dropUri = srv.uriFor(_source(), 'Music/drop.mp3');
+        await (await (await client.getUrl(dropUri)).close()).drain<void>();
+
+        expect(await cache.contains(_source().id, 'Music/keep.mp3'), isTrue);
+      } finally {
+        client.close(force: true);
+        await srv.stop();
+      }
+    });
+  });
+}
+
+class _TruncatingProvider extends _FakeProvider {
+  _TruncatingProvider(RemoteSource source, {required this.expectedSize})
+      : super(source, <String, List<int>>{
+          'Music/trunc.mp3': List<int>.filled(expectedSize, 1),
+        });
+
+  final int expectedSize;
+
+  @override
+  Stream<List<int>> openRead(String path, {int start = 0, int? end}) async* {
+    yield const <int>[1, 2, 3, 4];
+  }
 }

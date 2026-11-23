@@ -44,6 +44,8 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
   /// (the repository has already dropped it, so no further events ever come).
   static const int _deletedIgnoreWindowMs = 5000;
   final Map<String, int> _deletedAtMsByVideoId = {};
+  final Set<String> _cancelingVideoIds = <String>{};
+  final Map<String, Future<void>> _inFlightCancels = <String, Future<void>>{};
   // FIX-G2: Single-writer mutex for tombstone mutations
   final Mutex _deleteMutex = Mutex();
 
@@ -207,6 +209,7 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
     _resubscribeAttempts = 0;
 
     await _deleteMutex.protect(() async {
+      if (_cancelingVideoIds.contains(task.videoId)) return;
       final now = _nowMs;
       _deletedAtMsByVideoId.removeWhere(
           (_, deletedAt) => now - deletedAt >= _deletedIgnoreWindowMs);
@@ -216,13 +219,13 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
       final existingTask = currentTasks[task.videoId];
       if (existingTask != null && existingTask == task) return;
 
-      final lastEmit = _lastEmitTimeByVideoId[task.videoId] ?? 0;
+      final lastEmit = _lastEmitTimeByVideoId[task.videoId];
       final isProgressOnly = existingTask != null &&
           existingTask.status == task.status &&
           task.status == DownloadStatus.downloading &&
           task.progress < 1.0;
 
-      if (isProgressOnly && (now - lastEmit < 100)) {
+      if (isProgressOnly && lastEmit != null && (now - lastEmit < 100)) {
         return;
       }
 
@@ -329,7 +332,11 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
   /// and whether the track was newly queued versus already active/complete.
   Future<Either<AppFailure, QueueDownloadResult>> queueDownload(
       DownloadTask task) async {
+    while (_inFlightCancels.containsKey(task.videoId)) {
+      await _inFlightCancels[task.videoId];
+    }
     final result = await _queueDownloadUseCase(task);
+    if (isClosed) return result;
     if (result.isRight()) {
       // A fresh queue for this video supersedes any delete tombstone, so the
       // queued event is not swallowed by the stale-emission guard.
@@ -399,12 +406,32 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
   }
 
   // FIX-A13: Cancel download by pausing (if pausable) and removing task
-  Future<void> cancelDownload(String videoId) async {
-    final task = state.tasks[videoId];
-    if (task != null && task.status.canPause) {
-      await pauseDownload(videoId);
-    }
-    await deleteDownload(videoId);
+  Future<void> cancelDownload(String videoId) {
+    final existing = _inFlightCancels[videoId];
+    if (existing != null) return existing;
+    late final Future<void> future;
+    future = () async {
+      _cancelingVideoIds.add(videoId);
+      try {
+        final task = state.tasks[videoId];
+        if (task != null && task.status.canPause) {
+          final pauseResult = await _pauseDownloadUseCase(videoId);
+          if (isClosed) return;
+          pauseResult.fold(
+            (failure) => safeEmit(state.copyWith(error: failure)),
+            (_) {},
+          );
+        }
+        await deleteDownload(videoId);
+      } finally {
+        _cancelingVideoIds.remove(videoId);
+        if (identical(_inFlightCancels[videoId], future)) {
+          _inFlightCancels.remove(videoId);
+        }
+      }
+    }();
+    _inFlightCancels[videoId] = future;
+    return future;
   }
 
   Future<void> deleteDownload(String videoId) async {

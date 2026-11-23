@@ -22,6 +22,7 @@ class RemoteSourceDraft {
     required this.rootPath,
     required this.username,
     required this.password,
+    this.clearPassword = false,
   });
 
   /// Selected transport.
@@ -45,8 +46,12 @@ class RemoteSourceDraft {
   /// Login name; empty means anonymous.
   final String username;
 
-  /// Password; empty on an edit means "keep the stored secret".
+  /// Password; empty on an edit means "keep the stored secret" unless
+  /// [clearPassword] is `true`.
   final String password;
+
+  /// When `true` on an edit with an empty [password], clears any stored secret.
+  final bool clearPassword;
 }
 
 /// Modal form for creating or editing a remote source.
@@ -84,6 +89,7 @@ class _RemoteSourceEditorDialogState extends State<RemoteSourceEditorDialog> {
   String? _portError;
   String? _rootError;
   String? _subsonicUrlError;
+  bool _clearPassword = false;
 
   bool get _isEditing => widget.initial != null;
 
@@ -182,6 +188,7 @@ class _RemoteSourceEditorDialogState extends State<RemoteSourceEditorDialog> {
         rootPath: rootText,
         username: _username.text.trim(),
         password: _password.text,
+        clearPassword: _clearPassword && _password.text.isEmpty,
       ),
     );
   }
@@ -210,6 +217,7 @@ class _RemoteSourceEditorDialogState extends State<RemoteSourceEditorDialog> {
         rootPath: parsed.path.isEmpty ? '/' : parsed.path,
         username: _username.text.trim(),
         password: _password.text,
+        clearPassword: _clearPassword && _password.text.isEmpty,
       ),
     );
   }
@@ -379,10 +387,40 @@ class _RemoteSourceEditorDialogState extends State<RemoteSourceEditorDialog> {
                 controller: _password,
                 label: RemoteSourcesStrings.passwordLabel,
                 hint: _isEditing
-                    ? RemoteSourcesStrings.passwordKeepHint
+                    ? (_clearPassword
+                        ? RemoteSourcesStrings.anonymous
+                        : RemoteSourcesStrings.passwordKeepHint)
                     : null,
                 obscureText: true,
                 textInputAction: TextInputAction.done,
+                onChanged: (_) {
+                  if (_clearPassword && _password.text.isNotEmpty) {
+                    setState(() => _clearPassword = false);
+                  }
+                },
+                suffixIcon: _isEditing
+                    ? IconButton(
+                        tooltip: _clearPassword
+                            ? RemoteSourcesStrings.passwordKeepHint
+                            : MaterialLocalizations.of(context)
+                                .deleteButtonTooltip,
+                        icon: Icon(
+                          _clearPassword
+                              ? Icons.undo_rounded
+                              : Icons.clear_rounded,
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            if (_clearPassword) {
+                              _clearPassword = false;
+                            } else {
+                              _password.clear();
+                              _clearPassword = true;
+                            }
+                          });
+                        },
+                      )
+                    : null,
                 onSubmitted: (_) => _submit(),
               ),
             ],
@@ -413,6 +451,8 @@ class _Field extends StatelessWidget {
     this.obscureText = false,
     this.textInputAction,
     this.onSubmitted,
+    this.onChanged,
+    this.suffixIcon,
   });
 
   final TextEditingController controller;
@@ -423,6 +463,8 @@ class _Field extends StatelessWidget {
   final bool obscureText;
   final TextInputAction? textInputAction;
   final ValueChanged<String>? onSubmitted;
+  final ValueChanged<String>? onChanged;
+  final Widget? suffixIcon;
 
   @override
   Widget build(BuildContext context) {
@@ -433,6 +475,7 @@ class _Field extends StatelessWidget {
         keyboardType: keyboardType,
         obscureText: obscureText,
         textInputAction: textInputAction,
+        onChanged: onChanged,
         onSubmitted: onSubmitted,
         autocorrect: false,
         enableSuggestions: !obscureText,
@@ -440,6 +483,7 @@ class _Field extends StatelessWidget {
           labelText: label,
           hintText: hint,
           errorText: errorText,
+          suffixIcon: suffixIcon,
           border: const OutlineInputBorder(),
         ),
       ),

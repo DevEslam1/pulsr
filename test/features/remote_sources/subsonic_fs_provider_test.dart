@@ -408,5 +408,42 @@ void main() {
       expect(provider.getCoverArtCacheKey(null), isNull);
       expect(provider.getCoverArtCacheKey('   '), isNull);
     });
+
+    test('openRead disables HTTP redirects and stat handles null-albumId search songs',
+        () async {
+      bool? followRedirects;
+      var getAlbumCalled = false;
+      final fake = _FakeHttpClient((request) async {
+        if (request.url.path == '/rest/search3.view') {
+          return _json(<String, dynamic>{
+            'searchResult3': <String, dynamic>{
+              'song': <dynamic>[
+                <String, dynamic>{
+                  'id': 's-orphan',
+                  'title': 'Orphan Track',
+                  'size': 2048,
+                },
+              ],
+            },
+          });
+        }
+        if (request.url.path == '/rest/getAlbum.view') {
+          getAlbumCalled = true;
+          return _json(const <String, dynamic>{});
+        }
+        followRedirects = request.followRedirects;
+        return _bytes(const <int>[1, 2, 3]);
+      });
+      final provider = _provider(fake);
+
+      await provider.search('orphan');
+      final stat = await provider.stat(SubsonicFsProvider.songPath('song', 's-orphan'));
+      expect(getAlbumCalled, isFalse);
+      expect(stat?.name, 'Orphan Track');
+      expect(stat?.sizeBytes, 2048);
+
+      await provider.openRead(SubsonicFsProvider.songPath('song', 's-orphan')).toList();
+      expect(followRedirects, isFalse);
+    });
   });
 }

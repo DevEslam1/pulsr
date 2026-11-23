@@ -180,4 +180,30 @@ void main() {
 
     expect(storage.values, isEmpty);
   });
+
+  test('mergeAndSave clears password and removes empty entry when clearPassword is true',
+      () async {
+    final storage = _FakeStorage();
+    final store = RemoteCredentialsStore(storage);
+    await store.save(
+      'a',
+      const RemoteCredentials(username: 'media', password: 's3cret'),
+    );
+
+    final cleared = await store.mergeAndSave(
+      'a',
+      const RemoteCredentials(username: 'media', password: ''),
+      clearPassword: true,
+    );
+    expect(cleared.username, 'media');
+    expect(cleared.password, '');
+    expect((await store.read('a'))?.password, '');
+
+    await store.mergeAndSave(
+      'a',
+      const RemoteCredentials(username: '', password: ''),
+      clearPassword: true,
+    );
+    expect(await store.read('a'), isNull);
+  });
 }

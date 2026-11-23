@@ -8,6 +8,7 @@ class PartyTrack {
   final String? thumbnailUrl;
   final int? durationMs;
   final bool fromAutoplay;
+  final bool isLocalOnly;
 
   const PartyTrack({
     required this.videoId,
@@ -16,6 +17,7 @@ class PartyTrack {
     this.thumbnailUrl,
     this.durationMs,
     this.fromAutoplay = false,
+    this.isLocalOnly = false,
   });
 
   Map<String, dynamic> toJson() => {
@@ -25,16 +27,19 @@ class PartyTrack {
         if (thumbnailUrl != null) 'thumbnailUrl': thumbnailUrl,
         if (durationMs != null) 'durationMs': durationMs,
         'fromAutoplay': fromAutoplay,
+        if (isLocalOnly) 'isLocalOnly': true,
       };
 
   factory PartyTrack.fromJson(Map<String, dynamic> json) {
+    final vid = json['videoId'] as String? ?? '';
     return PartyTrack(
-      videoId: json['videoId'] as String? ?? '',
+      videoId: vid,
       title: json['title'] as String? ?? '',
       artist: json['artist'] as String? ?? '',
       thumbnailUrl: json['thumbnailUrl'] as String?,
       durationMs: (json['durationMs'] as num?)?.toInt(),
       fromAutoplay: json['fromAutoplay'] as bool? ?? false,
+      isLocalOnly: (json['isLocalOnly'] as bool?) ?? vid.startsWith('local:'),
     );
   }
 

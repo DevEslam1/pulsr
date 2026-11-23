@@ -78,11 +78,14 @@ class RemoteCacheStore {
 
   final Map<String, RemoteCacheEntry> _entries = <String, RemoteCacheEntry>{};
   final Map<String, Future<File?>> _inFlight = <String, Future<File?>>{};
+  final Set<RemoteCacheSink> _activeSinks = <RemoteCacheSink>{};
+  final Set<String> _pinnedKeys = <String>{};
 
   /// Tail of the per-key commit queue. Commits for one key run one at a time in
   /// arrival order, so the last finished download wins the index entry instead
   /// of two renames racing over the same target file.
   final Map<String, Future<void>> _commitQueues = <String, Future<void>>{};
+  int _clearGeneration = 0;
   Future<void>? _initFuture;
   Directory? _root;
   RemoteCacheIndex? _index;
@@ -177,7 +180,7 @@ class RemoteCacheStore {
         p.join(root.path, '$digest.bin.${_partialToken()}$partialSuffix'));
     await partial.parent.create(recursive: true);
     final sink = partial.openWrite();
-    return RemoteCacheSink(
+    final cacheSink = RemoteCacheSink(
       key: key,
       partialFile: partial,
       sink: sink,
@@ -186,7 +189,11 @@ class RemoteCacheStore {
       maxEntryBytes: maxEntryBytes,
       etag: etag,
       modifiedAt: modifiedAt,
+      clearGeneration: _clearGeneration,
+      onClose: _activeSinks.remove,
     );
+    _activeSinks.add(cacheSink);
+    return cacheSink;
   }
 
   /// Downloads [bytes] for [sourceId]/[path] and caches it.
@@ -268,10 +275,27 @@ class RemoteCacheStore {
   }
 
   /// Pins (or unpins) an existing entry so eviction skips it.
+  ///
+  /// When called before the entry finishes streaming into the cache, the pin is
+  /// queued so [commitPartial] persists it atomically on commit.
   Future<void> pin(String sourceId, String path, {bool pinned = true}) async {
     await ensureInitialized();
-    final entry = _entries[keyFor(sourceId, path)];
-    if (entry == null || entry.pinned == pinned) return;
+    final key = keyFor(sourceId, path);
+    final entry = _entries[key];
+    if (entry == null) {
+      if (pinned) {
+        _pinnedKeys.add(key);
+      } else {
+        _pinnedKeys.remove(key);
+      }
+      return;
+    }
+    if (pinned) {
+      _pinnedKeys.add(key);
+    } else {
+      _pinnedKeys.remove(key);
+    }
+    if (entry.pinned == pinned) return;
     entry.pinned = pinned;
     await _persistIndex();
     if (!pinned) await evictIfNeeded();
@@ -280,19 +304,27 @@ class RemoteCacheStore {
   /// Pins every cached file of [sourceId] (used when a library is played).
   Future<void> pinSource(String sourceId, {bool pinned = true}) async {
     await ensureInitialized();
+    final prefix = '$sourceId/';
+    if (!pinned) {
+      _pinnedKeys.removeWhere((key) => key.startsWith(prefix));
+    }
     var changed = false;
     for (final entry in _entries.values) {
-      if (entry.key.startsWith('$sourceId/') && entry.pinned != pinned) {
+      if (entry.key.startsWith(prefix) && entry.pinned != pinned) {
         entry.pinned = pinned;
         changed = true;
       }
     }
-    if (changed) await _persistIndex();
+    if (changed) {
+      await _persistIndex();
+      if (!pinned) await evictIfNeeded();
+    }
   }
 
   /// Deletes one cached file.
   Future<void> remove(String sourceId, String path) async {
     await ensureInitialized();
+    _pinnedKeys.remove(keyFor(sourceId, path));
     await _deleteEntry(keyFor(sourceId, path));
   }
 
@@ -303,10 +335,15 @@ class RemoteCacheStore {
   Future<void> removeSource(String sourceId) async {
     await ensureInitialized();
     final prefix = '$sourceId/';
+    _pinnedKeys.removeWhere((key) => key.startsWith(prefix));
     final keys = _entries.keys.where((key) => key.startsWith(prefix)).toList();
+    var removed = false;
     for (final key in keys) {
-      await _deleteEntry(key);
+      if (await _deleteEntry(key, persist: false)) {
+        removed = true;
+      }
     }
+    if (removed) await _persistIndex();
   }
 
   /// Evicts least-recently-used unpinned entries until the cache fits.
@@ -324,11 +361,15 @@ class RemoteCacheStore {
         .where((e) => !e.pinned && e.key != protectKey)
         .toList()
       ..sort((a, b) => a.lastAccess.compareTo(b.lastAccess));
+    var removed = false;
     for (final entry in candidates) {
       if (total <= maxBytes) break;
       total -= entry.sizeBytes;
-      await _deleteEntry(entry.key);
+      if (await _deleteEntry(entry.key, persist: false)) {
+        removed = true;
+      }
     }
+    if (removed) await _persistIndex();
     if (total > maxBytes) {
       ErrorLogger.log(
         'Remote cache still above its cap because the remaining entries are pinned',
@@ -338,9 +379,34 @@ class RemoteCacheStore {
     }
   }
 
-  /// Deletes every cached file and the index.
+  /// Deletes every cached file and the index, aborting active writes and
+  /// draining queued commits first so background work cannot resurrect files.
   Future<void> clear() async {
     await ensureInitialized();
+    _clearGeneration++;
+    while (_activeSinks.isNotEmpty ||
+        _inFlight.isNotEmpty ||
+        _commitQueues.isNotEmpty) {
+      for (final sink in _activeSinks.toList(growable: false)) {
+        await sink.abort();
+        _activeSinks.remove(sink);
+      }
+      for (final future in _inFlight.values.toList(growable: false)) {
+        try {
+          await future;
+        } catch (_) {}
+      }
+      for (final future in _commitQueues.values.toList(growable: false)) {
+        try {
+          await future;
+        } catch (_) {}
+      }
+    }
+    await _index?.waitForIdle();
+    _pinnedKeys.clear();
+    _entries.clear();
+    _changeStamp++;
+    _lastIndexWrite = DateTime.fromMillisecondsSinceEpoch(0);
     final root = _root;
     if (root == null || !await root.exists()) return;
     try {
@@ -365,9 +431,6 @@ class RemoteCacheStore {
         category: 'RemoteSources',
       );
     }
-    _entries.clear();
-    _changeStamp++;
-    _lastIndexWrite = DateTime.fromMillisecondsSinceEpoch(0);
   }
 
   /// Finishes a write started by [RemoteCacheSink]: renames the partial file
@@ -379,6 +442,7 @@ class RemoteCacheStore {
     required bool pinned,
     String? etag,
     DateTime? modifiedAt,
+    int? clearGeneration,
   }) {
     // Serialize per key: the rename, the index write and eviction are not
     // reentrant, and two concurrent downloads of one key must finish with a
@@ -392,6 +456,7 @@ class RemoteCacheStore {
         pinned: pinned,
         etag: etag,
         modifiedAt: modifiedAt,
+        clearGeneration: clearGeneration,
       ),
     );
   }
@@ -427,8 +492,13 @@ class RemoteCacheStore {
     required bool pinned,
     String? etag,
     DateTime? modifiedAt,
+    int? clearGeneration,
   }) async {
     await ensureInitialized();
+    if (clearGeneration != null && clearGeneration != _clearGeneration) {
+      if (await partial.exists()) await partial.delete();
+      return null;
+    }
     final root = _root;
     if (root == null) return null;
     final digest = sha256.convert(utf8.encode(key)).toString();
@@ -439,12 +509,13 @@ class RemoteCacheStore {
     }
     await partial.rename(target.path);
     final existing = _entries[key];
+    final shouldPin = pinned || _pinnedKeys.remove(key) || (existing?.pinned ?? false);
     _entries[key] = RemoteCacheEntry(
       key: key,
       fileName: '$digest.bin',
       sizeBytes: bytes,
       lastAccess: _clock(),
-      pinned: pinned || (existing?.pinned ?? false),
+      pinned: shouldPin,
       etag: etag,
       modifiedAt: modifiedAt,
     );
@@ -454,12 +525,12 @@ class RemoteCacheStore {
     return target;
   }
 
-  Future<void> _deleteEntry(String key) async {
+  Future<bool> _deleteEntry(String key, {bool persist = true}) async {
     final entry = _entries.remove(key);
-    if (entry == null) return;
+    if (entry == null) return false;
     _changeStamp++;
     final root = _root;
-    if (root == null) return;
+    if (root == null) return true;
     final file = File(p.join(root.path, entry.fileName));
     try {
       if (await file.exists()) await file.delete();
@@ -472,7 +543,8 @@ class RemoteCacheStore {
         meta: {'key': key},
       );
     }
-    await _persistIndex();
+    if (persist) await _persistIndex();
+    return true;
   }
 
   int _totalBytes() {

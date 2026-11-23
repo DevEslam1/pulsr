@@ -108,6 +108,8 @@ abstract final class DlnaStrings {
         return l.dlnaStateScanning;
       case DlnaState.connecting:
         return l.dlnaStateConnecting;
+      case DlnaState.buffering:
+        return l.dlnaStateConnecting;
       case DlnaState.playing:
         return l.dlnaStatePlaying;
       case DlnaState.paused:

@@ -411,6 +411,79 @@ void main() {
     await cubit.close();
   });
 
+  test('cancelDownload suppresses transient paused stream events and serializes retry queue', () async {
+    final repo = _Repo();
+    final controller = StreamController<DownloadTask>.broadcast();
+    final pauseCompleter = Completer<Either<AppFailure, Unit>>();
+    final events = <String>[];
+    _stubCommon(
+      repo,
+      initial: [_task('c1', progress: 0.4)],
+      events: controller.stream,
+    );
+    when(() => repo.pauseDownload('c1')).thenAnswer((_) async {
+      events.add('pause-start');
+      controller.add(_task('c1', status: DownloadStatus.paused, progress: 0.4));
+      final res = await pauseCompleter.future;
+      events.add('pause-end');
+      return res;
+    });
+    when(() => repo.deleteDownload('c1')).thenAnswer((_) async {
+      events.add('delete');
+      return const Right(unit);
+    });
+    when(() => repo.queueDownload(any())).thenAnswer((_) async {
+      events.add('queue');
+      return const Right(QueueDownloadResult(
+        taskId: 'c1',
+        admission: DownloadAdmission.queued,
+      ));
+    });
+
+    final cubit = _build(repo);
+    await pumpEventQueue();
+
+    final seenStatuses = <DownloadStatus>[];
+    final sub = cubit.stream.listen((s) {
+      final t = s.tasks['c1'];
+      if (t != null) seenStatuses.add(t.status);
+    });
+
+    final cancelFuture = cubit.cancelDownload('c1');
+    final queueFuture = cubit.queueDownload(_task('c1', status: DownloadStatus.queued));
+    await pumpEventQueue();
+    expect(seenStatuses, isNot(contains(DownloadStatus.paused)));
+    expect(events, equals(['pause-start']));
+
+    pauseCompleter.complete(const Right(unit));
+    await Future.wait([cancelFuture, queueFuture]);
+
+    expect(events, equals(['pause-start', 'pause-end', 'delete', 'queue']));
+    await sub.cancel();
+    await controller.close();
+    await cubit.close();
+  });
+
+  test('first progress tick within 100ms after boot is not dropped', () async {
+    final repo = _Repo();
+    final controller = StreamController<DownloadTask>.broadcast();
+    _stubCommon(
+      repo,
+      initial: [_task('d1', progress: 0.1)],
+      events: controller.stream,
+    );
+
+    final cubit = _build(repo);
+    await pumpEventQueue();
+
+    controller.add(_task('d1', progress: 0.25));
+    await pumpEventQueue();
+
+    expect(cubit.state.tasks['d1']?.progress, closeTo(0.25, 0.001));
+    await controller.close();
+    await cubit.close();
+  });
+
   test('throttle bookkeeping is pruned past its cap', () async {
     final repo = _Repo();
     final controller = StreamController<DownloadTask>.broadcast();

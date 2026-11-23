@@ -101,8 +101,12 @@ class UpnpDeviceDescription {
       );
     }
 
-    final resolvedControl = Uri.parse(controlUrl);
-    if (!SsdpClient.isAllowedDescriptionLocation(resolvedControl, location.host)) {
+    final resolvedControl = Uri.tryParse(controlUrl);
+    if (resolvedControl == null ||
+        !SsdpClient.isAllowedDescriptionLocation(
+          resolvedControl,
+          location.host,
+        )) {
       throw const UpnpParseError(
         code: 'DLNA_CONTROL_URL_DISALLOWED',
         userMessage: 'The AVTransport control URL points to a disallowed location.',
@@ -124,7 +128,9 @@ class UpnpDeviceDescription {
 /// Removes namespace prefixes such as `s:` from element tags so lookups can
 /// use local names. Attribute values are untouched.
 String _stripNamespacePrefixes(String xml) {
-  final closing = xml.replaceAll(RegExp(r'<\s*/\s*[A-Za-z_][\w.-]*:'), '</');
+  final withoutComments = xml.replaceAll(RegExp(r'<!--.*?-->', dotAll: true), '');
+  final closing =
+      withoutComments.replaceAll(RegExp(r'<\s*/\s*[A-Za-z_][\w.-]*:'), '</');
   return closing.replaceAll(RegExp(r'<\s*[A-Za-z_][\w.-]*:'), '<');
 }
 
@@ -157,11 +163,15 @@ Uri _resolveBase(String document, Uri location) {
   if (urlBase == null || urlBase.isEmpty) return location;
   final parsed = Uri.tryParse(urlBase);
   if (parsed == null || !parsed.hasScheme) return location;
-  final resolved = location.resolveUri(parsed);
-  if (!SsdpClient.isAllowedDescriptionLocation(resolved, location.host)) {
+  try {
+    final resolved = location.resolveUri(parsed);
+    if (!SsdpClient.isAllowedDescriptionLocation(resolved, location.host)) {
+      return location;
+    }
+    return resolved;
+  } on FormatException {
     return location;
   }
-  return resolved;
 }
 
 _ServiceEntry? _selectAvTransportService(
@@ -219,7 +229,12 @@ _ServiceEntry? _selectService(
     final type = _elementText(body, 'serviceType') ?? '';
     final control = _elementText(body, 'controlURL') ?? '';
     if (control.isEmpty) continue;
-    final resolved = base.resolve(control);
+    final Uri resolved;
+    try {
+      resolved = base.resolve(control);
+    } on FormatException {
+      continue;
+    }
     if (!SsdpClient.isAllowedDescriptionLocation(resolved, sourceAddress)) {
       continue;
     }

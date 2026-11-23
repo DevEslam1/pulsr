@@ -44,9 +44,13 @@ class UpnpFsProvider implements RemoteFsProvider {
     http.Client? client,
     Duration timeout = const Duration(seconds: 20),
     Set<String> allowedHostSuffixes = const {},
+    Duration resourceTtl = const Duration(minutes: 5),
+    DateTime Function()? clock,
   })  : _client = client ?? http.Client(),
         _ownsClient = client == null,
-        _timeout = timeout {
+        _timeout = timeout,
+        _resourceTtl = resourceTtl,
+        _clock = clock ?? DateTime.now {
     _controlUrl = _validatedControlUrl(controlUrl);
     _allowedHosts = <String>{
       ...allowedHostSuffixes,
@@ -75,10 +79,12 @@ class UpnpFsProvider implements RemoteFsProvider {
   final http.Client _client;
   final bool _ownsClient;
   final Duration _timeout;
+  final Duration _resourceTtl;
+  final DateTime Function() _clock;
   late final Uri _controlUrl;
   late final Set<String> _allowedHosts;
   late final UpnpContentDirectory _directory;
-  final Map<String, Uri> _resources = <String, Uri>{};
+  final Map<String, _CachedResource> _resources = <String, _CachedResource>{};
   bool _closed = false;
 
   /// Control URL of the ContentDirectory service described by [source].
@@ -203,22 +209,27 @@ class UpnpFsProvider implements RemoteFsProvider {
       );
     }
 
-    final uri = await _resourceUri(target.objectId);
     final fullRead = start == 0 && end == null;
-    final request = http.Request('GET', uri)..followRedirects = false;
-    if (!fullRead) {
-      request.headers[HttpHeaders.rangeHeader] = rangeHeader(start, end);
-    }
-
-    final http.StreamedResponse response;
-    try {
-      response = await _client.send(request).timeout(_timeout);
-    } on TimeoutException catch (e, st) {
-      throw _unreachable('The media server did not answer in time.', e, st);
-    } on http.ClientException catch (e, st) {
-      throw _unreachable('Could not reach the media server.', e, st);
-    } on IOException catch (e, st) {
-      throw _unreachable('Could not reach the media server.', e, st);
+    final resolved = await _resolveResourceUri(target.objectId);
+    var response = await _sendGet(
+      resolved.uri,
+      fullRead: fullRead,
+      start: start,
+      end: end,
+    );
+    if (resolved.fromCache && _isExpiredResourceStatus(response.statusCode)) {
+      await _discard(response.stream);
+      _resources.remove(target.objectId);
+      final refreshed = await _resolveResourceUri(
+        target.objectId,
+        forceRefresh: true,
+      );
+      response = await _sendGet(
+        refreshed.uri,
+        fullRead: fullRead,
+        start: start,
+        end: end,
+      );
     }
 
     if (response.statusCode != 200 && response.statusCode != 206) {
@@ -321,10 +332,46 @@ class UpnpFsProvider implements RemoteFsProvider {
     return page.objects.isEmpty ? null : page.objects.first;
   }
 
-  /// Playable resource URI for [objectId], remembered once resolved.
-  Future<Uri> _resourceUri(String objectId) async {
-    final cached = _resources[objectId];
-    if (cached != null) return cached;
+  static bool _isExpiredResourceStatus(int status) =>
+      status == 401 || status == 403 || status == 404 || status == 410;
+
+  Future<http.StreamedResponse> _sendGet(
+    Uri uri, {
+    required bool fullRead,
+    required int start,
+    int? end,
+  }) async {
+    final request = http.Request('GET', uri)..followRedirects = false;
+    if (!fullRead) {
+      request.headers[HttpHeaders.rangeHeader] = rangeHeader(start, end);
+    }
+    try {
+      return await _client.send(request).timeout(_timeout);
+    } on TimeoutException catch (e, st) {
+      throw _unreachable('The media server did not answer in time.', e, st);
+    } on http.ClientException catch (e, st) {
+      throw _unreachable('Could not reach the media server.', e, st);
+    } on IOException catch (e, st) {
+      throw _unreachable('Could not reach the media server.', e, st);
+    }
+  }
+
+  /// Playable resource URI for [objectId], bounded by [_resourceTtl] and
+  /// re-resolved on demand when [forceRefresh] is `true`.
+  Future<({Uri uri, bool fromCache})> _resolveResourceUri(
+    String objectId, {
+    bool forceRefresh = false,
+  }) async {
+    if (!forceRefresh) {
+      final cached = _resources[objectId];
+      if (cached != null) {
+        if (_resourceTtl <= Duration.zero ||
+            _clock().difference(cached.cachedAt) < _resourceTtl) {
+          return (uri: cached.uri, fromCache: true);
+        }
+        _resources.remove(objectId);
+      }
+    }
     final UpnpObject? object;
     try {
       object = await _readObject(objectId);
@@ -347,8 +394,8 @@ class UpnpFsProvider implements RemoteFsProvider {
     if (_resources.length >= maxCachedResources) {
       _resources.remove(_resources.keys.first);
     }
-    _resources[objectId] = uri;
-    return uri;
+    _resources[objectId] = _CachedResource(uri, _clock());
+    return (uri: uri, fromCache: false);
   }
 
   /// True for an audio item with an absolute http(s) resource.
@@ -510,4 +557,11 @@ class UpnpFsProvider implements RemoteFsProvider {
       // The body is being thrown away; a failed drain has no consequence.
     }
   }
+}
+
+class _CachedResource {
+  const _CachedResource(this.uri, this.cachedAt);
+
+  final Uri uri;
+  final DateTime cachedAt;
 }

@@ -14,6 +14,7 @@ import 'package:pulsr/core/errors/failures.dart';
 import 'package:pulsr/core/services/yt_download_service.dart';
 import 'package:pulsr/data/db/app_database.dart';
 import 'package:pulsr/domain/models/download_task.dart';
+import 'package:pulsr/domain/models/ytm_audio_quality.dart';
 import 'package:pulsr/features/downloads/cubit/downloads_cubit.dart';
 import 'package:pulsr/features/downloads/cubit/downloads_state.dart';
 import 'package:pulsr/features/player/cubit/player_cubit.dart';
@@ -382,6 +383,62 @@ void main() {
       final cubit = build();
       await cubit.close();
       expect(cubit.activeSubscriptionCount, 0);
+    });
+
+    test('upstream re-queue clears canceled mask and deleted repo failure disappears',
+        () async {
+      final cubit = build();
+      await cubit.cancelDownload('requeue0001');
+      expect(
+          cubit.state.itemFor('requeue0001').status, YtDownloadStatus.canceled);
+
+      // Transient paused emit clears/maps canceled when canceled, whereas an
+      // upstream re-queue into queued unmasks immediately.
+      controller.add(DownloadsState(tasks: {
+        'requeue0001': taskWith('requeue0001', DownloadStatus.queued),
+        'deadfail001':
+            taskWith('deadfail001', DownloadStatus.failed, error: 'network'),
+      }));
+      await Future.delayed(Duration.zero);
+      expect(cubit.state.itemFor('requeue0001').status, YtDownloadStatus.queued);
+      expect(cubit.state.itemFor('deadfail001').status, YtDownloadStatus.failed);
+
+      // Deleting the failed repo task clears the failed item instead of
+      // keeping it pinned in state.items forever.
+      controller.add(const DownloadsState(tasks: {}));
+      await Future.delayed(Duration.zero);
+      expect(cubit.state.itemFor('deadfail001').status, YtDownloadStatus.idle);
+      await cubit.close();
+    });
+
+    test('changing quality on a paused track cancels and re-queues with new quality',
+        () async {
+      final cubit = build();
+      final song = remoteSong('qual0000001');
+      await cubit.download(song, quality: YtmAudioQuality.low);
+
+      controller.add(DownloadsState(tasks: {
+        'qual0000001': taskWith('qual0000001', DownloadStatus.paused),
+      }));
+      await Future.delayed(Duration.zero);
+      expect(cubit.state.itemFor('qual0000001').status, YtDownloadStatus.paused);
+
+      await cubit.download(song, quality: YtmAudioQuality.high);
+
+      verify(() => mockDownloads.cancelDownload('qual0000001')).called(1);
+      final captured = verify(() => mockDownloads.queueDownload(captureAny()))
+          .captured
+          .last as DownloadTask;
+      expect(captured.quality, YtmAudioQuality.high);
+      await cubit.close();
+    });
+
+    test('pauseDownload forwards to DownloadsCubit', () async {
+      when(() => mockDownloads.pauseDownload(any())).thenAnswer((_) async {});
+      final cubit = build();
+      await cubit.pauseDownload('pause000001');
+      verify(() => mockDownloads.pauseDownload('pause000001')).called(1);
+      await cubit.close();
     });
   });
 }

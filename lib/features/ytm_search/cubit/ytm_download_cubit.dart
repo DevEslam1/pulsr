@@ -117,8 +117,14 @@ class YtmDownloadCubit extends PulsrCubit<YtmDownloadState> {
   final LinkedHashSet<String> _reconciledVideoIds = LinkedHashSet<String>();
 
   /// Video IDs explicitly canceled by the user, preserved across pause/delete
-  /// lifecycle transitions in DownloadsCubit until re-queued.
-  final Set<String> _canceledVideoIds = {};
+  /// lifecycle transitions in DownloadsCubit until re-queued or pruned.
+  final LinkedHashSet<String> _canceledVideoIds = LinkedHashSet<String>();
+  final Set<String> _cancelingVideoIds = <String>{};
+  final Set<String> _repoFailedVideoIds = <String>{};
+  final LinkedHashSet<String> _admissionFailedVideoIds =
+      LinkedHashSet<String>();
+  final Map<String, YtmAudioQuality?> _queuedQualityByVideoId = {};
+  static const int _maxRetainedTerminalEntries = 100;
   final Map<String, bool> _reconcileLocks = {};
   // FIX-C12: Shield recently completed tasks with a 10-second TTL
   final Map<String, int> _recentlyCompleted = {};
@@ -164,23 +170,36 @@ class YtmDownloadCubit extends PulsrCubit<YtmDownloadState> {
 
     final mapped = <String, YtDownloadItem>{};
     for (final task in downloads.tasks.values) {
-      if (_canceledVideoIds.contains(task.videoId)) {
+      final isCanceling = _cancelingVideoIds.contains(task.videoId);
+      if (isCanceling ||
+          (_canceledVideoIds.contains(task.videoId) &&
+              task.status == DownloadStatus.paused)) {
         mapped[task.videoId] =
             const YtDownloadItem(status: YtDownloadStatus.canceled);
       } else {
+        _canceledVideoIds.remove(task.videoId);
         mapped[task.videoId] = _mapTask(task);
+        if (task.status == DownloadStatus.failed) {
+          _repoFailedVideoIds.add(task.videoId);
+          _admissionFailedVideoIds.remove(task.videoId);
+        } else {
+          _repoFailedVideoIds.remove(task.videoId);
+          _admissionFailedVideoIds.remove(task.videoId);
+        }
         if (task.status == DownloadStatus.complete) {
           _recentlyCompleted[task.videoId] = now;
+          _queuedQualityByVideoId.remove(task.videoId);
         }
       }
     }
-    // Canceled lives only here: the repository deletes the task on cancel, so a
-    // canceled row keeps its state until the song is downloaded again.
+    _repoFailedVideoIds.removeWhere((id) => !downloads.tasks.containsKey(id));
+    // Canceled/admission-failed entries have no repository task behind them;
+    // keep them visible until retried/re-queued or evicted above the cap, while
+    // dropping repo-failed rows deleted upstream.
     for (final entry in state.items.entries) {
-      // Canceled/failed admissions have no repository task behind them; keep
-      // the row (and its error) visible until the user retries or it queues.
       if (entry.value.status == YtDownloadStatus.canceled ||
-          entry.value.status == YtDownloadStatus.failed) {
+          (entry.value.status == YtDownloadStatus.failed &&
+              _admissionFailedVideoIds.contains(entry.key))) {
         mapped.putIfAbsent(entry.key, () => entry.value);
       }
     }
@@ -188,6 +207,7 @@ class YtmDownloadCubit extends PulsrCubit<YtmDownloadState> {
       mapped.putIfAbsent(
           id, () => const YtDownloadItem(status: YtDownloadStatus.canceled));
     }
+    _pruneRetainedTerminalEntries(mapped, downloads.tasks);
 
     safeEmit(YtmDownloadState(items: mapped));
 
@@ -310,16 +330,25 @@ class YtmDownloadCubit extends PulsrCubit<YtmDownloadState> {
     if (current.status == YtDownloadStatus.paused) {
       _reconciledVideoIds.remove(videoId);
       _canceledVideoIds.remove(videoId);
-      final resumed = await _downloads.resumeDownload(videoId);
-      if (isClosed) return (outcome: _AdmitOutcome.alreadyActive, error: null);
-      if (resumed.isRight()) {
-        return (outcome: _AdmitOutcome.queued, error: null);
+      if (quality != null && _queuedQualityByVideoId[videoId] != quality) {
+        await _downloads.cancelDownload(videoId);
+        if (isClosed) return (outcome: _AdmitOutcome.alreadyActive, error: null);
+        _queuedQualityByVideoId.remove(videoId);
+      } else {
+        final resumed = await _downloads.resumeDownload(videoId);
+        if (isClosed) {
+          return (outcome: _AdmitOutcome.alreadyActive, error: null);
+        }
+        if (resumed.isRight()) {
+          return (outcome: _AdmitOutcome.queued, error: null);
+        }
+        final message = resumed.getLeft().toNullable()?.message ??
+            (L10nHolder.current?.downloadErrorGeneric ?? 'Download failed');
+        _admissionFailedVideoIds.add(videoId);
+        _set(videoId,
+            YtDownloadItem(status: YtDownloadStatus.failed, error: message));
+        return (outcome: _AdmitOutcome.failed, error: message);
       }
-      final message = resumed.getLeft().toNullable()?.message ??
-          (L10nHolder.current?.downloadErrorGeneric ?? 'Download failed');
-      _set(videoId,
-          YtDownloadItem(status: YtDownloadStatus.failed, error: message));
-      return (outcome: _AdmitOutcome.failed, error: message);
     }
 
     // Already a local library track (a completed earlier download, or a file
@@ -327,6 +356,8 @@ class YtmDownloadCubit extends PulsrCubit<YtmDownloadState> {
     // duplicate file and a duplicate row.
     if (await _alreadyInLibrary(videoId)) {
       if (!isClosed) {
+        _queuedQualityByVideoId.remove(videoId);
+        _admissionFailedVideoIds.remove(videoId);
         _set(videoId,
             const YtDownloadItem(status: YtDownloadStatus.done, progress: 1));
       }
@@ -335,6 +366,14 @@ class YtmDownloadCubit extends PulsrCubit<YtmDownloadState> {
 
     _reconciledVideoIds.remove(videoId);
     _canceledVideoIds.remove(videoId);
+    _cancelingVideoIds.remove(videoId);
+    _repoFailedVideoIds.remove(videoId);
+    _admissionFailedVideoIds.remove(videoId);
+    if (quality != null) {
+      _queuedQualityByVideoId[videoId] = quality;
+    } else {
+      _queuedQualityByVideoId.remove(videoId);
+    }
     _set(videoId,
         const YtDownloadItem(status: YtDownloadStatus.queued, progress: 0));
 
@@ -349,12 +388,15 @@ class YtmDownloadCubit extends PulsrCubit<YtmDownloadState> {
         case DownloadAdmission.alreadyActive:
           return (outcome: _AdmitOutcome.alreadyActive, error: null);
         case DownloadAdmission.alreadyComplete:
+          _queuedQualityByVideoId.remove(videoId);
           _set(videoId,
               const YtDownloadItem(status: YtDownloadStatus.done, progress: 1));
           return (outcome: _AdmitOutcome.alreadyLocal, error: null);
       }
     }
 
+    _queuedQualityByVideoId.remove(videoId);
+    _admissionFailedVideoIds.add(videoId);
     final message = result.getLeft().toNullable()?.message ?? 'Download failed';
     _set(videoId,
         YtDownloadItem(status: YtDownloadStatus.failed, error: message));
@@ -394,10 +436,22 @@ class YtmDownloadCubit extends PulsrCubit<YtmDownloadState> {
         createdAt: DateTime.now(),
       );
 
-  void cancelDownload(String videoId) {
+  Future<void> pauseDownload(String videoId) =>
+      _downloads.pauseDownload(videoId);
+
+  Future<void> cancelDownload(String videoId) async {
+    _cancelingVideoIds.add(videoId);
+    _canceledVideoIds.remove(videoId);
     _canceledVideoIds.add(videoId);
-    _downloads.cancelDownload(videoId);
+    _admissionFailedVideoIds.remove(videoId);
+    _repoFailedVideoIds.remove(videoId);
+    _queuedQualityByVideoId.remove(videoId);
     _set(videoId, const YtDownloadItem(status: YtDownloadStatus.canceled));
+    try {
+      await _downloads.cancelDownload(videoId);
+    } finally {
+      _cancelingVideoIds.remove(videoId);
+    }
   }
 
   /// Queues multiple songs for download in batch and reports what actually
@@ -517,7 +571,7 @@ class YtmDownloadCubit extends PulsrCubit<YtmDownloadState> {
     }
 
     final now = DateTime.now().millisecondsSinceEpoch;
-    final lastEmit = _lastEmitTimeByVideoId[videoId] ?? 0;
+    final lastEmit = _lastEmitTimeByVideoId[videoId];
 
     // Throttle progress updates to at most 5/sec per videoId. State transitions
     // and completion are emitted immediately.
@@ -527,14 +581,42 @@ class YtmDownloadCubit extends PulsrCubit<YtmDownloadState> {
         item.progress != null &&
         item.progress! < 1.0;
 
-    if (isIntermediateProgress && (now - lastEmit < 200)) {
+    if (isIntermediateProgress && lastEmit != null && (now - lastEmit < 200)) {
       return;
     }
 
     _lastEmitTimeByVideoId[videoId] = now;
-    safeEmit(YtmDownloadState(
-        items: Map<String, YtDownloadItem>.unmodifiable(
-            {...state.items, videoId: item})));
+    final nextItems = <String, YtDownloadItem>{...state.items, videoId: item};
+    _pruneRetainedTerminalEntries(nextItems, const {});
+    safeEmit(YtmDownloadState(items: Map<String, YtDownloadItem>.unmodifiable(nextItems)));
+  }
+
+  void _pruneRetainedTerminalEntries(
+    Map<String, YtDownloadItem> items,
+    Map<String, DownloadTask> activeTasks,
+  ) {
+    if (items.length <= _maxRetainedTerminalEntries) return;
+    final candidates = <String>[
+      for (final id in _canceledVideoIds)
+        if (!activeTasks.containsKey(id)) id,
+      for (final id in _admissionFailedVideoIds)
+        if (!activeTasks.containsKey(id)) id,
+      for (final entry in items.entries)
+        if ((entry.value.status == YtDownloadStatus.canceled ||
+                entry.value.status == YtDownloadStatus.failed) &&
+            !activeTasks.containsKey(entry.key) &&
+            !_canceledVideoIds.contains(entry.key) &&
+            !_admissionFailedVideoIds.contains(entry.key))
+          entry.key,
+    ];
+    for (final id in candidates) {
+      if (items.length <= _maxRetainedTerminalEntries) break;
+      items.remove(id);
+      _canceledVideoIds.remove(id);
+      _admissionFailedVideoIds.remove(id);
+      _lastEmitTimeByVideoId.remove(id);
+      _queuedQualityByVideoId.remove(id);
+    }
   }
 
   @override
@@ -543,6 +625,11 @@ class YtmDownloadCubit extends PulsrCubit<YtmDownloadState> {
     _sub = null;
     _lastEmitTimeByVideoId.clear();
     _reconciledVideoIds.clear();
+    _canceledVideoIds.clear();
+    _cancelingVideoIds.clear();
+    _repoFailedVideoIds.clear();
+    _admissionFailedVideoIds.clear();
+    _queuedQualityByVideoId.clear();
     _reconcileLocks.clear();
     return super.close();
   }

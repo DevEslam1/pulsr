@@ -73,7 +73,7 @@ class _DownloadQualityPickerSheetState
     return switch (q) {
       YtmAudioQuality.low => 64,
       YtmAudioQuality.medium => 128,
-      YtmAudioQuality.high => 256,
+      YtmAudioQuality.high => 160,
     };
   }
 
@@ -87,7 +87,7 @@ class _DownloadQualityPickerSheetState
         quality: YtmAudioQuality.high,
         title: context.l10n.settingsQualityHigh,
         desc: context.l10n.settingsQualityHighDownloadDesc,
-        badge: '256 kbps',
+        badge: '160 kbps',
         icon: Icons.high_quality_rounded,
       ),
       (

@@ -132,7 +132,7 @@ void main() {
     await pumpSheet(tester);
     final controller = wireWebViewController(tester, fake);
     final params = webViewParams(tester);
-    for (var i = 0; i < 4; i++) {
+    for (var i = 0; i < 6; i++) {
       params.onLoadStop?.call(
           controller, WebUri('https://accounts.google.com/CookieMismatch'));
       await tester.pump(const Duration(milliseconds: 800));

@@ -1,12 +1,14 @@
 // lib/features/ytm_browse/presentation/ytm_browse_screen.dart
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 import 'package:pulsr/core/motion/pulsr_motion.dart';
+import 'package:pulsr/core/network/remote_target_policy.dart';
 import 'package:pulsr/core/responsive/pulsr_layout_metrics.dart';
 
 import '../../../../core/di/injection.dart';
@@ -25,9 +27,11 @@ import '../../../../core/widgets/shimmer_skeleton.dart';
 import '../../../data/db/app_database.dart';
 import '../../player/cubit/player_cubit.dart';
 import '../../player/cubit/player_state.dart';
+import '../../playlist_detail/presentation/online_playlist_detail_screen.dart';
 import '../../sheets/add_to_playlist_sheet.dart';
 import '../../ytm_search/cubit/ytm_download_cubit.dart';
 import '../../ytm_search/presentation/widgets/ytm_download_button.dart';
+import '../../ytm_search/presentation/ytm_search_screen.dart';
 import '../cubit/ytm_browse_cubit.dart';
 import '../cubit/ytm_browse_state.dart';
 
@@ -38,13 +42,12 @@ class YtmBrowseScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final browseProvider = BlocProvider(
-      create: (_) => YtmBrowseCubit(getIt<YtmBrowseService>())..load(),
-      child: const _YtmBrowseView(),
-    );
-
-    if (!getIt.isRegistered<YtmDownloadCubit>()) {
-      return browseProvider;
+    final hasDownloadCubit = getIt.isRegistered<YtmDownloadCubit>();
+    if (!hasDownloadCubit) {
+      return BlocProvider(
+        create: (_) => YtmBrowseCubit(getIt<YtmBrowseService>())..load(),
+        child: const _YtmBrowseView(),
+      );
     }
 
     return MultiBlocProvider(
@@ -200,7 +203,7 @@ class _YtmBrowseView extends StatelessWidget {
         subtitle: _failureCopy(context, state.failureReason),
         primaryActionLabel: context.l10n.retry,
         primaryActionIcon: Icons.refresh_rounded,
-        onPrimaryAction: () => cubit.load(),
+        onPrimaryAction: () => cubit.load(force: true),
       );
     }
 
@@ -246,10 +249,11 @@ class _YtmBrowseView extends StatelessWidget {
                     final sectionFailure = state.sectionFailure(section.id);
                     final sectionRefreshing =
                         state.isSectionRefreshing(section.id);
-                    // Build the queue once per section instead of once per card
+                    // Build the playable queue from song/video items only so
+                    // playlists, albums, and artists are never queued as tracks.
                     final queueSongs = [
                       for (final e in section.items)
-                        e.toYtmTrack().toSongData(),
+                        if (_isTrackItem(e)) e.toYtmTrack().toSongData(),
                     ];
 
                     return Column(
@@ -410,15 +414,25 @@ class _YtmBrowseView extends StatelessWidget {
                                 const SizedBox(width: AppSpacing.s14),
                             itemBuilder: (context, i) {
                               final item = section.items[i];
-                              final song = queueSongs[i];
+                              final song = _isTrackItem(item)
+                                  ? item.toYtmTrack().toSongData()
+                                  : null;
                               return _BrowseTrackCard(
                                 item: item,
                                 song: song,
                                 queueSongs: queueSongs,
                                 palette: p,
                                 formatDuration: _formatDuration,
-                                onLongPress: () =>
-                                    _showBrowseItemSheet(context, song, p),
+                                onContainerTap: song == null
+                                    ? () => _openBrowseContainer(context, item)
+                                    : null,
+                                onLongPress: song == null
+                                    ? null
+                                    : () => _showBrowseItemSheet(
+                                          context,
+                                          song,
+                                          p,
+                                        ),
                               );
                             },
                           ),
@@ -433,6 +447,42 @@ class _YtmBrowseView extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  static bool _isTrackItem(YtmBrowseItem item) =>
+      item.type.isEmpty || item.type == 'song' || item.type == 'video';
+
+  void _openBrowseContainer(BuildContext context, YtmBrowseItem item) {
+    PulsrHaptics.selectionClick();
+    if (item.type == 'artist') {
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => YtmSearchScreen(
+            initialQuery: item.title,
+            autofocus: false,
+          ),
+        ),
+      );
+      return;
+    }
+
+    final args = OnlinePlaylistDetailArgs(
+      playlistId: item.id,
+      title: item.title,
+      subtitle: item.subtitle,
+      artworkUrl: item.artworkUrl,
+      kind: OnlineLibraryKind.custom,
+    );
+    final router = GoRouter.maybeOf(context);
+    if (router != null) {
+      router.push('/online-playlist', extra: args);
+    } else {
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => OnlinePlaylistDetailScreen(args: args),
+        ),
+      );
+    }
   }
 
   Future<void> _showBrowseItemSheet(
@@ -582,11 +632,12 @@ class _SectionIconButton extends StatelessWidget {
 
 class _BrowseTrackCard extends StatelessWidget {
   final YtmBrowseItem item;
-  final SongsTableData song;
+  final SongsTableData? song;
   final List<SongsTableData> queueSongs;
   final PulsrPalette palette;
   final String Function(Duration) formatDuration;
-  final VoidCallback onLongPress;
+  final VoidCallback? onContainerTap;
+  final VoidCallback? onLongPress;
 
   const _BrowseTrackCard({
     required this.item,
@@ -594,247 +645,276 @@ class _BrowseTrackCard extends StatelessWidget {
     required this.queueSongs,
     required this.palette,
     required this.formatDuration,
-    required this.onLongPress,
+    this.onContainerTap,
+    this.onLongPress,
   });
 
   @override
   Widget build(BuildContext context) {
-    final p = palette;
-    final cardWidth = Adaptive.isTablet(context) ? 180.0 : 142.0;
-    final imgHeight = (cardWidth * 0.92).roundToDouble();
-
+    final trackSong = song;
+    if (trackSong == null) {
+      return _buildCard(context, isActive: false, trackSong: null);
+    }
     return BlocSelector<PlayerCubit, PlayerState, bool>(
       selector: (state) {
         final current = state.currentSong;
         if (current == null) return false;
-        if (current.id == song.id) return true;
+        if (current.id == trackSong.id) return true;
         return current.remoteId != null &&
             current.remoteId!.isNotEmpty &&
-            current.remoteId == song.remoteId;
+            current.remoteId == trackSong.remoteId;
       },
-      builder: (context, isActive) {
-        return Semantics(
-          button: true,
-          selected: isActive,
-          label: context.l10n.songByArtist(item.title, item.subtitle),
-          child: AnimatedContainer(
-            duration: context.motion(PulsrMotion.state),
-            curve: context.motionCurve(PulsrMotion.enter),
-            width: cardWidth,
-            decoration: BoxDecoration(
+      builder: (context, isActive) =>
+          _buildCard(context, isActive: isActive, trackSong: trackSong),
+    );
+  }
+
+  Widget _buildCard(
+    BuildContext context, {
+    required bool isActive,
+    required SongsTableData? trackSong,
+  }) {
+    final p = palette;
+    final cardWidth = Adaptive.isTablet(context) ? 180.0 : 142.0;
+    final imgHeight = (cardWidth * 0.92).roundToDouble();
+    final safeArtwork =
+        item.artworkUrl != null && RemoteTargetPolicy.isHttpUrl(item.artworkUrl!)
+            ? item.artworkUrl
+            : null;
+    return Semantics(
+      button: true,
+      selected: isActive,
+      label: trackSong != null
+          ? context.l10n.songByArtist(item.title, item.subtitle)
+          : '${item.title} ${item.subtitle}'.trim(),
+      child: AnimatedContainer(
+        duration: context.motion(PulsrMotion.state),
+        curve: context.motionCurve(PulsrMotion.enter),
+        width: cardWidth,
+        decoration: BoxDecoration(
+          color: isActive
+              ? Color.alphaBlend(
+                  p.accent.withValues(alpha: 0.10),
+                  p.surfaceCard,
+                )
+              : p.surfaceCard,
+          borderRadius: AppRadii.r16All,
+          border: Border.all(
+            color: isActive
+                ? p.accent.withValues(alpha: 0.65)
+                : p.hairline.withValues(alpha: 0.65),
+            width: isActive ? 1.5 : 1.0,
+          ),
+          boxShadow: [
+            BoxShadow(
               color: isActive
-                  ? Color.alphaBlend(
-                      p.accent.withValues(alpha: 0.10),
-                      p.surfaceCard,
-                    )
-                  : p.surfaceCard,
-              borderRadius: AppRadii.r16All,
-              border: Border.all(
-                color: isActive
-                    ? p.accent.withValues(alpha: 0.65)
-                    : p.hairline.withValues(alpha: 0.65),
-                width: isActive ? 1.5 : 1.0,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: isActive
-                      ? p.accent.withValues(alpha: p.isDark ? 0.22 : 0.12)
-                      : Colors.black.withValues(alpha: p.isDark ? 0.22 : 0.05),
-                  blurRadius: isActive ? 14 : 10,
-                  offset: const Offset(0, 3),
+                  ? p.accent.withValues(alpha: p.isDark ? 0.22 : 0.12)
+                  : Colors.black.withValues(alpha: p.isDark ? 0.22 : 0.05),
+              blurRadius: isActive ? 14 : 10,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Material(
+          type: MaterialType.transparency,
+          child: InkWell(
+            onTap: () {
+              if (trackSong != null) {
+                PulsrHaptics.selectionClick();
+                context
+                    .read<PlayerCubit>()
+                    .playSong(trackSong, queue: queueSongs);
+              } else {
+                onContainerTap?.call();
+              }
+            },
+            onLongPress: onLongPress,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Stack(
+                  children: [
+                    if (safeArtwork != null)
+                      Image.network(
+                        safeArtwork,
+                        width: cardWidth,
+                        height: imgHeight,
+                        fit: BoxFit.cover,
+                        cacheWidth: (cardWidth * 2).round(),
+                        cacheHeight: (imgHeight * 2).round(),
+                        frameBuilder: (context, child, frame,
+                            wasSynchronouslyLoaded) {
+                          if (wasSynchronouslyLoaded) return child;
+                          return AnimatedOpacity(
+                            opacity: frame == null ? 0.0 : 1.0,
+                            duration: context.motion(PulsrMotion.state),
+                            curve: context.motionCurve(Curves.easeOut),
+                            child: child,
+                          );
+                        },
+                        loadingBuilder: (context, child, progress) =>
+                            progress == null
+                                ? child
+                                : Container(
+                                    width: cardWidth,
+                                    height: imgHeight,
+                                    color: p.surfaceContainer,
+                                    child: Center(
+                                      child: PulsrProgressBar.circular(
+                                        size: 22,
+                                        strokeWidth: 2,
+                                        color: p.accent,
+                                      ),
+                                    ),
+                                  ),
+                        errorBuilder: (_, __, ___) => _ArtworkFallback(
+                          width: cardWidth,
+                          height: imgHeight,
+                          palette: p,
+                        ),
+                      )
+                    else
+                      _ArtworkFallback(
+                        width: cardWidth,
+                        height: imgHeight,
+                        palette: p,
+                      ),
+                    // Bottom gradient for badge legibility
+                    PositionedDirectional(
+                      start: 0,
+                      end: 0,
+                      bottom: 0,
+                      height: 42,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.transparent,
+                              Colors.black.withValues(alpha: 0.55),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    if (trackSong != null && item.hasKnownDuration)
+                      PositionedDirectional(
+                        bottom: 6,
+                        start: 6,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.s6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.scrimAt(0.70),
+                            borderRadius: AppRadii.circular(6),
+                          ),
+                          child: Text(
+                            formatDuration(item.duration),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: AppFontSize.caption,
+                              fontWeight: FontWeight.w700,
+                              fontFeatures: [
+                                FontFeature.tabularFigures(),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    PositionedDirectional(
+                      bottom: 6,
+                      end: 6,
+                      child: Container(
+                        padding: const EdgeInsets.all(AppSpacing.s6),
+                        decoration: BoxDecoration(
+                          color: isActive ? p.accent : AppColors.scrimAt(0.75),
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.3),
+                              blurRadius: 6,
+                            ),
+                          ],
+                        ),
+                        child: Icon(
+                          trackSong == null
+                              ? switch (item.type) {
+                                  'artist' => Icons.person_rounded,
+                                  'album' => Icons.album_rounded,
+                                  _ => Icons.playlist_play_rounded,
+                                }
+                              : (isActive
+                                  ? Icons.graphic_eq_rounded
+                                  : Icons.play_arrow_rounded),
+                          color: isActive
+                              ? (ThemeData.estimateBrightnessForColor(
+                                          p.accent) ==
+                                      Brightness.dark
+                                  ? Colors.white
+                                  : Colors.black)
+                              : Colors.white,
+                          size: 18,
+                        ),
+                      ),
+                    ),
+                    if (trackSong != null)
+                      PositionedDirectional(
+                        top: 4,
+                        end: 4,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: AppColors.scrimAt(0.60),
+                            shape: BoxShape.circle,
+                          ),
+                          child: YtmDownloadButton(
+                            song: trackSong,
+                            iconSize: 16,
+                            iconColor: Colors.white,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(AppSpacing.xs),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: isActive ? p.accent : p.textPrimary,
+                          fontSize: AppFontSize.bodySmall,
+                          fontWeight:
+                              isActive ? FontWeight.w800 : FontWeight.w700,
+                          letterSpacing: -0.15,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.s2),
+                      Text(
+                        item.subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: p.textSecondary,
+                          fontSize: AppFontSize.caption,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
-            clipBehavior: Clip.antiAlias,
-            child: Material(
-              type: MaterialType.transparency,
-              child: InkWell(
-                onTap: () {
-                  PulsrHaptics.selectionClick();
-                  context.read<PlayerCubit>().playSong(song, queue: queueSongs);
-                },
-                onLongPress: onLongPress,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Stack(
-                      children: [
-                        if (item.artworkUrl != null)
-                          Image.network(
-                            item.artworkUrl!,
-                            width: cardWidth,
-                            height: imgHeight,
-                            fit: BoxFit.cover,
-                            cacheWidth: (cardWidth * 2).round(),
-                            cacheHeight: (imgHeight * 2).round(),
-                            frameBuilder: (context, child, frame,
-                                wasSynchronouslyLoaded) {
-                              if (wasSynchronouslyLoaded) return child;
-                              return AnimatedOpacity(
-                                opacity: frame == null ? 0.0 : 1.0,
-                                duration: context.motion(PulsrMotion.state),
-                                curve: context.motionCurve(Curves.easeOut),
-                                child: child,
-                              );
-                            },
-                            loadingBuilder: (context, child, progress) =>
-                                progress == null
-                                    ? child
-                                    : Container(
-                                        width: cardWidth,
-                                        height: imgHeight,
-                                        color: p.surfaceContainer,
-                                        child: Center(
-                                          child: PulsrProgressBar.circular(
-                                            size: 22,
-                                            strokeWidth: 2,
-                                            color: p.accent,
-                                          ),
-                                        ),
-                                      ),
-                            errorBuilder: (_, __, ___) => _ArtworkFallback(
-                              width: cardWidth,
-                              height: imgHeight,
-                              palette: p,
-                            ),
-                          )
-                        else
-                          _ArtworkFallback(
-                            width: cardWidth,
-                            height: imgHeight,
-                            palette: p,
-                          ),
-                        // Bottom gradient for badge legibility
-                        PositionedDirectional(
-                          start: 0,
-                          end: 0,
-                          bottom: 0,
-                          height: 42,
-                          child: DecoratedBox(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topCenter,
-                                end: Alignment.bottomCenter,
-                                colors: [
-                                  Colors.transparent,
-                                  Colors.black.withValues(alpha: 0.55),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                        if (item.hasKnownDuration)
-                          PositionedDirectional(
-                            bottom: 6,
-                            start: 6,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: AppSpacing.s6,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppColors.scrimAt(0.70),
-                                borderRadius: AppRadii.circular(6),
-                              ),
-                              child: Text(
-                                formatDuration(item.duration),
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: AppFontSize.caption,
-                                  fontWeight: FontWeight.w700,
-                                  fontFeatures: [
-                                    FontFeature.tabularFigures(),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        PositionedDirectional(
-                          bottom: 6,
-                          end: 6,
-                          child: Container(
-                            padding: const EdgeInsets.all(AppSpacing.s6),
-                            decoration: BoxDecoration(
-                              color:
-                                  isActive ? p.accent : AppColors.scrimAt(0.75),
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.3),
-                                  blurRadius: 6,
-                                ),
-                              ],
-                            ),
-                            child: Icon(
-                              isActive
-                                  ? Icons.graphic_eq_rounded
-                                  : Icons.play_arrow_rounded,
-                              color: isActive
-                                  ? (ThemeData.estimateBrightnessForColor(
-                                              p.accent) ==
-                                          Brightness.dark
-                                      ? Colors.white
-                                      : Colors.black)
-                                  : Colors.white,
-                              size: 18,
-                            ),
-                          ),
-                        ),
-                        PositionedDirectional(
-                          top: 4,
-                          end: 4,
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: AppColors.scrimAt(0.60),
-                              shape: BoxShape.circle,
-                            ),
-                            child: YtmDownloadButton(
-                              song: song,
-                              iconSize: 16,
-                              iconColor: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.all(AppSpacing.xs),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            item.title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: isActive ? p.accent : p.textPrimary,
-                              fontSize: AppFontSize.bodySmall,
-                              fontWeight:
-                                  isActive ? FontWeight.w800 : FontWeight.w700,
-                              letterSpacing: -0.15,
-                            ),
-                          ),
-                          const SizedBox(height: AppSpacing.s2),
-                          Text(
-                            item.subtitle,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: p.textSecondary,
-                              fontSize: AppFontSize.caption,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 }

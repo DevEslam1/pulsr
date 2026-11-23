@@ -2,6 +2,7 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/di/injection.dart';
 import 'package:pulsr/core/services/ytm_browse_service.dart';
@@ -178,5 +179,97 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Retry'), findsWidgets);
+  });
+
+  testWidgets('error empty-state retry calls getHomeFeed with force: true',
+      (tester) async {
+    var calls = 0;
+    when(() => mockBrowse.getHomeFeed(force: any(named: 'force')))
+        .thenAnswer((_) async {
+      calls++;
+      if (calls == 1) throw Exception('offline');
+      return const [
+        YtmBrowseSection(title: 'Recovered', items: [
+          YtmBrowseItem(
+            id: 'dQw4w9WgXcQ',
+            title: 'Recovered Track',
+            subtitle: 'Artist',
+            type: 'song',
+          ),
+        ]),
+      ];
+    });
+
+    await tester.pumpWidget(host());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Retry'));
+    await tester.pumpAndSettle();
+
+    verify(() => mockBrowse.getHomeFeed(force: true)).called(1);
+    expect(find.text('Recovered'), findsOneWidget);
+  });
+
+  testWidgets('container items route to playlist detail or artist search instead of playback',
+      (tester) async {
+    final player = stubPlayerCubit();
+    Object? pushedExtra;
+    when(() => mockBrowse.getHomeFeed(force: any(named: 'force')))
+        .thenAnswer((_) async => const [
+              YtmBrowseSection(title: 'Mixed Picks', items: [
+                YtmBrowseItem(
+                  id: 'VLPL1234',
+                  title: 'Evening Mix',
+                  subtitle: 'Curated',
+                  type: 'playlist',
+                ),
+                YtmBrowseItem(
+                  id: 'UCartist1',
+                  title: 'Fairuz',
+                  subtitle: 'Artist',
+                  type: 'artist',
+                ),
+              ]),
+            ]);
+
+    final router = GoRouter(
+      initialLocation: '/',
+      routes: [
+        GoRoute(
+          path: '/',
+          builder: (_, __) => const YtmBrowseScreen(),
+        ),
+        GoRoute(
+          path: '/online-playlist',
+          builder: (_, state) {
+            pushedExtra = state.extra;
+            return const Scaffold(body: Text('online-playlist-target'));
+          },
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MultiBlocProvider(
+        providers: [BlocProvider<PlayerCubit>.value(value: player)],
+        child: MaterialApp.router(
+          theme: AuraTheme.darkTheme,
+          localizationsDelegates: appLocalizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          routerConfig: router,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byIcon(Icons.playlist_play_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.person_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.play_arrow_rounded), findsNothing);
+
+    await tester.tap(find.text('Evening Mix'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('online-playlist-target'), findsOneWidget);
+    expect(pushedExtra, isNotNull);
   });
 }

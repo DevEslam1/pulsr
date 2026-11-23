@@ -136,7 +136,6 @@ class SmbFsProvider implements RemoteFsProvider {
       yield chunk;
       offset += chunk.length;
       if (remaining > 0) remaining -= chunk.length;
-      if (chunk.length < want) return;
     }
   }
 

@@ -88,6 +88,7 @@ class _AddStationDialogState extends State<_AddStationDialog> {
   late final TextEditingController _nameController;
   late final TextEditingController _urlController;
   late final TextEditingController _genreController;
+  String? _nameError;
   String? _urlError;
   String? _artworkUrl;
 
@@ -119,7 +120,7 @@ class _AddStationDialogState extends State<_AddStationDialog> {
     try {
       final picker = ImagePicker();
       final picked = await picker.pickImage(source: ImageSource.gallery);
-      if (picked != null) {
+      if (picked != null && mounted) {
         setState(() => _artworkUrl = picked.path);
       }
     } catch (_) {}
@@ -143,6 +144,7 @@ class _AddStationDialogState extends State<_AddStationDialog> {
   }
 
   void _submit() {
+    final initial = widget.initial;
     final url = _urlController.text.trim();
     final error = _validateUrl(url);
     if (error != null) {
@@ -150,21 +152,47 @@ class _AddStationDialogState extends State<_AddStationDialog> {
       return;
     }
     final name = _nameController.text.trim();
+    if (initial != null && name.isEmpty) {
+      setState(() => _nameError = context.l10n.remoteSrcNameRequired);
+      return;
+    }
     final genre = _genreController.text.trim();
     final effectiveArt = _artworkUrl ??
         RadioStationStore.resolveArtworkForStation(
+          id: initial?.id,
           name: name,
           url: url,
         );
-    Navigator.of(context, rootNavigator: true).pop(
-      RadioStation.create(
+    final RadioStation result;
+    if (initial != null) {
+      final updated = initial.copyWith(
         name: name,
         url: url,
         genre: genre.isNotEmpty ? genre : null,
         artworkUrl: effectiveArt,
-        lastPlayed: widget.initial?.lastPlayed,
-      ),
-    );
+      );
+      result = (genre.isEmpty || effectiveArt == null)
+          ? RadioStation(
+              id: updated.id,
+              name: updated.name,
+              url: updated.url,
+              genre: genre.isNotEmpty ? genre : null,
+              artworkUrl: effectiveArt,
+              lastPlayed: updated.lastPlayed,
+              bitrate: updated.bitrate,
+              codec: updated.codec,
+              stationUuid: updated.stationUuid,
+            )
+          : updated;
+    } else {
+      result = RadioStation.create(
+        name: name,
+        url: url,
+        genre: genre.isNotEmpty ? genre : null,
+        artworkUrl: effectiveArt,
+      );
+    }
+    Navigator.of(context, rootNavigator: true).pop(result);
   }
 
   Widget _buildPresetChip(String label, String assetPath) {
@@ -287,9 +315,13 @@ class _AddStationDialogState extends State<_AddStationDialog> {
       controller: _nameController,
       textInputAction: TextInputAction.next,
       onChanged: (text) {
+        if (_nameError != null) {
+          setState(() => _nameError = null);
+        }
         if (_artworkUrl == null ||
             _artworkUrl!.startsWith('assets/Pictures/')) {
           final detected = RadioStationStore.resolveArtworkForStation(
+            id: widget.initial?.id,
             name: text,
             url: _urlController.text,
           );
@@ -304,6 +336,7 @@ class _AddStationDialogState extends State<_AddStationDialog> {
         labelStyle: TextStyle(color: p.textSecondary),
         hintText: context.l10n.browseRadioNameHint,
         hintStyle: TextStyle(color: p.textTertiary),
+        errorText: _nameError,
         filled: true,
         fillColor: p.surfaceContainerHigh.withValues(alpha: 0.5),
         border: OutlineInputBorder(

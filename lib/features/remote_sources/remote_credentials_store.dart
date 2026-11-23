@@ -135,22 +135,28 @@ class RemoteCredentialsStore {
   /// is removed.
   Future<RemoteCredentials> mergeAndSave(
     String sourceId,
-    RemoteCredentials incoming,
-  ) async {
+    RemoteCredentials incoming, {
+    bool clearPassword = false,
+  }) async {
     final existing = await read(sourceId);
-    final password = incoming.password.isNotEmpty
+    final password = clearPassword
         ? incoming.password
-        : (existing?.password ?? '');
+        : (incoming.password.isNotEmpty
+            ? incoming.password
+            : (existing?.password ?? ''));
     final merged = RemoteCredentials(
-      username: incoming.username,
+      username: clearPassword
+          ? incoming.username
+          : (incoming.username.isNotEmpty
+              ? incoming.username
+              : (existing?.username ?? '')),
       password: password,
     );
-    if (merged.isEmpty) return merged;
-    if (merged.password.isEmpty && existing == null) {
-      // Anonymous access: nothing secret to write, and writing an empty blob
-      // over a slot that could not be read would destroy it.
+    if (clearPassword && merged.isEmpty) {
+      await delete(sourceId);
       return merged;
     }
+    if (merged.isEmpty) return merged;
     await save(sourceId, merged);
     return merged;
   }

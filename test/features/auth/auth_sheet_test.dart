@@ -257,4 +257,39 @@ void main() {
     expect(find.textContaining('Signed in as'), findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());
   });
+
+  testWidgets('does not pop behind a pushed overlay route or re-pop on sync updates',
+      (tester) async {
+    final user = MockUser();
+    when(() => user.email).thenReturn('a@b.com');
+    when(() => auth.signInWithGoogle()).thenAnswer((_) async => user);
+
+    final navKey = GlobalKey<NavigatorState>();
+    await tester.pumpWidget(MaterialApp(
+      theme: AuraTheme.darkTheme,
+      navigatorKey: navKey,
+      localizationsDelegates: appLocalizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      home: const Scaffold(body: SizedBox()),
+    ));
+    navKey.currentState!.push(MaterialPageRoute<void>(
+      builder: (_) => BlocProvider<AuthCubit>.value(
+        value: cubit,
+        child: const Scaffold(body: AuthSheet()),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    // Cover AuthSheet with another route so ModalRoute.of(context)?.isCurrent is false.
+    navKey.currentState!.push(MaterialPageRoute<void>(
+      builder: (_) => const Scaffold(body: Text('overlay-route')),
+    ));
+    await tester.pumpAndSettle();
+    expect(find.text('overlay-route'), findsOneWidget);
+
+    await cubit.signInWithGoogle();
+    await tester.pumpAndSettle();
+    expect(find.text('overlay-route'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
 }

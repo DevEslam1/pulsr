@@ -65,6 +65,7 @@ class RemoteStreamServer {
   final DateTime Function() _clock;
   final Map<String, RemoteFsProvider> _providers = <String, RemoteFsProvider>{};
   final Map<String, String> _tokens = <String, String>{};
+  final Set<String> _pinnedStreamKeys = <String>{};
 
   /// Recent provider stats, keyed like the disk cache ([RemoteCacheStore.keyFor]).
   final Map<String, _StatMemo> _statCache = <String, _StatMemo>{};
@@ -83,6 +84,9 @@ class RemoteStreamServer {
 
   /// Whether [start] completed and the socket is accepting connections.
   bool get isRunning => _server != null;
+
+  /// Whether a provider is registered for [sourceId].
+  bool hasProvider(String sourceId) => _providers.containsKey(sourceId);
 
   /// Makes [provider] reachable under its source id.
   ///
@@ -113,6 +117,7 @@ class RemoteStreamServer {
   }) async {
     _tokens.remove(sourceId);
     _forgetStats(sourceId);
+    _pinnedStreamKeys.removeWhere((key) => key.startsWith('$sourceId/'));
     final provider = _providers.remove(sourceId);
     if (closeProvider && provider != null) await _closeQuietly(provider);
   }
@@ -129,11 +134,17 @@ class RemoteStreamServer {
 
   /// Builds the URL a player should open for [path] on [source].
   ///
-  /// Throws [StateError] when the server has not been started, because the URL
-  /// would carry port 0 and no player could connect to it.
-  Uri uriFor(RemoteSource source, String path) {
+  /// When [pin] is true, the stream server pins the cache entry atomically
+  /// when caching begins during streaming. Throws [StateError] when the server
+  /// has not been started, because the URL would carry port 0 and no player
+  /// could connect to it.
+  Uri uriFor(RemoteSource source, String path, {bool pin = false}) {
     if (!isRunning) {
       throw StateError('Await RemoteStreamServer.start() before uriFor().');
+    }
+    final key = RemoteCacheStore.keyFor(source.id, path);
+    if (pin) {
+      _pinnedStreamKeys.add(key);
     }
     final token = _tokens[source.id] ??= _newToken();
     final encoded = base64UrlEncode(utf8.encode(path)).replaceAll('=', '');
@@ -212,6 +223,7 @@ class RemoteStreamServer {
     if (server != null) await server.close(force: true);
     _tokens.clear();
     _statCache.clear();
+    _pinnedStreamKeys.clear();
     if (closeProviders) {
       final providers = _providers.values.toList(growable: false);
       _providers.clear();
@@ -324,6 +336,11 @@ class RemoteStreamServer {
         category: 'RemoteSources',
       );
       await _pump.sendText(response, HttpStatus.badGateway, e.userMessage);
+    } on IOException catch (e) {
+      ErrorLogger.log(
+        'Remote stream client closed the socket: $e',
+        category: 'RemoteSources',
+      );
     } catch (e, st) {
       ErrorLogger.log(
         'Remote stream request failed unexpectedly',
@@ -335,12 +352,54 @@ class RemoteStreamServer {
     }
   }
 
+  /// Infers an audio `Content-Type` from [path]'s extension when recognized.
+  static ContentType contentTypeForPath(String path) {
+    final trimmed = path.trim().toLowerCase();
+    final dot = trimmed.lastIndexOf('.');
+    if (dot < 0 || dot == trimmed.length - 1) return ContentType.binary;
+    switch (trimmed.substring(dot + 1)) {
+      case 'mp3':
+        return ContentType('audio', 'mpeg');
+      case 'flac':
+        return ContentType('audio', 'flac');
+      case 'm4a':
+      case 'm4b':
+      case 'mp4':
+        return ContentType('audio', 'mp4');
+      case 'aac':
+        return ContentType('audio', 'aac');
+      case 'ogg':
+      case 'oga':
+        return ContentType('audio', 'ogg');
+      case 'opus':
+        return ContentType('audio', 'opus');
+      case 'wav':
+        return ContentType('audio', 'wav');
+      case 'wma':
+        return ContentType('audio', 'x-ms-wma');
+      case 'aiff':
+      case 'aif':
+        return ContentType('audio', 'aiff');
+      case 'alac':
+        return ContentType('audio', 'alac');
+      case 'dsf':
+        return ContentType('audio', 'dsf');
+      case 'dff':
+        return ContentType('audio', 'x-dff');
+      case 'wv':
+        return ContentType('audio', 'x-wavpack');
+      default:
+        return ContentType.binary;
+    }
+  }
+
   Future<void> _serve(
     HttpRequest request,
     HttpResponse response,
     RemoteFsProvider provider,
     String path,
   ) async {
+    response.headers.contentType = contentTypeForPath(path);
     final sourceId = provider.source.id;
     // Stat first, then one cache lookup carrying those validators: a cached
     // copy can only be judged stale once the server's current etag/mtime is
@@ -378,9 +437,9 @@ class RemoteStreamServer {
     final cachedLength = cached != null ? await cached.length() : null;
     final totalLength = cachedLength ?? stat?.sizeBytes;
     final headOnly = request.method == 'HEAD';
-    if (totalLength == null || totalLength <= 0) {
-      // The size is unknown (or the file is empty): serve the body directly and
-      // skip range handling, because a 206 without a total is not valid.
+    if (totalLength == null) {
+      // The size is unknown: serve the body directly and skip range handling,
+      // because a 206 without a total is not valid.
       response.statusCode = HttpStatus.ok;
       if (headOnly) {
         await response.close();
@@ -429,12 +488,15 @@ class RemoteStreamServer {
       await _pump.sendFile(response, cached, range);
       return;
     }
+    final cacheKey = RemoteCacheStore.keyFor(sourceId, path);
+    final shouldPin = _pinnedStreamKeys.remove(cacheKey);
     final sink = range == null
         ? await _pump.startCacheWrite(
-            provider.source.id,
+            sourceId,
             path,
             etag: stat?.etag,
             modifiedAt: stat?.modifiedAt,
+            pin: shouldPin,
           )
         : null;
     await _pump.sendFromProvider(
@@ -444,6 +506,7 @@ class RemoteStreamServer {
       start: range?.start ?? 0,
       end: range?.end,
       sink: sink,
+      expectedLength: range?.length ?? totalLength,
     );
   }
 
