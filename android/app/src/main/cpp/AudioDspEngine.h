@@ -379,7 +379,7 @@ private:
     // Synthesizes the Arbitrary EQ kernel for snap.sampleRate on the calling
     // (control) thread and stores it as the snapshot's preparedFilter.
     void ensureArbitraryEqPrepared(DspParamSnapshot& snap);
-    void resetInternal();
+    void resetInternal(const DspParamSnapshot& current);
     // Direct USB software attenuation actually in force for this snapshot: the
     // clamped directUsbGain only while Direct USB PCM output is the live
     // endpoint (bitPerfect.directUsbActive), otherwise unity. Pure arithmetic,

@@ -47,8 +47,8 @@ class NowPlayingWidget : AppWidgetProvider() {
     override fun onReceive(context: Context, intent: Intent) {
         val action = intent.action
         if (action != null && action.startsWith(WIDGET_ACTION_PREFIX)) {
-            // Enforce authentic widget broadcast origin: either holds signature permission WIDGET_CONTROL,
-            // or carries the process token injected into PendingIntents created by our own AppWidget.
+            // Enforce authentic widget broadcast origin: require the process token
+            // injected into PendingIntents created by our own AppWidget.
             // C-10: only the known transport actions are accepted — an arbitrary broadcast that merely
             // shares our prefix must not reach the action handler.
             if (!isTrustedWidgetAction(context, intent)) {
@@ -102,24 +102,12 @@ class NowPlayingWidget : AppWidgetProvider() {
         val action = intent.action ?: return false
         if (action !in WIDGET_ACTIONS) return false
 
-        // Fast-path: matching active or within-grace-window rotated token
+        // PendingIntents created by our widget inject EXTRA_WIDGET_TOKEN. External
+        // broadcasts lacking a valid token must never execute playback actions;
+        // checkCallingOrSelfPermission() inside BroadcastReceiver.onReceive() checks
+        // Pulsr's own manifest grants and would erroneously pass for any sender.
         val token = intent.getStringExtra(EXTRA_WIDGET_TOKEN)
-        if (isValidWidgetToken(context, token)) return true
-
-        // Signature-level permission check if granted
-        try {
-            if (context.checkCallingOrSelfPermission(WIDGET_CONTROL_PERMISSION) ==
-                PackageManager.PERMISSION_GRANTED
-            ) {
-                return true
-            }
-        } catch (_: Throwable) {
-            // Ignore
-        }
-
-        // PendingIntents created by our widget inject EXTRA_WIDGET_TOKEN. External broadcasts
-        // lacking the token or WIDGET_CONTROL permission must not execute playback actions.
-        return false
+        return isValidWidgetToken(context, token)
     }
 
     override fun onAppWidgetOptionsChanged(
@@ -282,7 +270,6 @@ class NowPlayingWidget : AppWidgetProvider() {
         const val EXTRA_RATIO = "extra_ratio"
         internal const val EXTRA_WIDGET_TOKEN = "com.pulsr.music.widget.extra.TOKEN"
         private const val WIDGET_ACTION_PREFIX = "com.pulsr.music.widget."
-        private const val WIDGET_CONTROL_PERMISSION = "com.pulsr.music.permission.WIDGET_CONTROL"
 
         private const val TOKEN_GRACE_WINDOW_MS = 5 * 60 * 1000L
         private const val TOKEN_MAX_AGE_MS = 24 * 60 * 60 * 1000L // 24 hours

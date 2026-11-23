@@ -141,6 +141,7 @@ class UsbErgonomicsPlugin private constructor(
         val quirk = QuirkConfig(
             vid = call.argument<Int>(ARG_VID),
             pid = call.argument<Int>(ARG_PID),
+            deviceId = call.argument<Int>(ARG_DEVICE_ID),
             hidEnabled = call.argument<Boolean>(ARG_HID_ENABLED) == true,
         )
         runAsync(result) {
@@ -173,7 +174,8 @@ class UsbErgonomicsPlugin private constructor(
     private fun handleResetAltSetting(call: MethodCall, result: MethodChannel.Result) {
         val vid = call.argument<Int>(ARG_VID)
         val pid = call.argument<Int>(ARG_PID)
-        runAsync(result) { usbResetAltSetting(usbManager, vid, pid) }
+        val deviceId = call.argument<Int>(ARG_DEVICE_ID)
+        runAsync(result) { usbResetAltSetting(usbManager, vid, pid, deviceId) }
     }
 
     // ---- HID consumer control ----
@@ -218,6 +220,9 @@ class UsbErgonomicsPlugin private constructor(
         hidClaimed = false
         hidThread = null
         hidRequest = null
+        consumerSeen = false
+        lastUsageName = null
+        hidDetail = null
         // Item 5: cancel and close the pending request BEFORE the connection, so a
         // reader blocked in requestWait() wakes up and observes the dead session.
         if (request != null) {
@@ -255,7 +260,8 @@ class UsbErgonomicsPlugin private constructor(
 
     private fun claimAndRead(quirk: QuirkConfig, session: Long) {
         if (!isCurrentSession(session)) return
-        val device = UsbDeviceLookup.audioDevice(usbManager, quirk.vid, quirk.pid)
+        val device = UsbDeviceLookup.audioDeviceById(usbManager, quirk.deviceId)
+            ?: UsbDeviceLookup.audioDevice(usbManager, quirk.vid, quirk.pid)
         if (device == null) {
             markHidStopped(session, "no_audio_device")
             return
@@ -540,13 +546,16 @@ class UsbErgonomicsPlugin private constructor(
     /** Runs [block] on the IO worker and replies on the main thread. */
     private fun runAsync(result: MethodChannel.Result, block: () -> Map<String, Any?>) {
         workerHandler.post {
+            if (disposed) return@post
             val payload = try {
                 block()
             } catch (e: Exception) {
                 Log.w(TAG, "A USB ergonomics worker step failed: ${e.message}")
                 mapOf<String, Any?>("error" to (e.message ?: "worker_failed"))
             }
-            mainHandler.post { result.success(payload) }
+            mainHandler.post {
+                if (!disposed) result.success(payload)
+            }
         }
     }
 
@@ -578,6 +587,7 @@ class UsbErgonomicsPlugin private constructor(
 private data class QuirkConfig(
     val vid: Int?,
     val pid: Int?,
+    val deviceId: Int? = null,
     val hidEnabled: Boolean,
 )
 
@@ -790,9 +800,11 @@ private fun usbResetAltSetting(
     usbManager: UsbManager?,
     vid: Int?,
     pid: Int?,
+    deviceId: Int? = null,
 ): Map<String, Any?> {
     val manager = usbManager ?: return mapOf("ok" to false, "detail" to "usb_unavailable")
-    val device = UsbDeviceLookup.audioDevice(manager, vid, pid)
+    val device = UsbDeviceLookup.audioDeviceById(manager, deviceId)
+        ?: UsbDeviceLookup.audioDevice(manager, vid, pid)
         ?: return mapOf("ok" to false, "detail" to "no_audio_device")
     if (!manager.hasPermission(device)) {
         return mapOf("ok" to false, "detail" to "permission_required")

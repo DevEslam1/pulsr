@@ -1121,18 +1121,26 @@ void ConvolutionReverb::preparePartitions() {
 
     if (preparedIr_->numPartitions == 0) {
         const int ringSize = preparedIr_->totalTaps * 2 + 16;
+        bool ringCleared = false;
         if (static_cast<int>(directRingL_.size()) < ringSize) {
             directRingL_.resize(ringSize, 0.0f);
             directRingR_.resize(ringSize, 0.0f);
             directPos_ = 0;
+            std::fill(directRingL_.begin(), directRingL_.end(), 0.0f);
+            std::fill(directRingR_.begin(), directRingR_.end(), 0.0f);
+            ringCleared = true;
         }
-        if (preparedIr_->totalTaps > 0 && directPos_ >= preparedIr_->totalTaps) {
+        if (!ringCleared &&
+            (preparedIr_->totalTaps < lastDirectTaps_ ||
+             (preparedIr_->totalTaps > 0 && directPos_ >= preparedIr_->totalTaps))) {
             directPos_ = 0;
             std::fill(directRingL_.begin(), directRingL_.end(), 0.0f);
             std::fill(directRingR_.begin(), directRingR_.end(), 0.0f);
         }
+        lastDirectTaps_ = preparedIr_->totalTaps;
         return;
     }
+    lastDirectTaps_ = 0;
 
     // B-06: RT-alloc guard — cap effective partitions to preallocated max (2048) to avoid
     // unbounded allocation on the audio thread.
@@ -1292,7 +1300,8 @@ void ConvolutionReverb::process(const float* inL, const float* inR, float* outL,
     // 3. Resample wet output back up to source sample rate
     const float* wetPlanar[2] = { resampleWetL_.data(), resampleWetR_.data() };
     float* outResampled[2] = { resampleOutL_.data(), resampleOutR_.data() };
-    int outWetFrames = wetOutResampler_.processPlanar(wetPlanar, outResampled, coreFrames, 2, frames);
+    const int outCapacity = static_cast<int>(resampleOutL_.size());
+    int outWetFrames = wetOutResampler_.processPlanar(wetPlanar, outResampled, coreFrames, 2, outCapacity);
 
     // 4. Mix at native rate: native dry (time-aligned with the wet path) +
     //    resampled pure wet reverberation.

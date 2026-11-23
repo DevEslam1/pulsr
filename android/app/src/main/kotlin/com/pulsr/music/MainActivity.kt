@@ -58,6 +58,11 @@ class MainActivity : AudioServiceActivity() {
          * installed.
          */
         @Volatile private var assistantReady = false
+
+        // Tracks which MainActivity currently owns the Activity-scoped channels on
+        // each cached FlutterEngine so a finishing Activity's cleanUpFlutterEngine
+        // cannot strip handlers installed by its replacement (M-12).
+        private val activeActivityByEngine = java.util.IdentityHashMap<FlutterEngine, MainActivity>()
     }
 
     /**
@@ -151,6 +156,7 @@ class MainActivity : AudioServiceActivity() {
     private var batteryChannel: MethodChannel? = null
     private var updaterChannel: MethodChannel? = null
     private var playbackTileChannel: MethodChannel? = null
+    private var boundFlutterEngine: FlutterEngine? = null
     @Volatile private var activityChannelsBound = false
     private val lyricsExecutor = java.util.concurrent.Executors.newFixedThreadPool(2)
     private var mediaReceiver: android.content.BroadcastReceiver? = null
@@ -444,12 +450,17 @@ class MainActivity : AudioServiceActivity() {
         // audio_service re-attaches the same cached engine to every Activity, so
         // this method runs more than once per process. Engine-scoped plugins are
         // created once per engine; only Activity-scoped channels are re-bound.
-        PulsrEnginePlugins.obtain(flutterEngine, applicationContext)
+        val plugins = PulsrEnginePlugins.obtain(flutterEngine, applicationContext)
+        plugins.tagEditor.attachActivity(this)
         bindActivityChannels(flutterEngine)
     }
 
     private fun bindActivityChannels(flutterEngine: FlutterEngine) {
-        if (activityChannelsBound) return
+        synchronized(activeActivityByEngine) {
+            activeActivityByEngine[flutterEngine] = this
+        }
+        if (activityChannelsBound && boundFlutterEngine === flutterEngine) return
+        boundFlutterEngine = flutterEngine
         activityChannelsBound = true
 
         val fileChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, FILE_OPENER_CHANNEL)
@@ -867,22 +878,45 @@ class MainActivity : AudioServiceActivity() {
         // FlutterEngine (and playback) outlives this Activity; engine-scoped
         // plugins are torn down by PulsrEnginePlugins when the engine itself is
         // destroyed, never while the service is still playing.
-        updaterChannel?.setMethodCallHandler(null)
+        val stillOwner = synchronized(activeActivityByEngine) {
+            if (activeActivityByEngine[flutterEngine] === this) {
+                activeActivityByEngine.remove(flutterEngine)
+                true
+            } else {
+                false
+            }
+        }
+        PulsrEnginePlugins.find(flutterEngine)?.tagEditor?.detachActivity(this)
+        if (boundFlutterEngine === flutterEngine) {
+            boundFlutterEngine = null
+        }
+        if (stillOwner) {
+            updaterChannel?.setMethodCallHandler(null)
+            playbackTileChannel?.setMethodCallHandler(null)
+            purityChannel?.setMethodCallHandler(null)
+            batteryChannel?.setMethodCallHandler(null)
+            fileOpenerChannel?.setMethodCallHandler(null)
+            assistantChannel?.setMethodCallHandler(null)
+            lyricsChannel?.setMethodCallHandler(null)
+        }
         updaterChannel = null
-        playbackTileChannel?.setMethodCallHandler(null)
         playbackTileChannel = null
-        purityChannel?.setMethodCallHandler(null)
         purityChannel = null
-        batteryChannel?.setMethodCallHandler(null)
         batteryChannel = null
-        fileOpenerChannel?.setMethodCallHandler(null)
         fileOpenerChannel = null
-        assistantChannel?.setMethodCallHandler(null)
         assistantChannel = null
-        lyricsChannel?.setMethodCallHandler(null)
         lyricsChannel = null
         activityChannelsBound = false
         super.cleanUpFlutterEngine(flutterEngine)
+    }
+
+    @Suppress("DEPRECATION")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        val handled = flutterEngine?.let { engine ->
+            PulsrEnginePlugins.find(engine)?.tagEditor?.handleActivityResult(requestCode, resultCode, data)
+        } == true
+        if (handled) return
+        super.onActivityResult(requestCode, resultCode, data)
     }
 
     private fun tryOpenOemBatterySettings(): Boolean {

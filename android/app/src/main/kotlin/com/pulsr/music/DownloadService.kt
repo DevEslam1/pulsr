@@ -34,6 +34,7 @@ class DownloadService : Service() {
         const val ACTION_UPDATE = "com.pulsr.music.download.UPDATE"
         const val ACTION_CANCEL = "com.pulsr.music.download.CANCEL"
         const val ACTION_STOP = "com.pulsr.music.download.STOP"
+        const val ACTION_RELEASE = "com.pulsr.music.download.RELEASE"
 
         /** Notification-initiated pause/resume: invoke the Dart listeners (C-7). */
         const val ACTION_PAUSE = "com.pulsr.music.download.PAUSE"
@@ -324,6 +325,30 @@ class DownloadService : Service() {
                 appContext.startService(intent)
             } catch (_: Exception) {}
         }
+
+        /**
+         * C-05: Release a failed/cancelled job's slot without marking it completed (no 100%).
+         */
+        fun releaseJob(context: Context, videoId: String) {
+            if (videoId.isBlank()) return
+            val live = activeInstance
+            if (live != null) {
+                companionHandler.post {
+                    if (activeInstance === live) {
+                        live.handleReleaseJob(videoId)
+                    }
+                }
+                return
+            }
+            val appContext = context.applicationContext ?: context
+            val intent = Intent(appContext, DownloadService::class.java).apply {
+                action = ACTION_RELEASE
+                putExtra(EXTRA_VIDEO_ID, videoId)
+            }
+            try {
+                appContext.startService(intent)
+            } catch (_: Exception) {}
+        }
     }
 
     // Concurrent collections: onStartCommand is normally serialized on the main
@@ -444,6 +469,21 @@ class DownloadService : Service() {
         stopForegroundAndSelf()
     }
 
+    private fun handleReleaseJob(vid: String) {
+        if (vid.isBlank()) return
+        recordTombstone(vid)
+        activeDownloads.remove(vid)
+        downloadTitles.remove(vid)
+        speedStates.remove(vid)
+        pausedDownloads.remove(vid)
+        timeoutPausedIds.remove(vid)
+        if (activeDownloads.isEmpty()) {
+            scheduleIdleStop()
+        } else {
+            renderCurrentNotification(null)
+        }
+    }
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_START -> {
@@ -554,6 +594,9 @@ class DownloadService : Service() {
                 val vid = intent.getStringExtra(EXTRA_VIDEO_ID)
                 val paused = intent.getBooleanExtra(EXTRA_PAUSED, false)
                 handleSetPaused(vid, paused)
+            }
+            ACTION_RELEASE -> {
+                intent.getStringExtra(EXTRA_VIDEO_ID)?.let { handleReleaseJob(it) }
             }
             ACTION_STOP -> {
                 handleStop(intent.getStringExtra(EXTRA_VIDEO_ID))

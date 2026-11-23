@@ -165,7 +165,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     @Volatile private var remasterPcmToDsdOrder = 5
 
     @Volatile private var isLimiterEnabled = false
-    @Volatile private var limiterLookaheadMs = 3.0
+    @Volatile private var limiterLookaheadMs = DspParamRanges.limiterLookaheadMs.defaultValue
     @Volatile private var limiterThresholdDb = -0.2
     @Volatile private var limiterReleaseMs = 50.0
     @Volatile private var limiterTruePeakMode = true
@@ -1090,7 +1090,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         if (!isNativeDspLoaded) return 1
         val live = try {
             nativeGetActiveOversampleMultiplier()
-        } catch (_: Exception) {
+        } catch (_: Throwable) {
             1
         }
         return maxOf(live, remasterOversampleMultiplier)
@@ -1102,7 +1102,10 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             return false
         }
         if (Integer.bitCount(activeDspStages) > 0) return true
-        return activeRemasterFactor() > 1 || remasterPcmToDsdEnabled || isHrtfBinauralEnabled
+        // H-03: PcmToDsd is offline-engine-only (not on the playback route), so
+        // it must not falsely mark playback DSP active or block bit-perfect bypass.
+        // H-05: DVC and ReplayGain actively scale PCM samples inside the engine.
+        return activeRemasterFactor() > 1 || isHrtfBinauralEnabled || dvcActive || isReplayGainEnabled
     }
 
     /**
@@ -2154,6 +2157,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             if (isNativeDspLoaded) {
                 try { nativeSetDirectVolumeParams(true, dvcGain) } catch (_: Throwable) {}
             }
+            syncDspActiveRouting()
             return true
         } else {
             if (!dvcEnabled || !dvcActive) return false
@@ -2169,6 +2173,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             if (isNativeDspLoaded) {
                 try { nativeSetDirectVolumeParams(false, 1.0) } catch (_: Throwable) {}
             }
+            syncDspActiveRouting()
             return true
         }
     }
@@ -2392,7 +2397,9 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         // Java sink layer: the AAudio sink would keep refusing volume.
         publishBitPerfectRequestToSinkLayer()
         dvcActive = false
+        isReplayGainEnabled = false
         isBypassCompareActive = false
+        syncDspActiveRouting()
         bitPerfectSpatializerOwned = false
         lastSystemEffectsStatus = "unknown"
         try { methodChannel.setMethodCallHandler(null) } catch (_: Exception) {}
@@ -3823,7 +3830,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
 
                 "setLimiterParams" -> {
                     val lookaheadMs = DspParamRanges.limiterLookaheadMs.clamp(
-                        (call.argument<Number>("lookaheadMs"))?.toDouble() ?: 3.0
+                        (call.argument<Number>("lookaheadMs"))?.toDouble()
+                            ?: DspParamRanges.limiterLookaheadMs.defaultValue
                     )
                     val thresholdDb = DspParamRanges.limiterThresholdDb.clamp(
                         (call.argument<Number>("thresholdDb"))?.toDouble() ?: -0.2
@@ -5502,6 +5510,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     isReplayGainEnabled = enabled
                     replayGainSnapshot = replayGainSnapshot?.copy(enabled = enabled)
                     cachedDebugReport = null
+                    syncDspActiveRouting()
                     if (!isNativeDspLoaded) {
                         result.success(notApplied("ReplayGain requires the native DSP engine (not loaded)"))
                         return
@@ -5530,6 +5539,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                         preAmpDb, preventClipping, enabled,
                     )
                     cachedDebugReport = null
+                    syncDspActiveRouting()
                     if (!isNativeDspLoaded) {
                         result.success(notApplied("ReplayGain requires the native DSP engine (not loaded)"))
                         return
@@ -5550,11 +5560,13 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 "setDvcEnabled" -> {
                     val enabled = call.argument<Boolean>("enabled") ?: false
                     if (enabled && !isNativeDspLoaded) {
+                        syncDspActiveRouting()
                         result.success(notApplied("Direct Volume Control requires the native DSP engine (not loaded)"))
                         return
                     }
                     if (enabled && isBitPerfectBypassActive) {
                         dvcActive = false
+                        syncDspActiveRouting()
                         result.success(notApplied("Direct Volume Control is unavailable during Bit-Perfect playback"))
                         return
                     }
@@ -5569,6 +5581,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                                 dvcEnabled = false
                                 dvcActive = false
                                 cachedDebugReport = null
+                                syncDspActiveRouting()
                                 result.success(notApplied("Direct Volume Control could not set system volume"))
                                 return
                             }
@@ -5586,9 +5599,11 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                             }
                         }
                         cachedDebugReport = null
+                        syncDspActiveRouting()
                         result.success(true)
                     } catch (e: Exception) {
                         Log.w(TAG, "setDvcEnabled failed: ${e.message}")
+                        syncDspActiveRouting()
                         result.success(notApplied("Direct Volume Control failed: ${e.message}"))
                     }
                 }
@@ -5608,6 +5623,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     try {
                         nativeSetDirectVolumeParams(true, gain)
                         cachedDebugReport = null
+                        syncDspActiveRouting()
                         result.success(true)
                     } catch (e: Exception) {
                         Log.w(TAG, "nativeSetDirectVolumeParams failed: ${e.message}")
@@ -7276,8 +7292,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     isDitherEnabled ||
                     isReplayGainEnabled ||
                     dvcActive ||
-                    activeRemasterFactor() > 1 ||
-                    remasterPcmToDsdEnabled
+                    activeRemasterFactor() > 1
             )
 
             return halActive || nativeActive

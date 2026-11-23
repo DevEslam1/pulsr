@@ -320,6 +320,41 @@ class UsbExclusivePlugin(
     @Volatile private var lastRequestedRate: Int = 48_000
     @Volatile private var lastRequestedDepth: Int = 16
     @Volatile private var lastRequestedChannels: Int = 2
+    @Volatile private var lastRequestedStrict: Boolean = false
+    @Volatile private var lastDsdTuple: DsdAltSettingTuple? = null
+    @Volatile private var lastDsdStrict: Boolean = true
+    @Volatile private var suspendedStreamParams: SuspendedStreamParams? = null
+
+    private data class SuspendedStreamParams(
+        val isDsd: Boolean,
+        val sampleRate: Int = 0,
+        val channels: Int = 0,
+        val bitDepth: Int = 0,
+        val strict: Boolean = false,
+        val renderMode: Int = 0,
+        val dsdTuple: DsdAltSettingTuple? = null,
+    )
+
+    private fun captureSuspendedStreamParams(): SuspendedStreamParams? {
+        if (!streaming && !isNativeActive()) return null
+        return if (activeRenderMode == RENDER_MODE_DSD && lastDsdTuple != null) {
+            SuspendedStreamParams(
+                isDsd = true,
+                strict = lastDsdStrict,
+                renderMode = RENDER_MODE_DSD,
+                dsdTuple = lastDsdTuple,
+            )
+        } else {
+            SuspendedStreamParams(
+                isDsd = false,
+                sampleRate = streamFormat?.sampleRate ?: lastRequestedRate,
+                channels = streamFormat?.channels ?: lastRequestedChannels,
+                bitDepth = streamFormat?.bitDepth ?: lastRequestedDepth,
+                strict = lastRequestedStrict,
+                renderMode = activeRenderMode,
+            )
+        }
+    }
 
     // Blocking USB control transfers, raw-descriptor parsing and native sink
     // start/stop/query must never run on the main thread (ANR). All such work
@@ -893,6 +928,7 @@ class UsbExclusivePlugin(
                     // connection (blocking); run it off the main thread.
                     workerHandler.post {
                         if (detached == null || detached.deviceId == openedDevice?.deviceId) {
+                            suspendedStreamParams = null
                             sessionStep("detached") { machine, now -> machine.onDetached(now) }
                             recordEvent(lastError = "device_detached")
                             closeLocked()
@@ -985,7 +1021,10 @@ class UsbExclusivePlugin(
                         startStreamingInternal(sampleRate, channels, bitDepth, strict, renderMode)
                     }
                 }
-                "stopStreaming" -> runAsync(call.method, result) { stopStreamingInternal() }
+                "stopStreaming" -> runAsync(call.method, result) {
+                    suspendedStreamParams = null
+                    stopStreamingInternal()
+                }
                 // Native DSD (DSD_U32). The alt setting comes from the
                 // descriptor probe (`getDopCapabilities` -> nativeDsdAltSetting),
                 // never from a rate/depth guess: the sink admits exactly one
@@ -1006,7 +1045,7 @@ class UsbExclusivePlugin(
                 "writeDsd" -> {
                     val left = call.argument<ByteArray>("left")
                     val right = call.argument<ByteArray>("right")
-                    val producerId = call.argument<Long>("producerId") ?: DSD_PRODUCER_ID
+                    val producerId = (call.argument<Number>("producerId"))?.toLong() ?: DSD_PRODUCER_ID
                     runAsync(call.method, result) {
                         writeDsd(
                             left ?: ByteArray(0),
@@ -1774,16 +1813,52 @@ class UsbExclusivePlugin(
     // ---- exclusive claim ----
 
     private fun setExclusiveInternal(enabled: Boolean): Map<String, Any?> {
-        val device = findAudioDevice() ?: return failure("no_usb_device")
+        val device = findAudioDevice() ?: run {
+            if (enabled) suspendedStreamParams = null
+            return failure("no_usb_device")
+        }
         if (usbManager?.hasPermission(device) != true) return failure("permission_required")
         if (!enabled) {
-            if (streaming) {
-                return failure("streaming_active")
+            val savedParams = captureSuspendedStreamParams()
+            val hadStreamingClaims = streaming || isNativeActive() ||
+                claimedStreamingInterface != null || claimedControlInterface != null
+            if (hadStreamingClaims) {
+                val stopResult = stopStreamingInternal()
+                if (stopResult["success"] != true) {
+                    return stopResult
+                }
+            }
+            if (savedParams != null) {
+                suspendedStreamParams = savedParams
             }
             releaseClaim()
-            return buildStatus()
+            return buildStatus() + mapOf("success" to true)
         }
-        if (claimedInterface != null) return buildStatus()
+        val toRestore = suspendedStreamParams
+        if (toRestore != null) {
+            suspendedStreamParams = null
+            if (!streaming && !isNativeActive()) {
+                val restartResult = if (toRestore.isDsd && toRestore.dsdTuple != null) {
+                    startDsdStreamingInternal(toRestore.dsdTuple, toRestore.strict)
+                } else {
+                    startStreamingInternal(
+                        sampleRate = toRestore.sampleRate,
+                        channels = toRestore.channels,
+                        bitDepth = toRestore.bitDepth,
+                        strict = toRestore.strict,
+                        renderMode = toRestore.renderMode,
+                    )
+                }
+                if (restartResult["success"] != true &&
+                    restartResult["error"] !in setOf("no_usb_device", "dsd_format_unsupported")
+                ) {
+                    // Keep suspended snapshot so a transient interface_busy/permission race can retry.
+                    suspendedStreamParams = toRestore
+                }
+                return restartResult
+            }
+        }
+        if (claimedInterface != null) return buildStatus() + mapOf("success" to true)
 
         val conn = ensureConnection(device) ?: return failure("open_failed")
         val ifaceNumber = streamInterfaceNumber ?: return failure("no_streaming_interface")
@@ -1804,7 +1879,7 @@ class UsbExclusivePlugin(
         }
         claimedInterface = iface
         emitState()
-        return buildStatus()
+        return buildStatus() + mapOf("success" to true)
     }
 
     private fun releaseClaim() {
@@ -2457,6 +2532,8 @@ class UsbExclusivePlugin(
                 sampleRate, DSD_VALID_BIT_DEPTH, DSD_CHANNELS,
                 wireBitDepth = DSD_VALID_BIT_DEPTH, wireChannels = DSD_CHANNELS,
             )
+            lastDsdTuple = tuple
+            lastDsdStrict = strict
             streaming = true
             activeRenderMode = RENDER_MODE_DSD
             activeQuirks = null
@@ -2513,9 +2590,11 @@ class UsbExclusivePlugin(
             lastStreamResultCode = 3
             return startFailure("dsd_requires_alt_setting")
         }
+        suspendedStreamParams = null
         lastRequestedRate = sampleRate
         lastRequestedDepth = bitDepth
         lastRequestedChannels = channels
+        lastRequestedStrict = strict
         val owner = directOwner
         if (owner != null && owner !== this) {
             lastStreamResultCode = -1
@@ -2792,6 +2871,8 @@ class UsbExclusivePlugin(
                 effectiveRate, effectiveDepth, effectiveChannels,
                 wireBitDepth = selected.bitResolution, wireChannels = wireChannels,
             )
+            lastDsdTuple = null
+            lastDsdStrict = false
             streaming = true
             activeRenderMode = mode
             activeQuirks = resolved

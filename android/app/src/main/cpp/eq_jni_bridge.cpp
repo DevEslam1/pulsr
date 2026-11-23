@@ -573,23 +573,6 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeSetSincResamplerEnabled(
     });
 }
 
-JNIEXPORT void JNICALL
-Java_com_pulsr_music_AudioEffectsPlugin_nativeSetSincResamplerRates(
-        JNIEnv* /* env */, jobject /* thiz */, jdouble inRate, jdouble outRate) {
-    AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
-        snap.resampler.inRate = inRate;
-        snap.resampler.outRate = outRate;
-    });
-}
-
-JNIEXPORT void JNICALL
-Java_com_pulsr_music_AudioEffectsPlugin_nativeSetSincResamplerQuality(
-        JNIEnv* /* env */, jobject /* thiz */, jint quality) {
-    AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
-        snap.resampler.quality = quality;
-    });
-}
-
 // Tap-side SRC quality (0..3 -> 64/128/256/512 taps). The engine rebuilds
 // its kernel on this thread and the next configure/flush picks it up, so the
 // audio callback never reallocates. Storing is all this can promise: a stream
@@ -1340,15 +1323,6 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeWasSafetySuppressed(
     return DspEngineRegistry::instance().wasSafetySuppressed() ? JNI_TRUE : JNI_FALSE;
 }
 
-JNIEXPORT void JNICALL
-Java_com_pulsr_music_AudioEffectsPlugin_nativeSetDirectUsbActive(
-        JNIEnv* /* env */, jobject /* thiz */, jboolean active) {
-    const bool on = (active == JNI_TRUE);
-    AudioDspEngine::instance().updateParams([on](DspParamSnapshot& snap) {
-        snap.bitPerfect.directUsbActive = on;
-    });
-}
-
 // ---- ExoPlayer Media3 NativeDspAudioProcessor In-Stream Direct Buffer Bridge ----
 
 JNIEXPORT jlong JNICALL
@@ -1808,6 +1782,7 @@ Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeProcessDirectFloatB
     }
     try {
         struct PendingUsbRetry {
+            static constexpr size_t kMaxRetrySamples = 262144;
             uint64_t retryEpoch = 0;
             int64_t handle = 0;
             int frames = 0;
@@ -1815,11 +1790,17 @@ Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeProcessDirectFloatB
             int sampleRate = 0;
             int sourceBitDepth = 0;
             int sourceSampleRate = 0;
+            size_t stagedFloatCount = 0;
+            size_t stagedPcmBytes = 0;
             bool raw = false;
             bool dop = false;
             bool active = false;
             std::vector<float> stagedFloats;
             std::vector<uint8_t> stagedPcm;
+
+            PendingUsbRetry()
+                : stagedFloats(kMaxRetrySamples, 0.0f),
+                  stagedPcm(kMaxRetrySamples * 4, 0) {}
         };
         thread_local PendingUsbRetry sPendingRetry;
 
@@ -1831,7 +1812,8 @@ Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeProcessDirectFloatB
             if (sPendingRetry.retryEpoch == currentRetryEpoch &&
                 sPendingRetry.handle == static_cast<int64_t>(engineHandle) &&
                 sPendingRetry.frames == frameCount &&
-                sPendingRetry.channels == channels) {
+                sPendingRetry.channels == channels &&
+                sPendingRetry.stagedFloatCount == static_cast<size_t>(frameCount) * static_cast<size_t>(channels)) {
                 reusedPendingDsp = true;
             } else {
                 sPendingRetry.active = false;
@@ -1855,7 +1837,7 @@ Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeProcessDirectFloatB
                 ? sPendingRetry.sampleRate
                 : static_cast<int>(engine->getSampleRate());
             const uint8_t* pcmToWrite = reusedPendingDsp
-                ? (sPendingRetry.stagedPcm.empty() ? nullptr : sPendingRetry.stagedPcm.data())
+                ? (sPendingRetry.stagedPcmBytes == 0 ? nullptr : sPendingRetry.stagedPcm.data())
                 : sourceBytes;
             const int pcmBitDepth = reusedPendingDsp ? sPendingRetry.sourceBitDepth : sourceBitDepth;
             const int pcmSampleRate = reusedPendingDsp ? sPendingRetry.sourceSampleRate : sourceSampleRate;
@@ -1887,32 +1869,36 @@ Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeProcessDirectFloatB
             if (!written) {
                 if (usb.GetLastError() == ENOSPC) {
                     // Never zero floatBuffer before retry (BUG-P1-1)! Stage the
-                    // already-processed block so Java's retry (which refills
-                    // floatBuffer from inputBuffer) replays the exact processed
-                    // audio without double-advancing DSP state.
+                    // already-processed block into preallocated scratch so Java's
+                    // retry replays exact processed audio without RT allocations.
                     if (!reusedPendingDsp) {
                         const size_t sampleCount =
                             static_cast<size_t>(frameCount) * static_cast<size_t>(channels);
-                        sPendingRetry.stagedFloats.assign(
-                            floatBuffer, floatBuffer + sampleCount);
-                        if (raw && sourceBytes && sourceBitDepth > 0) {
-                            const size_t pcmBytes =
-                                sampleCount * static_cast<size_t>(sourceBitDepth / 8);
-                            sPendingRetry.stagedPcm.assign(
-                                sourceBytes, sourceBytes + pcmBytes);
+                        const size_t pcmBytes = (raw && sourceBytes && sourceBitDepth > 0)
+                            ? sampleCount * static_cast<size_t>(sourceBitDepth / 8)
+                            : 0;
+                        if (sampleCount <= sPendingRetry.stagedFloats.size() &&
+                            pcmBytes <= sPendingRetry.stagedPcm.size()) {
+                            std::memcpy(sPendingRetry.stagedFloats.data(), floatBuffer,
+                                        sampleCount * sizeof(float));
+                            sPendingRetry.stagedFloatCount = sampleCount;
+                            if (pcmBytes > 0) {
+                                std::memcpy(sPendingRetry.stagedPcm.data(), sourceBytes, pcmBytes);
+                            }
+                            sPendingRetry.stagedPcmBytes = pcmBytes;
+                            sPendingRetry.retryEpoch = currentRetryEpoch;
+                            sPendingRetry.handle = static_cast<int64_t>(engineHandle);
+                            sPendingRetry.frames = frameCount;
+                            sPendingRetry.channels = channels;
+                            sPendingRetry.sampleRate = targetRate;
+                            sPendingRetry.sourceBitDepth = sourceBitDepth;
+                            sPendingRetry.sourceSampleRate = sourceSampleRate;
+                            sPendingRetry.raw = raw;
+                            sPendingRetry.dop = dop;
+                            sPendingRetry.active = true;
                         } else {
-                            sPendingRetry.stagedPcm.clear();
+                            sPendingRetry.active = false;
                         }
-                        sPendingRetry.retryEpoch = currentRetryEpoch;
-                        sPendingRetry.handle = static_cast<int64_t>(engineHandle);
-                        sPendingRetry.frames = frameCount;
-                        sPendingRetry.channels = channels;
-                        sPendingRetry.sampleRate = targetRate;
-                        sPendingRetry.sourceBitDepth = sourceBitDepth;
-                        sPendingRetry.sourceSampleRate = sourceSampleRate;
-                        sPendingRetry.raw = raw;
-                        sPendingRetry.dop = dop;
-                        sPendingRetry.active = true;
                     }
                     return kDirectUsbRetry;
                 }
@@ -2038,54 +2024,6 @@ Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeIsBitPerfect(
     }
 }
 
-// OBSERVED: whether the block this engine produced last was really rendered
-// through the bit-perfect bypass (and not revoked mid-block by a USB gain or a
-// transport fade). Lock-free atomic read on the render engine.
-JNIEXPORT jboolean JNICALL
-Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeWasLastBlockBitPerfect(
-        JNIEnv* /* env */, jclass /* clazz */, jlong engineHandle) {
-    if (engineHandle == 0) return JNI_FALSE;
-    EngineLease lease(static_cast<int64_t>(engineHandle));
-    auto* engine = lease.get();
-    if (!engine) return JNI_FALSE;
-    try {
-        return engine->wasLastBlockBitPerfect() ? JNI_TRUE : JNI_FALSE;
-    } catch (...) {
-        return JNI_FALSE;
-    }
-}
-
-// OBSERVED: true when the last block ran the bit-perfect bypass while headphone
-// safety was enabled, i.e. the safety limiter was suppressed by that path. Dose
-// is still metered read-only, so this is not "safety off".
-JNIEXPORT jboolean JNICALL
-Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeWasSafetySuppressed(
-        JNIEnv* /* env */, jclass /* clazz */, jlong engineHandle) {
-    if (engineHandle == 0) return JNI_FALSE;
-    EngineLease lease(static_cast<int64_t>(engineHandle));
-    auto* engine = lease.get();
-    if (!engine) return JNI_FALSE;
-    try {
-        return engine->wasSafetySuppressed() ? JNI_TRUE : JNI_FALSE;
-    } catch (...) {
-        return JNI_FALSE;
-    }
-}
-
-// Direct USB PCM is (or is not) the live endpoint. Gates bitPerfect.directUsbGain
-// inside the engine: when no Direct USB output is active the software
-// attenuation is ignored and that stage runs at unity. Runs on the singleton
-// control engine like nativeSetDirectUsbVolume — updateParams broadcasts the
-// snapshot to every registered render engine.
-JNIEXPORT void JNICALL
-Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeSetDirectUsbActive(
-        JNIEnv* /* env */, jclass /* clazz */, jboolean active) {
-    const bool on = (active == JNI_TRUE);
-    AudioDspEngine::instance().updateParams([on](DspParamSnapshot& snap) {
-        snap.bitPerfect.directUsbActive = on;
-    });
-}
-
 // OBSERVED bit-perfect state for the effects plugin (no engine handle: the
 // plugin talks to the registry, which reads the engine that actually renders).
 // Fail-closed: a missing/teardown engine answers false, never true.
@@ -2104,8 +2042,9 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeWasLastBlockBitPerfect(
 
 JNIEXPORT jboolean JNICALL
 Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeIsUsbExclusive(
-        JNIEnv* /* env */, jclass /* clazz */) {
-    return pulsr::UsbAudioSink::instance().IsExclusive() ? JNI_TRUE : JNI_FALSE;
+        JNIEnv* /* env */, jclass /* clazz */, jlong /* engineHandle */) {
+    auto& usb = pulsr::UsbAudioSink::instance();
+    return (usb.IsExclusive() && usb.IsActive()) ? JNI_TRUE : JNI_FALSE;
 }
 
 JNIEXPORT jboolean JNICALL

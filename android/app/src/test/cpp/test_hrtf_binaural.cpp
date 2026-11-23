@@ -676,6 +676,102 @@ void test_hrtf_settled_bypass_and_old_slot_release() {
     }
 }
 
+void test_wav_rf64_quad_and_atomic_sr_reset() {
+    std::cout << "--- test_wav_rf64_quad_and_atomic_sr_reset ---" << std::endl;
+
+    auto pushU32Le = [](std::vector<uint8_t>& b, uint32_t v) {
+        b.push_back(static_cast<uint8_t>(v & 0xFF));
+        b.push_back(static_cast<uint8_t>((v >> 8) & 0xFF));
+        b.push_back(static_cast<uint8_t>((v >> 16) & 0xFF));
+        b.push_back(static_cast<uint8_t>((v >> 24) & 0xFF));
+    };
+    auto pushU16Le = [](std::vector<uint8_t>& b, uint16_t v) {
+        b.push_back(static_cast<uint8_t>(v & 0xFF));
+        b.push_back(static_cast<uint8_t>((v >> 8) & 0xFF));
+    };
+
+    // 1. Crafted RIFF chunk with chunkSize == 0xFFFFFFFF must not wrap uint32 or hang.
+    {
+        std::vector<uint8_t> malicious;
+        malicious.insert(malicious.end(), {'R', 'I', 'F', 'F'});
+        pushU32Le(malicious, 36);
+        malicious.insert(malicious.end(), {'W', 'A', 'V', 'E'});
+        malicious.insert(malicious.end(), {'j', 'u', 'n', 'k'});
+        pushU32Le(malicious, 0xFFFFFFFFu); // uint64_t step skips safely past EOF
+        std::vector<float> l, r;
+        int ch = 0;
+        double sr = 0.0;
+        bool parsed = pulsr::HrtfBinaural::parseWavHrir(
+            malicious.data(), malicious.size(), l, r, ch, sr);
+        check(!parsed, "0xFFFFFFFF WAV chunk exits cleanly instead of hanging");
+    }
+
+    // 2. True 4-channel WAV HRIR (hLL, hLR, hRL, hRR) preserves distinct cross-ear taps.
+    {
+        const uint32_t frames = 64;
+        const uint32_t channels = 4;
+        const uint32_t dataBytes = frames * channels * sizeof(float);
+        std::vector<uint8_t> wav;
+        wav.insert(wav.end(), {'R', 'I', 'F', 'F'});
+        pushU32Le(wav, 36 + dataBytes);
+        wav.insert(wav.end(), {'W', 'A', 'V', 'E'});
+        wav.insert(wav.end(), {'f', 'm', 't', ' '});
+        pushU32Le(wav, 16);
+        pushU16Le(wav, 3); // IEEE float
+        pushU16Le(wav, channels);
+        pushU32Le(wav, 48000);
+        pushU32Le(wav, 48000 * channels * 4);
+        pushU16Le(wav, channels * 4);
+        pushU16Le(wav, 32);
+        wav.insert(wav.end(), {'d', 'a', 't', 'a'});
+        pushU32Le(wav, dataBytes);
+        std::vector<float> pcm(frames * channels, 0.0f);
+        pcm[2 * 4 + 0] = 0.9f;  // hLL @ frame 2
+        pcm[5 * 4 + 1] = 0.35f; // hLR @ frame 5
+        pcm[7 * 4 + 2] = 0.25f; // hRL @ frame 7
+        pcm[9 * 4 + 3] = 0.85f; // hRR @ frame 9
+        const auto* raw = reinterpret_cast<const uint8_t*>(pcm.data());
+        wav.insert(wav.end(), raw, raw + dataBytes);
+
+        std::vector<float> ll, lr, rl, rr;
+        int outCh = 0;
+        double outSr = 0.0;
+        bool ok = pulsr::HrtfBinaural::parseWavHrirQuad(
+            wav.data(), wav.size(), ll, lr, rl, rr, outCh, outSr);
+        check(ok && outCh == 4 && ll.size() == frames, "parseWavHrirQuad decodes 4ch IEEE float HRIR");
+        check(std::abs(ll[2] - 0.9f) < 1e-5f && std::abs(lr[5] - 0.35f) < 1e-5f &&
+              std::abs(rl[7] - 0.25f) < 1e-5f && std::abs(rr[9] - 0.85f) < 1e-5f,
+              "4ch WAV preserves independent LL/LR/RL/RR taps");
+    }
+
+    // 3. Concurrent setSampleRate + processInterleaved uses atomic render-thread reset.
+    {
+        pulsr::HrtfBinaural hrtf;
+        hrtf.setSampleRate(48000.0);
+        hrtf.setEnabled(true);
+        hrtf.reset();
+
+        std::atomic<bool> stop{false};
+        std::atomic<bool> nanSeen{false};
+        std::thread audio([&]() {
+            std::vector<float> buf(256 * 2, 0.1f);
+            for (int iter = 0; iter < 400 && !stop.load(std::memory_order_relaxed); ++iter) {
+                std::fill(buf.begin(), buf.end(), 0.1f * std::sin(static_cast<float>(iter)));
+                hrtf.processInterleaved(buf.data(), 256, 2);
+                for (float v : buf) {
+                    if (!std::isfinite(v)) nanSeen.store(true, std::memory_order_relaxed);
+                }
+            }
+        });
+        for (int s = 0; s < 40; ++s) {
+            hrtf.setSampleRate((s % 2 == 0) ? 96000.0 : 44100.0);
+        }
+        stop.store(true, std::memory_order_relaxed);
+        audio.join();
+        check(!nanSeen.load(), "Concurrent setSampleRate + processInterleaved stays finite and lock-free");
+    }
+}
+
 } // namespace
 
 int main() {
@@ -691,6 +787,7 @@ int main() {
     test_hrtf_concurrent_load();
     test_hrtf_zero_lag_and_safety_guards();
     test_hrtf_settled_bypass_and_old_slot_release();
+    test_wav_rf64_quad_and_atomic_sr_reset();
 
     if (gFailures == 0) {
         std::cout << "[ALL TESTS PASSED] test_hrtf_binaural succeeded completely!" << std::endl;

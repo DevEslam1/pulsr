@@ -776,7 +776,7 @@ inline void ArbitraryResponseEq::processFrame(
 
 void ArbitraryResponseEq::process(float* L, float* R, int frames) {
     const float targetEnabledMix = (enabled_ && hasResponse_) ? 1.0f : 0.0f;
-    if (!enabled_ && smoothedEnabledMix_ < 1e-4f) return;
+    if (targetEnabledMix <= 0.0f && smoothedEnabledMix_ < 1e-4f) return;
     if (!L || !R || frames <= 0) return;
     if (smoothedEnabledMix_ < 1e-4f && targetEnabledMix > 0.0f) {
         // Cold enable: clear stale convolution/phase-delay history so the first
@@ -812,7 +812,7 @@ void ArbitraryResponseEq::process(float* L, float* R, int frames) {
 
 void ArbitraryResponseEq::processInterleaved(float* buffer, int frames, int channels) {
     const float targetEnabledMix = (enabled_ && hasResponse_) ? 1.0f : 0.0f;
-    if (!enabled_ && smoothedEnabledMix_ < 1e-4f) return;
+    if (targetEnabledMix <= 0.0f && smoothedEnabledMix_ < 1e-4f) return;
     if (!buffer || frames <= 0 || channels < 1) return;
     if (smoothedEnabledMix_ < 1e-4f && targetEnabledMix > 0.0f) {
         std::memset(historyL_, 0, sizeof(historyL_));

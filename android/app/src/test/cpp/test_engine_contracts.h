@@ -22,25 +22,32 @@ void runEngineCommandContractsTest() {
 
     params->directVolume.enabled = true;
     params->directVolume.gainLinear = 0.5;
+    params->replayGain.enabled = true;
+    params->replayGain.mode = ReplayGainMode::Track;
+    params->replayGain.preAmpDb = -6.02059991; // ~0.5 linear pre-amp (smoothed, no tag change snap)
     engine->publishParams(params);
     for (int k = 0; k < 100; ++k) {
         std::fill(pcm.begin(), pcm.end(), 0.25f);
         engine->processInterleaved(pcm.data(), 512, 2);
     }
-    assert(std::abs(pcm[0] - 0.125f) < 0.001f);
+    assert(std::abs(pcm[0] - 0.0625f) < 0.001f);
     engine->reset();
     engine->updateParams([](DspParamSnapshot& p) { p.panner.balance = 0.0; });
     engine->resyncForTrack(96000, 2);
     engine->publishParams(params);
     std::fill(pcm.begin(), pcm.end(), 0.25f);
     engine->processInterleaved(pcm.data(), 512, 2);
-    assert(std::abs(pcm[0] - 0.25f) < 0.001f); // reset survived all publications
+    // reset() must keep DVC attenuation (0.5 -> 0.125f, no unity seek blast) while resetting ReplayGain smoother to 1.0!
+    assert(std::abs(pcm[0] - 0.125f) < 0.001f); // reset survived all publications
     const float resetBlockEnd = pcm.back();
+    assert(resetBlockEnd < 0.124f);
     engine->updateParams([](DspParamSnapshot& p) { p.panner.balance = 0.0; });
     std::fill(pcm.begin(), pcm.end(), 0.25f);
     engine->processInterleaved(pcm.data(), 512, 2);
     assert(std::abs(pcm[0] - resetBlockEnd) < 0.001f); // no repeated reset
 
+    params->replayGain.enabled = false;
+    params->replayGain.preAmpDb = 0.0;
     params->directVolume.gainLinear = 4.0;
     params->limiter.thresholdDb = -1.0;
     engine->publishParams(params); // limiter toggle AND stage mask remain OFF

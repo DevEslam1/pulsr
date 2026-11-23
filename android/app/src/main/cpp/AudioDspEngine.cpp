@@ -1125,8 +1125,7 @@ void AudioDspEngine::initVolumeSmoothersFromSnapshot(const DspParamSnapshot& sna
     lastBypassCompareRequested_ = snap.bypassCompare.enabled;
 }
 
-void AudioDspEngine::resetInternal() {
-    auto current = currentParams_.load();
+void AudioDspEngine::resetInternal(const DspParamSnapshot& current) {
     eq_.reset();
     crossfeed_.reset();
     limiter_.reset();
@@ -1157,11 +1156,11 @@ void AudioDspEngine::resetInternal() {
     dacVoicing_.reset();
     smoothedReplayGain_ = 1.0;
     targetReplayGain_ = 1.0;
-    smoothedDirectVolume_ = (current && current->directVolume.enabled)
-        ? std::clamp(current->directVolume.gainLinear, 0.0, 8.0)
+    smoothedDirectVolume_ = current.directVolume.enabled
+        ? std::clamp(current.directVolume.gainLinear, 0.0, 8.0)
         : 1.0;
-    smoothedDirectUsbVolume_ = (current && current->bitPerfect.directUsbActive)
-        ? std::clamp(current->bitPerfect.directUsbGain, 0.0, 1.0)
+    smoothedDirectUsbVolume_ = current.bitPerfect.directUsbActive
+        ? std::clamp(current.bitPerfect.directUsbGain, 0.0, 1.0)
         : 1.0;
     smoothedSafetyGain_ = 1.0;
     gainBoostLatched_ = false;
@@ -1941,7 +1940,7 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
     hrtf_.setEnabled(hrtfEarlyEnabled);
     const uint64_t resetGeneration = resetRequestGeneration_.load(std::memory_order_acquire);
     if (resetGeneration != lastResetGeneration_) {
-        resetInternal();
+        resetInternal(*snapshot);
         lastResetGeneration_ = resetGeneration;
     }
     // Bit-perfect edge: entering or leaving the bypass changes which stages ran
@@ -1959,7 +1958,7 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
         const double rgAlbumDb = lastRgAlbumDb_;
         const bool rgHasTrack = lastRgHasTrack_;
         const bool rgHasAlbum = lastRgHasAlbum_;
-        resetInternal();
+        resetInternal(*snapshot);
         targetReplayGain_ = replayGainTarget;
         lastRgTrackDb_ = rgTrackDb;
         lastRgAlbumDb_ = rgAlbumDb;
@@ -2252,7 +2251,6 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
                                      !snapshot->eq.enabled &&
                                      (std::abs(snapshot->eq.preampDb) < 0.001) &&
                                      !snapshot->oversample.enabled &&
-                                     !snapshot->pcmToDsd.enabled &&
                                      !snapshot->hrtf.enabled &&
                                      !snapshot->directVolume.enabled &&
                                      !snapshot->replayGain.enabled &&
@@ -2434,7 +2432,7 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
     if (snapshot->directVolume.enabled && snapshot->directVolume.gainLinear > 1.001) {
         hasNetPositiveGain = true;
     }
-    if (((stages & STAGE_EQ) && snapshot->eq.enabled) || (!(degraded & STAGE_EQ) && eq_.isRamping())) {
+    if (((stages & STAGE_EQ) && snapshot->eq.enabled) || eq_.isRamping()) {
         if (snapshot->eq.preampDb > 0.01 || eq_.isRamping()) hasNetPositiveGain = true;
         for (int b = 0; b < snapshot->eq.bandCount; ++b) {
             const auto& band = snapshot->eq.bands[b];
@@ -2449,39 +2447,59 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
     }
     if (((stages & STAGE_LOUDNESS) && snapshot->loudness.enabled &&
          snapshot->loudness.intensity > 0.01 && snapshot->loudness.volumeLinear < 0.99) ||
-        (!(degraded & STAGE_LOUDNESS) && loudnessContour_.isRamping())) {
+        loudnessContour_.isRamping()) {
         hasNetPositiveGain = true;
     }
     if (((stages & STAGE_WIDTH) && snapshot->stereoWidth.enabled &&
          (snapshot->stereoWidth.width > 1.01 || (snapshot->stereoWidth.multiband &&
           (snapshot->stereoWidth.lowWidth > 1.01 || snapshot->stereoWidth.midWidth > 1.01 || snapshot->stereoWidth.highWidth > 1.01)))) ||
-        (!(degraded & STAGE_WIDTH) && stereoWidth_.isRamping())) {
+        stereoWidth_.isRamping()) {
         hasNetPositiveGain = true;
     }
     if (((stages & STAGE_DYNAMIC_BASS) && snapshot->dynamicBass.enabled && snapshot->dynamicBass.strength > 1.01) ||
-        (!(degraded & STAGE_DYNAMIC_BASS) && dynamicBass_.isRamping())) {
+        dynamicBass_.isRamping()) {
         hasNetPositiveGain = true;
     }
 
     // Nonlinear/custom stages (and active release ramps) may boost even without a positive EQ knob.
+    // Let stages finish their soft fade-out ramps even when auto-degraded (target already OFF above).
+    const bool eqRamping = eq_.isRamping();
+    const bool arbitraryEqRamping = arbitraryEq_.isRamping();
+    const bool viperDdcRamping = viperDdc_.isRamping();
+    const bool liveProgRamping = liveProg_.isRamping();
+    const bool reverbRamping = reverb_.isRamping();
+    const bool multibandRamping = multibandCompressor_.isRamping();
+    const bool dynEqRamping = dynamicEq_.isRamping();
+    const bool saturationRamping = saturation_.isRamping();
+    const bool dacVoicingRamping = dacVoicing_.isRamping();
+    const bool hrtfRamping = hrtf_.isRamping();
+    const bool pannerRamping = panner_.isRamping();
+    const bool crossfeedRamping = crossfeed_.isRamping();
+    const bool subCrossoverRamping = subCrossover_.isRamping();
+    const bool lfeCrossoverRamping = lfeCrossover_.isRamping();
+    const bool widthRamping = stereoWidth_.isRamping();
+    const bool dynBassRamping = dynamicBass_.isRamping();
+    const bool loudnessRamping = loudnessContour_.isRamping();
+    const bool channelManagerRamping = channelManager_.isRamping();
+
     hasNetPositiveGain |=
-        (((stages & STAGE_ARBITRARY_EQ) || arbitraryEq_.isRamping()) && (snapshot->arbitraryEq.enabled || arbitraryEq_.isRamping())) ||
-        (((stages & STAGE_VIPER_DDC) || viperDdc_.isRamping()) && (snapshot->viperDdc.enabled || viperDdc_.isRamping())) ||
-        (((stages & STAGE_LIVE_PROG) || liveProg_.isRamping()) && (snapshot->liveProg.enabled || liveProg_.isRamping())) ||
-        ((stages & STAGE_REVERB) && snapshot->reverb.enabled) || reverb_.isRamping() ||
-        ((stages & STAGE_MULTIBAND_COMPRESSOR) && snapshot->multibandCompressor.enabled) || multibandCompressor_.isRamping() ||
-        ((stages & STAGE_DYNEQ) && snapshot->dynamicEq.enabled) || (!(degraded & STAGE_DYNEQ) && dynamicEq_.isRamping()) ||
-        (((stages & STAGE_SATURATION) || saturation_.isRamping()) && (snapshot->saturation.enabled || saturation_.isRamping())) ||
-        (((stages & STAGE_DAC_VOICING) || dacVoicing_.isRamping()) && (snapshot->dacVoicing.enabled || dacVoicing_.isRamping())) ||
-        hrtfRequested || hrtf_.isRamping() ||
-        ((stages & STAGE_PANNER) && std::abs(snapshot->panner.balance) > 0.001) || panner_.isRamping() ||
+        (((stages & STAGE_ARBITRARY_EQ) || arbitraryEqRamping) && (snapshot->arbitraryEq.enabled || arbitraryEqRamping)) ||
+        (((stages & STAGE_VIPER_DDC) || viperDdcRamping) && (snapshot->viperDdc.enabled || viperDdcRamping)) ||
+        (((stages & STAGE_LIVE_PROG) || liveProgRamping) && (snapshot->liveProg.enabled || liveProgRamping)) ||
+        ((stages & STAGE_REVERB) && snapshot->reverb.enabled) || reverbRamping ||
+        ((stages & STAGE_MULTIBAND_COMPRESSOR) && snapshot->multibandCompressor.enabled) || multibandRamping ||
+        ((stages & STAGE_DYNEQ) && snapshot->dynamicEq.enabled) || dynEqRamping ||
+        (((stages & STAGE_SATURATION) || saturationRamping) && (snapshot->saturation.enabled || saturationRamping)) ||
+        (((stages & STAGE_DAC_VOICING) || dacVoicingRamping) && (snapshot->dacVoicing.enabled || dacVoicingRamping)) ||
+        hrtfRequested || hrtfRamping ||
+        ((stages & STAGE_PANNER) && std::abs(snapshot->panner.balance) > 0.001) || pannerRamping ||
         // Crossfeed and SubCrossover can sum channels above unity at low
         // frequencies; guard them (and their ramp-downs) too.
-        crossfeedRequested || (!(degraded & STAGE_CROSSFEED) && crossfeed_.isRamping()) ||
-        ((stages & STAGE_CROSSOVER) && snapshot->subCrossover.enabled) || (!(degraded & STAGE_CROSSOVER) && subCrossover_.isRamping()) ||
-        (((stages & STAGE_LFE_CROSSOVER) || (!(degraded & STAGE_LFE_CROSSOVER) && lfeCrossover_.isRamping())) &&
+        crossfeedRequested || crossfeedRamping ||
+        ((stages & STAGE_CROSSOVER) && snapshot->subCrossover.enabled) || subCrossoverRamping ||
+        (((stages & STAGE_LFE_CROSSOVER) || lfeCrossoverRamping) &&
          channels >= LfeCrossover::MIN_MULTICHANNEL &&
-         (snapshot->lfeCrossover.enabled || lfeCrossover_.isRamping())) ||
+         (snapshot->lfeCrossover.enabled || lfeCrossoverRamping)) ||
         // DVC boost (> 1.0 / > 0 dB) must be guarded by lookahead limiter to prevent DAC clipping
         (snapshot->directVolume.enabled && (snapshot->directVolume.gainLinear > 1.001 || smoothedDirectVolume_ > 1.001));
     // The lookahead limiter runs only when the chain can boost above unity (or
@@ -2513,29 +2531,29 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
     // UI commonly publishes 0xFFFFFFFF with every stage flag off. Include a
     // stage only when its own enabled flag (or an active ramp) says so.
     const bool anyStageEnabled =
-        (((stages & STAGE_EQ) != 0) && snapshot->eq.enabled) || eq_.isRamping() ||
-        (((stages & STAGE_DYNEQ) != 0) && snapshot->dynamicEq.enabled) || dynamicEq_.isRamping() ||
-        crossfeedRequested || crossfeed_.isRamping() ||
+        (((stages & STAGE_EQ) != 0) && snapshot->eq.enabled) || eqRamping ||
+        (((stages & STAGE_DYNEQ) != 0) && snapshot->dynamicEq.enabled) || dynEqRamping ||
+        crossfeedRequested || crossfeedRamping ||
         // A raw STAGE_PANNER bit is not evidence of work either: a centered
         // balance with monoMix off is an exact pass-through, and treating it as
         // active would defeat the bit-exact fast path for the common
         // activeStages=0xFFFFFFFF snapshot.
-        (((stages & STAGE_PANNER) != 0) && (snapshot->panner.monoMix || std::abs(snapshot->panner.balance) > 0.001)) || panner_.isRamping() ||
-        (((stages & STAGE_WIDTH) != 0) && snapshot->stereoWidth.enabled) || stereoWidth_.isRamping() ||
-        (((stages & STAGE_CROSSOVER) != 0) && snapshot->subCrossover.enabled) || subCrossover_.isRamping() ||
+        (((stages & STAGE_PANNER) != 0) && (snapshot->panner.monoMix || std::abs(snapshot->panner.balance) > 0.001)) || pannerRamping ||
+        (((stages & STAGE_WIDTH) != 0) && snapshot->stereoWidth.enabled) || widthRamping ||
+        (((stages & STAGE_CROSSOVER) != 0) && snapshot->subCrossover.enabled) || subCrossoverRamping ||
         ((((stages & STAGE_LFE_CROSSOVER) != 0) && snapshot->lfeCrossover.enabled &&
-          channels >= LfeCrossover::MIN_MULTICHANNEL) || lfeCrossover_.isRamping()) ||
-        (((stages & STAGE_DYNAMIC_BASS) != 0) && snapshot->dynamicBass.enabled) || dynamicBass_.isRamping() ||
-        (((stages & STAGE_LOUDNESS) != 0) && snapshot->loudness.enabled) || loudnessContour_.isRamping() ||
-        (((stages & STAGE_REVERB) != 0) && snapshot->reverb.enabled) || reverb_.isRamping() ||
-        (((stages & STAGE_SATURATION) != 0) && snapshot->saturation.enabled) || saturation_.isRamping() ||
-        (((stages & STAGE_ARBITRARY_EQ) != 0) && snapshot->arbitraryEq.enabled) || arbitraryEq_.isRamping() ||
-        (((stages & STAGE_VIPER_DDC) != 0) && snapshot->viperDdc.enabled) || viperDdc_.isRamping() ||
-        (((stages & STAGE_MULTIBAND_COMPRESSOR) != 0) && snapshot->multibandCompressor.enabled) || multibandCompressor_.isRamping() ||
-        (((stages & STAGE_LIVE_PROG) != 0) && snapshot->liveProg.enabled) || liveProg_.isRamping() ||
-        (((stages & STAGE_CHANNEL_MANAGER) != 0) && snapshot->channelManager.enabled) || channelManager_.isRamping() ||
-        (((stages & STAGE_DAC_VOICING) != 0) && snapshot->dacVoicing.enabled) || dacVoicing_.isRamping() ||
-        hrtfRequested || hrtf_.isRamping();
+          channels >= LfeCrossover::MIN_MULTICHANNEL) || lfeCrossoverRamping) ||
+        (((stages & STAGE_DYNAMIC_BASS) != 0) && snapshot->dynamicBass.enabled) || dynBassRamping ||
+        (((stages & STAGE_LOUDNESS) != 0) && snapshot->loudness.enabled) || loudnessRamping ||
+        (((stages & STAGE_REVERB) != 0) && snapshot->reverb.enabled) || reverbRamping ||
+        (((stages & STAGE_SATURATION) != 0) && snapshot->saturation.enabled) || saturationRamping ||
+        (((stages & STAGE_ARBITRARY_EQ) != 0) && snapshot->arbitraryEq.enabled) || arbitraryEqRamping ||
+        (((stages & STAGE_VIPER_DDC) != 0) && snapshot->viperDdc.enabled) || viperDdcRamping ||
+        (((stages & STAGE_MULTIBAND_COMPRESSOR) != 0) && snapshot->multibandCompressor.enabled) || multibandRamping ||
+        (((stages & STAGE_LIVE_PROG) != 0) && snapshot->liveProg.enabled) || liveProgRamping ||
+        (((stages & STAGE_CHANNEL_MANAGER) != 0) && snapshot->channelManager.enabled) || channelManagerRamping ||
+        (((stages & STAGE_DAC_VOICING) != 0) && snapshot->dacVoicing.enabled) || dacVoicingRamping ||
+        hrtfRequested || hrtfRamping;
     const bool nonUnityGain = anyStageEnabled ||
                               (std::abs(smoothedReplayGain_ - 1.0) > 1e-4) ||
                               (std::abs(startReplayGain - 1.0) > 1e-4) ||
@@ -2584,49 +2602,49 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
         //    control surface and telemetry keep their existing shape.
 
         // 1. Parametric EQ Stage
-        if ((stages & STAGE_EQ) || (!(degraded & STAGE_EQ) && eq_.isRamping())) {
+        if ((stages & STAGE_EQ) || eqRamping) {
             eq_.processInterleaved(buffer, frames, channels);
         }
 
         // 1b. Arbitrary Response EQ (EqualizerAPO GraphicEq)
-        if ((stages & STAGE_ARBITRARY_EQ) || arbitraryEq_.isRamping()) {
+        if ((stages & STAGE_ARBITRARY_EQ) || arbitraryEqRamping) {
             arbitraryEq_.processInterleaved(buffer, frames, channels);
             // FIR latency applies to every channel count, not only stereo, but
             // only while the stage is actually enabled or fading out.
             if (((stages & STAGE_ARBITRARY_EQ) != 0 && snapshot->arbitraryEq.enabled) ||
-                arbitraryEq_.isRamping()) {
+                arbitraryEqRamping) {
                 blockLatency += arbitraryEq_.getLatencyFrames();
             }
         }
 
         // 1c. ViPER-DDC (Digital Dynamic Correction)
-        if ((stages & STAGE_VIPER_DDC) || viperDdc_.isRamping()) {
+        if ((stages & STAGE_VIPER_DDC) || viperDdcRamping) {
             viperDdc_.processInterleaved(buffer, frames, channels);
         }
 
         // 2. Dynamic EQ Stage — adjacent to the parametric EQ so band energy
         //    is detected on the tonally-shaped (but not yet spatialized) signal
-        if ((stages & STAGE_DYNEQ) || (!(degraded & STAGE_DYNEQ) && dynamicEq_.isRamping())) {
+        if ((stages & STAGE_DYNEQ) || dynEqRamping) {
             dynamicEq_.processInterleaved(buffer, frames, channels);
         }
 
         // 2b. Native Multiband Compressor Stage — 4-band LR4 dynamics
-        if (((stages & STAGE_MULTIBAND_COMPRESSOR) || multibandCompressor_.isRamping()) && channels >= 1) {
+        if (((stages & STAGE_MULTIBAND_COMPRESSOR) || multibandRamping) && channels >= 1) {
             multibandCompressor_.processInterleaved(buffer, frames, channels);
         }
 
         // 3. Spatial Panner & Balance (All channels) — positioner before reverb for natural acoustics
-        if ((stages & STAGE_PANNER) || panner_.isRamping()) {
+        if ((stages & STAGE_PANNER) || pannerRamping) {
             panner_.processInterleaved(buffer, frames, channels);
         }
 
         // 4. Crossfeed Stage (Stereo channels 0 and 1)
-        if (((stages & STAGE_CROSSFEED) || (!(degraded & STAGE_CROSSFEED) && crossfeed_.isRamping())) && channels >= 2) {
+        if (((stages & STAGE_CROSSFEED) || crossfeedRamping) && channels >= 2) {
             crossfeed_.processInterleaved(buffer, frames, channels);
         }
 
         // 4b. HRTF / SOFA Binaural Virtualization Stage (Stereo channels 0 and 1)
-        if ((hrtf_.isEnabled() || hrtf_.isRamping()) && channels >= 2) {
+        if ((hrtf_.isEnabled() || hrtfRamping) && channels >= 2) {
             hrtf_.processInterleaved(buffer, frames, channels);
             if (hrtf_.isEnabled()) {
                 blockLatency += hrtf_.getLatencyFrames();
@@ -2636,45 +2654,45 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
         // 5. Harmonic Saturation / Exciter Stage — 4x oversampled with anti-aliasing.
         //    Runs BEFORE reverb so harmonics are generated on the dry signal and
         //    the reverb tail is not re-saturated (which muddies the wet signal).
-        if ((stages & STAGE_SATURATION) || saturation_.isRamping()) {
+        if ((stages & STAGE_SATURATION) || saturationRamping) {
             saturation_.processInterleaved(buffer, frames, channels);
             if (((stages & STAGE_SATURATION) != 0 && snapshot->saturation.enabled) ||
-                saturation_.isRamping()) {
+                saturationRamping) {
                 blockLatency += saturation_.getLatencyFrames();
             }
         }
 
         // 6. Convolution Reverb Stage
-        if ((((stages & STAGE_REVERB) && snapshot->reverb.enabled) || reverb_.isRamping()) && channels >= 1) {
+        if ((((stages & STAGE_REVERB) && snapshot->reverb.enabled) || reverbRamping) && channels >= 1) {
             reverb_.processInterleaved(buffer, frames, channels);
             blockLatency += reverb_.getReverbLatencyFrames();
         }
 
         // 6b. Live Programmable DSP Stage
-        if ((stages & STAGE_LIVE_PROG) || liveProg_.isRamping()) {
+        if ((stages & STAGE_LIVE_PROG) || liveProgRamping) {
             liveProg_.processInterleaved(buffer, frames, channels);
         }
 
         // 7. Stereo Width Stage (M/S, stereo channels 0 and 1) — after crossfeed/reverb so
         //    the widened field is not re-collapsed by later spatial stages
-        if (((stages & STAGE_WIDTH) || (!(degraded & STAGE_WIDTH) && stereoWidth_.isRamping())) && channels >= 2) {
+        if (((stages & STAGE_WIDTH) || widthRamping) && channels >= 2) {
             stereoWidth_.processInterleaved(buffer, frames, channels);
         }
 
         // 8. Subwoofer / LFE Crossover Stage (bass redirection sum, stereo pairs)
-        if ((stages & STAGE_CROSSOVER) || (!(degraded & STAGE_CROSSOVER) && subCrossover_.isRamping())) {
+        if ((stages & STAGE_CROSSOVER) || subCrossoverRamping) {
             subCrossover_.processInterleaved(buffer, frames, channels);
         }
 
         // 8b. Dynamic Bass Stage (ViPER-modeled Dynamic System)
-        if (((stages & STAGE_DYNAMIC_BASS) || (!(degraded & STAGE_DYNAMIC_BASS) && dynamicBass_.isRamping())) && channels >= 1) {
+        if (((stages & STAGE_DYNAMIC_BASS) || dynBassRamping) && channels >= 1) {
             dynamicBass_.processInterleaved(buffer, frames, channels);
         }
 
         // 9. Loudness Contour Stage — computed against the current volume-stage
         //    value (pushed from Dart). Applied pre-limiter so the limiter still
         //    guards the contour-boosted peaks.
-        if ((stages & STAGE_LOUDNESS) || (!(degraded & STAGE_LOUDNESS) && loudnessContour_.isRamping())) {
+        if ((stages & STAGE_LOUDNESS) || loudnessRamping) {
             loudnessContour_.processInterleaved(buffer, frames, channels);
         }
 
@@ -2699,14 +2717,14 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
         // 9b-bis. Multichannel LFE Bass Management Crossover (3-8 channels).
         // Runs before ChannelManager so per-channel trim/delay and the limiter
         // act on the crossed-over satellite and LFE feeds.
-        if (((stages & STAGE_LFE_CROSSOVER) || (!(degraded & STAGE_LFE_CROSSOVER) && lfeCrossover_.isRamping())) &&
+        if (((stages & STAGE_LFE_CROSSOVER) || lfeCrossoverRamping) &&
             channels >= LfeCrossover::MIN_MULTICHANNEL) {
             lfeCrossover_.processInterleaved(buffer, frames, channels);
         }
 
         // 9c. Multichannel trim/delay (2-8 channels). Runs before the limiter
         // so a boosted surround channel is still caught by the brickwall.
-        if ((stages & STAGE_CHANNEL_MANAGER) || channelManager_.isRamping()) {
+        if ((stages & STAGE_CHANNEL_MANAGER) || channelManagerRamping) {
             channelManager_.processInterleaved(buffer, frames, channels);
             // Alignment delay is real pipeline latency: report it so lyrics,
             // gapless hand-off and the custody report see the 0..50 ms.
@@ -2718,7 +2736,7 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
         // addition is caught by the brickwall. Disabled-and-settled is a
         // bit-exact early return, so transparent chains stay bit-perfect and
         // getLatencyFrames() reports 0.
-        if ((stages & STAGE_DAC_VOICING) || dacVoicing_.isRamping()) {
+        if ((stages & STAGE_DAC_VOICING) || dacVoicingRamping) {
             dacVoicing_.processInterleaved(buffer, frames, channels);
             blockLatency += dacVoicing_.getLatencyFrames();
         }
@@ -3077,7 +3095,7 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
                      ? std::clamp(snapshot->directVolume.gainLinear, 0.0, 8.0)
                      : 1.0) *
                 effectiveDirectUsbGain(*snapshot);
-            resetInternal();
+            resetInternal(*snapshot);
             targetReplayGain_ = replayGainTarget;
             smoothedReplayGain_ = replayGainTarget;
             smoothedDirectVolume_ = dvcTarget;

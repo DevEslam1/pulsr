@@ -83,11 +83,15 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
     private int deferredBufferSize;
     private int[] deferredChannels;
     private boolean playing = false;
+    private boolean streamStarted = false;
     private boolean usbClockActive = false;
     private long usbStartPresentationTimeUs = C.TIME_UNSET;
+    private long usbAccumulatedUs = 0;
     private long usbWrittenFrames = 0;
     private long usbLastPositionUs = C.TIME_UNSET;
     private boolean usbEosPending = false;
+    private ByteBuffer pendingDirectUsbRetryPcm;
+    private int pendingDirectUsbRetryEncoding = C.ENCODING_INVALID;
 
     /** Shared byte-preserving gapless editor; no conversion precedes the native tee. */
     static final class PcmFrameEditor {
@@ -285,6 +289,11 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
             deferredChannels = outputChannels == null ? null : outputChannels.clone();
             return;
         }
+        if (usbClockActive && lastInputFormat != null && lastInputFormat.sampleRate > 0
+                && format.sampleRate != lastInputFormat.sampleRate) {
+            usbAccumulatedUs += (usbWrittenFrames * 1_000_000L) / lastInputFormat.sampleRate;
+            usbWrittenFrames = 0;
+        }
         lastInputFormat = format;
         lastBufferSize = bufferSize;
         final int encoding = format.pcmEncoding;
@@ -435,17 +444,75 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
         if ((!processFloat || processor == null) && frameEditor == null) {
             if (bypassedForBitPerfect && processor != null && lastInputFormat != null
                     && processor.isUsbExclusiveActive()) {
+                final boolean midStream = streamStarted;
                 try {
                     configure(lastInputFormat, lastBufferSize, null);
+                    if (midStream && frameEditor != null) {
+                        frameEditor.delayBytes = 0;
+                        frameEditor.started = true;
+                    }
                 } catch (ConfigurationException e) {
                     throw new InitializationException("Direct USB tee configuration failed", 0,
                             lastInputFormat, false, e);
                 }
             } else {
-                return super.handleBuffer(input, presentationTimeUs, accessUnits);
+                final int startPos = input.position();
+                final boolean consumed = super.handleBuffer(input, presentationTimeUs, accessUnits);
+                if (consumed || input.position() != startPos) {
+                    streamStarted = true;
+                }
+                return consumed;
             }
         }
         final boolean usbExclusiveNow = processFloat && processor != null && processor.isUsbExclusiveActive();
+        if (pendingDirectUsbRetryPcm != null) {
+            if (!playing && usbExclusiveNow && usbClockActive) {
+                return false;
+            }
+            if (playing && usbExclusiveNow && !usbClockActive) {
+                processor.setUsbPaused(false);
+            }
+            if (processFloat && processor != null) {
+                final int retryFrames = queuePreparedToProcessor(pendingDirectUsbRetryPcm,
+                        pendingDirectUsbRetryEncoding, frameEditor);
+                if (processor.consumeDirectUsbBackpressure()) {
+                    return false;
+                }
+                pendingDirectUsbRetryPcm = null;
+                pendingDirectUsbRetryEncoding = C.ENCODING_INVALID;
+                if (usbExclusiveNow) {
+                    if (!playing) {
+                        processor.releaseUsbProducer();
+                    }
+                    if (usbStartPresentationTimeUs == C.TIME_UNSET) {
+                        usbStartPresentationTimeUs = pendingPresentationTimeUs;
+                        usbWrittenFrames = 0;
+                        usbLastPositionUs = pendingPresentationTimeUs;
+                    }
+                    usbWrittenFrames += retryFrames;
+                    usbClockActive = true;
+                    usbEosPending = false;
+                    processor.getOutput();
+                    if (frameEditor != null && frameEditor.edits()) frameEditor.commit();
+                    input.position(pendingInputEnd);
+                    pendingOutput = null;
+                    pendingInput = null;
+                    streamStarted = true;
+                    try {
+                        applyDeferredConfiguration();
+                    } catch (ConfigurationException e) {
+                        throw new InitializationException("Deferred PCM configuration failed", 0,
+                                lastInputFormat, false, e);
+                    }
+                    return !input.hasRemaining();
+                }
+                pendingOutput = boundaryOutput(processor.getOutput(), processorOutputFormat.encoding);
+            } else {
+                pendingOutput = boundaryOutput(pendingDirectUsbRetryPcm, pendingDirectUsbRetryEncoding);
+                pendingDirectUsbRetryPcm = null;
+                pendingDirectUsbRetryEncoding = C.ENCODING_INVALID;
+            }
+        }
         if (pendingOutput == null) {
             // Allow the initial pre-play priming block while STATE_BUFFERING
             // (usbClockActive == false) so ExoPlayer transitions to STATE_READY
@@ -507,6 +574,7 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
                     input.position(pendingInputEnd);
                     pendingOutput = null;
                     pendingInput = null;
+                    streamStarted = true;
                     try {
                         applyDeferredConfiguration();
                     } catch (ConfigurationException e) {
@@ -536,6 +604,7 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
         input.position(pendingInputEnd);
         pendingOutput = null;
         pendingInput = null;
+        streamStarted = true;
         try {
             applyDeferredConfiguration();
         } catch (ConfigurationException e) {
@@ -598,27 +667,72 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
         return quantizedOutput;
     }
 
+    private int queuePreparedToProcessor(ByteBuffer pcm, int encoding, PcmFrameEditor editor) {
+        ByteBuffer view = pcm.duplicate().order(ByteOrder.nativeOrder());
+        final int bytesPerSample = encoding == C.ENCODING_PCM_16BIT ? 2
+                : (encoding == C.ENCODING_PCM_24BIT ? 3 : 4);
+        final int ch = (lastInputFormat != null && lastInputFormat.channelCount > 0)
+                ? lastInputFormat.channelCount : 2;
+        final int frames = Math.max(0, view.remaining() / Math.max(1, bytesPerSample * ch));
+        if (encoding == C.ENCODING_PCM_FLOAT) {
+            processor.queueInput(view);
+        } else {
+            int previousEncoding = inputEncoding;
+            inputEncoding = encoding;
+            ByteBuffer floats = convertToFloat(view.duplicate().order(ByteOrder.nativeOrder()));
+            inputEncoding = previousEncoding;
+            final int srcBits = editor != null ? editor.sampleBytes * 8 : bytesPerSample * 8;
+            final int srcRate = lastInputFormat != null && lastInputFormat.sampleRate > 0
+                    ? lastInputFormat.sampleRate : 48000;
+            processor.queueInput(floats, view, srcBits, srcRate);
+        }
+        return frames;
+    }
+
+    private ByteBuffer copyDirectBuffer(ByteBuffer src) {
+        ByteBuffer dup = src.duplicate().order(ByteOrder.nativeOrder());
+        ByteBuffer copy = ByteBuffer.allocateDirect(dup.remaining()).order(ByteOrder.nativeOrder());
+        copy.put(dup);
+        copy.flip();
+        return copy;
+    }
+
+    private ByteBuffer widenPcm16ToFloat(ByteBuffer pcm16) {
+        ByteBuffer view = pcm16.duplicate().order(ByteOrder.nativeOrder());
+        int samples = view.remaining() / 2;
+        ensureConvertCapacity(samples);
+        converted.clear();
+        convertedFloats.clear();
+        ShortBuffer shorts = view.asShortBuffer();
+        for (int i = 0; i < samples; i++) {
+            convertedFloats.put(i, shorts.get(i) / 32768f);
+        }
+        converted.limit(samples * 4);
+        return converted;
+    }
+
     void acceptPreparedPcm(ByteBuffer pcm, int encoding, ByteBuffer input, int inputEnd,
             long timeUs, int units, PcmFrameEditor editor) {
         frameEditor = editor;
+        pendingDirectUsbRetryPcm = null;
+        pendingDirectUsbRetryEncoding = C.ENCODING_INVALID;
         if (pcm == null) return;
-        ByteBuffer view = pcm.duplicate().order(ByteOrder.nativeOrder());
+        streamStarted = true;
         if (processFloat && processor != null) {
-            if (encoding == C.ENCODING_PCM_FLOAT) {
-                processor.queueInput(view);
+            final ByteBuffer savedCopy = copyDirectBuffer(pcm);
+            queuePreparedToProcessor(pcm, encoding, editor);
+            if (processor.consumeDirectUsbBackpressure()) {
+                pendingDirectUsbRetryPcm = savedCopy;
+                pendingDirectUsbRetryEncoding = encoding;
+                pendingOutput = null;
             } else {
-                int previousEncoding = inputEncoding;
-                inputEncoding = encoding;
-                ByteBuffer floats = convertToFloat(view.duplicate().order(ByteOrder.nativeOrder()));
-                inputEncoding = previousEncoding;
-                processor.queueInput(floats, view, editor.sampleBytes * 8, lastInputFormat.sampleRate);
+                pendingOutput = boundaryOutput(processor.getOutput(), processorOutputFormat.encoding);
             }
-            pendingOutput = boundaryOutput(processor.getOutput(), processorOutputFormat.encoding);
         } else {
             // Integer passthrough (bit-perfect bypass or DSP off): boundaryOutput()
             // hands back the integer bytes unchanged, so the transferred buffer is
             // written as-is (24-bit stays sampleBytes == 3, no float round-trip).
-            pendingOutput = boundaryOutput(view, encoding);
+            pendingOutput = boundaryOutput(pcm.duplicate().order(ByteOrder.nativeOrder()), encoding);
         }
         pendingInput = input;
         pendingInputEnd = inputEnd;
@@ -661,8 +775,10 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
 
     void transferPendingTo(FloatDspAudioSink target) {
         target.playing = this.playing;
+        target.streamStarted = this.streamStarted;
         target.usbClockActive = this.usbClockActive;
         target.usbStartPresentationTimeUs = this.usbStartPresentationTimeUs;
+        target.usbAccumulatedUs = this.usbAccumulatedUs;
         target.usbWrittenFrames = this.usbWrittenFrames;
         target.usbLastPositionUs = this.usbLastPositionUs;
         target.usbEosPending = this.usbEosPending;
@@ -673,9 +789,27 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
             deferredFormat = null;
             deferredChannels = null;
         }
-        target.pendingOutput = pendingOutput == null ? null : target.boundaryOutput(pendingOutput,
-                pcm16Boundary ? C.ENCODING_PCM_16BIT
-                        : (processFloat ? processorOutputFormat.encoding : inputEncoding));
+        if (pendingDirectUsbRetryPcm != null) {
+            target.pendingDirectUsbRetryPcm = pendingDirectUsbRetryPcm;
+            target.pendingDirectUsbRetryEncoding = pendingDirectUsbRetryEncoding;
+            target.pendingOutput = null;
+            pendingDirectUsbRetryPcm = null;
+            pendingDirectUsbRetryEncoding = C.ENCODING_INVALID;
+        } else if (pendingOutput == null) {
+            target.pendingOutput = null;
+        } else {
+            final int sourceEncoding = pcm16Boundary ? C.ENCODING_PCM_16BIT
+                    : (processFloat ? processorOutputFormat.encoding : inputEncoding);
+            final boolean targetExpectsFloat = !target.pcm16Boundary
+                    && target.configuredOutputFormat != null
+                    && target.configuredOutputFormat.pcmEncoding == C.ENCODING_PCM_FLOAT;
+            if (sourceEncoding == C.ENCODING_PCM_16BIT && targetExpectsFloat) {
+                target.pendingOutput = target.boundaryOutput(
+                        target.widenPcm16ToFloat(pendingOutput), C.ENCODING_PCM_FLOAT);
+            } else {
+                target.pendingOutput = target.boundaryOutput(pendingOutput, sourceEncoding);
+            }
+        }
         target.pendingInput = pendingInput;
         target.pendingInputEnd = pendingInputEnd;
         target.pendingPresentationTimeUs = pendingPresentationTimeUs;
@@ -715,7 +849,8 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
         if (usbClockActive && processor != null && processor.isUsbExclusiveActive()
                 && lastInputFormat != null && lastInputFormat.sampleRate > 0
                 && usbStartPresentationTimeUs != C.TIME_UNSET) {
-            final long writtenUs = (usbWrittenFrames * 1_000_000L) / lastInputFormat.sampleRate;
+            final long writtenUs = usbAccumulatedUs
+                    + (usbWrittenFrames * 1_000_000L) / lastInputFormat.sampleRate;
             final long bufferedUs = Math.max(0L, Math.round(processor.getUsbBufferedMs() * 1000.0));
             long posUs = usbStartPresentationTimeUs + Math.max(0L, writtenUs - bufferedUs);
             if (usbLastPositionUs != C.TIME_UNSET && posUs < usbLastPositionUs) {
@@ -725,6 +860,17 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
             return posUs;
         }
         return super.getCurrentPositionUs(sourceEnded);
+    }
+
+    @Override
+    public void handleDiscontinuity() {
+        usbClockActive = false;
+        usbStartPresentationTimeUs = C.TIME_UNSET;
+        usbAccumulatedUs = 0;
+        usbWrittenFrames = 0;
+        usbLastPositionUs = C.TIME_UNSET;
+        usbEosPending = false;
+        super.handleDiscontinuity();
     }
 
     @Override
@@ -753,6 +899,7 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
 
     @Override
     public boolean hasPendingData() {
+        if (pendingDirectUsbRetryPcm != null) return true;
         if (usbClockActive && processor != null && processor.isUsbExclusiveActive()) {
             return processor.getUsbBufferedMs() > 1.0;
         }
@@ -761,6 +908,7 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
 
     @Override
     public boolean isEnded() {
+        if (pendingDirectUsbRetryPcm != null) return false;
         if (usbClockActive && processor != null && processor.isUsbExclusiveActive()) {
             return usbEosPending && processor.getUsbBufferedMs() <= 1.0;
         }
@@ -773,15 +921,19 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
         eosQueued = false;
         usbClockActive = false;
         usbStartPresentationTimeUs = C.TIME_UNSET;
+        usbAccumulatedUs = 0;
         usbWrittenFrames = 0;
         usbLastPositionUs = C.TIME_UNSET;
         usbEosPending = false;
+        pendingDirectUsbRetryPcm = null;
+        pendingDirectUsbRetryEncoding = C.ENCODING_INVALID;
         if (frameEditor != null) frameEditor.flush();
         pendingOutput = null;
         pendingInput = null;
         try { applyDeferredConfiguration(); }
         catch (ConfigurationException e) { throw new IllegalStateException("Deferred PCM configuration failed", e); }
         if (processor != null) {
+            processor.setUsbPaused(true);
             processor.flushUsbSink();
         }
         if (processFloat && processor != null) {
@@ -797,11 +949,15 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
     @Override
     public void reset() {
         playing = false;
+        streamStarted = false;
         usbClockActive = false;
         usbStartPresentationTimeUs = C.TIME_UNSET;
+        usbAccumulatedUs = 0;
         usbWrittenFrames = 0;
         usbLastPositionUs = C.TIME_UNSET;
         usbEosPending = false;
+        pendingDirectUsbRetryPcm = null;
+        pendingDirectUsbRetryEncoding = C.ENCODING_INVALID;
         frameEditor = null;
         deferredFormat = null;
         deferredChannels = null;

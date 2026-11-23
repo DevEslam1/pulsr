@@ -190,5 +190,66 @@ int main() {
         assert(rev->getRetiredPendingCount() == 0);
         std::cout << "  [PASS] Cross-partition crossfade & >512 retired-IR overflow drain verified." << std::endl;
     }
+
+    // 4. Direct-IR shrink clears stale directRingL_/R_ taps AND high-rate (>= 96kHz)
+    //    wetOutResampler_ uses full resampleOutL_/R_ buffer capacity.
+    {
+        auto rev = std::make_unique<ConvolutionReverb>();
+        rev->setSampleRate(48000.0);
+        rev->setEnabled(true);
+        rev->setWetDry(1.0);
+        rev->setPredelay(0.0);
+
+        // Long direct IR (256 taps) with impulse at tap 200
+        std::vector<float> irLong(256 * 2, 0.0f);
+        irLong[200 * 2] = 0.8f;
+        irLong[200 * 2 + 1] = 0.8f;
+        assert(rev->loadCustomIR(irLong.data(), 256, 2));
+
+        std::vector<float> inL(512, 0.0f), inR(512, 0.0f), outL(512, 0.0f), outR(512, 0.0f);
+        inL[400] = 1.0f; // Still inside directRingL_ history past index 32
+        inR[400] = 1.0f;
+        rev->process(inL.data(), inR.data(), outL.data(), outR.data(), 512);
+
+        // Shrink direct IR to 16 taps (tap 0 = 0.5). Crossfade must finish cleanly and
+        // feeding silence afterward must not leak tap-200 energy from old directRing_.
+        std::vector<float> irShort(16 * 2, 0.0f);
+        irShort[0] = 0.5f;
+        irShort[1] = 0.5f;
+        assert(rev->loadCustomIR(irShort.data(), 16, 2));
+
+        std::fill(inL.begin(), inL.end(), 0.0f);
+        std::fill(inR.begin(), inR.end(), 0.0f);
+        for (int b = 0; b < 8; ++b) {
+            rev->process(inL.data(), inR.data(), outL.data(), outR.data(), 512);
+        }
+        std::fill(inL.begin(), inL.end(), 0.0f);
+        std::fill(inR.begin(), inR.end(), 0.0f);
+        rev->process(inL.data(), inR.data(), outL.data(), outR.data(), 512);
+        for (int i = 0; i < 512; ++i) {
+            assert(std::abs(outL[i]) < 1e-4f && std::abs(outR[i]) < 1e-4f &&
+                   "Direct IR shrink must not retain stale history beyond new tap length");
+        }
+
+        // High-rate (>48kHz) wetOutResampler_ test at 192 kHz with full resampleOutL_/R_ capacity
+        rev->setSampleRate(192000.0);
+        rev->setPreset(ReverbPreset::Room);
+        std::vector<float> hiInL(1024), hiInR(1024), hiOutL(1024, 0.0f), hiOutR(1024, 0.0f);
+        for (int i = 0; i < 1024; ++i) {
+            float v = 0.3f * std::sin(2.0f * static_cast<float>(M_PI) * 440.0f * i / 192000.0f);
+            hiInL[i] = v;
+            hiInR[i] = v;
+        }
+        float maxWet = 0.0f;
+        for (int b = 0; b < 6; ++b) {
+            rev->process(hiInL.data(), hiInR.data(), hiOutL.data(), hiOutR.data(), 1024);
+            for (int i = 0; i < 1024; ++i) {
+                assert(std::isfinite(hiOutL[i]) && std::isfinite(hiOutR[i]));
+                maxWet = std::max(maxWet, std::abs(hiOutL[i]));
+            }
+        }
+        assert(maxWet > 0.01f && "192kHz resampled wet output must remain active and finite");
+        std::cout << "  [PASS] Direct-IR shrink ring clear & 192kHz wetOutResampler capacity verified." << std::endl;
+    }
     return 0;
 }

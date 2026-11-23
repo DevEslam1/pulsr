@@ -461,6 +461,65 @@ int main() {
               "Crossfeed must be suppressed while HRTF binaural virtualization is active");
     }
 
+    // H-03 & M-12: pcmToDsd.enabled does not falsely veto low-power bypass,
+    // and auto-degrading an active EQ stage allows its fade-out ramp to finish
+    // so !eq().isRamping() settles and never wedges low-power bypass afterwards.
+    {
+        auto engine = makeEngine();
+        auto snap = baseSnapshot();
+        snap->activeStages = 0;
+        snap->eq.enabled = false;
+        snap->eq.preampDb = 0.0;
+        snap->oversample.enabled = false;
+        snap->hrtf.enabled = false;
+        snap->lowPower.enabled = true;
+        snap->pcmToDsd.enabled = true;
+        engine->publishParams(snap);
+        auto work = makeSignal(frames, channels);
+        engine->processInterleaved(work.data(), frames, channels);
+        check(engine->isLowPowerBypassed(),
+              "H-03: pcmToDsd flag alone must not block low-power bypass");
+
+        auto eqSnap = baseSnapshot();
+        eqSnap->lowPower.enabled = true;
+        eqSnap->activeStages = STAGE_EQ;
+        eqSnap->eq.enabled = true;
+        eqSnap->eq.preampDb = 3.0;
+        eqSnap->eq.bandCount = 1;
+        eqSnap->eq.bands[0].enabled = true;
+        eqSnap->eq.bands[0].gainDb = 6.0;
+        eqSnap->eq.bands[0].q = 1.0;
+        engine->publishParams(eqSnap);
+        for (int b = 0; b < 8; ++b) {
+            work = makeSignal(frames, channels);
+            engine->processInterleaved(work.data(), frames, channels);
+        }
+        check(!engine->isLowPowerBypassed(), "active EQ keeps low-power bypass disengaged");
+
+        engine->triggerStageAutoDegrade(STAGE_EQ);
+        for (int b = 0; b < 16; ++b) {
+            work = makeSignal(frames, channels);
+            engine->processInterleaved(work.data(), frames, channels);
+        }
+        check(!engine->eq().isRamping(),
+              "M-12: auto-degraded EQ completes fade-out instead of staying stuck ramping");
+
+        auto cleanSnap = baseSnapshot();
+        cleanSnap->activeStages = 0;
+        cleanSnap->eq.enabled = false;
+        cleanSnap->eq.preampDb = 0.0;
+        cleanSnap->oversample.enabled = false;
+        cleanSnap->hrtf.enabled = false;
+        cleanSnap->lowPower.enabled = true;
+        engine->publishParams(cleanSnap);
+        for (int b = 0; b < 24; ++b) {
+            work = makeSignal(frames, channels);
+            engine->processInterleaved(work.data(), frames, channels);
+        }
+        check(engine->isLowPowerBypassed(),
+              "M-12: settled stage after auto-degrade unblocks low-power bypass cleanly");
+    }
+
     if (gFailures != 0) {
         std::cout << "[FAIL] " << gFailures << " bypass transparency check(s) failed." << std::endl;
         return 1;

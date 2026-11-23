@@ -121,8 +121,8 @@ public:
     int32_t DeviceId() const;
     int64_t GetTimestampLatencyFrames() const;
     double GetOutputLatencyMs() const;
-    int32_t SampleRate() const { return config_.sampleRate; }
-    int32_t ChannelCount() const { return config_.channelCount; }
+    int32_t SampleRate() const { return activeSampleRate_.load(std::memory_order_acquire); }
+    int32_t ChannelCount() const { return activeChannelCount_.load(std::memory_order_acquire); }
     bool HasPendingData() const;
 
 private:
@@ -149,6 +149,7 @@ private:
     // from XRunDelta() (whose JNI call site keeps its identical signature).
     void CheckAndAdaptBuffer(AAudioStream* st) const;
     void ShrinkBufferIfStable(AAudioStream* st) const;
+    void UpdateBufferGovernor(AAudioStream* st) const;
 
     Config config_{};
     std::atomic<AAudioStream*> stream_{nullptr};
@@ -168,7 +169,11 @@ private:
     // but independent of it, so 24-bit PCM is no longer mistaken for DoP.
     std::atomic<bool> dop_{false};
     std::atomic<bool> volumeRejected_{false};
-    int32_t bytesPerFrame_ = 0;
+    std::atomic<int32_t> bytesPerFrame_{0};
+    std::atomic<int32_t> activeSampleRate_{48000};
+    std::atomic<int32_t> activeChannelCount_{2};
+    std::atomic<int32_t> activeEncoding_{static_cast<int32_t>(Encoding::Int16)};
+    std::atomic<int32_t> activeTargetBufferMs_{150};
     // TPDF state for the sink-side volume requantization (shared mode only).
     // Kept per stream instance so the sequence does not restart every block.
     SinkDitherState sinkDither_;
@@ -177,6 +182,7 @@ private:
     std::atomic<int64_t> readBase_{0}; // device read counter at last flush
     std::atomic<int64_t> readOffset_{0}; // timeline carried across disconnect recovery
     mutable std::atomic<int32_t> lastXRunCount_{0};
+    mutable std::atomic<int32_t> governorLastXRunCount_{0};
     std::atomic<int32_t> initialBufferFrames_{0};
     mutable std::atomic<int64_t> lastXRunTimestampMs_{0};
     mutable std::atomic<int64_t> lastShrinkTimestampMs_{0};

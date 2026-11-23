@@ -9,6 +9,7 @@
 
 class ViperDdc {
 public:
+    static constexpr int MAX_CHANNELS = 8;
     struct Section {
         double b0 = 1.0;
         double b1 = 0.0;
@@ -16,15 +17,11 @@ public:
         double a1 = 0.0;
         double a2 = 0.0;
 #if defined(PULSR_F32_BIQUADS)
-        float v1L = 0.0f;
-        float v2L = 0.0f;
-        float v1R = 0.0f;
-        float v2R = 0.0f;
+        float v1[MAX_CHANNELS] = {};
+        float v2[MAX_CHANNELS] = {};
 #else
-        double v1L = 0.0;
-        double v2L = 0.0;
-        double v1R = 0.0;
-        double v2R = 0.0;
+        double v1[MAX_CHANNELS] = {};
+        double v2[MAX_CHANNELS] = {};
 #endif
     };
 
@@ -35,8 +32,9 @@ public:
     void setEnabled(bool enabled) { enabled_ = enabled; }
     bool isEnabled() const { return enabled_; }
     bool isRamping() const {
-        return (!enabled_ && smoothedEnabledMix_ >= 1e-4f) ||
-               (enabled_ && smoothedEnabledMix_ < 0.9999f) ||
+        const bool shouldBeOn = enabled_ && !activeSections_.empty();
+        return (!shouldBeOn && smoothedEnabledMix_ >= 1e-4f) ||
+               (shouldBeOn && smoothedEnabledMix_ < 0.9999f) ||
                (sectionCrossfadeProgress_ < 1.0f && !crossfadeSections_.empty());
     }
     void applyParams(const ViperDdcParamSet& params);
