@@ -6,10 +6,12 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:get_it/get_it.dart';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
 
 import '../../core/errors/app_error.dart';
+import '../../core/network/remote_target_policy.dart';
 import '../../core/utils/error_logger.dart';
 import 'av_transport.dart';
 import 'dlna_strings.dart';
@@ -35,6 +37,9 @@ enum DlnaState {
   /// A device was picked and its AVTransport service is being probed.
   connecting,
 
+  /// The renderer is transitioning or buffering media.
+  buffering,
+
   /// Media is playing on the renderer.
   playing,
 
@@ -48,13 +53,62 @@ enum DlnaState {
   error,
 }
 
+/// One item in a renderer playback queue.
+class DlnaQueueTrack {
+  /// Creates a local-file or stream-URL queue item.
+  const DlnaQueueTrack({
+    this.path,
+    this.url,
+    this.title,
+    this.artist,
+    this.album,
+    this.duration,
+    this.mimeType,
+  }) : assert(path != null || url != null);
+
+  final String? path;
+  final String? url;
+  final String? title;
+  final String? artist;
+  final String? album;
+  final Duration? duration;
+  final String? mimeType;
+}
+
 /// ChangeNotifier that drives one DLNA MediaRenderer.
 ///
 /// All network and file-system failures are converted to [AppError] and exposed
 /// through [lastError] while the state becomes [DlnaState.error].
 class DlnaRendererService extends ChangeNotifier {
+  static DlnaRendererService? _sharedInstance;
+
+  /// App-scoped singleton resolved from GetIt when registered or shared
+  /// lazily across [DlnaScreen] navigations so cast playback survives back nav.
+  static DlnaRendererService get shared {
+    if (GetIt.instance.isRegistered<DlnaRendererService>()) {
+      return GetIt.instance<DlnaRendererService>();
+    }
+    final current = _sharedInstance;
+    if (current != null && !current._disposed) return current;
+    final created = DlnaRendererService();
+    _sharedInstance = created;
+    return created;
+  }
+
+  /// Disposes and clears the lazily created shared singleton (for tests).
+  @visibleForTesting
+  static void resetSharedForTest() {
+    final existing = _sharedInstance;
+    _sharedInstance = null;
+    existing?.dispose();
+  }
+
   /// Largest description document accepted from a renderer, in bytes.
   static const int maxDescriptionBytes = 256 * 1024;
+
+  /// Number of consecutive STOPPED/NO_MEDIA polls required before transitioning
+  /// active playback to stopped/idle.
+  static const int maxConsecutiveStoppedPolls = 2;
 
   final SsdpClient _ssdp;
   final MediaHttpServer _mediaServer;
@@ -69,10 +123,13 @@ class DlnaRendererService extends ChangeNotifier {
   final Duration _descriptionTimeout;
   final DlnaLocalAddressResolver _localAddressResolver;
   final UpnpDeviceDescriptionCache _descriptionCache;
+  final Set<String> _allowedMediaHosts;
+  final Future<List<String>> Function(String host)? _dnsLookup;
 
   DlnaState _state = DlnaState.idle;
   List<UpnpDeviceDescription> _devices = const <UpnpDeviceDescription>[];
   UpnpDeviceDescription? _selectedDevice;
+  UpnpDeviceDescription? _pendingSelectDevice;
   AvTransportClient? _avTransport;
   String? _nowPlayingTitle;
   Duration _position = Duration.zero;
@@ -81,8 +138,10 @@ class DlnaRendererService extends ChangeNotifier {
   Timer? _pollTimer;
   bool _polling = false;
   int _pollFailures = 0;
+  int _consecutiveStoppedPolls = 0;
   bool _pollStale = false;
   String? _token;
+  String? _nextToken;
   String? _lastCastPath;
   String? _lastCastUrl;
   String? _lastCastMimeType;
@@ -90,8 +149,17 @@ class DlnaRendererService extends ChangeNotifier {
   String? _lastCastArtist;
   String? _lastCastAlbum;
   Duration? _lastCastDuration;
+  List<DlnaQueueTrack> _queue = const <DlnaQueueTrack>[];
+  int _queueIndex = -1;
+  bool _advancingQueue = false;
   int _opSequence = 0;
   bool _disposed = false;
+
+  /// Optional external handler invoked when [next] is pressed with no queue.
+  Future<void> Function()? onNextRequested;
+
+  /// Optional external handler invoked when [previous] is pressed with no queue.
+  Future<void> Function()? onPreviousRequested;
 
   /// Creates the service. Every collaborator is injectable for tests.
   DlnaRendererService({
@@ -103,6 +171,8 @@ class DlnaRendererService extends ChangeNotifier {
     Duration descriptionTimeout = const Duration(seconds: 4),
     DlnaLocalAddressResolver? localAddressResolver,
     UpnpDeviceDescriptionCache? descriptionCache,
+    Set<String> allowedMediaHosts = const {},
+    Future<List<String>> Function(String host)? dnsLookup,
   })  : _ssdp = ssdpClient ?? SsdpClient(),
         _mediaServer = mediaServer ?? MediaHttpServer(),
         _httpClient = httpClient ?? http.Client(),
@@ -113,7 +183,10 @@ class DlnaRendererService extends ChangeNotifier {
         _localAddressResolver =
             localAddressResolver ?? MediaHttpServer.localAddressFacing,
         _descriptionCache =
-            descriptionCache ?? UpnpDeviceDescriptionCache();
+            descriptionCache ?? UpnpDeviceDescriptionCache(),
+        _allowedMediaHosts =
+            allowedMediaHosts.map((h) => h.trim().toLowerCase()).toSet(),
+        _dnsLookup = dnsLookup;
 
   /// Current state.
   DlnaState get state => _state;
@@ -150,6 +223,12 @@ class DlnaRendererService extends ChangeNotifier {
 
   /// Exposed so the host can report the serving URL / port.
   MediaHttpServer get mediaServer => _mediaServer;
+
+  /// Loaded cast queue, when casting from a multi-track list.
+  List<DlnaQueueTrack> get queue => List<DlnaQueueTrack>.unmodifiable(_queue);
+
+  /// Current zero-based index inside [queue], or `-1` when unqueued.
+  int get currentQueueIndex => _queueIndex;
 
   /// Scans the LAN and loads descriptions of discovered renderers.
   Future<void> discover() async {
@@ -194,63 +273,77 @@ class DlnaRendererService extends ChangeNotifier {
 
   /// Selects [device] and probes its AVTransport state.
   ///
-  /// Switching to a different renderer first stops the previous one, drops its
-  /// media token and shuts the media server down so the next cast can bind the
-  /// interface facing the new device.
+  /// When switching away from an active renderer, the new target is probed
+  /// first so an unreachable candidate never disconnects the current renderer
+  /// or loses retry state.
   Future<void> select(UpnpDeviceDescription device) async {
     if (_disposed) return;
     final op = ++_opSequence;
+    _pendingSelectDevice = device;
     _state = DlnaState.connecting;
     _lastError = null;
     notifyListeners();
 
     final previousClient = _avTransport;
     final previousDevice = _selectedDevice;
-    _avTransport = null;
-    _stopPolling();
-
     final switching = previousClient != null &&
         previousDevice != null &&
         previousDevice.identity != device.identity;
-    if (switching) {
-      await _stopRenderer(previousClient);
-    }
-    previousClient?.close();
 
-    if (switching) {
-      _selectedDevice = null;
-      _nowPlayingTitle = null;
-      _position = Duration.zero;
-      _duration = Duration.zero;
-      _revokeMediaToken();
-      await _shutdownMediaServer();
-    }
-    if (_disposed || op != _opSequence) return;
-
-    final client = AvTransportClient(
+    final candidateClient = AvTransportClient(
       device.avTransportControlUrl,
       client: _httpClient,
     );
-    _avTransport = client;
 
     try {
-      final info = await client.getTransportInfo();
+      final info = await candidateClient.getTransportInfo();
       if (_disposed || op != _opSequence) {
-        client.close();
+        candidateClient.close();
         return;
       }
-      _selectedDevice = device;
+
+      _stopPolling();
       if (switching) {
+        await _stopRenderer(previousClient);
+        previousClient.close();
+        _revokeMediaTokens();
+        await _shutdownMediaServer();
         _nowPlayingTitle = null;
         _position = Duration.zero;
         _duration = Duration.zero;
+        _queue = const <DlnaQueueTrack>[];
+        _queueIndex = -1;
+      } else {
+        previousClient?.close();
       }
+      if (_disposed || op != _opSequence) {
+        candidateClient.close();
+        return;
+      }
+
+      _avTransport = candidateClient;
+      _selectedDevice = device;
+      _pendingSelectDevice = null;
+      _consecutiveStoppedPolls = 0;
+      _pollFailures = 0;
+      _pollStale = false;
       _state = _stateFor(info.state);
+      if (_state == DlnaState.playing ||
+          _state == DlnaState.paused ||
+          _state == DlnaState.buffering ||
+          _nowPlayingTitle == null) {
+        await _refreshMediaInfo(candidateClient, op);
+      }
+      if (_disposed || op != _opSequence) return;
+      if (_state == DlnaState.playing ||
+          _state == DlnaState.paused ||
+          _state == DlnaState.buffering) {
+        _startPolling();
+      }
       notifyListeners();
     } catch (error, stackTrace) {
-      if (op != _opSequence) return;
-      _avTransport = null;
-      client.close();
+      candidateClient.close();
+      if (_disposed || op != _opSequence) return;
       _fail(error, stackTrace, 'DLNA connect failed');
     }
   }
@@ -260,6 +353,24 @@ class DlnaRendererService extends ChangeNotifier {
   /// [duration] is embedded in the DIDL metadata when the caller already knows
   /// it. The previous token is revoked before the new one is registered.
   Future<void> playFile(
+    String path, {
+    String? title,
+    String? artist,
+    String? album,
+    Duration? duration,
+  }) {
+    _queue = const <DlnaQueueTrack>[];
+    _queueIndex = -1;
+    return _playFileInternal(
+      path,
+      title: title,
+      artist: artist,
+      album: album,
+      duration: duration,
+    );
+  }
+
+  Future<void> _playFileInternal(
     String path, {
     String? title,
     String? artist,
@@ -287,6 +398,7 @@ class DlnaRendererService extends ChangeNotifier {
       return;
     }
 
+    _pendingSelectDevice = null;
     final resolvedTitle = title ?? p.basenameWithoutExtension(path);
     _lastCastPath = path;
     _lastCastUrl = null;
@@ -298,19 +410,26 @@ class DlnaRendererService extends ChangeNotifier {
 
     String? token;
     try {
-      // Revoke the previous token before any work that could fail: a new cast
+      // Revoke previous tokens before any work that could fail: a new cast
       // attempt must never leave the old URL fetchable.
-      _revokeMediaToken();
+      _revokeMediaTokens();
       final size = await File(path).length();
       if (_disposed || op != _opSequence) return;
-      if (!_mediaServer.isRunning) {
-        final controlUrl = device.avTransportControlUrl;
-        final controlPort = controlUrl.hasPort
-            ? controlUrl.port
-            : (controlUrl.scheme == 'https' ? 443 : 80);
-        final bindAddress =
-            await _localAddressResolver(controlUrl.host, controlPort);
+
+      final controlUrl = device.avTransportControlUrl;
+      final controlPort = controlUrl.hasPort
+          ? controlUrl.port
+          : (controlUrl.scheme == 'https' ? 443 : 80);
+      final bindAddress =
+          await _localAddressResolver(controlUrl.host, controlPort);
+      if (_disposed || op != _opSequence) return;
+      if (_mediaServer.isRunning &&
+          bindAddress != null &&
+          _mediaServer.host != bindAddress.address) {
+        await _mediaServer.stop();
         if (_disposed || op != _opSequence) return;
+      }
+      if (!_mediaServer.isRunning) {
         await _mediaServer.start(bindAddress: bindAddress);
         if (_disposed || op != _opSequence) return;
       }
@@ -332,8 +451,9 @@ class DlnaRendererService extends ChangeNotifier {
 
       _nowPlayingTitle = resolvedTitle;
       _position = Duration.zero;
-      _duration = Duration.zero;
+      _duration = duration ?? Duration.zero;
       _lastError = null;
+      _consecutiveStoppedPolls = 0;
 
       await client.setAvTransportUri(url, metadata);
       if (_disposed || op != _opSequence) {
@@ -349,8 +469,10 @@ class DlnaRendererService extends ChangeNotifier {
       }
       _state = DlnaState.playing;
       _pollFailures = 0;
+      _pollStale = false;
       notifyListeners();
       _startPolling();
+      await _preQueueNextTrack();
     } catch (error, stackTrace) {
       if (op != _opSequence) return;
       if (token != null) {
@@ -361,9 +483,29 @@ class DlnaRendererService extends ChangeNotifier {
     }
   }
 
-  /// Plays an arbitrary stream [url] (e.g. from a loopback proxy or remote stream)
-  /// on the selected renderer.
+  /// Plays an arbitrary stream [url] (e.g. from a remote stream) on the
+  /// selected renderer after validating it against [RemoteTargetPolicy].
   Future<void> playUrl(
+    String url, {
+    String? title,
+    String? artist,
+    String? album,
+    Duration? duration,
+    String? mimeType,
+  }) {
+    _queue = const <DlnaQueueTrack>[];
+    _queueIndex = -1;
+    return _playUrlInternal(
+      url,
+      title: title,
+      artist: artist,
+      album: album,
+      duration: duration,
+      mimeType: mimeType,
+    );
+  }
+
+  Future<void> _playUrlInternal(
     String url, {
     String? title,
     String? artist,
@@ -383,11 +525,8 @@ class DlnaRendererService extends ChangeNotifier {
       );
       return;
     }
-    final parsedUri = Uri.tryParse(url);
-    final scheme = parsedUri?.scheme.toLowerCase();
-    if (parsedUri == null ||
-        (scheme != 'http' && scheme != 'https') ||
-        parsedUri.host.isEmpty) {
+    if (!await _isAllowedMediaUrl(url, device: device)) {
+      if (_disposed || op != _opSequence) return;
       _fail(
         uiError('Invalid DLNA stream URL: $url', code: 'DLNA_INVALID_URL'),
         StackTrace.empty,
@@ -395,6 +534,9 @@ class DlnaRendererService extends ChangeNotifier {
       );
       return;
     }
+    if (_disposed || op != _opSequence) return;
+
+    _pendingSelectDevice = null;
     final resolvedTitle = title ?? url;
     _lastCastPath = null;
     _lastCastUrl = url;
@@ -405,7 +547,7 @@ class DlnaRendererService extends ChangeNotifier {
     _lastCastDuration = duration;
 
     try {
-      _revokeMediaToken();
+      _revokeMediaTokens();
       final metadata = AvTransportClient.buildDidlLiteMetadata(
         url: url,
         title: resolvedTitle,
@@ -419,6 +561,7 @@ class DlnaRendererService extends ChangeNotifier {
       _position = Duration.zero;
       _duration = duration ?? Duration.zero;
       _lastError = null;
+      _consecutiveStoppedPolls = 0;
 
       await client.setAvTransportUri(url, metadata);
       if (_disposed || op != _opSequence) return;
@@ -426,12 +569,131 @@ class DlnaRendererService extends ChangeNotifier {
       if (_disposed || op != _opSequence) return;
       _state = DlnaState.playing;
       _pollFailures = 0;
+      _pollStale = false;
       notifyListeners();
       _startPolling();
+      await _preQueueNextTrack();
     } catch (error, stackTrace) {
       if (op != _opSequence) return;
       _fail(error, stackTrace, 'DLNA playUrl failed');
     }
+  }
+
+  /// Casts [tracks] starting at [startIndex] and wires [next]/[previous] to
+  /// step through the queue while pre-queuing each upcoming track.
+  Future<void> playQueue(
+    List<DlnaQueueTrack> tracks, {
+    int startIndex = 0,
+  }) async {
+    if (_disposed || tracks.isEmpty) return;
+    _queue = List<DlnaQueueTrack>.unmodifiable(tracks);
+    _queueIndex = startIndex.clamp(0, tracks.length - 1);
+    await _playQueueTrack(_queue[_queueIndex]);
+  }
+
+  Future<void> _playQueueTrack(DlnaQueueTrack track) async {
+    final path = track.path;
+    if (path != null && path.isNotEmpty) {
+      await _playFileInternal(
+        path,
+        title: track.title,
+        artist: track.artist,
+        album: track.album,
+        duration: track.duration,
+      );
+      return;
+    }
+    final url = track.url;
+    if (url != null && url.isNotEmpty) {
+      await _playUrlInternal(
+        url,
+        title: track.title,
+        artist: track.artist,
+        album: track.album,
+        duration: track.duration,
+        mimeType: track.mimeType,
+      );
+    }
+  }
+
+  Future<void> _preQueueNextTrack() async {
+    if (_disposed || _queue.isEmpty || _queueIndex + 1 >= _queue.length) return;
+    final client = _avTransport;
+    final device = _selectedDevice;
+    if (client == null || device == null) return;
+    final upcoming = _queue[_queueIndex + 1];
+    try {
+      String? nextUrl = upcoming.url;
+      String? mime = upcoming.mimeType;
+      int? size;
+      var trustedLocalMedia = false;
+      if ((nextUrl == null || nextUrl.isEmpty) &&
+          upcoming.path != null &&
+          _mediaServer.isRunning) {
+        final file = File(upcoming.path!);
+        if (!await file.exists()) return;
+        size = await file.length();
+        final nextToken = MediaHttpServer.newToken();
+        _mediaServer.register(nextToken, MediaSource.file(upcoming.path!));
+        if (_nextToken != null) _mediaServer.unregister(_nextToken!);
+        _nextToken = nextToken;
+        nextUrl = _mediaServer.uriFor(nextToken).toString();
+        mime ??= MediaHttpServer.contentTypeFor(upcoming.path!);
+        trustedLocalMedia = true;
+      }
+      if (nextUrl == null ||
+          (!trustedLocalMedia &&
+              !await _isAllowedMediaUrl(nextUrl, device: device))) {
+        return;
+      }
+      final metadata = AvTransportClient.buildDidlLiteMetadata(
+        url: nextUrl,
+        title: upcoming.title ?? nextUrl,
+        artist: upcoming.artist,
+        album: upcoming.album,
+        mimeType: mime ?? 'audio/mpeg',
+        size: size,
+        duration: upcoming.duration,
+      );
+      await client.setNextAvTransportUri(nextUrl, metadata);
+    } catch (error, stackTrace) {
+      ErrorLogger.log(
+        'DLNA SetNextAVTransportURI failed',
+        error: error,
+        stackTrace: stackTrace,
+        category: 'DLNA',
+      );
+    }
+  }
+
+  Future<bool> _isAllowedMediaUrl(
+    String url, {
+    required UpnpDeviceDescription device,
+  }) async {
+    final parsed = Uri.tryParse(url);
+    final scheme = parsed?.scheme.toLowerCase();
+    if (parsed == null ||
+        (scheme != 'http' && scheme != 'https') ||
+        parsed.host.isEmpty) {
+      return false;
+    }
+    final allowed = <String>{
+      device.location.host.toLowerCase(),
+      device.avTransportControlUrl.host.toLowerCase(),
+      if (_mediaServer.isRunning &&
+          _mediaServer.host != InternetAddress.loopbackIPv4.address)
+        _mediaServer.host.toLowerCase(),
+      ..._allowedMediaHosts,
+    };
+    if (RemoteTargetPolicy.classify(url, allowedHostSuffixes: allowed) !=
+        RemoteTargetVerdict.allowed) {
+      return false;
+    }
+    if (!RemoteTargetPolicy.hostMatchesAnySuffix(parsed.host, allowed) &&
+        !RemoteTargetPolicy.isIpLiteral(parsed.host)) {
+      return RemoteTargetPolicy.isSafeHost(parsed.host, lookup: _dnsLookup);
+    }
+    return true;
   }
 
   /// Queues [url] as the next track via SetNextAVTransportURI.
@@ -445,12 +707,9 @@ class DlnaRendererService extends ChangeNotifier {
   }) async {
     if (_disposed) return;
     final client = _avTransport;
-    if (client == null) return;
-    final parsedUri = Uri.tryParse(url);
-    final scheme = parsedUri?.scheme.toLowerCase();
-    if (parsedUri == null ||
-        (scheme != 'http' && scheme != 'https') ||
-        parsedUri.host.isEmpty) {
+    final device = _selectedDevice;
+    if (client == null || device == null) return;
+    if (!await _isAllowedMediaUrl(url, device: device)) {
       _fail(
         uiError('Invalid DLNA stream URL: $url', code: 'DLNA_INVALID_URL'),
         StackTrace.empty,
@@ -473,10 +732,20 @@ class DlnaRendererService extends ChangeNotifier {
     }
   }
 
-  /// Advances to the next track.
+  /// Advances to the next track in the loaded queue or asks the renderer.
   Future<void> next() async {
     final client = _avTransport;
     if (_disposed || client == null) return;
+    if (_queue.isNotEmpty && _queueIndex + 1 < _queue.length) {
+      _queueIndex++;
+      await _playQueueTrack(_queue[_queueIndex]);
+      return;
+    }
+    final callback = onNextRequested;
+    if (callback != null) {
+      await callback();
+      return;
+    }
     try {
       await client.next();
     } catch (error, stackTrace) {
@@ -484,10 +753,20 @@ class DlnaRendererService extends ChangeNotifier {
     }
   }
 
-  /// Returns to the previous track.
+  /// Returns to the previous track in the loaded queue or asks the renderer.
   Future<void> previous() async {
     final client = _avTransport;
     if (_disposed || client == null) return;
+    if (_queue.isNotEmpty && _queueIndex > 0) {
+      _queueIndex--;
+      await _playQueueTrack(_queue[_queueIndex]);
+      return;
+    }
+    final callback = onPreviousRequested;
+    if (callback != null) {
+      await callback();
+      return;
+    }
     try {
       await client.previous();
     } catch (error, stackTrace) {
@@ -495,16 +774,19 @@ class DlnaRendererService extends ChangeNotifier {
     }
   }
 
-  /// Pauses playback on the renderer.
+  /// Pauses playback on the renderer while keeping polling active to observe
+  /// remote resume or stop events on the renderer.
   Future<void> pause() async {
     final client = _avTransport;
-    if (_disposed || client == null || _state != DlnaState.playing) return;
+    if (_disposed || client == null) return;
+    if (_state != DlnaState.playing && _state != DlnaState.buffering) return;
     try {
       await client.pause();
       if (_disposed) return;
       _state = DlnaState.paused;
+      _consecutiveStoppedPolls = 0;
       notifyListeners();
-      _stopPolling();
+      if (_pollTimer == null) _startPolling();
     } catch (error, stackTrace) {
       _fail(error, stackTrace, 'DLNA pause failed');
     }
@@ -513,12 +795,14 @@ class DlnaRendererService extends ChangeNotifier {
   /// Resumes playback on the renderer.
   Future<void> resume() async {
     final client = _avTransport;
-    if (_disposed || client == null || _state != DlnaState.paused) return;
+    if (_disposed || client == null) return;
+    if (_state != DlnaState.paused && _state != DlnaState.buffering) return;
     try {
       await client.play();
       if (_disposed) return;
       _state = DlnaState.playing;
       _pollFailures = 0;
+      _consecutiveStoppedPolls = 0;
       notifyListeners();
       _startPolling();
     } catch (error, stackTrace) {
@@ -532,7 +816,7 @@ class DlnaRendererService extends ChangeNotifier {
     final op = ++_opSequence;
     final client = _avTransport;
     if (client == null) {
-      _revokeMediaToken();
+      _revokeMediaTokens();
       return;
     }
     _stopPolling();
@@ -542,12 +826,15 @@ class DlnaRendererService extends ChangeNotifier {
       _state = DlnaState.stopped;
       _nowPlayingTitle = null;
       _position = Duration.zero;
+      _queue = const <DlnaQueueTrack>[];
+      _queueIndex = -1;
+      _consecutiveStoppedPolls = 0;
       notifyListeners();
     } catch (error, stackTrace) {
       if (op != _opSequence) return;
       _fail(error, stackTrace, 'DLNA stop failed');
     } finally {
-      _revokeMediaToken();
+      _revokeMediaTokens();
     }
   }
 
@@ -568,13 +855,18 @@ class DlnaRendererService extends ChangeNotifier {
 
   /// Retries the last failed operation.
   ///
-  /// When a file was already cast this re-casts that same file instead of
-  /// reconnecting to the renderer.
+  /// Retries a pending device selection if connect/switch failed, re-casts the
+  /// current file/URL when casting failed, or falls back to discovery.
   Future<void> retry() async {
     if (_disposed) return;
+    final pendingSelect = _pendingSelectDevice;
+    if (pendingSelect != null) {
+      await select(pendingSelect);
+      return;
+    }
     final path = _lastCastPath;
     if (path != null && _avTransport != null && _selectedDevice != null) {
-      await playFile(
+      await _playFileInternal(
         path,
         title: _lastCastTitle,
         artist: _lastCastArtist,
@@ -585,7 +877,7 @@ class DlnaRendererService extends ChangeNotifier {
     }
     final url = _lastCastUrl;
     if (url != null && _avTransport != null && _selectedDevice != null) {
-      await playUrl(
+      await _playUrlInternal(
         url,
         title: _lastCastTitle,
         artist: _lastCastArtist,
@@ -615,15 +907,31 @@ class DlnaRendererService extends ChangeNotifier {
     _pollTimer = null;
   }
 
+  Future<void> _refreshMediaInfo(AvTransportClient client, int op) async {
+    try {
+      final media = await client.getMediaInfo();
+      if (_disposed || op != _opSequence) return;
+      if (_nowPlayingTitle == null && media.title != null) {
+        _nowPlayingTitle = media.title;
+      }
+      if (_duration == Duration.zero && media.mediaDuration != null) {
+        _duration = media.mediaDuration!;
+      }
+    } catch (_) {
+      // Optional action: renderers that return 501/500 must not break select/poll.
+    }
+  }
+
   Future<void> _pollOnce() async {
     if (_disposed || _polling) return;
     final client = _avTransport;
     if (client == null) return;
+    final op = _opSequence;
     _polling = true;
     try {
       final position = await client.getPositionInfo();
       final transport = await client.getTransportInfo();
-      if (_disposed) return;
+      if (_disposed || op != _opSequence) return;
       _pollFailures = 0;
       if (_pollStale) {
         _pollStale = false;
@@ -633,9 +941,43 @@ class DlnaRendererService extends ChangeNotifier {
       if (reported != null) _position = reported;
       final reportedDuration = position.trackDuration;
       if (reportedDuration != null) _duration = reportedDuration;
-      _state = _stateFor(transport.state);
-      if (_state == DlnaState.stopped || _state == DlnaState.idle) {
-        _stopPolling();
+      if (_nowPlayingTitle == null || _duration == Duration.zero) {
+        await _refreshMediaInfo(client, op);
+        if (_disposed || op != _opSequence) return;
+      }
+
+      final nextState = _stateFor(transport.state);
+      if (nextState == DlnaState.stopped || nextState == DlnaState.idle) {
+        final wasActive = _state == DlnaState.playing ||
+            _state == DlnaState.paused ||
+            _state == DlnaState.buffering;
+        if (wasActive) {
+          _consecutiveStoppedPolls += 1;
+          if (_consecutiveStoppedPolls >= maxConsecutiveStoppedPolls) {
+            if (transport.state == TransportState.stopped &&
+                !_advancingQueue &&
+                _queue.isNotEmpty &&
+                _queueIndex + 1 < _queue.length) {
+              _consecutiveStoppedPolls = 0;
+              _advancingQueue = true;
+              try {
+                _queueIndex++;
+                await _playQueueTrack(_queue[_queueIndex]);
+              } finally {
+                _advancingQueue = false;
+              }
+              return;
+            }
+            _state = nextState;
+            _stopPolling();
+          }
+        } else {
+          _state = nextState;
+          _stopPolling();
+        }
+      } else {
+        _consecutiveStoppedPolls = 0;
+        _state = nextState;
       }
       notifyListeners();
     } catch (error, stackTrace) {
@@ -713,19 +1055,23 @@ class DlnaRendererService extends ChangeNotifier {
       case TransportState.noMedia:
         return DlnaState.idle;
       case TransportState.transitioning:
+        // Renderer is loading/buffering; keep polling and keep controls responsive.
+        return DlnaState.buffering;
       case TransportState.unknown:
-        // A renderer changing state is still on its way; keep polling instead
-        // of declaring playback stopped.
+        // A renderer reporting UNKNOWN stays in connecting/polling state.
         return DlnaState.connecting;
       case TransportState.stopped:
         return DlnaState.stopped;
     }
   }
 
-  void _revokeMediaToken() {
+  void _revokeMediaTokens() {
     final token = _token;
     _token = null;
     if (token != null) _mediaServer.unregister(token);
+    final nextToken = _nextToken;
+    _nextToken = null;
+    if (nextToken != null) _mediaServer.unregister(nextToken);
   }
 
   Future<void> _stopRenderer(AvTransportClient client) async {

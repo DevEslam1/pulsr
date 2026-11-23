@@ -275,8 +275,8 @@ void main() {
     expect(service.state, DlnaState.playing);
   });
 
-  test('keeps polling and reports connecting while the renderer is '
-      'TRANSITIONING or unknown', () async {
+  test('keeps polling and reports buffering on TRANSITIONING and connecting on unknown',
+      () async {
     service = buildService(pollInterval: const Duration(milliseconds: 30));
     addTearDown(service.dispose);
     await service.discover();
@@ -285,7 +285,7 @@ void main() {
 
     transportState = 'TRANSITIONING';
     await Future<void>.delayed(const Duration(milliseconds: 120));
-    expect(service.state, DlnaState.connecting);
+    expect(service.state, DlnaState.buffering);
 
     int transportPolls() => requests
         .where((request) => _actionOf(request) == 'GetTransportInfo')
@@ -293,14 +293,14 @@ void main() {
     final before = transportPolls();
     await Future<void>.delayed(const Duration(milliseconds: 120));
     expect(transportPolls(), greaterThan(before));
-    expect(service.state, DlnaState.connecting);
+    expect(service.state, DlnaState.buffering);
 
     transportState = 'SOME_UNKNOWN_STATE';
     await Future<void>.delayed(const Duration(milliseconds: 120));
     expect(service.state, DlnaState.connecting);
   });
 
-  test('switching renderers stops the previous one before connecting',
+  test('switching renderers probes the new device before stopping the previous one',
       () async {
     service = buildService();
     addTearDown(service.dispose);
@@ -320,15 +320,19 @@ void main() {
 
     await service.select(device('b'));
 
-    final stopIndex =
-        requests.indexWhere((request) => _actionOf(request) == 'Stop');
-    expect(stopIndex, isNonNegative);
-    expect(requests[stopIndex].url.path, endsWith('/control/avt-a'));
     final probeIndex = requests.indexWhere(
-      (request) => _actionOf(request) == 'GetTransportInfo',
+      (request) =>
+          _actionOf(request) == 'GetTransportInfo' &&
+          request.url.path.endsWith('/control/avt-b'),
+    );
+    final stopIndex = requests.indexWhere(
+      (request) =>
+          _actionOf(request) == 'Stop' &&
+          request.url.path.endsWith('/control/avt-a'),
     );
     expect(probeIndex, isNonNegative);
-    expect(stopIndex, lessThan(probeIndex));
+    expect(stopIndex, isNonNegative);
+    expect(probeIndex, lessThan(stopIndex));
     expect(service.selectedDevice?.identity, 'uuid:renderer-b');
   });
 
@@ -566,5 +570,199 @@ void main() {
     expect(executedActions, contains('SetAVTransportURI'));
     expect(executedActions, contains('Stop'));
     expect(executedActions.where((a) => a == 'Play'), isEmpty);
+  });
+
+  group('H-42 hardening', () {
+    UpnpDeviceDescription deviceFor(String suffix) => UpnpDeviceDescription(
+          friendlyName: 'Renderer $suffix',
+          udn: 'uuid:renderer-$suffix',
+          deviceType: 'urn:schemas-upnp-org:device:MediaRenderer:1',
+          location: Uri.parse('http://192.168.1.5:5555/description.xml'),
+          avTransportControlUrl:
+              Uri.parse('http://192.168.1.5:5555/control/avt-$suffix'),
+        );
+
+    test('failed switch leaves previous renderer intact and retry retries new device',
+        () async {
+      var failDeviceB = true;
+      final client = MockClient((request) async {
+        requests.add(request);
+        if (request.url.path.endsWith('/control/avt-b') && failDeviceB) {
+          return http.Response('unreachable', 503);
+        }
+        switch (_actionOf(request)) {
+          case 'GetTransportInfo':
+            return http.Response(
+              _soap(
+                '<u:GetTransportInfoResponse xmlns:u="urn:schemas-upnp-org:service:AVTransport:1">'
+                '<CurrentTransportState>PLAYING</CurrentTransportState>'
+                '</u:GetTransportInfoResponse>',
+              ),
+              200,
+            );
+          default:
+            return http.Response(_soap(''), 200);
+        }
+      });
+      final testService = DlnaRendererService(
+        httpClient: client,
+        pollInterval: const Duration(minutes: 1),
+        localAddressResolver: (_, __) async => InternetAddress.loopbackIPv4,
+      );
+      addTearDown(testService.dispose);
+
+      await testService.select(deviceFor('a'));
+      requests.clear();
+
+      await testService.select(deviceFor('b'));
+      expect(testService.state, DlnaState.error);
+      expect(testService.selectedDevice?.identity, 'uuid:renderer-a');
+      expect(
+        requests.where(
+          (r) =>
+              _actionOf(r) == 'Stop' && r.url.path.endsWith('/control/avt-a'),
+        ),
+        isEmpty,
+      );
+
+      failDeviceB = false;
+      await testService.retry();
+      expect(testService.selectedDevice?.identity, 'uuid:renderer-b');
+      expect(testService.lastError, isNull);
+    });
+
+    test('playUrl rejects private/loopback/DNS-rebinding targets via RemoteTargetPolicy',
+        () async {
+      final client = MockClient((_) async => http.Response(_soap(''), 200));
+      final testService = DlnaRendererService(
+        httpClient: client,
+        pollInterval: const Duration(minutes: 1),
+        dnsLookup: (host) async =>
+            host == 'rebind.net' ? <String>['10.0.0.5'] : <String>['93.184.216.34'],
+      );
+      addTearDown(testService.dispose);
+      await testService.select(deviceFor('a'));
+
+      await testService.playUrl('http://127.0.0.1:8080/secret');
+      expect(testService.lastError?.code, 'DLNA_INVALID_URL');
+
+      await testService.playUrl('http://169.254.169.254/latest/meta-data/');
+      expect(testService.lastError?.code, 'DLNA_INVALID_URL');
+
+      await testService.playUrl('https://rebind.net/audio.mp3');
+      expect(testService.lastError?.code, 'DLNA_INVALID_URL');
+    });
+
+    test('requires two consecutive stopped polls and keeps polling while paused',
+        () async {
+      var polls = 0;
+      transportState = 'PLAYING';
+      final client = MockClient((request) async {
+        switch (_actionOf(request)) {
+          case 'GetTransportInfo':
+            polls++;
+            if (polls == 2) transportState = 'STOPPED';
+            if (polls == 3) transportState = 'PLAYING';
+            if (polls >= 4) transportState = 'STOPPED';
+            return http.Response(
+              _soap(
+                '<u:GetTransportInfoResponse xmlns:u="urn:schemas-upnp-org:service:AVTransport:1">'
+                '<CurrentTransportState>$transportState</CurrentTransportState>'
+                '</u:GetTransportInfoResponse>',
+              ),
+              200,
+            );
+          case 'GetPositionInfo':
+            return http.Response(
+              _soap(
+                '<u:GetPositionInfoResponse xmlns:u="urn:schemas-upnp-org:service:AVTransport:1">'
+                '<TrackDuration>0:03:00</TrackDuration><RelTime>0:00:10</RelTime>'
+                '</u:GetPositionInfoResponse>',
+              ),
+              200,
+            );
+          default:
+            return http.Response(_soap(''), 200);
+        }
+      });
+      final testService = DlnaRendererService(
+        httpClient: client,
+        pollInterval: const Duration(milliseconds: 25),
+        localAddressResolver: (_, __) async => InternetAddress.loopbackIPv4,
+      );
+      addTearDown(testService.dispose);
+      await testService.select(deviceFor('a'));
+      await testService.playFile(mediaFile.path, title: 'Track');
+
+      // Pause does NOT stop polling: renderer transitioning externally is seen.
+      await testService.pause();
+      expect(testService.state, DlnaState.paused);
+
+      // Single STOPPED poll doesn't immediately stop; 2 consecutive STOPPED do.
+      await Future<void>.delayed(const Duration(milliseconds: 180));
+      expect(testService.state, DlnaState.stopped);
+    });
+
+    test('GetMediaInfo populates title/duration on select and playQueue steps next/previous',
+        () async {
+      final client = MockClient((request) async {
+        requests.add(request);
+        switch (_actionOf(request)) {
+          case 'GetTransportInfo':
+            return http.Response(
+              _soap(
+                '<u:GetTransportInfoResponse xmlns:u="urn:schemas-upnp-org:service:AVTransport:1">'
+                '<CurrentTransportState>PLAYING</CurrentTransportState>'
+                '</u:GetTransportInfoResponse>',
+              ),
+              200,
+            );
+          case 'GetMediaInfo':
+            return http.Response(
+              _soap(
+                '<u:GetMediaInfoResponse xmlns:u="urn:schemas-upnp-org:service:AVTransport:1">'
+                '<MediaDuration>0:04:12</MediaDuration>'
+                '<CurrentURIMetaData>&lt;DIDL-Lite&gt;&lt;item&gt;&lt;dc:title&gt;External Track&lt;/dc:title&gt;&lt;/item&gt;&lt;/DIDL-Lite&gt;</CurrentURIMetaData>'
+                '</u:GetMediaInfoResponse>',
+              ),
+              200,
+            );
+          case 'GetPositionInfo':
+            return http.Response(_soap(''), 200);
+          default:
+            return http.Response(_soap(''), 200);
+        }
+      });
+      final testService = DlnaRendererService(
+        httpClient: client,
+        pollInterval: const Duration(minutes: 1),
+        localAddressResolver: (_, __) async => InternetAddress.loopbackIPv4,
+      );
+      addTearDown(testService.dispose);
+
+      await testService.select(deviceFor('a'));
+      expect(testService.nowPlayingTitle, 'External Track');
+      expect(testService.duration, const Duration(minutes: 4, seconds: 12));
+
+      final secondFile = File('${tempDir.path}${Platform.pathSeparator}song2.mp3')
+        ..writeAsBytesSync(const <int>[1, 2, 3]);
+      await testService.playQueue(<DlnaQueueTrack>[
+        DlnaQueueTrack(path: mediaFile.path, title: 'First'),
+        DlnaQueueTrack(path: secondFile.path, title: 'Second'),
+      ]);
+      expect(testService.nowPlayingTitle, 'First');
+      expect(
+        requests.where((r) => _actionOf(r) == 'SetNextAVTransportURI'),
+        isNotEmpty,
+      );
+
+      await testService.next();
+      expect(testService.nowPlayingTitle, 'Second');
+      expect(testService.currentQueueIndex, 1);
+
+      await testService.previous();
+      expect(testService.nowPlayingTitle, 'First');
+      expect(testService.currentQueueIndex, 0);
+    });
   });
 }

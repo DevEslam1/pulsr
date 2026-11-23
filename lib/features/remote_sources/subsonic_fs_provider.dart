@@ -74,6 +74,8 @@ class SubsonicFsProvider implements RemoteFsProvider {
   /// Path segment that introduces a track.
   static const String songSegment = 'song';
 
+  static const int _maxCachedSongs = 512;
+
   @override
   final RemoteSource source;
 
@@ -81,6 +83,7 @@ class SubsonicFsProvider implements RemoteFsProvider {
   final bool _ownsClient;
   final Duration _timeout;
   late final SubsonicClient _api;
+  final Map<String, SubsonicSong> _songCache = <String, SubsonicSong>{};
   bool _closed = false;
 
   /// `(scheme)://(host):(port)(rootPath)` for [source].
@@ -140,6 +143,7 @@ class SubsonicFsProvider implements RemoteFsProvider {
         final albumId = _decodeId(segments[1]);
         if (albumId == null) throw _badPath();
         final album = await _api.getAlbum(albumId);
+        _rememberSongs(album.songs);
         return _sorted(<RemoteEntry>[
           for (final song in album.songs)
             RemoteEntry(
@@ -200,25 +204,49 @@ class SubsonicFsProvider implements RemoteFsProvider {
           artworkCacheKey: _coverArtCacheKey(album.coverArt),
         );
       }
+      if (segments.length == 2 && segments[0] == songSegment) {
+        final songId = _decodeId(segments[1]);
+        if (songId == null) return null;
+        final cached = _songCache[songId];
+        return cached == null
+            ? null
+            : _entryForSong(cached, albumId: cached.albumId ?? songSegment);
+      }
       if (segments.length == 4 &&
           segments[0] == albumSegment &&
           segments[2] == songSegment) {
         final albumId = _decodeId(segments[1]);
         final songId = _decodeId(segments[3]);
         if (albumId == null || songId == null) return null;
-        final album = await _api.getAlbum(albumId);
-        for (final song in album.songs) {
-          if (song.id != songId) continue;
-          return RemoteEntry(
-            path: songPath(album.id, song.id),
-            name: _songName(song),
-            isDirectory: false,
-            sizeBytes: song.sizeBytes,
-            artworkUri: _coverArtUri(song.coverArt ?? album.coverArt),
-            artworkCacheKey: _coverArtCacheKey(song.coverArt ?? album.coverArt),
-          );
+        if (albumId == songSegment) {
+          final cached = _songCache[songId];
+          return cached == null
+              ? null
+              : _entryForSong(cached, albumId: songSegment);
         }
-        return null;
+        try {
+          final album = await _api.getAlbum(albumId);
+          _rememberSongs(album.songs);
+          for (final song in album.songs) {
+            if (song.id != songId) continue;
+            return _entryForSong(
+              song,
+              albumId: album.id,
+              fallbackCoverArt: album.coverArt,
+            );
+          }
+          return null;
+        } on SubsonicError catch (e, st) {
+          final mapped = _asRemoteError(e, st);
+          if (mapped is RemoteNotFoundError) {
+            final cached = _songCache[songId];
+            if (cached != null) {
+              return _entryForSong(cached, albumId: albumId);
+            }
+            return null;
+          }
+          rethrow;
+        }
       }
       return null;
     } on SubsonicError catch (e, st) {
@@ -257,7 +285,7 @@ class SubsonicFsProvider implements RemoteFsProvider {
     }
 
     final fullRead = start == 0 && end == null;
-    final request = http.Request('GET', uri);
+    final request = http.Request('GET', uri)..followRedirects = false;
     if (!fullRead) {
       request.headers[HttpHeaders.rangeHeader] = rangeHeader(start, end);
     }
@@ -367,7 +395,7 @@ class SubsonicFsProvider implements RemoteFsProvider {
     int songOffset = 0,
   }) async {
     try {
-      return await _api.search3(
+      final result = await _api.search3(
         query,
         artistCount: artistCount,
         artistOffset: artistOffset,
@@ -376,6 +404,8 @@ class SubsonicFsProvider implements RemoteFsProvider {
         songCount: songCount,
         songOffset: songOffset,
       );
+      _rememberSongs(result.songs);
+      return result;
     } on SubsonicError catch (e, st) {
       throw _asRemoteError(e, st);
     }
@@ -436,9 +466,38 @@ class SubsonicFsProvider implements RemoteFsProvider {
     }
   }
 
+  void _rememberSongs(Iterable<SubsonicSong> songs) {
+    for (final song in songs) {
+      if (_songCache.length >= _maxCachedSongs &&
+          !_songCache.containsKey(song.id)) {
+        _songCache.remove(_songCache.keys.first);
+      }
+      _songCache[song.id] = song;
+    }
+  }
+
+  RemoteEntry _entryForSong(
+    SubsonicSong song, {
+    required String albumId,
+    String? fallbackCoverArt,
+  }) {
+    final coverArt = song.coverArt ?? fallbackCoverArt;
+    return RemoteEntry(
+      path: songPath(albumId, song.id),
+      name: _songName(song),
+      isDirectory: false,
+      sizeBytes: song.sizeBytes,
+      artworkUri: _coverArtUri(coverArt),
+      artworkCacheKey: _coverArtCacheKey(coverArt),
+    );
+  }
+
   /// Song id addressed by [path], or `null` for anything but a song path.
   static String? _songIdFrom(String path) {
     final segments = _segments(path);
+    if (segments.length == 2 && segments[0] == songSegment) {
+      return _decodeId(segments[1]);
+    }
     if (segments.length != 4) return null;
     if (segments[0] != albumSegment || segments[2] != songSegment) return null;
     return _decodeId(segments[3]);

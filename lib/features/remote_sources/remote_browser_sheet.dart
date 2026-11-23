@@ -67,6 +67,7 @@ class _RemoteBrowserSheetState extends State<RemoteBrowserSheet> {
   Timer? _debounceTimer;
   int _searchSequence = 0;
   int _loadSequence = 0;
+  bool _openingPlay = false;
 
   @override
   void initState() {
@@ -142,13 +143,13 @@ class _RemoteBrowserSheetState extends State<RemoteBrowserSheet> {
         _searchLoading = false;
       });
     } catch (e, st) {
+      if (!mounted || currentSeq != _searchSequence) return;
       ErrorLogger.log(
         'Subsonic search failed',
         error: e,
         stackTrace: st,
         category: 'RemoteSources',
       );
-      if (!mounted) return;
       setState(() {
         _searchResults = null;
         _searchError = RemoteSourcesStrings.folderLoadFailed;
@@ -241,9 +242,10 @@ class _RemoteBrowserSheetState extends State<RemoteBrowserSheet> {
         _searchLoadingMore = false;
       });
     } catch (e, st) {
+      if (!mounted || currentSeq != _searchSequence) return;
       ErrorLogger.log('Subsonic search page failed',
           error: e, stackTrace: st, category: 'RemoteSources');
-      if (mounted) setState(() => _searchLoadingMore = false);
+      setState(() => _searchLoadingMore = false);
     }
   }
 
@@ -316,11 +318,13 @@ class _RemoteBrowserSheetState extends State<RemoteBrowserSheet> {
   }
 
   Future<void> _play(RemoteEntry entry) async {
+    if (_openingPlay) return;
     final onPlay = widget.onPlay;
     if (onPlay == null) {
       setState(() => _playError = RemoteSourcesStrings.folderLoadFailed);
       return;
     }
+    _openingPlay = true;
     try {
       await onPlay(widget.source, entry);
       if (!mounted) return;
@@ -345,6 +349,8 @@ class _RemoteBrowserSheetState extends State<RemoteBrowserSheet> {
       );
       if (!mounted) return;
       setState(() => _playError = RemoteSourcesStrings.folderLoadFailed);
+    } finally {
+      _openingPlay = false;
     }
   }
 
@@ -377,12 +383,18 @@ class _RemoteBrowserSheetState extends State<RemoteBrowserSheet> {
                       tooltip: RemoteSourcesStrings.searchLibrary,
                       icon: Icon(_isSearching ? Icons.close : Icons.search),
                       onPressed: () {
+                        _debounceTimer?.cancel();
+                        _searchSequence++;
                         setState(() {
                           _isSearching = !_isSearching;
                           if (!_isSearching) {
                             _searchController.clear();
                             _searchResults = null;
                             _searchError = null;
+                            _searchLoading = false;
+                            _searchLoadingMore = false;
+                            _searchQuery = '';
+                            _searchHasMore = false;
                           }
                         });
                       },

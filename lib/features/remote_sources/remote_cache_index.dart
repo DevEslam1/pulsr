@@ -7,6 +7,7 @@
 // file name, its size, its last access time and its pinned flag. The index is
 // written through a `.partial` file and renamed, and a missing or corrupt index
 // is recovered by scanning the `.bin` files that are actually on disk.
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -180,21 +181,48 @@ class RemoteCacheIndex {
     return found;
   }
 
-  /// Writes are chained so the shared `index.json.partial` staging file can
-  /// never be deleted by a concurrent write (which used to lose an entry).
-  Future<void> _writeChain = Future<void>.value();
+  /// Latest queued snapshot; bursts coalesce into at most one queued write.
+  Map<String, RemoteCacheEntry>? _queuedEntries;
+  Completer<void>? _queuedWaiter;
+  Future<void>? _activeWrite;
+
+  /// Waits until any active or queued `index.json` write finishes.
+  Future<void> waitForIdle() async {
+    while (_activeWrite != null) {
+      await _activeWrite;
+    }
+  }
 
   /// Writes the index atomically through a `.partial` file.
   ///
-  /// Calls are serialized: the encode + replace sequence is not reentrant and
-  /// two callers using the same temp name would interleave.
+  /// Calls are serialized and coalesced: if multiple mutations land while one
+  /// write is on disk, only the latest snapshot is flushed next.
   Future<void> write(Map<String, RemoteCacheEntry> entries) {
     // Snapshot now: the store keeps mutating its live map while this write is
     // queued behind another one.
-    final snapshot = Map<String, RemoteCacheEntry>.from(entries);
-    final next = _writeChain.then((_) => _writeNow(snapshot));
-    _writeChain = next;
-    return next;
+    _queuedEntries = Map<String, RemoteCacheEntry>.from(entries);
+    final waiter = _queuedWaiter ??= Completer<void>();
+    _activeWrite ??= _drainWrites();
+    return waiter.future;
+  }
+
+  Future<void> _drainWrites() async {
+    try {
+      while (_queuedEntries != null) {
+        final snapshot = _queuedEntries!;
+        final waiter = _queuedWaiter!;
+        _queuedEntries = null;
+        _queuedWaiter = null;
+        try {
+          await _writeNow(snapshot);
+          waiter.complete();
+        } catch (e, st) {
+          waiter.completeError(e, st);
+        }
+      }
+    } finally {
+      _activeWrite = null;
+    }
   }
 
   Future<void> _writeNow(Map<String, RemoteCacheEntry> entries) async {

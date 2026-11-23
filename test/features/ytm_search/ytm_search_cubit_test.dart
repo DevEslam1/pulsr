@@ -684,4 +684,67 @@ void main() {
       expect(cubit.state.results.single.title, 'Direct Hit');
     });
   });
+
+  group('bot recovery and offline classification fixes', () {
+    test('does not retry search when ensurePoTokenReady returns false',
+        () async {
+      when(() => service.searchWithFallback(any()))
+          .thenThrow(const YtmException('BOT_CHALLENGE'));
+      when(() => service.ensurePoTokenReady()).thenAnswer((_) async => false);
+
+      final cubit = build();
+      cubit.onQueryChanged('blocked');
+      await Future<void>.delayed(const Duration(milliseconds: 350));
+      await pumpEventQueue();
+
+      verify(() => service.searchWithFallback('blocked')).called(1);
+      verify(() => service.ensurePoTokenReady()).called(1);
+      expect(cubit.state.isLoading, isFalse);
+      expect(cubit.state.error?.code, 'YTM_BOT_BLOCK');
+    });
+
+    test('single-flight poToken refresh recovers subsequent query without deadlock',
+        () async {
+      final tokenCompleter = Completer<bool>();
+      var calls = 0;
+      when(() => service.ensurePoTokenReady())
+          .thenAnswer((_) => tokenCompleter.future);
+      when(() => service.searchWithFallback(any())).thenAnswer((_) async {
+        calls++;
+        if (calls <= 2) {
+          throw const YtmException('BOT_CHALLENGE');
+        }
+        return [_track('dQw4w9WgXcQ', 'Recovered')];
+      });
+
+      final cubit = build();
+      cubit.onQueryChanged('first');
+      await Future<void>.delayed(const Duration(milliseconds: 350));
+      cubit.onQueryChanged('second');
+      await Future<void>.delayed(const Duration(milliseconds: 350));
+      await pumpEventQueue();
+
+      verify(() => service.invalidatePoToken()).called(1);
+      tokenCompleter.complete(true);
+      await pumpEventQueue();
+
+      expect(cubit.state.isLoading, isFalse);
+      expect(cubit.state.query, 'second');
+      expect(cubit.state.results.single.title, 'Recovered');
+    });
+
+    test('YTM_NETWORK classification sets YTM_NETWORK_OFFLINE for statusMessageFor',
+        () async {
+      when(() => service.searchWithFallback(any()))
+          .thenThrow(const YtmException('YTM_NETWORK'));
+
+      final cubit = build();
+      cubit.onQueryChanged('offline');
+      await Future<void>.delayed(const Duration(milliseconds: 350));
+      await pumpEventQueue();
+
+      expect(cubit.state.error?.code, 'YTM_NETWORK_OFFLINE');
+      expect(cubit.statusMessageFor(false), contains('offline'));
+    });
+  });
 }

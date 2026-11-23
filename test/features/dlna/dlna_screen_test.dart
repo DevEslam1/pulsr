@@ -267,4 +267,57 @@ void main() {
     service.addListener(() {});
     service.dispose();
   });
+
+  testWidgets('screen back navigation keeps shared singleton alive and shows controls during buffering or missing title',
+      (tester) async {
+    DlnaRendererService.resetSharedForTest();
+    addTearDown(DlnaRendererService.resetSharedForTest);
+
+    final shared = DlnaRendererService.shared;
+    var popped = false;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => ElevatedButton(
+            onPressed: () async {
+              await Navigator.of(context).push<void>(
+                MaterialPageRoute<void>(
+                  builder: (_) => const DlnaScreen(),
+                ),
+              );
+              popped = true;
+            },
+            child: const Text('Open'),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+    expect(identical(DlnaRendererService.shared, shared), isTrue);
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(popped, isTrue);
+    // Shared singleton remains alive for active casts across back navigation.
+    expect(() => shared.addListener(() {}), returnsNormally);
+
+    // Controls remain rendered when playing without a local title.
+    final namelessPlaying = _NamelessPlayingStub();
+    addTearDown(namelessPlaying.dispose);
+    await tester.pumpWidget(MaterialApp(home: DlnaScreen(service: namelessPlaying)));
+    expect(find.byTooltip(DlnaStrings.stop), findsOneWidget);
+  });
+}
+
+class _NamelessPlayingStub extends _StubRendererService {
+  @override
+  UpnpDeviceDescription? get selectedDevice => _device;
+
+  @override
+  DlnaState get state => DlnaState.buffering;
+
+  @override
+  String? get nowPlayingTitle => null;
 }

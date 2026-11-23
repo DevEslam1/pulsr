@@ -230,12 +230,19 @@ class DownloadTile extends StatelessWidget {
                     minWidth: AppSpacing.minTouchTarget,
                     minHeight: AppSpacing.minTouchTarget,
                   ),
-                  onPressed: () {
+                  onPressed: () async {
                     final title =
                         task.title.isNotEmpty ? task.title : task.videoId;
-                    cubit.cancelDownload(task.videoId);
+                    final toastContext =
+                        Scaffold.maybeOf(context)?.context ?? context;
+                    await cubit.cancelDownload(task.videoId);
+                    if (!toastContext.mounted) return;
+                    if (cubit.state.error != null ||
+                        cubit.state.tasks.containsKey(task.videoId)) {
+                      return;
+                    }
                     PulsrToast.show(
-                      context,
+                      toastContext,
                       message: '$title ${l10n.statusCancelled.toLowerCase()}',
                       icon: Icons.cancel_outlined,
                       actionLabel: l10n.retry,
@@ -267,6 +274,8 @@ class DownloadTile extends StatelessWidget {
                           cubit.retryDownload(task.videoId);
                           break;
                         case 'delete':
+                          final toastContext =
+                              Scaffold.maybeOf(context)?.context ?? context;
                           final confirmed =
                               await PulsrDialogHelper.showConfirmDialog(
                             context,
@@ -281,9 +290,13 @@ class DownloadTile extends StatelessWidget {
                           );
                           if (confirmed != true) return;
                           await cubit.deleteDownload(task.videoId);
-                          if (!context.mounted) return;
+                          if (!toastContext.mounted) return;
+                          if (cubit.state.error != null ||
+                              cubit.state.tasks.containsKey(task.videoId)) {
+                            return;
+                          }
                           PulsrToast.show(
-                            context,
+                            toastContext,
                             message: l10n.songDeleted,
                             icon: Icons.delete_outline_rounded,
                             isSuccess: true,

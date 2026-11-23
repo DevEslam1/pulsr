@@ -21,15 +21,18 @@ class RadioDirectorySheet extends StatefulWidget {
     super.key,
     this.service,
     required this.store,
+    this.onStationAdded,
   });
 
   final RadioBrowserService? service;
   final RadioStationStore store;
+  final ValueChanged<RadioStation>? onStationAdded;
 
   static Future<void> show(
     BuildContext context, {
     RadioBrowserService? service,
     RadioStationStore? store,
+    ValueChanged<RadioStation>? onStationAdded,
   }) {
     final size = MediaQuery.sizeOf(context);
     final isLandscape = size.width > size.height;
@@ -46,6 +49,7 @@ class RadioDirectorySheet extends StatefulWidget {
             child: RadioDirectorySheet(
               service: service,
               store: store ?? RadioStationStore(),
+              onStationAdded: onStationAdded,
             ),
           ),
         ),
@@ -95,6 +99,7 @@ class _RadioDirectorySheetState extends State<RadioDirectorySheet> {
 
   @override
   void dispose() {
+    _generation++;
     if (_ownsService) {
       _service.dispose();
     }
@@ -150,6 +155,7 @@ class _RadioDirectorySheetState extends State<RadioDirectorySheet> {
       await widget.store.add(station);
       if (!mounted) return;
       setState(() => _addedIds.add(station.id));
+      widget.onStationAdded?.call(station);
       PulsrToast.show(
         context,
         message: context.l10n.radioDirectoryAdded,
@@ -198,7 +204,8 @@ class _RadioDirectorySheetState extends State<RadioDirectorySheet> {
                   borderRadius: AppRadii.r12All,
                 ),
                 clipBehavior: Clip.antiAlias,
-                child: station.artworkUrl != null
+                child: station.artworkUrl != null &&
+                        RadioStation.isHttpUrl(station.artworkUrl!)
                     ? Image.network(
                         station.artworkUrl!,
                         fit: BoxFit.cover,

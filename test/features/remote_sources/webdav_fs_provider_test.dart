@@ -345,4 +345,42 @@ void main() {
       await targetServer.close(force: true);
     }
   });
+
+  test('skips 404/403 propstat responses, rejects .. hrefs, and decodes numeric XML entities',
+      () async {
+    const xml = '''<?xml version="1.0"?>
+<d:multistatus xmlns:d="DAV:">
+  <d:response>
+    <d:href>/dav/Music/denied.mp3</d:href>
+    <d:propstat>
+      <d:prop><d:resourcetype/></d:prop>
+      <d:status>HTTP/1.1 404 Not Found</d:status>
+    </d:propstat>
+  </d:response>
+  <d:response>
+    <d:href>/dav/Music/../etc/passwd</d:href>
+    <d:propstat>
+      <d:prop><d:resourcetype/></d:prop>
+      <d:status>HTTP/1.1 200 OK</d:status>
+    </d:propstat>
+  </d:response>
+  <d:response>
+    <d:href>/dav/Music/Rock%20&#x27;n&#39;%20Roll%20&amp;amp%3B.mp3</d:href>
+    <d:propstat>
+      <d:prop><d:resourcetype/><d:getcontentlength>42</d:getcontentlength></d:prop>
+      <d:status>HTTP/1.1 200 OK</d:status>
+    </d:propstat>
+  </d:response>
+</d:multistatus>''';
+
+    final entries = WebDavFsProvider.parseMultiStatus(
+      xml,
+      rootPath: '/dav',
+      requestPath: 'Music',
+    );
+
+    expect(entries, hasLength(1));
+    expect(entries.single.name, "Rock 'n' Roll &amp;.mp3");
+    expect(entries.single.sizeBytes, 42);
+  });
 }

@@ -16,7 +16,7 @@ import 'auth_state.dart';
 class AuthCubit extends PulsrCubit<AuthState> {
   final AuthService _authService;
   final CloudSyncService _cloudSyncService;
-  bool _syncing = false;
+  Future<void>? _activeSyncFuture;
   int _syncToken = 0;
   // Set when a sync arrives while one is already in flight; the in-flight pass
   // re-runs once it finishes so an account switch mid-sync is never dropped.
@@ -275,84 +275,91 @@ class AuthCubit extends PulsrCubit<AuthState> {
   /// the sentence.
   static AuthFailure classifyAuthError(Object e) => AuthFailure.fromAny(e);
 
-  Future<void> syncNow() async {
+  Future<void> syncNow() {
     final currentUser = state.user;
-    if (currentUser == null) return;
+    if (currentUser == null) return Future<void>.value();
     final currentUid = _userUid(currentUser);
-    if (_syncing) {
+    final active = _activeSyncFuture;
+    if (active != null) {
       // Only queue a re-run if the user account actually switched mid-sync:
       // do NOT queue a duplicate back-to-back sync when signIn... and
       // authStateChanges both invoke syncNow() for the same user.
       if (currentUid != _syncingUserId) {
         _syncQueued = true;
       }
-      return;
+      return active;
     }
     // FIX-C11: Monotonic clock prevents system wall-clock jumps from disrupting sync deduplication.
     // Allow immediate retries if the previous sync resulted in a failure.
     if (state.syncStatus != SyncStatus.failure &&
         _syncStopwatch.isRunning &&
         _syncStopwatch.elapsed < _syncDedupeWindow) {
-      return;
+      return Future<void>.value();
     }
-    _syncStopwatch
-      ..reset()
-      ..start();
-    final token = ++_syncToken;
-    _syncing = true;
-    _syncQueued = false;
-    _syncingUserId = currentUid;
-    safeEmit(state.copyWith(syncStatus: SyncStatus.syncing, syncError: null));
-    try {
-      final success = await _cloudSyncService.syncAll();
-      if (token == _syncToken && !isClosed && state.user != null) {
-        if (success) {
-          safeEmit(state.copyWith(
-            syncStatus: SyncStatus.success,
-            lastSyncedAt: _cloudSyncService.lastSyncTime,
-            syncError: null,
-          ));
-        } else {
+
+    late final Future<void> future;
+    future = () async {
+      try {
+        do {
+          final loopUser = state.user;
+          if (loopUser == null || isClosed) break;
+          _syncQueued = false;
           _syncStopwatch
-            ..stop()
-            ..reset();
-          safeEmit(state.copyWith(
-            syncStatus: SyncStatus.failure,
-            syncError: const GenericAppError(
-              code: 'AUTH_SYNC_FAILED',
-              userMessage:
-                  'Failed to sync with cloud. Check internet connection.',
-            ),
-          ));
+            ..reset()
+            ..start();
+          final token = ++_syncToken;
+          _syncingUserId = _userUid(loopUser);
+          safeEmit(
+              state.copyWith(syncStatus: SyncStatus.syncing, syncError: null));
+          try {
+            final success = await _cloudSyncService.syncAll();
+            if (token == _syncToken && !isClosed && state.user != null) {
+              if (success) {
+                safeEmit(state.copyWith(
+                  syncStatus: SyncStatus.success,
+                  lastSyncedAt: _cloudSyncService.lastSyncTime,
+                  syncError: null,
+                ));
+              } else {
+                _syncStopwatch
+                  ..stop()
+                  ..reset();
+                safeEmit(state.copyWith(
+                  syncStatus: SyncStatus.failure,
+                  syncError: const GenericAppError(
+                    code: 'AUTH_SYNC_FAILED',
+                    userMessage:
+                        'Failed to sync with cloud. Check internet connection.',
+                  ),
+                ));
+              }
+            }
+          } catch (_) {
+            if (token == _syncToken && !isClosed && state.user != null) {
+              _syncStopwatch
+                ..stop()
+                ..reset();
+              safeEmit(state.copyWith(
+                syncStatus: SyncStatus.failure,
+                syncError: const GenericAppError(
+                  code: 'AUTH_SYNC_FAILED',
+                  userMessage:
+                      'Failed to sync with cloud. Check internet connection.',
+                ),
+              ));
+            }
+          } finally {
+            _syncingUserId = null;
+          }
+        } while (_syncQueued && !isClosed && state.user != null);
+      } finally {
+        if (identical(_activeSyncFuture, future)) {
+          _activeSyncFuture = null;
         }
       }
-    } catch (_) {
-      if (token == _syncToken && !isClosed && state.user != null) {
-        _syncStopwatch
-          ..stop()
-          ..reset();
-        safeEmit(state.copyWith(
-          syncStatus: SyncStatus.failure,
-          syncError: const GenericAppError(
-            code: 'AUTH_SYNC_FAILED',
-            userMessage:
-                'Failed to sync with cloud. Check internet connection.',
-          ),
-        ));
-      }
-    } finally {
-      _syncing = false;
-      _syncingUserId = null;
-    }
-    if (_syncQueued && !isClosed) {
-      _syncQueued = false;
-      // Bypass the dedupe window: the queued run is the account that must
-      // actually sync, not a duplicate of the pass that just finished.
-      _syncStopwatch
-        ..stop()
-        ..reset();
-      await syncNow();
-    }
+    }();
+    _activeSyncFuture = future;
+    return future;
   }
 
   Future<void> signOut() async {

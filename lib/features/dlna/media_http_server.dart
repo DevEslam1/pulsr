@@ -77,6 +77,7 @@ class MediaHttpServer {
 
   HttpServer? _server;
   StreamSubscription<HttpRequest>? _subscription;
+  Future<void>? _starting;
   String _host = InternetAddress.loopbackIPv4.address;
   int _activeRequests = 0;
 
@@ -151,6 +152,22 @@ class MediaHttpServer {
   /// interface the advertised URL uses exactly that interface; when the server
   /// binds the wildcard address the best local address is detected.
   Future<void> start({InternetAddress? bindAddress}) async {
+    if (_server != null) return;
+    final pending = _starting;
+    if (pending != null) {
+      await pending;
+      return;
+    }
+    final future = _startInternal(bindAddress: bindAddress);
+    _starting = future;
+    try {
+      await future;
+    } finally {
+      if (identical(_starting, future)) _starting = null;
+    }
+  }
+
+  Future<void> _startInternal({InternetAddress? bindAddress}) async {
     if (_server != null) return;
     try {
       final target = bindAddress ?? _defaultBindAddress;
@@ -542,12 +559,10 @@ class MediaHttpServer {
         type: InternetAddressType.IPv4,
         includeLoopback: false,
       );
-      for (final interface in interfaces) {
-        for (final address in interface.addresses) {
-          if (address.address.startsWith('169.254.')) continue;
-          return address.address;
-        }
-      }
+      final preferred = selectPreferredIpv4(
+        interfaces.map((iface) => (name: iface.name, addresses: iface.addresses)),
+      );
+      if (preferred != null) return preferred;
     } on SocketException catch (error, stackTrace) {
       ErrorLogger.log(
         'DLNA media host detection failed',
@@ -557,6 +572,46 @@ class MediaHttpServer {
       );
     }
     return InternetAddress.loopbackIPv4.address;
+  }
+
+  /// Selects the best LAN IPv4 address from [interfaces], avoiding VPN TUN/TAP
+  /// and CGNAT addresses whenever a real LAN interface is available.
+  static String? selectPreferredIpv4(
+    Iterable<({String name, List<InternetAddress> addresses})> interfaces,
+  ) {
+    String? fallback;
+    for (final interface in interfaces) {
+      final virtualOrVpn = isVirtualOrTunnelInterface(interface.name);
+      for (final address in interface.addresses) {
+        if (address.type != InternetAddressType.IPv4) continue;
+        final raw = address.rawAddress;
+        if (raw.length != 4) continue;
+        // Skip link-local 169.254.0.0/16 and loopback 127.0.0.0/8.
+        if ((raw[0] == 169 && raw[1] == 254) || raw[0] == 127) continue;
+        final isCgnat = raw[0] == 100 && (raw[1] & 0xc0) == 64;
+        if (!virtualOrVpn && !isCgnat) return address.address;
+        fallback ??= address.address;
+      }
+    }
+    return fallback;
+  }
+
+  /// True for common VPN tunnel and container virtual interface names.
+  static bool isVirtualOrTunnelInterface(String name) {
+    final lower = name.trim().toLowerCase();
+    return lower.startsWith('tun') ||
+        lower.startsWith('tap') ||
+        lower.startsWith('ppp') ||
+        lower.startsWith('wg') ||
+        lower.startsWith('utun') ||
+        lower.startsWith('ipsec') ||
+        lower.startsWith('tailscale') ||
+        lower.startsWith('veth') ||
+        lower.startsWith('docker') ||
+        lower.startsWith('br-') ||
+        lower.contains('vpn') ||
+        lower.contains('proton') ||
+        lower.contains('nordlynx');
   }
 
   static bool _isUnspecified(InternetAddress address) =>

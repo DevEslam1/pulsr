@@ -31,8 +31,8 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
   bool get showingCachedResults => _showingCachedResults;
 
   int _generation = 0;
-  // FIX-C7: Latch to prevent concurrent bot-block retries
-  bool _botRetryInFlight = false;
+  // Single-flight poToken refresh shared across concurrent bot-blocked queries
+  Future<bool>? _poTokenRefreshFuture;
 
   /// Page size for load-more. The native extractor caps a single search at 200
   /// (YtmExtractorPlugin.MAX_SEARCH_LIMIT); each load-more raises the limit by
@@ -177,6 +177,9 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
   String? statusMessageFor(bool coolingDown) {
     if (coolingDown) {
       return 'YTM cooling down (bot protection) — retry shortly';
+    }
+    if (state.error?.code == 'YTM_NETWORK_OFFLINE') {
+      return 'YTM offline — showing local results';
     }
     final err = state.errorMessage;
     if (err != null && err.isNotEmpty) {
@@ -426,54 +429,38 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
     } on YtmException catch (e) {
       if (effectiveGeneration != _generation || isClosed) return;
 
-      // FIX-C7: Auto-recovery with _botRetryInFlight latch
-      if (e.isBotBlocked &&
-          !isRetryAfterBotBlock &&
-          retryDepth < 2 &&
-          !_botRetryInFlight) {
-        _botRetryInFlight = true;
-        try {
-          var refreshed = false;
+      if (e.isBotBlocked && !isRetryAfterBotBlock && retryDepth < 2) {
+        final refreshed = await _refreshPoTokenSingleFlight();
+        if (effectiveGeneration != _generation || isClosed) return;
+        if (refreshed) {
           try {
-            await _service.invalidatePoToken();
-            await _service.ensurePoTokenReady();
-            refreshed = true;
-          } catch (e2, st2) {
-            // FIX-A05: Log failed token refresh during bot block recovery
-            ErrorLogger.log('Failed poToken refresh in recovery',
-                error: e2, stackTrace: st2, category: 'YtmSearchCubit');
+            await _executeSearch(
+              query,
+              isRetryAfterBotBlock: true,
+              retryDepth: retryDepth + 1,
+              generation: effectiveGeneration,
+            );
+            return;
+          } catch (retryErr, retrySt) {
+            ErrorLogger.log('Bot block retry search failed',
+                error: retryErr,
+                stackTrace: retrySt,
+                category: 'YtmSearchCubit');
           }
-          if (effectiveGeneration != _generation || isClosed) return;
-          if (refreshed) {
-            try {
-              await _executeSearch(
-                query,
-                isRetryAfterBotBlock: true,
-                retryDepth: retryDepth + 1,
-                generation: effectiveGeneration,
-              );
-              return;
-            } catch (retryErr, retrySt) {
-              ErrorLogger.log('Bot block retry search failed',
-                  error: retryErr,
-                  stackTrace: retrySt,
-                  category: 'YtmSearchCubit');
-              return;
-            }
-          }
-        } finally {
-          _botRetryInFlight = false;
         }
       }
 
       // FIX-C04: Ensure generation guard precedes every emit in catch blocks
       if (effectiveGeneration != _generation || isClosed) return;
       final errorInfo = YtmErrorClassifier.classify(e);
+      final isOffline =
+          e.isNetwork || errorInfo.signal == YtmBlockSignal.networkUnavailable;
       final msg = e.isBotBlocked
           ? 'YouTube is rate-limiting requests. Please wait a few minutes.'
           : errorInfo.message;
       safeEmit(state.copyWith(
         isLoading: false,
+        hasSearched: true,
         results: [],
         error: e.isBotBlocked
             ? const GenericAppError(
@@ -482,30 +469,53 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
                     'YouTube is rate-limiting requests. Please wait a few minutes.',
               )
             : GenericAppError(
-                code: 'YTM_SEARCH_FAILED',
+                code: isOffline ? 'YTM_NETWORK_OFFLINE' : 'YTM_SEARCH_FAILED',
                 userMessage: msg,
               ),
       ));
       // Only a transport failure is answered from the cache. A bot/geo/rate
       // verdict must stay visible: cached cards would play, then fail again.
-      if (e.isNetwork ||
-          errorInfo.signal == YtmBlockSignal.networkUnavailable) {
+      if (isOffline) {
         unawaited(_maybeShowCached(query, effectiveGeneration));
       }
     } catch (e) {
       // FIX-C04: Ensure generation guard precedes emit
       if (effectiveGeneration != _generation || isClosed) return;
       final errorInfo = YtmErrorClassifier.classify(e);
+      final isOffline = errorInfo.signal == YtmBlockSignal.networkUnavailable;
       safeEmit(state.copyWith(
         isLoading: false,
+        hasSearched: true,
         results: [],
         error: GenericAppError(
-          code: 'YTM_SEARCH_FAILED',
+          code: isOffline ? 'YTM_NETWORK_OFFLINE' : 'YTM_SEARCH_FAILED',
           userMessage: errorInfo.message,
         ),
       ));
       unawaited(_maybeShowCached(query, effectiveGeneration));
     }
+  }
+
+  Future<bool> _refreshPoTokenSingleFlight() {
+    final active = _poTokenRefreshFuture;
+    if (active != null) return active;
+    late final Future<bool> future;
+    future = () async {
+      try {
+        await _service.invalidatePoToken();
+        return await _service.ensurePoTokenReady();
+      } catch (e, st) {
+        ErrorLogger.log('Failed poToken refresh in recovery',
+            error: e, stackTrace: st, category: 'YtmSearchCubit');
+        return false;
+      } finally {
+        if (identical(_poTokenRefreshFuture, future)) {
+          _poTokenRefreshFuture = null;
+        }
+      }
+    }();
+    _poTokenRefreshFuture = future;
+    return future;
   }
 
   /// Replaces an empty live answer with the last saved one, when available.
@@ -519,6 +529,7 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
     safeEmit(state.copyWith(
       results: List<YtmTrack>.unmodifiable(cached),
       isLoading: false,
+      hasSearched: true,
       loadMoreFailed: false,
       error: null,
     ));

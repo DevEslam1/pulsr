@@ -100,6 +100,8 @@ class SsdpClient {
         (event) {
           if (event == RawSocketEvent.read) {
             _drain(socket!, responses);
+          } else if (event == RawSocketEvent.closed && !finished.isCompleted) {
+            finished.complete();
           }
         },
         onError: (Object error, StackTrace stackTrace) {
@@ -110,13 +112,34 @@ class SsdpClient {
             category: 'DLNA',
           );
         },
+        onDone: () {
+          if (!finished.isCompleted) finished.complete();
+        },
       );
 
       // A test socket may already hold queued datagrams; draining once here
       // keeps search deterministic without changing real-device behaviour.
       _drain(socket, responses);
+      var sentAny = false;
+      SocketException? lastSendError;
+      StackTrace? lastSendSt;
       for (final target in searchTargets) {
-        _sendSearch(socket, target);
+        try {
+          _sendSearch(socket, target);
+          sentAny = true;
+        } on SocketException catch (error, stackTrace) {
+          lastSendError = error;
+          lastSendSt = stackTrace;
+          ErrorLogger.log(
+            'SSDP target send failed ($target)',
+            error: error,
+            stackTrace: stackTrace,
+            category: 'DLNA',
+          );
+        }
+      }
+      if (!sentAny && lastSendError != null) {
+        Error.throwWithStackTrace(lastSendError, lastSendSt!);
       }
 
       deadline = Timer(timeout, () {

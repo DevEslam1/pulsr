@@ -172,10 +172,33 @@ void main() {
         .where((call) => call.method == 'openReadChunk')
         .map((call) => call.arguments as Map<Object?, Object?>)
         .toList();
-    expect(chunkCalls.map((args) => args['offset']), [0, 4, 8]);
+    expect(chunkCalls.map((args) => args['offset']), [0, 4, 8, 10]);
     expect(chunkCalls.every((args) => args['path'] == 'song.mp3'), isTrue);
     expect(chunkCalls.every((args) => _nativeJoin(args) == 'Studio/song.mp3'),
         isTrue);
+  });
+
+  test('openRead keeps reading across short SMB chunks until empty EOF',
+      () async {
+    final payload = List<int>.generate(10, (index) => index);
+    var offset = 0;
+    install((call) async {
+      if (call.method != 'openReadChunk') return null;
+      final requestedOffset = (call.arguments as Map<Object?, Object?>)['offset']! as int;
+      expect(requestedOffset, offset);
+      if (offset >= payload.length) return Uint8List(0);
+      // Return a short 2-byte frame even though chunkSize is 8.
+      final end = (offset + 2).clamp(0, payload.length);
+      final chunk = Uint8List.fromList(payload.sublist(offset, end));
+      offset = end;
+      return chunk;
+    });
+    final provider = SmbFsProvider(_smbSource(), chunkSize: 8);
+
+    final bytes =
+        await provider.openRead('song.mp3').expand((chunk) => chunk).toList();
+
+    expect(bytes, payload);
   });
 
   test('openRead stops at end and never reads past it', () async {

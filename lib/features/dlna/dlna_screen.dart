@@ -57,14 +57,12 @@ class _DlnaScreenState extends State<DlnaScreen> {
   ];
 
   late final DlnaRendererService _service =
-      widget.service ?? DlnaRendererService();
-  late final bool _ownsService = widget.service == null;
+      widget.service ?? DlnaRendererService.shared;
   bool _scanned = false;
   double? _seekPreviewMs;
 
   @override
   void dispose() {
-    if (_ownsService) _service.dispose();
     super.dispose();
   }
 
@@ -131,6 +129,14 @@ class _DlnaScreenState extends State<DlnaScreen> {
     if (file == null) return;
     await _pauseLocalPlayback();
     if (!mounted) return;
+    final queueTracks = _buildLocalCastQueue(activePath: file.path);
+    if (queueTracks.tracks.length > 1) {
+      await _service.playQueue(
+        queueTracks.tracks,
+        startIndex: queueTracks.startIndex,
+      );
+      return;
+    }
     await _service.playFile(
       file.path,
       title: track.title,
@@ -138,6 +144,46 @@ class _DlnaScreenState extends State<DlnaScreen> {
       album: track.album,
       duration: track.duration,
     );
+  }
+
+  ({List<DlnaQueueTrack> tracks, int startIndex}) _buildLocalCastQueue({
+    required String activePath,
+  }) {
+    final registry = GetIt.instance;
+    if (!registry.isRegistered<PulsrAudioHandler>()) {
+      return (tracks: const <DlnaQueueTrack>[], startIndex: 0);
+    }
+    final handler = registry<PulsrAudioHandler>();
+    final items = handler.queue.value;
+    if (items.length <= 1) {
+      return (tracks: const <DlnaQueueTrack>[], startIndex: 0);
+    }
+    final currentId = handler.mediaItem.value?.id;
+    final tracks = <DlnaQueueTrack>[];
+    var startIndex = 0;
+    for (final item in items) {
+      final rawPath = item.extras?['path'];
+      if (rawPath is! String) continue;
+      final validated = SafeFilePath.validate(
+        rawPath,
+        allowedExtensions: _castExtensions,
+      );
+      if (validated == null) continue;
+      if ((currentId != null && item.id == currentId) ||
+          validated.path == activePath) {
+        startIndex = tracks.length;
+      }
+      tracks.add(
+        DlnaQueueTrack(
+          path: validated.path,
+          title: item.title,
+          artist: item.artist,
+          album: item.album,
+          duration: item.duration,
+        ),
+      );
+    }
+    return (tracks: tracks, startIndex: startIndex);
   }
 
   /// Pauses on-device playback so the same audio is not played twice. The
@@ -334,11 +380,16 @@ class _DlnaScreenState extends State<DlnaScreen> {
       ]);
     }
 
-    if (selected != null && title != null) {
+    final showNowPlaying = selected != null &&
+        (title != null ||
+            state == DlnaState.playing ||
+            state == DlnaState.paused ||
+            state == DlnaState.buffering);
+    if (showNowPlaying) {
       children.addAll(<Widget>[
         const SizedBox(height: AppSpacing.lg),
         _NowPlayingCard(
-          title: title,
+          title: title ?? selected.friendlyName,
           state: state,
           stale: _service.isPollStale,
           position: _service.position,
@@ -561,7 +612,8 @@ class _NowPlayingCard extends StatelessWidget {
         .toDouble();
     final canSeek = durationMs > 0;
     final paused = state == DlnaState.paused;
-    final canPause = state == DlnaState.playing || paused;
+    final canPause =
+        state == DlnaState.playing || paused || state == DlnaState.buffering;
 
     return Container(
       padding: const EdgeInsets.all(AppSpacing.md),

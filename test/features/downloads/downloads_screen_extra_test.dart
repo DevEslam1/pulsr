@@ -291,4 +291,49 @@ void main() {
 
     expect(find.text(l10n.libraryReadError), findsOneWidget);
   });
+
+  testWidgets('completed task with null localSongId but non-empty filePath is playable',
+      (tester) async {
+    final taskWithPath = DownloadTask(
+      id: 'p1',
+      videoId: 'p1',
+      title: 'Path Song',
+      artist: 'Artist',
+      status: DownloadStatus.complete,
+      filePath: '/tmp/path_song.m4a',
+      createdAt: DateTime(2024, 1, 1),
+    );
+    await pumpScreen(tester, DownloadsState(tasks: {'p1': taskWithPath}));
+
+    await tester.tap(find.text('Path Song'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text(l10n.libraryReadError), findsOneWidget);
+  });
+
+  testWidgets('retryAllFailed resets batch lock if retryAllFailed throws',
+      (tester) async {
+    var shouldThrow = true;
+    when(() => cubit.retryAllFailed()).thenAnswer((_) async {
+      if (shouldThrow) {
+        shouldThrow = false;
+        throw StateError('transient');
+      }
+      return 1;
+    });
+    await pumpScreen(
+      tester,
+      DownloadsState(tasks: {'f1': _task('f1', DownloadStatus.failed)}),
+    );
+
+    await tester.tap(find.text('${l10n.retry} (1)'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    await tester.tap(find.text('${l10n.retry} (1)'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    verify(() => cubit.retryAllFailed()).called(2);
+  });
 }

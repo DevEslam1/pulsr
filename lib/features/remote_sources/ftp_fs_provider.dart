@@ -70,8 +70,11 @@ class FtpFsProvider implements RemoteFsProvider {
         await _session.ensureConnected();
         final absolute = _resolve(path);
         List<RemoteEntry> entries = const [];
+        var listSucceeded = false;
+        var listing = '';
         try {
-          final listing = await _session.readListing('LIST $absolute');
+          listing = await _session.readListing('LIST $absolute');
+          listSucceeded = true;
           entries = FtpListingParser.parseListing(
             listing,
             parentPath: path,
@@ -89,6 +92,10 @@ class FtpFsProvider implements RemoteFsProvider {
           entries = const [];
         }
         if (entries.isNotEmpty) return entries;
+        // A clean empty LIST response already proves the folder has no entries;
+        // calling NLST next turns valid empty folders into 550 errors on many
+        // FTP daemons.
+        if (listSucceeded && listing.trim().isEmpty) return const [];
         final names = await _session.readListing('NLST $absolute');
         return _enrichTypes(
           FtpListingParser.parseNameList(names, parentPath: path),
@@ -180,6 +187,7 @@ class FtpFsProvider implements RemoteFsProvider {
         throw _errors.mapReply(reply, 'RETR');
       }
       var remaining = end == null ? -1 : end - start + 1;
+      var stoppedEarly = false;
       await for (final chunk in data.timeout(_timeout)) {
         var bytes = chunk;
         if (skip > 0) {
@@ -195,14 +203,22 @@ class FtpFsProvider implements RemoteFsProvider {
         }
         if (remaining >= 0) remaining -= bytes.length;
         if (bytes.isNotEmpty) yield bytes;
-        if (remaining == 0) break;
+        if (remaining == 0) {
+          stoppedEarly = true;
+          break;
+        }
       }
       // Close the data socket before awaiting the completion reply: a server
       // that writes `226` only after the data connection disappears would
       // otherwise deadlock against us. `completeTransfer` accepts 426 (the
-      // normal answer to an early close) as a healthy completion.
+      // normal answer to an early close) as a healthy completion. Destroy
+      // immediately on ranged early-stop so unread tail bytes never stall close.
       try {
-        await data.close();
+        if (stoppedEarly) {
+          data.destroy();
+        } else {
+          await data.close();
+        }
       } on IOException catch (e, st) {
         ErrorLogger.log(
           'FTP data socket did not close cleanly at the end of a read',
@@ -259,8 +275,10 @@ class FtpFsProvider implements RemoteFsProvider {
       );
     } finally {
       try {
-        if (data != null) await data.close();
-      } on IOException catch (e, st) {
+        // Destroy on abnormal/canceled teardown so lingering server buffers or
+        // FIN handshakes never stall subsequent transfers.
+        data?.destroy();
+      } catch (e, st) {
         ErrorLogger.log(
           'FTP data socket did not close cleanly',
           error: e,
@@ -279,39 +297,39 @@ class FtpFsProvider implements RemoteFsProvider {
 
   /// Logs in and runs `NOOP` to prove the session works.
   @override
-  Future<bool> testConnection() async {
-    final watch = Stopwatch()..start();
-    try {
-      await _session.ensureConnected();
-      final reply = await _session.requireControl().command('NOOP');
-      final ok = reply.isSuccess;
-      ErrorLogger.log(
-        'FTP probe ${ok ? 'succeeded' : 'failed'} in '
-        '${watch.elapsedMilliseconds} ms (code ${reply.code})',
-        category: 'RemoteSources',
-        meta: {'authority': source.authority},
-      );
-      return ok;
-    } on AppError catch (e, st) {
-      ErrorLogger.log(
-        'FTP probe failed: ${e.code}',
-        error: e,
-        stackTrace: st,
-        category: 'RemoteSources',
-        meta: {'authority': source.authority},
-      );
-      return false;
-    } catch (e, st) {
-      ErrorLogger.log(
-        'FTP probe failed unexpectedly',
-        error: e,
-        stackTrace: st,
-        category: 'RemoteSources',
-        meta: {'authority': source.authority},
-      );
-      return false;
-    }
-  }
+  Future<bool> testConnection() => _transferLock.protect(() async {
+        final watch = Stopwatch()..start();
+        try {
+          await _session.ensureConnected();
+          final reply = await _session.requireControl().command('NOOP');
+          final ok = reply.isSuccess;
+          ErrorLogger.log(
+            'FTP probe ${ok ? 'succeeded' : 'failed'} in '
+            '${watch.elapsedMilliseconds} ms (code ${reply.code})',
+            category: 'RemoteSources',
+            meta: {'authority': source.authority},
+          );
+          return ok;
+        } on AppError catch (e, st) {
+          ErrorLogger.log(
+            'FTP probe failed: ${e.code}',
+            error: e,
+            stackTrace: st,
+            category: 'RemoteSources',
+            meta: {'authority': source.authority},
+          );
+          return false;
+        } catch (e, st) {
+          ErrorLogger.log(
+            'FTP probe failed unexpectedly',
+            error: e,
+            stackTrace: st,
+            category: 'RemoteSources',
+            meta: {'authority': source.authority},
+          );
+          return false;
+        }
+      });
 
   /// Sends `QUIT` and closes the session.
   @override
@@ -345,6 +363,12 @@ class FtpFsProvider implements RemoteFsProvider {
   }
 
   String _relative(String path) {
+    if (_containsControlChars(path)) {
+      throw const RemoteProtocolError(
+        code: 'FTP_PATH_TRAVERSAL',
+        userMessage: 'That path is not allowed.',
+      );
+    }
     var value = path.trim().replaceAll('\\', '/');
     while (value.startsWith('/')) {
       value = value.substring(1);
@@ -354,7 +378,7 @@ class FtpFsProvider implements RemoteFsProvider {
     }
     for (final segment in value.split('/')) {
       if (_isTraversalSegment(segment)) {
-        throw RemoteProtocolError(
+        throw const RemoteProtocolError(
           code: 'FTP_PATH_TRAVERSAL',
           userMessage: 'That path is not allowed.',
         );
@@ -371,11 +395,16 @@ class FtpFsProvider implements RemoteFsProvider {
     return segments.isEmpty ? '/' : segments.last;
   }
 
+  static bool _containsControlChars(String value) =>
+      value.contains('\r') || value.contains('\n') || value.contains('\u0000');
+
   static bool _isTraversalSegment(String segment) {
     if (segment.isEmpty) return false;
+    if (_containsControlChars(segment)) return true;
     if (segment == '..') return true;
     try {
-      return Uri.decodeComponent(segment) == '..';
+      final decoded = Uri.decodeComponent(segment);
+      return decoded == '..' || _containsControlChars(decoded);
     } on ArgumentError {
       return true;
     } on FormatException {

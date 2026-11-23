@@ -92,26 +92,17 @@ class YtmDownloadButton extends StatelessWidget {
     final tintColor = activeColor ?? p.accent;
     final baseColor = iconColor ?? p.textTertiary;
 
-    final provided = context.watch<YtmDownloadCubit?>();
+    final provided = context.read<YtmDownloadCubit?>();
     final cubit = provided ??
         (getIt.isRegistered<YtmDownloadCubit>()
             ? getIt<YtmDownloadCubit>()
             : null);
     if (cubit == null) return const SizedBox.shrink();
 
-    return BlocBuilder<YtmDownloadCubit, YtmDownloadState>(
+    return BlocSelector<YtmDownloadCubit, YtmDownloadState, YtDownloadItem>(
       bloc: cubit,
-      buildWhen: (a, b) {
-        final prev = a.itemFor(videoId);
-        final next = b.itemFor(videoId);
-        return prev.status != next.status ||
-            prev.progress != next.progress ||
-            prev.speedKbps != next.speedKbps ||
-            prev.etaSeconds != next.etaSeconds ||
-            prev.error != next.error;
-      },
-      builder: (context, state) {
-        final item = state.itemFor(videoId);
+      selector: (state) => state.itemFor(videoId),
+      builder: (context, item) {
         final isAlreadyLocal = song.source == SongSource.local &&
             (song.remoteId != null && song.remoteId!.isNotEmpty);
 
@@ -141,45 +132,89 @@ class YtmDownloadButton extends StatelessWidget {
           switch (item.status) {
             case YtDownloadStatus.queued:
             case YtDownloadStatus.running:
-              final progressValue = item.status == YtDownloadStatus.queued
-                  ? null
-                  : item.progress?.clamp(0.0, 1.0);
+              final isRunning = item.status == YtDownloadStatus.running;
+              final progressValue = isRunning
+                  ? item.progress?.clamp(0.0, 1.0)
+                  : null;
               final pctLabel = progressValue == null
                   ? null
                   : '${(progressValue * 100).toStringAsFixed(0)}%';
-              child = SizedBox(
+              final actionLabel = isRunning
+                  ? '${context.l10n.pause}${pctLabel != null ? ' ($pctLabel)' : ''}'
+                  : context.l10n.cancel;
+              child = Tooltip(
                 key: const ValueKey('ytm_dl_progress'),
-                width: AppSpacing.s40,
-                height: 40,
-                child: Center(
-                  child: Semantics(
-                    label: context.l10n.browseDownloadOffline,
-                    value: pctLabel,
-                    child: Tooltip(
-                      message: pctLabel ?? context.l10n.browseDownloadOffline,
-                      child: SizedBox(
-                        width: iconSize + 4,
-                        height: iconSize + 4,
-                        child: Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            CircularProgressIndicator(
-                              strokeWidth: 2.2,
-                              value: progressValue,
-                              color: tintColor,
-                              backgroundColor:
-                                  tintColor.withValues(alpha: 0.18),
-                            ),
-                            Icon(
-                              Icons.arrow_downward_rounded,
-                              size: iconSize * 0.58,
-                              color: tintColor,
-                            ),
-                          ],
+                message: actionLabel,
+                child: Semantics(
+                  button: true,
+                  label: actionLabel,
+                  value: pctLabel,
+                  child: InkResponse(
+                    radius: 20,
+                    onTap: () {
+                      PulsrHaptics.selectionClick();
+                      if (isRunning) {
+                        cubit.pauseDownload(videoId);
+                      } else {
+                        cubit.cancelDownload(videoId);
+                      }
+                    },
+                    onLongPress: () {
+                      PulsrHaptics.mediumImpact();
+                      cubit.cancelDownload(videoId);
+                    },
+                    child: SizedBox(
+                      width: AppSpacing.s40,
+                      height: 40,
+                      child: Center(
+                        child: SizedBox(
+                          width: iconSize + 4,
+                          height: iconSize + 4,
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              CircularProgressIndicator(
+                                strokeWidth: 2.2,
+                                value: progressValue,
+                                color: tintColor,
+                                backgroundColor:
+                                    tintColor.withValues(alpha: 0.18),
+                              ),
+                              Icon(
+                                isRunning
+                                    ? Icons.pause_rounded
+                                    : Icons.close_rounded,
+                                size: iconSize * 0.58,
+                                color: tintColor,
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
                   ),
+                ),
+              );
+              break;
+            case YtDownloadStatus.paused:
+              child = GestureDetector(
+                key: const ValueKey('ytm_dl_paused'),
+                onLongPress: () => _openQualityPicker(context, cubit),
+                child: IconButton(
+                  constraints: const BoxConstraints(
+                    minWidth: AppSpacing.minTouchTarget,
+                    minHeight: AppSpacing.minTouchTarget,
+                  ),
+                  tooltip: context.l10n.resume,
+                  icon: Icon(
+                    Icons.pause_circle_outline_rounded,
+                    size: iconSize,
+                    color: tintColor,
+                  ),
+                  onPressed: () {
+                    PulsrHaptics.selectionClick();
+                    cubit.download(song);
+                  },
                 ),
               );
               break;
@@ -219,7 +254,6 @@ class YtmDownloadButton extends StatelessWidget {
                 ),
               );
               break;
-            case YtDownloadStatus.paused:
             case YtDownloadStatus.canceled:
             case YtDownloadStatus.idle:
               child = GestureDetector(

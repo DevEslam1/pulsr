@@ -158,8 +158,11 @@ class _RadioScreenState extends State<RadioScreen> {
       case 'recent':
       case 'lastPlayed':
         filtered.sort((a, b) {
-          final timeA = a.lastPlayed ?? 0;
-          final timeB = b.lastPlayed ?? 0;
+          final timeA = a.lastPlayed;
+          final timeB = b.lastPlayed;
+          if (timeA == null && timeB == null) return 0;
+          if (timeA == null) return 1;
+          if (timeB == null) return -1;
           if (timeA != timeB) {
             final cmp = timeB.compareTo(timeA);
             return sortAscending ? -cmp : cmp;
@@ -1025,7 +1028,11 @@ class _RadioScreenState extends State<RadioScreen> {
               tooltip: context.l10n.radioDirectoryBrowse,
               icon: const Icon(Icons.public_rounded),
               onPressed: () async {
-                await RadioDirectorySheet.show(context, store: _store);
+                await RadioDirectorySheet.show(
+                  context,
+                  store: _store,
+                  onStationAdded: (_) => _refresh(),
+                );
                 _refresh();
               },
             ),
@@ -1138,8 +1145,12 @@ class _RadioScreenState extends State<RadioScreen> {
             ),
           ],
         ),
-        body: Center(
-          child: ConstrainedBox(
+        body: BlocListener<PlayerCubit, PlayerState>(
+          listenWhen: (prev, curr) =>
+              prev.currentSong?.path != curr.currentSong?.path,
+          listener: (_, __) => _refresh(),
+          child: Center(
+            child: ConstrainedBox(
             constraints: BoxConstraints(maxWidth: effectiveMaxWidth),
             child: LayoutBuilder(
               builder: (context, viewport) {
@@ -1310,6 +1321,7 @@ class _RadioScreenState extends State<RadioScreen> {
               },
             ),
           ),
+        ),
         ),
       ),
     );

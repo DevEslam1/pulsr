@@ -556,7 +556,9 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
                                       final task = filteredTasks[index];
                                       final playable = task.status ==
                                               DownloadStatus.complete &&
-                                          task.localSongId != null;
+                                          (task.localSongId != null ||
+                                              (task.filePath?.isNotEmpty ??
+                                                  false));
                                       final isSelected = _selectedVideoIds
                                           .contains(task.videoId);
 
@@ -722,7 +724,8 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
                           final task = filteredTasks[taskIndex];
                           final playable =
                               task.status == DownloadStatus.complete &&
-                                  task.localSongId != null;
+                                  (task.localSongId != null ||
+                                      (task.filePath?.isNotEmpty ?? false));
                           final isSelected =
                               _selectedVideoIds.contains(task.videoId);
 
@@ -1017,9 +1020,18 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
     });
     // Paced inside the cubit: a raw concurrent loop here fired every retry at
     // once and tripped YouTube's 429/bot throttling.
-    final queued = await cubit.retryDownloads(failedIds);
+    var queued = 0;
+    try {
+      queued = await cubit.retryDownloads(failedIds);
+    } catch (e, st) {
+      ErrorLogger.log('Failed to retry selected downloads',
+          error: e, stackTrace: st, category: 'Downloads');
+    } finally {
+      if (mounted) {
+        setState(() => _retryingBatch = false);
+      }
+    }
     if (!mounted) return;
-    setState(() => _retryingBatch = false);
     _showRequeued(queued);
   }
 
@@ -1028,9 +1040,18 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
     if (_retryingBatch) return;
     final cubit = context.read<DownloadsCubit>();
     setState(() => _retryingBatch = true);
-    final queued = await cubit.retryAllFailed();
+    var queued = 0;
+    try {
+      queued = await cubit.retryAllFailed();
+    } catch (e, st) {
+      ErrorLogger.log('Failed to retry all downloads',
+          error: e, stackTrace: st, category: 'Downloads');
+    } finally {
+      if (mounted) {
+        setState(() => _retryingBatch = false);
+      }
+    }
     if (!mounted) return;
-    setState(() => _retryingBatch = false);
     _showRequeued(queued);
   }
 
@@ -1047,7 +1068,9 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
       BuildContext context, List<DownloadTask> completedTasks) async {
     final db = _db;
     if (db == null) return;
-    final songIds = completedTasks.map((t) => t.localSongId!).toSet();
+    final songIds =
+        completedTasks.map((t) => t.localSongId).whereType<int>().toSet();
+    if (songIds.isEmpty) return;
     final songs = await (db.select(db.songsTable)
           ..where((t) => t.id.isIn(songIds)))
         .get();
@@ -1062,7 +1085,8 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
 
   Future<void> _playCompleted(BuildContext context, DownloadTask task) async {
     final localId = task.localSongId;
-    if (localId == null) return;
+    final filePath = task.filePath;
+    if (localId == null && (filePath == null || filePath.isEmpty)) return;
     final downloadsCubit = context.read<DownloadsCubit>();
     final playerCubit = context.read<PlayerCubit>();
     final l10n = AppLocalizations.of(context)!;
@@ -1081,9 +1105,15 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
         }
         return;
       }
-      final song = await (db.select(db.songsTable)
-            ..where((t) => t.id.equals(localId)))
-          .getSingleOrNull();
+      var song = localId == null
+          ? null
+          : await (db.select(db.songsTable)..where((t) => t.id.equals(localId)))
+              .getSingleOrNull();
+      if (song == null && filePath != null && filePath.isNotEmpty) {
+        song = await (db.select(db.songsTable)
+              ..where((t) => t.path.equals(filePath)))
+            .getSingleOrNull();
+      }
       if (!context.mounted || !mounted) return;
       if (song == null) {
         PulsrToast.show(

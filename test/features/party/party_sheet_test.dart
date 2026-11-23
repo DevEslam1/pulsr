@@ -214,4 +214,38 @@ void main() {
     expect(find.byKey(const ValueKey<String>('party_kick_m_host')), findsNothing);
     expect(find.byKey(const ValueKey<String>('party_queue_remove_vid_next')), findsNothing);
   });
+
+  testWidgets('H-43: strips hyphens before capping 6-char party code and awaits reset default server URL',
+      (tester) async {
+    when(() => partyService.joinParty(
+          any(),
+          nickname: any(named: 'nickname'),
+        )).thenAnswer((_) async => 'ABC123');
+
+    await tester.pumpWidget(buildHost());
+    await tester.pumpAndSettle();
+
+    // Find the 6-character code TextField (second TextField in lobby: name is first, code is second)
+    final textFields = find.byType(TextField);
+    expect(textFields, findsNWidgets(2));
+    final codeField = textFields.at(1);
+
+    // Paste hyphenated code 'abc-123' -> should normalize to 'ABC123', not truncate to 'ABC-12' -> 'ABC12'
+    await tester.enterText(codeField, 'abc-123');
+    await tester.pump();
+
+    final codeWidget = tester.widget<TextField>(codeField);
+    expect(codeWidget.controller?.text, equals('ABC123'));
+
+    // Open settings and tap Reset to default
+    await tester.tap(find.byIcon(Icons.settings_rounded));
+    await tester.pumpAndSettle();
+
+    final resetBtn = find.byType(TextButton);
+    expect(resetBtn, findsOneWidget);
+    await tester.tap(resetBtn);
+    await tester.pumpAndSettle();
+
+    verify(() => partyService.setCustomServerUrl(null)).called(1);
+  });
 }

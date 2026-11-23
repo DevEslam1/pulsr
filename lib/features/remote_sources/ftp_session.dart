@@ -220,11 +220,15 @@ class FtpSession {
     final control = requireControl();
     final data = await openDataSocket();
     final buffer = StringBuffer();
+    var transferStarted = false;
+    var completed = false;
+    var aborted = false;
     try {
       final ack = await control.command(command);
       if (!ack.isIntermediate && !ack.isSuccess) {
         throw errors.mapReply(ack, command.split(' ').first);
       }
+      transferStarted = ack.isIntermediate;
       await for (final chunk in data.cast<List<int>>().transform(
         const Utf8Decoder(allowMalformed: true),
       ).timeout(_timeout)) {
@@ -236,6 +240,7 @@ class FtpSession {
           );
         }
       }
+      completed = true;
     } on FormatException catch (e, st) {
       // The control reply could not be decoded: the session is out of step and
       // cannot be reused for the next command.
@@ -246,6 +251,7 @@ class FtpSession {
         category: 'RemoteSources',
         meta: {'authority': source.authority},
       );
+      aborted = true;
       await abort();
       throw RemoteProtocolError(
         code: 'FTP_DECODE',
@@ -255,7 +261,11 @@ class FtpSession {
       );
     } finally {
       try {
-        await data.close();
+        if (completed) {
+          await data.close();
+        } else {
+          data.destroy();
+        }
       } on IOException catch (e, st) {
         ErrorLogger.log(
           'FTP data socket did not close cleanly after a listing',
@@ -264,8 +274,23 @@ class FtpSession {
           category: 'RemoteSources',
         );
       }
+      if (transferStarted && !completed && !aborted) {
+        await abort();
+      }
     }
-    final done = await control.readReply();
+    final FtpReply done;
+    try {
+      done = await control.readReply();
+    } on FormatException {
+      await abort();
+      rethrow;
+    } on TimeoutException {
+      await abort();
+      rethrow;
+    } on SocketException {
+      await abort();
+      rethrow;
+    }
     if (done.code != 226 && done.code != 250) {
       ErrorLogger.log(
         'FTP listing finished with an unexpected completion code',

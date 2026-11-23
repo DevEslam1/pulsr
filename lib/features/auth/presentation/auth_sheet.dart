@@ -9,6 +9,8 @@ import 'package:pulsr/core/constants/app_typography.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/errors/error_message_resolver.dart';
+import '../../../core/services/auth_service.dart';
+import '../../../core/services/cloud_sync_service.dart';
 import '../../../core/services/ytm_account_service.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
@@ -24,25 +26,37 @@ import 'ytm_web_login_sheet.dart';
 class AuthSheet extends StatefulWidget {
   const AuthSheet({super.key});
 
-  static Future<void> show(BuildContext context) {
-    AuthCubit? authCubit;
-    try {
-      authCubit = context.read<AuthCubit>();
-    } catch (_) {
+  static Future<void> show(BuildContext context, {AuthCubit? authCubit}) {
+    var resolvedCubit = authCubit;
+    if (resolvedCubit == null) {
       try {
-        if (getIt.isRegistered<AuthCubit>()) {
-          authCubit = getIt<AuthCubit>();
-        }
-      } catch (_) {}
+        resolvedCubit = context.read<AuthCubit>();
+      } catch (_) {
+        try {
+          if (getIt.isRegistered<AuthCubit>()) {
+            resolvedCubit = getIt<AuthCubit>();
+          }
+        } catch (_) {}
+      }
     }
 
     return PulsrSheetHelper.showPulsrSheet<void>(
       context: context,
       wrapWithContainer: false,
       builder: (ctx) {
-        if (authCubit != null) {
+        if (resolvedCubit != null) {
           return BlocProvider<AuthCubit>.value(
-            value: authCubit,
+            value: resolvedCubit,
+            child: const AuthSheet(),
+          );
+        }
+        if (getIt.isRegistered<AuthService>() &&
+            getIt.isRegistered<CloudSyncService>()) {
+          return BlocProvider<AuthCubit>(
+            create: (_) => AuthCubit(
+              getIt<AuthService>(),
+              getIt<CloudSyncService>(),
+            ),
             child: const AuthSheet(),
           );
         }
@@ -110,6 +124,15 @@ class _AuthSheetState extends State<AuthSheet> {
             : null;
 
     return BlocConsumer<AuthCubit, AuthState>(
+      listenWhen: (previous, current) {
+        final becameAuthenticated =
+            previous.status != AuthStatus.authenticated &&
+                current.status == AuthStatus.authenticated;
+        final errorChanged = current.errorMessage != null &&
+            (previous.errorMessage != current.errorMessage ||
+                previous.status != current.status);
+        return becameAuthenticated || errorChanged;
+      },
       listener: (context, state) {
         if (state.status == AuthStatus.authenticated) {
           if (context.mounted) {
@@ -123,7 +146,9 @@ class _AuthSheetState extends State<AuthSheet> {
                 ),
               );
           }
-          if (context.mounted && Navigator.of(context).canPop()) {
+          if (context.mounted &&
+              ModalRoute.of(context)?.isCurrent == true &&
+              Navigator.of(context).canPop()) {
             Navigator.of(context).pop();
           }
         } else if (state.errorMessage != null) {
@@ -549,91 +574,99 @@ class _AuthSheetState extends State<AuthSheet> {
                           ValueListenableBuilder<bool>(
                             valueListenable: ytmAccount.loginState,
                             builder: (context, isLoggedIn, _) {
-                              return OutlinedButton.icon(
-                                onPressed: () async {
-                                  if (isLoggedIn) {
-                                    await showYtmAccountDisconnectDialog(
-                                        context);
-                                  } else {
-                                    final ok =
-                                        await YtmWebLoginSheet.show(context);
-                                    if (ok == true && context.mounted) {
-                                      ScaffoldMessenger.of(context)
-                                        ..clearSnackBars()
-                                        ..showSnackBar(
-                                          SnackBar(
-                                            content:
-                                                Text(context.l10n.ytmConnected),
-                                            behavior: SnackBarBehavior.floating,
-                                          ),
-                                        );
-                                    }
-                                  }
-                                },
-                                icon: const Icon(
-                                  Icons.play_circle_fill_rounded,
-                                  color: AppColors.ytRed,
-                                  size: 20,
-                                ),
-                                label: Text(
-                                  isLoggedIn
-                                      ? '${context.l10n.browseYouTubeMusic}: ${ytmAccount.accountName ?? context.l10n.ytmConnected}'
-                                      : context.l10n.connectYtm,
-                                  style: TextStyle(
-                                    color: p.textPrimary,
-                                    fontSize: AppFontSize.bodySmall,
-                                    fontWeight: FontWeight.w600,
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  OutlinedButton.icon(
+                                    onPressed: () async {
+                                      if (isLoggedIn) {
+                                        await showYtmAccountDisconnectDialog(
+                                            context);
+                                      } else {
+                                        final ok =
+                                            await YtmWebLoginSheet.show(context);
+                                        if (ok == true && context.mounted) {
+                                          ScaffoldMessenger.of(context)
+                                            ..clearSnackBars()
+                                            ..showSnackBar(
+                                              SnackBar(
+                                                content: Text(
+                                                    context.l10n.ytmConnected),
+                                                behavior:
+                                                    SnackBarBehavior.floating,
+                                              ),
+                                            );
+                                        }
+                                      }
+                                    },
+                                    icon: const Icon(
+                                      Icons.play_circle_fill_rounded,
+                                      color: AppColors.ytRed,
+                                      size: 20,
+                                    ),
+                                    label: Text(
+                                      isLoggedIn
+                                          ? '${context.l10n.browseYouTubeMusic}: ${ytmAccount.accountName ?? context.l10n.ytmConnected}'
+                                          : context.l10n.connectYtm,
+                                      style: TextStyle(
+                                        color: p.textPrimary,
+                                        fontSize: AppFontSize.bodySmall,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    style: OutlinedButton.styleFrom(
+                                      minimumSize: const Size.fromHeight(
+                                        AppSpacing.minTouchTarget,
+                                      ),
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: AppSpacing.sm),
+                                      side: BorderSide(color: p.hairline),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: AppRadii.r14All,
+                                      ),
+                                    ),
                                   ),
-                                ),
-                                style: OutlinedButton.styleFrom(
-                                  minimumSize: const Size.fromHeight(
-                                    AppSpacing.minTouchTarget,
-                                  ),
-                                  padding: const EdgeInsets.symmetric(
-                                      vertical: AppSpacing.sm),
-                                  side: BorderSide(color: p.hairline),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: AppRadii.r14All,
-                                  ),
-                                ),
+                                  if (!isLoggedIn) ...[
+                                    const SizedBox(height: AppSpacing.xs),
+                                    TextButton.icon(
+                                      style: TextButton.styleFrom(
+                                        minimumSize: const Size(
+                                          AppSpacing.minTouchTarget,
+                                          AppSpacing.minTouchTarget,
+                                        ),
+                                      ),
+                                      onPressed: () async {
+                                        final ok =
+                                            await YtmOAuthLoginSheet.show(
+                                                context);
+                                        if (ok == true && context.mounted) {
+                                          ScaffoldMessenger.of(context)
+                                            ..clearSnackBars()
+                                            ..showSnackBar(
+                                              SnackBar(
+                                                content: Text(
+                                                    context.l10n.ytmConnected),
+                                                behavior:
+                                                    SnackBarBehavior.floating,
+                                              ),
+                                            );
+                                        }
+                                      },
+                                      icon: Icon(Icons.phonelink_setup_rounded,
+                                          size: 18, color: p.textSecondary),
+                                      label: Text(
+                                        context.l10n.authUseCodeSignIn,
+                                        style: TextStyle(
+                                          color: p.textSecondary,
+                                          fontSize: AppFontSize.label,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ],
                               );
                             },
                           ),
-                          if (!ytmAccount.loginState.value) ...[
-                            const SizedBox(height: AppSpacing.xs),
-                            TextButton.icon(
-                              style: TextButton.styleFrom(
-                                minimumSize: const Size(
-                                  AppSpacing.minTouchTarget,
-                                  AppSpacing.minTouchTarget,
-                                ),
-                              ),
-                              onPressed: () async {
-                                final ok =
-                                    await YtmOAuthLoginSheet.show(context);
-                                if (ok == true && context.mounted) {
-                                  ScaffoldMessenger.of(context)
-                                    ..clearSnackBars()
-                                    ..showSnackBar(
-                                      SnackBar(
-                                        content:
-                                            Text(context.l10n.ytmConnected),
-                                        behavior: SnackBarBehavior.floating,
-                                      ),
-                                    );
-                                }
-                              },
-                              icon: Icon(Icons.phonelink_setup_rounded,
-                                  size: 18, color: p.textSecondary),
-                              label: Text(
-                                context.l10n.authUseCodeSignIn,
-                                style: TextStyle(
-                                  color: p.textSecondary,
-                                  fontSize: AppFontSize.label,
-                                ),
-                              ),
-                            ),
-                          ],
                         ],
                       ],
                     ),

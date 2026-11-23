@@ -354,4 +354,63 @@ void main() {
       expect(await provider.testConnection(), isFalse);
     });
   });
+
+  group('resource URI refresh', () {
+    test('evicts stale cached URI and re-browses once on 401/403/404/410 or TTL expiry',
+        () async {
+      var browseMetadataCount = 0;
+      var now = DateTime.utc(2026, 1, 1, 12);
+      var v1Calls = 0;
+      final retryClient = _FakeHttpClient((request) async {
+        if (request.method == 'POST') {
+          browseMetadataCount++;
+          final url = browseMetadataCount == 1
+              ? 'http://192.168.1.5:8200/MediaItems/v1.flac'
+              : 'http://192.168.1.5:8200/MediaItems/v2.flac';
+          return _xml(
+            _browseResponse(_itemXml(id: '10', title: 'Track', resource: url)),
+          );
+        }
+        if (request.url.toString().endsWith('v1.flac')) {
+          v1Calls++;
+          if (v1Calls == 1) {
+            return http.StreamedResponse(
+              Stream<List<int>>.value(const <int>[9]),
+              200,
+            );
+          }
+          return http.StreamedResponse(
+            Stream<List<int>>.value(const <int>[]),
+            403,
+          );
+        }
+        return http.StreamedResponse(
+          Stream<List<int>>.value(const <int>[4, 5]),
+          200,
+        );
+      });
+      final cachedProvider = UpnpFsProvider(
+        _source(),
+        controlUrl: Uri.parse('http://192.168.1.5:8200/ctl/ContentDir'),
+        client: retryClient,
+        resourceTtl: const Duration(minutes: 5),
+        clock: () => now,
+      );
+
+      expect(await cachedProvider.openRead('i/10').expand((c) => c).toList(), [9]);
+      expect(browseMetadataCount, 1);
+
+      // Cached URI now returns 403 -> evicts cache, re-browses v2, retries once.
+      expect(
+        await cachedProvider.openRead('i/10').expand((c) => c).toList(),
+        [4, 5],
+      );
+      expect(browseMetadataCount, 2);
+
+      // After TTL passes, next open re-browses automatically without hitting old URI.
+      now = now.add(const Duration(minutes: 6));
+      await cachedProvider.openRead('i/10').expand((c) => c).toList();
+      expect(browseMetadataCount, 3);
+    });
+  });
 }

@@ -111,4 +111,39 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets('ignores unsafe artwork URLs and invokes onStationAdded',
+      (tester) async {
+    final unsafeArtStation = RadioStation.create(
+      name: 'Unsafe Art FM',
+      url: 'https://stream.example/safe',
+      artworkUrl: 'http://127.0.0.1/private.png',
+    );
+    RadioStation? addedCallbackStation;
+    when(() => service.search(query: any(named: 'query')))
+        .thenAnswer((_) async => [unsafeArtStation]);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AuraTheme.darkTheme,
+        localizationsDelegates: appLocalizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(
+          body: RadioDirectorySheet(
+            service: service,
+            store: store,
+            onStationAdded: (s) => addedCallbackStation = s,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(Image), findsNothing);
+
+    await tester.tap(find.text('Add'));
+    await tester.pumpAndSettle();
+
+    expect(addedCallbackStation?.id, unsafeArtStation.id);
+  });
 }

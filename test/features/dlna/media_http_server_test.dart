@@ -261,4 +261,23 @@ void main() {
       'application/octet-stream',
     );
   });
+
+  test('coalesces concurrent start calls and skips VPN/TUN interfaces when selecting LAN IPv4',
+      () async {
+    final raceServer = MediaHttpServer();
+    addTearDown(raceServer.stop);
+    await Future.wait(<Future<void>>[
+      raceServer.start(),
+      raceServer.start(),
+    ]);
+    expect(raceServer.isRunning, isTrue);
+    expect(raceServer.port, isPositive);
+
+    final picked = MediaHttpServer.selectPreferredIpv4(<({String name, List<InternetAddress> addresses})>[
+      (name: 'tun0', addresses: <InternetAddress>[InternetAddress('10.8.0.2')]),
+      (name: 'wg0', addresses: <InternetAddress>[InternetAddress('100.64.0.5')]),
+      (name: 'wlan0', addresses: <InternetAddress>[InternetAddress('192.168.1.42')]),
+    ]);
+    expect(picked, '192.168.1.42');
+  });
 }

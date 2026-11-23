@@ -78,6 +78,36 @@ class PositionInfo {
   });
 }
 
+/// Result of `GetMediaInfo`.
+class MediaInfo {
+  /// Currently loaded media URI (`CurrentURI`).
+  final String? currentUri;
+
+  /// Raw DIDL-Lite metadata (`CurrentURIMetaData`).
+  final String? currentUriMetadata;
+
+  /// Reported duration (`MediaDuration`).
+  final Duration? mediaDuration;
+
+  /// Track title decoded from DIDL-Lite metadata when present.
+  final String? title;
+
+  /// Artist decoded from DIDL-Lite metadata when present.
+  final String? artist;
+
+  /// Album decoded from DIDL-Lite metadata when present.
+  final String? album;
+
+  const MediaInfo({
+    this.currentUri,
+    this.currentUriMetadata,
+    this.mediaDuration,
+    this.title,
+    this.artist,
+    this.album,
+  });
+}
+
 /// A typed failure returned by a UPnP action, including its `errorCode`.
 class UpnpActionError extends AppError {
   /// Numeric UPnP error code, e.g. `714`.
@@ -200,6 +230,28 @@ class AvTransportClient {
       position: parseUpnpDuration(elementText(body, 'RelTime')),
       trackDuration: parseUpnpDuration(elementText(body, 'TrackDuration')),
       trackUri: elementText(body, 'CurrentTrackURI'),
+    );
+  }
+
+  /// Reads current track URI, metadata and total media duration.
+  Future<MediaInfo> getMediaInfo() async {
+    final body = await _invoke(
+      'GetMediaInfo',
+      buildGetMediaInfoEnvelope(),
+    );
+    final metadata = elementText(body, 'CurrentURIMetaData');
+    final rawTitle = metadata == null ? null : elementText(metadata, 'title');
+    final rawArtist = metadata == null
+        ? null
+        : (elementText(metadata, 'artist') ?? elementText(metadata, 'creator'));
+    final rawAlbum = metadata == null ? null : elementText(metadata, 'album');
+    return MediaInfo(
+      currentUri: elementText(body, 'CurrentURI'),
+      currentUriMetadata: metadata,
+      mediaDuration: parseUpnpDuration(elementText(body, 'MediaDuration')),
+      title: (rawTitle != null && rawTitle.isNotEmpty) ? rawTitle : null,
+      artist: (rawArtist != null && rawArtist.isNotEmpty) ? rawArtist : null,
+      album: (rawAlbum != null && rawAlbum.isNotEmpty) ? rawAlbum : null,
     );
   }
 
@@ -376,6 +428,16 @@ class AvTransportClient {
   }) {
     return buildSoapEnvelope(
       action: 'GetPositionInfo',
+      arguments: '<InstanceID>$instanceId</InstanceID>',
+    );
+  }
+
+  /// Envelope for `GetMediaInfo`.
+  static String buildGetMediaInfoEnvelope({
+    String instanceId = defaultInstanceId,
+  }) {
+    return buildSoapEnvelope(
+      action: 'GetMediaInfo',
       arguments: '<InstanceID>$instanceId</InstanceID>',
     );
   }

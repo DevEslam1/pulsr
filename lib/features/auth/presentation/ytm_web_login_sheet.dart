@@ -488,61 +488,76 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
   @override
   void initState() {
     super.initState();
-    _currentUrl = widget.initialUrl != null
-        ? _withGeoParams(widget.initialUrl!)
-        : (widget.isBrowseMode ? YtmLocale.homeUrl() : googleSignInUrl);
+    final fallbackUrl =
+        widget.isBrowseMode ? YtmLocale.homeUrl() : googleSignInUrl;
+    var initialTarget = fallbackUrl;
+    final rawInitial = widget.initialUrl?.trim();
+    if (rawInitial != null && rawInitial.isNotEmpty) {
+      final parsed = Uri.tryParse(rawInitial);
+      if (parsed != null &&
+          parsed.scheme == 'https' &&
+          YtmWebLoginSheet.evaluateNavigation(parsed) ==
+              NavigationActionPolicy.ALLOW) {
+        initialTarget = rawInitial;
+      }
+    }
+    _currentUrl = _withGeoParams(initialTarget);
 
-    // Pre-seed Egypt region preference cookie for YouTube domains
-    unawaited(() async {
-      try {
-        final cookieManager = CookieManager.instance();
-        await cookieManager.setCookie(
-          url: WebUri('https://music.youtube.com'),
-          name: 'PREF',
-          value: YtmLocale.prefCookieValue(),
-          domain: '.youtube.com',
-          path: '/',
-        );
-      } catch (_) {}
-    }());
+    unawaited(_initializeSheet());
+  }
 
-    final accountService = getIt<YtmAccountService>();
-    if (accountService.isLoggedIn) {
-      // Only a definite `invalid` may tear the jar down. `validateSession()`
-      // flattens the three-way verdict into a bool, so a timeout, a captive
-      // portal or an IP-level 403 read as "signed out": the sheet dropped to the
-      // sign-in prompt and `_clearCookiesAndReset()` wiped a session that was
-      // perfectly good, forcing a real re-login over something transient.
-      accountService.validateSessionDetailed().then((verdict) {
+  Future<void> _seedPrefCookie() async {
+    try {
+      final cookieManager = CookieManager.instance();
+      await cookieManager.setCookie(
+        url: WebUri('https://music.youtube.com'),
+        name: 'PREF',
+        value: YtmLocale.prefCookieValue(),
+        domain: '.youtube.com',
+        path: '/',
+      );
+    } catch (_) {}
+  }
+
+  Future<void> _initializeSheet() async {
+    try {
+      await _seedPrefCookie();
+      if (!mounted || _disposed) return;
+
+      await _bootstrapSettings();
+      if (!mounted || _disposed) return;
+
+      final accountService = getIt<YtmAccountService>();
+      if (accountService.isLoggedIn) {
+        // Only a definite `invalid` may tear the jar down. `validateSession()`
+        // flattens the three-way verdict into a bool, so a timeout, a captive
+        // portal or an IP-level 403 read as "signed out": the sheet dropped to
+        // the sign-in prompt and `_clearCookiesAndReset()` wiped a session that
+        // was perfectly good, forcing a real re-login over something transient.
+        final verdict = await accountService.validateSessionDetailed();
         if (!mounted || _disposed) return;
         setState(
             () => _isLoggedIn = verdict != SessionValidationResult.invalid);
         if (verdict == SessionValidationResult.invalid) {
-          _clearCookiesAndReset(); // start the re-login with a CLEAN jar (fixes B6)
+          await _clearCookiesAndReset();
         }
-      }).catchError((error, stackTrace) {
-        if (!mounted || _disposed) return;
-        ErrorLogger.log(
-          'Failed to validate session detailed in login sheet',
-          error: error,
-          stackTrace: stackTrace,
-          category: 'YtmWebLoginSheet',
-        );
-      });
-    }
-
-    unawaited(_bootstrapSettings().catchError((error, stackTrace) {
-      if (!mounted) return;
-      ErrorLogger.log('Failed to bootstrap WebView settings',
-          error: error, stackTrace: stackTrace, category: 'YtmWebLoginSheet');
-      if (mounted) {
+      }
+    } catch (error, stackTrace) {
+      if (!mounted || _disposed) return;
+      ErrorLogger.log(
+        'Failed to validate session or bootstrap settings in login sheet',
+        error: error,
+        stackTrace: stackTrace,
+        category: 'YtmWebLoginSheet',
+      );
+      if (_settings == null) {
         setState(() {
           _settings = YtmWebLoginSheet.buildDefaultSettings(
               userAgent: EmbeddedBrowserUa.mobile);
         });
-        _scheduleNextAuthPoll();
+        if (!widget.isBrowseMode) _scheduleNextAuthPoll();
       }
-    }));
+    }
   }
 
   /// Resolves the coherent runtime identity, then builds the WebView settings.
@@ -985,6 +1000,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
         if (cookieStr.startsWith('"') && cookieStr.endsWith('"')) {
           cookieStr = cookieStr.substring(1, cookieStr.length - 1);
         }
+        cookieStr = YtmAccountService.scopeCookiesForYouTube(cookieStr);
         if (cookieStr.isNotEmpty &&
             YtmAccountService.looksLikeSignedInCookies(cookieStr)) {
           if (!_isLoggedIn) {
@@ -1064,8 +1080,9 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
         if (cookieStr.startsWith('"') && cookieStr.endsWith('"')) {
           cookieStr = cookieStr.substring(1, cookieStr.length - 1);
         }
-        if (cookieStr.isNotEmpty) {
-          cookies = cookieStr;
+        final scoped = YtmAccountService.scopeCookiesForYouTube(cookieStr);
+        if (scoped.isNotEmpty) {
+          cookies = scoped;
         }
       } catch (e, st) {
         ErrorLogger.log('toString failed',

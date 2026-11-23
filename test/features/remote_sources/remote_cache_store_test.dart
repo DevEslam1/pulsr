@@ -257,4 +257,51 @@ void main() {
     final changed = buildStore();
     expect(await changed.lookup('src', 'a.mp3', etag: 'v2'), isNull);
   });
+
+  test('pin before commit marks the committed entry as pinned', () async {
+    final store = buildStore(maxBytes: 10);
+    await store.pin('src', 'keep.mp3');
+    final sink = await store.beginWrite('src', 'keep.mp3');
+    sink.add(List<int>.filled(6, 1));
+    await sink.commit();
+
+    // Writing another 6 bytes pushes over maxBytes (10); the unpinned one
+    // cannot be evicted because keep.mp3 was pinned before its write finished.
+    await store.store('src', 'other.mp3', Stream.value(List<int>.filled(6, 2)));
+
+    expect(await store.contains('src', 'keep.mp3'), isTrue);
+  });
+
+  test('pinSource unpinning evicts unpinned entries above cap', () async {
+    final store = buildStore(maxBytes: 8);
+    await store.store(
+      'src',
+      'a.mp3',
+      Stream.value(List<int>.filled(6, 1)),
+      pin: true,
+    );
+    await store.store(
+      'src',
+      'b.mp3',
+      Stream.value(List<int>.filled(6, 2)),
+      pin: true,
+    );
+    expect(await store.currentBytes(), 12);
+
+    await store.pinSource('src', pinned: false);
+    expect(await store.currentBytes(), lessThanOrEqualTo(8));
+  });
+
+  test('clear aborts active sinks and blocks old commits from resurrecting',
+      () async {
+    final store = buildStore();
+    final sink = await store.beginWrite('src', 'inprogress.mp3');
+    sink.add(utf8.encode('partial'));
+
+    await store.clear();
+
+    expect(await sink.commit(), isNull);
+    expect(await store.contains('src', 'inprogress.mp3'), isFalse);
+    expect(await tempDir.list().toList(), isEmpty);
+  });
 }

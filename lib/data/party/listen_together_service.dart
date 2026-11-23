@@ -17,6 +17,7 @@ import '../../core/utils/error_logger.dart';
 import '../../domain/models/ytm_track.dart';
 import '../../domain/repositories/music_repository_interface.dart';
 import '../../features/player/cubit/player_cubit.dart';
+import '../../features/player/cubit/player_state.dart';
 import '../../features/settings/cubit/settings_cubit.dart';
 import '../db/app_database.dart';
 import 'party_models.dart';
@@ -47,6 +48,7 @@ class ListenTogetherService {
   /// Resolved output latency of this device in ms, cached because it is read on
   /// every reconciliation tick.
   int _outputLatencyMs = 0;
+  int _calibratedBluetoothLatencyMs = 0;
   Timer? _scheduledStartTimer;
 
   final ValueNotifier<PartyConnectionState> connectionState =
@@ -119,10 +121,43 @@ class ListenTogetherService {
   // Subscriptions to local PlayerCubit
   StreamSubscription? _playerStateSub;
   bool _isReconcilingInbound = false;
+  Future<void>? _initFuture;
+  bool _initialized = false;
+  bool _disposed = false;
+
+  // Host outbound diff baseline (seeded on host creation and member->host promotion)
+  DateTime? _hostLastAt;
+  Duration _hostLastPosition = Duration.zero;
+  String? _hostLastSongKey;
+  bool? _hostLastPlaying;
+  String? _hostLastQueueSignature;
+  bool? _hostLastAutoplay;
+  int _lastSyncedQueueSeq = -1;
 
   /// Initializes party session if persisted or registers listener.
-  Future<void> init() async {
+  ///
+  /// Idempotent and safe to invoke multiple times or concurrently with
+  /// [createParty] / [joinParty].
+  Future<void> init() {
+    if (_disposed) return Future<void>.value();
+    if (_initialized) {
+      if (_playerStateSub == null) _bindPlayerCubitEvents();
+      return Future<void>.value();
+    }
+    final existing = _initFuture;
+    if (existing != null) return existing;
+    final future = _initInternal();
+    _initFuture = future;
+    return future.whenComplete(() => _initFuture = null);
+  }
+
+  Future<void> _initInternal() async {
     final prefs = await SharedPreferences.getInstance();
+    if (_disposed) return;
+    final rawLatency = prefs.get(PrefsKeys.bluetoothLatencyOffsetMs);
+    _calibratedBluetoothLatencyMs = rawLatency is num ? rawLatency.toInt() : 0;
+    _refreshCachedOutputLatencyMs();
+
     final savedCode = prefs.getString(prefSavedCodeKey);
     String? savedToken;
     try {
@@ -138,16 +173,19 @@ class ListenTogetherService {
           error: e, stackTrace: st, category: 'PARTY');
       savedToken = prefs.getString(prefSavedTokenKey);
     }
+    if (_disposed) return;
     final serverBase = await getServerUrl();
+    if (_disposed) return;
 
-    if (savedCode != null && savedToken != null) {
+    if (!inParty && savedCode != null && savedToken != null) {
       _activeCode = savedCode;
       _activeToken = savedToken;
       _activeServerBase = serverBase;
-      _connectWebSocket();
+      unawaited(_connectWebSocket());
     }
 
     _bindPlayerCubitEvents();
+    _initialized = true;
   }
 
   /// Normalizes a candidate party server URL, converting `ws://` -> `http://`
@@ -353,7 +391,11 @@ class ListenTogetherService {
   }
 
   /// Leave the active party.
-  Future<void> leaveParty() async {
+  ///
+  /// When [notifyServer] is `false` (e.g. after receiving a server `bye` frame
+  /// or terminal 401/403/404 response), local session state and stored
+  /// credentials are cleared without sending a redundant `POST /leave`.
+  Future<void> leaveParty({bool notifyServer = true}) async {
     final code = _activeCode;
     final token = _activeToken;
     final serverBase = _activeServerBase ?? await getServerUrl();
@@ -365,8 +407,10 @@ class ListenTogetherService {
     _reconnectScheduled = false;
     _reconnectAttempts = 0;
     _lastHandledSeq = -1;
+    _lastSyncedQueueSeq = -1;
     _activePartyTrackVideoId = null;
     _activePartyMatchedSongId = null;
+    _resetHostBaseline();
     _clock.reset();
     clockSynced.value = false;
     roundTripMs.value = 0;
@@ -388,7 +432,7 @@ class ListenTogetherService {
           error: e, stackTrace: st, category: 'PARTY');
     }
 
-    if (code != null && token != null) {
+    if (notifyServer && code != null && token != null) {
       try {
         final url = Uri.parse('$serverBase/api/parties/$code/leave');
         await _httpClient.post(
@@ -420,9 +464,36 @@ class ListenTogetherService {
   }
 
   void _applyMembership(PartyMembership membership) {
+    final wasHost = _isHost;
     partySnapshot.value = membership.party;
     currentMember.value = membership.you;
     _isHost = membership.you.isHost;
+    if (_isHost && !wasHost) {
+      _seedHostBaselineFromPlayer();
+    }
+  }
+
+  /// True when [error] or [closeCode] indicates an expired token, forbidden
+  /// membership, or dissolved party room (401/403/404) where retrying is futile.
+  @visibleForTesting
+  static bool isTerminalSessionFailure(Object? error, [int? closeCode]) {
+    if (closeCode == 4001 ||
+        closeCode == 4003 ||
+        closeCode == 4004 ||
+        closeCode == 1008) {
+      return true;
+    }
+    if (error == null) return false;
+    final text = error.toString();
+    return RegExp(
+      r'HTTP status code:\s*(401|403|404)\b|\b(401|403|404)\b.*(unauthorized|forbidden|not found)',
+      caseSensitive: false,
+    ).hasMatch(text);
+  }
+
+  Future<void> _handleTerminalSessionFailure(String message) async {
+    await leaveParty(notifyServer: false);
+    lastError.value = message;
   }
 
   // --------------------------------------------------------------------------
@@ -439,6 +510,7 @@ class ListenTogetherService {
 
     final generation = ++_connectGeneration;
     connectionState.value = PartyConnectionState.connecting;
+    unawaited(_resolveOutputLatencyMs());
     final wsBase = _resolveWsBase(serverBase);
     final wsUri = Uri.parse('$wsBase/ws/parties/$code');
 
@@ -464,9 +536,21 @@ class ListenTogetherService {
         onError: (e, st) {
           ErrorLogger.log('Party WebSocket error',
               error: e, stackTrace: st, category: 'PARTY');
+          if (isTerminalSessionFailure(e, channel.closeCode)) {
+            unawaited(_handleTerminalSessionFailure(
+              'Unable to reconnect to the party. Check your connection.',
+            ));
+            return;
+          }
           _scheduleReconnect();
         },
         onDone: () {
+          if (isTerminalSessionFailure(null, channel.closeCode)) {
+            unawaited(_handleTerminalSessionFailure(
+              'Unable to reconnect to the party. Check your connection.',
+            ));
+            return;
+          }
           _scheduleReconnect();
         },
       );
@@ -479,6 +563,12 @@ class ListenTogetherService {
       if (generation != _connectGeneration) return;
       ErrorLogger.log('Party WebSocket connect failed',
           error: e, stackTrace: st, category: 'PARTY');
+      if (isTerminalSessionFailure(e, _channel?.closeCode)) {
+        await _handleTerminalSessionFailure(
+          'Unable to reconnect to the party. Check your connection.',
+        );
+        return;
+      }
       _scheduleReconnect();
     }
   }
@@ -597,16 +687,25 @@ class ListenTogetherService {
         case 'welcome':
           final partyJson = json['party'] as Map<String, dynamic>?;
           final youJson = json['you'] as Map<String, dynamic>?;
+          final wasHost = _isHost;
+          PartySnapshot? welcomedSnap;
           if (partyJson != null) {
-            final snap = PartySnapshot.fromJson(partyJson);
-            partySnapshot.value = snap;
+            welcomedSnap = PartySnapshot.fromJson(partyJson);
+            partySnapshot.value = welcomedSnap;
           }
           if (youJson != null) {
             final you = PartyMember.fromJson(youJson);
             currentMember.value = you;
             _isHost = you.isHost;
           }
+          if (_isHost && !wasHost) {
+            _seedHostBaselineFromPlayer();
+          }
           connectionState.value = PartyConnectionState.live;
+          if (welcomedSnap != null && !_isHost) {
+            unawaited(_onInboundPlaybackUpdate(welcomedSnap.playback));
+            unawaited(_syncInboundQueue(welcomedSnap.queue));
+          }
           break;
 
         case 'pong':
@@ -653,6 +752,9 @@ class ListenTogetherService {
               queue: q,
               serverMs: currentSnap.serverMs,
             );
+            if (!_isHost) {
+              unawaited(_syncInboundQueue(q));
+            }
           }
           break;
 
@@ -676,19 +778,29 @@ class ListenTogetherService {
             serverMs: currentSnap.serverMs,
           );
 
-          // Update host status if member was promoted
+          // Update host status if member was promoted and sync host baseline so
+          // the next player tick does not broadcast a spurious setTrack.
           final myId = currentMember.value?.memberId;
           if (myId != null) {
             final me = members.where((m) => m.memberId == myId).firstOrNull;
             if (me != null) {
+              final wasHost = _isHost;
               currentMember.value = me;
               _isHost = me.isHost;
+              if (_isHost && !wasHost) {
+                _seedHostBaselineFromPlayer();
+              }
             }
           }
           break;
 
         case 'bye':
-          leaveParty();
+          final byeReason =
+              json['reason'] as String? ?? json['message'] as String?;
+          if (byeReason != null && byeReason.isNotEmpty) {
+            lastError.value = byeReason;
+          }
+          unawaited(leaveParty(notifyServer: false));
           break;
 
         case 'error':
@@ -706,37 +818,90 @@ class ListenTogetherService {
   // Bidirectional Playback Synchronization
   // --------------------------------------------------------------------------
 
+  void _resetHostBaseline() {
+    _hostLastAt = null;
+    _hostLastPosition = Duration.zero;
+    _hostLastSongKey = null;
+    _hostLastPlaying = null;
+    _hostLastQueueSignature = null;
+    _hostLastAutoplay = null;
+  }
+
+  void _seedHostBaselineFromPlayer() {
+    _hostLastAt = DateTime.now();
+    if (!getIt.isRegistered<PlayerCubit>()) return;
+    final state = getIt<PlayerCubit>().state;
+    _hostLastPosition = state.position;
+    _hostLastSongKey = _songPartyKey(state.currentSong);
+    _hostLastPlaying = state.isPlaying;
+    _hostLastQueueSignature = _queueSignature(state.queue, state.currentIndex);
+    _hostLastAutoplay = state.isAutoplayEnabled;
+  }
+
+  static String? _songPartyKey(SongsTableData? song) {
+    if (song == null) return null;
+    final remote = song.remoteId?.trim();
+    if (remote != null && remote.isNotEmpty) return remote;
+    return 'local:${song.id}';
+  }
+
+  static PartyTrack _partyTrackFromSong(SongsTableData song) {
+    final remote = song.remoteId?.trim();
+    final isLocal = remote == null || remote.isEmpty;
+    return PartyTrack(
+      videoId: isLocal ? 'local:${song.id}' : remote,
+      title: song.title,
+      artist: song.artist,
+      thumbnailUrl: song.remoteArtworkUrl ?? song.artworkUri,
+      durationMs: song.durationMs,
+      fromAutoplay: song.isAutoplay,
+      isLocalOnly: isLocal,
+    );
+  }
+
+  static String _queueSignature(List<SongsTableData> queue, int currentIndex) {
+    final keys = queue.map((s) => _songPartyKey(s) ?? '').join(',');
+    return '$currentIndex|$keys';
+  }
+
   void _bindPlayerCubitEvents() {
     _playerStateSub?.cancel();
     if (!getIt.isRegistered<PlayerCubit>()) return;
 
     final playerCubit = getIt<PlayerCubit>();
-    DateTime? lastAt;
-    Duration lastPosition = Duration.zero;
-    String? lastSongKey;
-    bool? lastPlaying;
+    if (_isHost) {
+      _seedHostBaselineFromPlayer();
+    }
     _playerStateSub = playerCubit.stream.listen((state) {
       if (!inParty || !_isHost) return;
       if (_isReconcilingInbound) return;
 
       final now = DateTime.now();
-      final songKey =
-          state.currentSong?.remoteId ?? state.currentSong?.id.toString();
-      final expectedPosition = lastPlaying == true && lastAt != null
-          ? lastPosition + now.difference(lastAt!)
-          : lastPosition;
+      final songKey = _songPartyKey(state.currentSong);
+      final expectedPosition = _hostLastPlaying == true && _hostLastAt != null
+          ? _hostLastPosition + now.difference(_hostLastAt!)
+          : _hostLastPosition;
       final seeked = (state.position - expectedPosition).abs() >
           const Duration(seconds: 2);
-      final trackChanged = songKey != lastSongKey;
-      final playingChanged = state.isPlaying != lastPlaying;
-      final changed = trackChanged || playingChanged || seeked;
-      final heartbeatDue = lastAt == null ||
-          now.difference(lastAt!) >= const Duration(milliseconds: 1000);
+      final trackChanged = songKey != _hostLastSongKey;
+      final playingChanged = state.isPlaying != _hostLastPlaying;
+      final queueSig = _queueSignature(state.queue, state.currentIndex);
+      final queueChanged = queueSig != _hostLastQueueSignature;
+      final autoplayChanged = state.isAutoplayEnabled != _hostLastAutoplay;
+      final changed = trackChanged ||
+          playingChanged ||
+          seeked ||
+          queueChanged ||
+          autoplayChanged;
+      final heartbeatDue = _hostLastAt == null ||
+          now.difference(_hostLastAt!) >= const Duration(milliseconds: 1000);
       if (!changed && !(state.isPlaying && heartbeatDue)) return;
-      lastAt = now;
-      lastPosition = state.position;
-      lastSongKey = songKey;
-      lastPlaying = state.isPlaying;
+      _hostLastAt = now;
+      _hostLastPosition = state.position;
+      _hostLastSongKey = songKey;
+      _hostLastPlaying = state.isPlaying;
+      _hostLastQueueSignature = queueSig;
+      _hostLastAutoplay = state.isAutoplayEnabled;
       unawaited(_syncHostPlayback(
         song: state.currentSong,
         isPlaying: state.isPlaying,
@@ -744,6 +909,9 @@ class ListenTogetherService {
         trackChanged: trackChanged,
         playingChanged: playingChanged,
         seeked: seeked,
+        queue: queueChanged ? state.queue : null,
+        queueIndex: state.currentIndex,
+        autoplayEnabled: autoplayChanged ? state.isAutoplayEnabled : null,
       ));
     });
   }
@@ -755,14 +923,37 @@ class ListenTogetherService {
     required bool trackChanged,
     required bool playingChanged,
     required bool seeked,
+    List<SongsTableData>? queue,
+    int queueIndex = -1,
+    bool? autoplayEnabled,
   }) async {
     if (!inParty) return;
 
-    await _resolveOutputLatencyMs();
+    final latencyMs = _refreshCachedOutputLatencyMs();
     final audiblePosMs = PartySyncController.audibleAnchorPositionMs(
       hostRenderPositionMs: position.inMilliseconds,
-      hostOutputLatencyMs: _outputLatencyMs,
+      hostOutputLatencyMs: latencyMs,
     );
+
+    if (autoplayEnabled != null) {
+      _sendFrame({
+        'type': 'control',
+        'action': 'setAutoplay',
+        'enabled': autoplayEnabled,
+      });
+    }
+
+    if (queue != null) {
+      _sendFrame({
+        'type': 'control',
+        'action': 'setQueue',
+        'queue': queue
+            .map(_partyTrackFromSong)
+            .map((track) => track.toJson())
+            .toList(),
+        'queueIndex': queueIndex,
+      });
+    }
 
     if (trackChanged) {
       if (song == null) {
@@ -773,13 +964,7 @@ class ListenTogetherService {
         });
         return;
       }
-      final track = PartyTrack(
-        videoId: song.remoteId ?? song.id.toString(),
-        title: song.title,
-        artist: song.artist,
-        thumbnailUrl: song.remoteArtworkUrl ?? song.artworkUri,
-        durationMs: song.durationMs,
-      );
+      final track = _partyTrackFromSong(song);
       _sendFrame({
         'type': 'control',
         'action': 'setTrack',
@@ -811,6 +996,10 @@ class ListenTogetherService {
       return;
     }
 
+    if (queue != null || autoplayEnabled != null) {
+      return;
+    }
+
     // Periodic heartbeat when track and transport state have not changed:
     // emit lightweight report frame so server does not reset AnchorMs (+350ms)
     // or spam activity messages every second.
@@ -821,20 +1010,29 @@ class ListenTogetherService {
     });
   }
 
-  /// This device's output latency in ms, from the Bluetooth calibration the user
-  /// measured. Resolved per check because the route changes under us: applying a
-  /// saved Bluetooth offset while a USB DAC is active would mistime playback by
-  /// the whole offset instead of correcting it.
+  /// Synchronously updates [_outputLatencyMs] from the cached Bluetooth offset
+  /// and active audio output route so host/follower sync never awaits prefs I/O.
+  int _refreshCachedOutputLatencyMs() {
+    var onBluetooth = false;
+    if (getIt.isRegistered<SettingsCubit>()) {
+      onBluetooth =
+          getIt<SettingsCubit>().state.currentOutputDevice?.isBluetooth ??
+              false;
+    }
+    _outputLatencyMs =
+        (onBluetooth && _calibratedBluetoothLatencyMs > 0)
+            ? _calibratedBluetoothLatencyMs
+            : 0;
+    return _outputLatencyMs;
+  }
+
+  /// Refreshes the cached Bluetooth latency preference in the background.
   Future<void> _resolveOutputLatencyMs() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final raw = prefs.get(PrefsKeys.bluetoothLatencyOffsetMs);
-      final calibrated = raw is num ? raw.toInt() : 0;
-      var onBluetooth = false;
-      if (getIt.isRegistered<SettingsCubit>()) {
-        onBluetooth = getIt<SettingsCubit>().state.currentOutputDevice?.isBluetooth ?? false;
-      }
-      _outputLatencyMs = (onBluetooth && calibrated > 0) ? calibrated : 0;
+      _calibratedBluetoothLatencyMs = raw is num ? raw.toInt() : 0;
+      _refreshCachedOutputLatencyMs();
     } catch (e, st) {
       ErrorLogger.log('Failed to resolve party output latency',
           error: e, stackTrace: st, category: 'PARTY');
@@ -899,6 +1097,11 @@ class ListenTogetherService {
       if (!inParty || _isHost) return;
       final snap = partySnapshot.value;
       if (snap == null) return;
+      if (!snap.playback.isPlaying &&
+          getIt.isRegistered<PlayerCubit>() &&
+          !getIt<PlayerCubit>().state.isPlaying) {
+        return;
+      }
       _checkMemberDrift(snap.playback);
     });
   }
@@ -908,7 +1111,63 @@ class ListenTogetherService {
     if (playback.seq <= _lastHandledSeq) return;
     _lastHandledSeq = playback.seq;
 
-    _checkMemberDrift(playback, forceTrackReconciliation: true);
+    if (getIt.isRegistered<PlayerCubit>()) {
+      final playerCubit = getIt<PlayerCubit>();
+      if (playerCubit.state.isAutoplayEnabled != playback.autoplayEnabled) {
+        _isReconcilingInbound = true;
+        try {
+          await playerCubit.setAutoplayEnabled(playback.autoplayEnabled);
+        } finally {
+          _isReconcilingInbound = false;
+        }
+      }
+    }
+
+    await _checkMemberDrift(playback, forceTrackReconciliation: true);
+  }
+
+  Future<void> _syncInboundQueue(PartyQueue partyQueue) async {
+    if (!inParty || _isHost) return;
+    if (partyQueue.seq < _lastSyncedQueueSeq) return;
+    _lastSyncedQueueSeq = partyQueue.seq;
+    if (!getIt.isRegistered<PlayerCubit>()) return;
+    final playerCubit = getIt<PlayerCubit>();
+
+    final startIdx = partyQueue.index >= 0 ? partyQueue.index + 1 : 0;
+    final upcomingTracks = startIdx < partyQueue.items.length
+        ? partyQueue.items.sublist(startIdx)
+        : const <PartyTrack>[];
+
+    final resolvedUpcoming = <SongsTableData>[];
+    for (final track in upcomingTracks) {
+      final song = await _resolvePartyTrackToSong(track);
+      if (song != null) resolvedUpcoming.add(song);
+    }
+
+    final currentQueue = playerCubit.state.queue;
+    final currentIdx = playerCubit.state.currentIndex;
+    final currentUpcoming =
+        (currentIdx >= 0 && currentIdx + 1 < currentQueue.length)
+            ? currentQueue.sublist(currentIdx + 1)
+            : const <SongsTableData>[];
+    final existingKeys = currentUpcoming.map(_songPartyKey).toList();
+    final targetKeys = resolvedUpcoming.map(_songPartyKey).toList();
+    if (listEquals(existingKeys, targetKeys)) return;
+
+    _isReconcilingInbound = true;
+    try {
+      for (var i = currentQueue.length - 1; i > currentIdx && i >= 0; i--) {
+        await playerCubit.removeQueueItem(i);
+      }
+      if (resolvedUpcoming.isNotEmpty) {
+        await playerCubit.addAllToQueue(resolvedUpcoming);
+      }
+    } catch (e, st) {
+      ErrorLogger.log('Failed to sync inbound party queue',
+          error: e, stackTrace: st, category: 'PARTY');
+    } finally {
+      _isReconcilingInbound = false;
+    }
   }
 
   Future<void> _checkMemberDrift(
@@ -922,13 +1181,28 @@ class ListenTogetherService {
       final playerCubit = getIt<PlayerCubit>();
       final playerState = playerCubit.state;
 
+      if (!playback.isPlaying) {
+        _scheduledStartTimer?.cancel();
+        _scheduledStartTimer = null;
+      }
+
       final targetTrack = playback.track;
-      if (targetTrack == null) return;
+      if (targetTrack == null) {
+        if (!playback.isPlaying && playerState.isPlaying) {
+          _isReconcilingInbound = true;
+          try {
+            await playerCubit.pause();
+          } finally {
+            _isReconcilingInbound = false;
+          }
+        }
+        return;
+      }
 
       final now = _clock.nowMs();
       if (now < _reconcileQuietUntilMs) return;
 
-      await _resolveOutputLatencyMs();
+      final latencyMs = _refreshCachedOutputLatencyMs();
 
       // 1. Reconcile Track: verify current track matches target videoId
       final currentSong = playerState.currentSong;
@@ -938,10 +1212,12 @@ class ListenTogetherService {
           currentSong.id == _activePartyMatchedSongId;
       final currentVideoId = isMatchedLocalSong
           ? targetTrack.videoId
-          : (currentSong?.remoteId ?? currentSong?.id.toString());
+          : _songPartyKey(currentSong);
 
       if (forceTrackReconciliation || currentVideoId != targetTrack.videoId) {
         if (currentVideoId != targetTrack.videoId) {
+          _scheduledStartTimer?.cancel();
+          _scheduledStartTimer = null;
           _isReconcilingInbound = true;
           _reconcileQuietUntilMs = now + 2500;
           try {
@@ -963,13 +1239,21 @@ class ListenTogetherService {
         }
         return;
       } else if (playback.isPlaying && !playerState.isPlaying) {
+        if (_scheduledStartTimer?.isActive ?? false) {
+          // A future anchor start is already armed; do not cancel or re-arm it.
+          return;
+        }
         await _startAtAnchor(playback);
+        if (_scheduledStartTimer?.isActive ?? false) {
+          return;
+        }
       }
 
       // 3. Audible-time correction. Compared against the latency-compensated
       // target: matching raw positions is not enough when one member hears the
       // music 200 ms after it is rendered and another hears it immediately.
       if (!playback.isPlaying || !_clock.synced) return;
+      if (_scheduledStartTimer?.isActive ?? false) return;
 
       final roomPosition = effectivePartyPositionMs(playback);
       if (roomPosition == null) return;
@@ -977,7 +1261,7 @@ class ListenTogetherService {
       final decision = _sync.evaluatePosition(
         localRenderMs: playerState.position.inMilliseconds,
         roomPositionMs: roomPosition,
-        outputLatencyMs: _outputLatencyMs,
+        outputLatencyMs: latencyMs,
         durationMs: targetTrack.durationMs,
       );
 
@@ -995,47 +1279,98 @@ class ListenTogetherService {
     }
   }
 
-  Future<void> _loadTrackForParty(
-      PartyTrack track, PartyPlayback playback) async {
-    final playerCubit = getIt<PlayerCubit>();
-
-    // 1. Try matching local database first
+  Future<SongsTableData?> _resolvePartyTrackToSong(PartyTrack track) async {
+    final isLocalOnly =
+        track.isLocalOnly || track.videoId.startsWith('local:');
     SongsTableData? match;
     try {
-      final repo = getIt<IMusicRepository>();
-      final matchedRes = await repo.findMatchingLocalSong(
-        remoteId: track.videoId,
-        title: track.title,
-        artist: track.artist,
-      );
-      match = matchedRes.fold((_) => null, (s) => s);
+      if (getIt.isRegistered<IMusicRepository>()) {
+        final repo = getIt<IMusicRepository>();
+        final matchedRes = await repo.findMatchingLocalSong(
+          remoteId: isLocalOnly ? null : track.videoId,
+          title: track.title,
+          artist: track.artist,
+        );
+        match = matchedRes.fold((_) => null, (s) => s);
+      }
     } catch (e, st) {
       ErrorLogger.log('Failed to match local party track',
           error: e, stackTrace: st, category: 'PARTY');
     }
-
-    // 2. If not in local library, create a YtmTrack
-    match ??= YtmTrack(
+    if (match != null) return match;
+    if (isLocalOnly) return null;
+    return YtmTrack(
       videoId: track.videoId,
       title: track.title,
       artist: track.artist,
       duration: Duration(milliseconds: track.durationMs ?? 0),
       artworkUrl: track.thumbnailUrl,
     ).toSongData();
+  }
+
+  Future<void> _loadTrackForParty(
+      PartyTrack track, PartyPlayback playback) async {
+    final playerCubit = getIt<PlayerCubit>();
+    final match = await _resolvePartyTrackToSong(track);
+    if (match == null) {
+      // Local-only track on the host device with no local match on this device.
+      _activePartyTrackVideoId = track.videoId;
+      _activePartyMatchedSongId = null;
+      lastError.value =
+          'Local track "${track.title}" is unavailable on this device.';
+      if (playerCubit.state.isPlaying) {
+        await playerCubit.pause();
+      }
+      return;
+    }
+
+    if (lastError.value != null &&
+        lastError.value!.startsWith('Local track "')) {
+      lastError.value = null;
+    }
 
     _activePartyTrackVideoId = track.videoId;
     _activePartyMatchedSongId = match.id;
 
-    final targetPos = effectivePartyPositionMs(playback) ?? playback.positionMs;
+    final nowServer = _clock.serverNowMs();
+    final plan = (!playback.isPlaying || nowServer == null)
+        ? null
+        : PartySyncController.planStart(
+            anchorServerMs: playback.anchorMs,
+            nowServerMs: nowServer,
+          );
+    final deferForFutureAnchor = plan != null && !plan.startImmediately;
+    final loadPaused = !playback.isPlaying || deferForFutureAnchor;
+    final targetPos = deferForFutureAnchor
+        ? playback.positionMs
+        : (effectivePartyPositionMs(playback) ?? playback.positionMs);
+
+    if (loadPaused) {
+      // Pause before loading with preservePlaybackState: true so joining a
+      // paused or future-anchored room produces zero audible blip.
+      if (playerCubit.state.isPlaying) {
+        await playerCubit.pause();
+      }
+      await playerCubit.playSong(
+        match,
+        initialPosition: Duration(milliseconds: targetPos),
+        openPlayerIfPlaying: false,
+        preservePlaybackState: true,
+      );
+      if (playerCubit.state.isPlaying) {
+        await playerCubit.pause();
+      }
+      if (playback.isPlaying && deferForFutureAnchor) {
+        await _startAtAnchor(playback);
+      }
+      return;
+    }
 
     await playerCubit.playSong(
       match,
       initialPosition: Duration(milliseconds: targetPos),
+      openPlayerIfPlaying: false,
     );
-
-    if (!playback.isPlaying) {
-      await playerCubit.pause();
-    }
   }
 
   // --------------------------------------------------------------------------
@@ -1078,16 +1413,35 @@ class ListenTogetherService {
     });
   }
 
-  void sendQueueRemove(String videoId) {
+  void sendQueueRemove(String videoId, {int? index}) {
     _sendFrame({
       'type': 'control',
       'action': 'queueRemove',
       'videoId': videoId,
+      if (index != null) 'index': index,
+    });
+  }
+
+  void sendSetQueue(List<PartyTrack> tracks, {int queueIndex = 0}) {
+    _sendFrame({
+      'type': 'control',
+      'action': 'setQueue',
+      'queue': tracks.map((t) => t.toJson()).toList(),
+      'queueIndex': queueIndex,
+    });
+  }
+
+  void sendSetAutoplay(bool enabled) {
+    _sendFrame({
+      'type': 'control',
+      'action': 'setAutoplay',
+      'enabled': enabled,
     });
   }
 
   @disposeMethod
   void dispose() {
+    _disposed = true;
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
     _disconnectWebSocket();

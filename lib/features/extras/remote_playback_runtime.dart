@@ -26,6 +26,9 @@ class RemotePlaybackRuntime {
   final RemoteCredentialsStore credentials;
   RemoteStreamServer? _server;
   Future<void>? _starting;
+  final Map<String, String> _providerSignatures = <String, String>{};
+  final Map<String, Future<void>> _inFlightRegistrations =
+      <String, Future<void>>{};
 
   RemoteStreamServer get server => _server ??= RemoteStreamServer(cache: cache);
 
@@ -47,22 +50,61 @@ class RemotePlaybackRuntime {
     await server.start();
   }
 
-  /// Registers a provider, pins the path so the cache survives eviction, and
-  /// returns the loopback URL handed to the player.
+  /// Registers a provider (reusing unchanged active instances), marks [path]
+  /// pinned for caching, and returns the loopback URL handed to the player.
   Future<Uri> prepareUri(RemoteSource source, String path) async {
     await ensureStarted();
-    final provider = createRemoteProvider(
-      source,
-      await credentials.read(source.id),
-    );
-    await server.registerProvider(provider);
+    await _ensureProviderRegistered(source);
     await cache.pin(source.id, path);
-    return server.uriFor(source, path);
+    return server.uriFor(source, path, pin: true);
   }
+
+  Future<void> _ensureProviderRegistered(RemoteSource source) async {
+    final pending = _inFlightRegistrations[source.id];
+    if (pending != null) {
+      await pending;
+      if (server.hasProvider(source.id)) return;
+    }
+    final future = () async {
+      final creds = await credentials.read(source.id);
+      final sig = _signatureFor(source, creds);
+      if (server.hasProvider(source.id) &&
+          _providerSignatures[source.id] == sig) {
+        return;
+      }
+      final provider = createRemoteProvider(source, creds);
+      await server.registerProvider(provider);
+      _providerSignatures[source.id] = sig;
+    }();
+    _inFlightRegistrations[source.id] = future;
+    try {
+      await future;
+    } finally {
+      if (identical(_inFlightRegistrations[source.id], future)) {
+        _inFlightRegistrations.remove(source.id);
+      }
+    }
+  }
+
+  /// Drops any cached provider registration for [sourceId] after an edit.
+  Future<void> invalidateSource(String sourceId) async {
+    _providerSignatures.remove(sourceId);
+    final srv = _server;
+    if (srv != null && srv.hasProvider(sourceId)) {
+      await srv.unregisterSource(sourceId);
+    }
+  }
+
+  static String _signatureFor(RemoteSource source, RemoteCredentials? creds) =>
+      '${source.kind.name}|${source.authority}|${source.rootPath}|'
+      '${source.useTls}|${source.username ?? ''}|'
+      '${creds?.username ?? ''}|${creds?.password ?? ''}';
 
   Future<void> dispose() async {
     final server = _server;
     _server = null;
+    _providerSignatures.clear();
+    _inFlightRegistrations.clear();
     await server?.stop();
   }
 }

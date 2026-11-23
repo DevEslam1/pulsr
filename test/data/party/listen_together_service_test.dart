@@ -108,5 +108,84 @@ void main() {
       expect(service.activePartyTrackVideoId, isNull);
       expect(service.activePartyMatchedSongId, isNull);
     });
+
+    test('C-14: init() is idempotent across concurrent and repeated calls', () async {
+      final service = ListenTogetherService();
+      addTearDown(() => service.dispose());
+
+      // Concurrent calls share the same initialization future and do not throw
+      await Future.wait([
+        service.init(),
+        service.init(),
+      ]);
+      // Subsequent call after completion returns immediately
+      await service.init();
+      expect(service.inParty, isFalse);
+    });
+
+    test('H-43: isTerminalSessionFailure detects 401/403/404 and terminal WS close codes', () {
+      expect(ListenTogetherService.isTerminalSessionFailure('HTTP 401 Unauthorized', null), isTrue);
+      expect(ListenTogetherService.isTerminalSessionFailure('HTTP 403 Forbidden', null), isTrue);
+      expect(ListenTogetherService.isTerminalSessionFailure('HTTP 404 Not Found', null), isTrue);
+      expect(ListenTogetherService.isTerminalSessionFailure(null, 4001), isTrue);
+      expect(ListenTogetherService.isTerminalSessionFailure(null, 4003), isTrue);
+      expect(ListenTogetherService.isTerminalSessionFailure(null, 4004), isTrue);
+      expect(ListenTogetherService.isTerminalSessionFailure(null, 1008), isTrue);
+      expect(ListenTogetherService.isTerminalSessionFailure('SocketException: Network unreachable', 1006), isFalse);
+    });
+
+    test('H-43: welcome frame populates partySnapshot and currentMember, and bye clears session without network throw', () async {
+      final service = ListenTogetherService();
+      addTearDown(() => service.dispose());
+
+      service.handleWebSocketMessageForTesting(jsonEncode({
+        'type': 'welcome',
+        'party': {
+          'code': 'XYZ789',
+          'maxMembers': 5,
+          'hostOnlyControl': true,
+          'members': [
+            {
+              'memberId': 'm1',
+              'displayName': 'Alice',
+              'isHost': true,
+              'connected': true,
+            }
+          ],
+          'playback': {
+            'isPlaying': false,
+            'positionMs': 15000,
+            'seq': 3,
+          },
+          'queue': {
+            'index': 0,
+            'items': [],
+          },
+        },
+        'you': {
+          'memberId': 'm1',
+          'displayName': 'Alice',
+          'isHost': true,
+          'connected': true,
+        },
+      }));
+
+      expect(service.partySnapshot.value?.code, equals('XYZ789'));
+      expect(service.partySnapshot.value?.hostOnlyControl, isTrue);
+      expect(service.currentMember.value?.memberId, equals('m1'));
+      expect(service.isHost, isTrue);
+      expect(service.connectionState.value, equals(PartyConnectionState.live));
+
+      // Receiving 'bye' sets lastError and tears down local session cleanly
+      service.handleWebSocketMessageForTesting(jsonEncode({
+        'type': 'bye',
+        'reason': 'Host ended the party',
+      }));
+      await Future<void>.delayed(Duration.zero);
+
+      expect(service.lastError.value, equals('Host ended the party'));
+      expect(service.partySnapshot.value, isNull);
+      expect(service.connectionState.value, equals(PartyConnectionState.offline));
+    });
   });
 }

@@ -40,6 +40,7 @@ class RemoteStreamPump {
     String path, {
     String? etag,
     DateTime? modifiedAt,
+    bool pin = false,
   }) async {
     final store = cache;
     if (store == null) return null;
@@ -47,6 +48,7 @@ class RemoteStreamPump {
       return await store.beginWrite(
         sourceId,
         path,
+        pin: pin,
         etag: etag,
         modifiedAt: modifiedAt,
       );
@@ -70,6 +72,7 @@ class RemoteStreamPump {
     final start = range?.start ?? 0;
     final end = range?.end ?? (await file.length()) - 1;
     RandomAccessFile? handle;
+    var clientAborted = false;
     try {
       handle = await file.open();
       await handle.setPosition(start);
@@ -80,7 +83,17 @@ class RemoteStreamPump {
         if (chunk.isEmpty) break;
         response.add(chunk);
         remaining -= chunk.length;
-        await response.flush();
+        try {
+          await response.flush();
+        } on IOException catch (e) {
+          clientAborted = true;
+          ErrorLogger.log(
+            'Stream client aborted cached playback: $e',
+            category: 'RemoteSources',
+          );
+          await destroy(response);
+          return;
+        }
       }
     } on FileSystemException catch (e, st) {
       ErrorLogger.log(
@@ -94,14 +107,25 @@ class RemoteStreamPump {
     } finally {
       await handle?.close();
     }
-    await response.close();
+    if (clientAborted) return;
+    try {
+      await response.close();
+    } on IOException catch (e) {
+      ErrorLogger.log(
+        'Stream client disconnected while finishing cached response: $e',
+        category: 'RemoteSources',
+      );
+      await destroy(response);
+    }
   }
 
   /// Pumps `provider.openRead` into [response], teeing into [sink] when given.
   ///
   /// Returns `false` when the connection had to be dropped because the failure
-  /// happened after the first byte was sent. A failure before that rethrows, so
-  /// the caller can still answer with a proper status code.
+  /// happened after the first byte was sent or when fewer than
+  /// [expectedLength] bytes arrived (never committing truncated bytes to cache).
+  /// A provider failure before any byte hits the wire rethrows so the caller
+  /// can still answer with a proper status code.
   Future<bool> sendFromProvider(
     HttpResponse response,
     RemoteFsProvider provider,
@@ -109,14 +133,27 @@ class RemoteStreamPump {
     int start = 0,
     int? end,
     RemoteCacheSink? sink,
+    int? expectedLength,
   }) async {
     var wrote = false;
+    var bytesRead = 0;
     try {
       await for (final chunk in provider.openRead(path, start: start, end: end)) {
-        response.add(chunk);
+        bytesRead += chunk.length;
         sink?.add(chunk);
-        wrote = true;
-        await response.flush();
+        try {
+          response.add(chunk);
+          wrote = true;
+          await response.flush();
+        } on IOException catch (e) {
+          ErrorLogger.log(
+            'Stream client aborted remote playback: $e',
+            category: 'RemoteSources',
+          );
+          await abortSink(sink);
+          await destroy(response);
+          return false;
+        }
       }
     } catch (e, st) {
       ErrorLogger.log(
@@ -135,11 +172,31 @@ class RemoteStreamPump {
       await destroy(response);
       return false;
     }
+    if (expectedLength != null && bytesRead != expectedLength) {
+      ErrorLogger.log(
+        'Remote stream ended early ($bytesRead of $expectedLength bytes); '
+        'discarding cache write',
+        category: 'RemoteSources',
+        meta: {'authority': provider.source.authority},
+      );
+      await abortSink(sink);
+      await destroy(response);
+      return false;
+    }
     final file = await sink?.commit();
     if (file == null) {
       await abortSink(sink);
     }
-    await response.close();
+    try {
+      await response.close();
+    } on IOException catch (e) {
+      ErrorLogger.log(
+        'Stream client disconnected while finishing remote response: $e',
+        category: 'RemoteSources',
+      );
+      await destroy(response);
+      return false;
+    }
     return true;
   }
 
@@ -180,6 +237,18 @@ class RemoteStreamPump {
     try {
       final socket = await response.detachSocket(writeHeaders: false);
       socket.destroy();
+      return;
+    } catch (_) {
+      // Headers were already flushed, so detachSocket() throws StateError.
+      // Signal an error into the IOSink and close so dart:io aborts the
+      // chunked stream instead of leaving the socket open forever.
+    }
+    try {
+      response.addError(const HttpException('Stream aborted'));
+      await response.close();
+    } on HttpException {
+      // Expected: closing an errored IOSink rethrows the injected abort error
+      // after terminating the HTTP stream cleanly.
     } catch (e, st) {
       ErrorLogger.log(
         'Could not drop a failed stream connection',

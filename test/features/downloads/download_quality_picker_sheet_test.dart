@@ -19,14 +19,14 @@ void main() {
     );
 
     test('estimateBytes computes correct byte estimates for bitrates', () {
-      // 382 seconds * 256 kbps * 1000 / 8 = 12,224,000 bytes (~11.6 MB)
-      final highBytes = DownloadQualityPickerSheet.estimateBytes(382000, 256);
-      expect(highBytes, equals(12224000));
+      // 382 seconds * 160 kbps * 1000 / 8 = 7,640,000 bytes (~7.3 MB)
+      final highBytes = DownloadQualityPickerSheet.estimateBytes(382000, 160);
+      expect(highBytes, equals(7640000));
 
       final lowBytes = DownloadQualityPickerSheet.estimateBytes(382000, 64);
       expect(lowBytes, equals(3056000));
 
-      expect(DownloadQualityPickerSheet.estimateBytes(0, 256), equals(0));
+      expect(DownloadQualityPickerSheet.estimateBytes(0, 160), equals(0));
       expect(DownloadQualityPickerSheet.estimateBytes(382000, 0), equals(0));
     });
 
@@ -55,7 +55,7 @@ void main() {
       );
 
       expect(find.byType(DownloadQualityPickerSheet), findsOneWidget);
-      expect(find.text('256 kbps'), findsOneWidget);
+      expect(find.text('160 kbps'), findsOneWidget);
       expect(find.text('128 kbps'), findsOneWidget);
       expect(find.text('64 kbps'), findsOneWidget);
       expect(find.textContaining('Comfortably Numb'), findsOneWidget);

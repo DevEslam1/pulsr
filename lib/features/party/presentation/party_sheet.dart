@@ -63,7 +63,10 @@ class _PartySheetState extends State<PartySheet> {
     super.initState();
     final initialCode = widget.initialCode?.trim();
     if (initialCode != null && initialCode.isNotEmpty) {
-      _codeController.text = initialCode.toUpperCase();
+      final cleaned =
+          initialCode.toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
+      _codeController.text =
+          cleaned.length > 6 ? cleaned.substring(0, 6) : cleaned;
     }
     _loadSettings();
   }
@@ -349,9 +352,10 @@ class _PartySheetState extends State<PartySheet> {
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
             TextButton(
-              onPressed: () {
+              onPressed: () async {
+                await _partyService.setCustomServerUrl(null);
+                if (!mounted) return;
                 _serverController.text = ListenTogetherService.defaultServerUrl;
-                _partyService.setCustomServerUrl(null);
                 setState(() {
                   _showSettings = false;
                   _serverUrlError = null;
@@ -469,7 +473,9 @@ class _PartySheetState extends State<PartySheet> {
               child: TextField(
                 controller: _codeController,
                 textCapitalization: TextCapitalization.characters,
-                maxLength: 6,
+                inputFormatters: const <TextInputFormatter>[
+                  _PartyCodeInputFormatter(),
+                ],
                 decoration: InputDecoration(
                   counterText: '',
                   hintText: context.l10n.partyCodeHint,
@@ -784,7 +790,7 @@ class _PartySheetState extends State<PartySheet> {
                 color: snap.hostOnlyControl ? p.accent : p.textSecondary,
               ),
               title: Text(
-                context.l10n.partyHostMember,
+                '${context.l10n.partyHostMember} • ${context.l10n.playback} / ${context.l10n.queue}',
                 style: TextStyle(
                   fontSize: AppFontSize.bodySmall,
                   fontWeight: FontWeight.w700,
@@ -805,7 +811,7 @@ class _PartySheetState extends State<PartySheet> {
               Icon(Icons.lock_rounded, size: 16, color: p.textSecondary),
               const SizedBox(width: AppSpacing.xs),
               Text(
-                context.l10n.partyHostMember,
+                '${context.l10n.partyHostMember} • ${context.l10n.playback} / ${context.l10n.queue}',
                 style: TextStyle(
                   fontSize: AppFontSize.caption,
                   fontWeight: FontWeight.w600,
@@ -940,6 +946,29 @@ class _PartySheetState extends State<PartySheet> {
             );
           }),
       ],
+    );
+  }
+}
+
+/// Strips hyphens, spaces, and non-alphanumeric characters before uppercasing
+/// and capping room codes at 6 characters so pasted codes like `ABC-123` are
+/// never truncated to 5 characters.
+class _PartyCodeInputFormatter extends TextInputFormatter {
+  const _PartyCodeInputFormatter();
+
+  static final RegExp _nonAlphanumeric = RegExp(r'[^A-Z0-9]');
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final cleaned =
+        newValue.text.toUpperCase().replaceAll(_nonAlphanumeric, '');
+    final capped = cleaned.length > 6 ? cleaned.substring(0, 6) : cleaned;
+    return TextEditingValue(
+      text: capped,
+      selection: TextSelection.collapsed(offset: capped.length),
     );
   }
 }

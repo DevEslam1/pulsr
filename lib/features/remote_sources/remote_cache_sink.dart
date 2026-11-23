@@ -28,10 +28,14 @@ class RemoteCacheSink {
     required int maxEntryBytes,
     this.etag,
     this.modifiedAt,
+    int? clearGeneration,
+    void Function(RemoteCacheSink)? onClose,
   })  : _partialFile = partialFile,
         _sink = sink,
         _store = store,
-        _maxEntryBytes = maxEntryBytes;
+        _maxEntryBytes = maxEntryBytes,
+        _clearGeneration = clearGeneration,
+        _onClose = onClose;
 
   /// Logical cache key this sink writes.
   final String key;
@@ -48,6 +52,8 @@ class RemoteCacheSink {
   final File _partialFile;
   final RemoteCacheStore _store;
   final int _maxEntryBytes;
+  final int? _clearGeneration;
+  final void Function(RemoteCacheSink)? _onClose;
   IOSink? _sink;
   int _bytes = 0;
   bool _active = true;
@@ -92,42 +98,47 @@ class RemoteCacheSink {
     _closed = true;
     final sink = _sink;
     _sink = null;
-    if (!_active || sink == null) {
-      // Close the handle first: on Windows an open sink keeps the file locked
-      // and the partial would survive (and be picked up again) after a crash.
+    try {
+      if (!_active || sink == null) {
+        // Close the handle first: on Windows an open sink keeps the file locked
+        // and the partial would survive (and be picked up again) after a crash.
+        try {
+          await sink?.close();
+        } catch (e, st) {
+          ErrorLogger.log(
+            'Remote cache sink did not close after an aborted write',
+            error: e,
+            stackTrace: st,
+            category: 'RemoteSources',
+          );
+        }
+        await _discard();
+        return null;
+      }
       try {
-        await sink?.close();
+        await sink.flush();
+        await sink.close();
+        return await _store.commitPartial(
+          key: key,
+          partial: _partialFile,
+          bytes: _bytes,
+          pinned: pinned,
+          etag: etag,
+          modifiedAt: modifiedAt,
+          clearGeneration: _clearGeneration,
+        );
       } catch (e, st) {
         ErrorLogger.log(
-          'Remote cache sink did not close after an aborted write',
+          'Remote cache commit failed',
           error: e,
           stackTrace: st,
           category: 'RemoteSources',
         );
+        await _discard();
+        return null;
       }
-      await _discard();
-      return null;
-    }
-    try {
-      await sink.flush();
-      await sink.close();
-      return await _store.commitPartial(
-        key: key,
-        partial: _partialFile,
-        bytes: _bytes,
-        pinned: pinned,
-        etag: etag,
-        modifiedAt: modifiedAt,
-      );
-    } catch (e, st) {
-      ErrorLogger.log(
-        'Remote cache commit failed',
-        error: e,
-        stackTrace: st,
-        category: 'RemoteSources',
-      );
-      await _discard();
-      return null;
+    } finally {
+      _onClose?.call(this);
     }
   }
 
@@ -138,16 +149,20 @@ class RemoteCacheSink {
     final sink = _sink;
     _sink = null;
     try {
-      await sink?.close();
-    } catch (e, st) {
-      ErrorLogger.log(
-        'Remote cache sink close failed after abort',
-        error: e,
-        stackTrace: st,
-        category: 'RemoteSources',
-      );
+      try {
+        await sink?.close();
+      } catch (e, st) {
+        ErrorLogger.log(
+          'Remote cache sink close failed after abort',
+          error: e,
+          stackTrace: st,
+          category: 'RemoteSources',
+        );
+      }
+      await _discard();
+    } finally {
+      _onClose?.call(this);
     }
-    await _discard();
   }
 
   Future<void> _discard() async {

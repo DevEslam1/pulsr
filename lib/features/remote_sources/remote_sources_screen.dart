@@ -23,6 +23,7 @@ import 'remote_provider_factory.dart';
 import 'remote_source_editor.dart';
 import 'remote_source_store.dart';
 import 'remote_sources_strings.dart';
+import 'remote_stream_server.dart';
 import 'upnp_server_picker_sheet.dart';
 
 /// Manages network libraries and browses them.
@@ -186,6 +187,9 @@ class _RemoteSourcesScreenState extends State<RemoteSourcesScreen> {
       return;
     }
     await _writeCredentials(source, draft);
+    if (existing != null) {
+      await RemoteStreamServer.revokeSource(source.id);
+    }
     if (!mounted) return;
     setState(() {
       _sources = _store.list;
@@ -199,12 +203,12 @@ class _RemoteSourcesScreenState extends State<RemoteSourcesScreen> {
   ) async {
     final username = draft.username.trim();
     try {
-      // mergeAndSave keeps a stored password when the field was left blank and
-      // never deletes an existing secret. A source that replaces another one
-      // by id (same endpoint) therefore keeps working credentials.
+      // mergeAndSave keeps a stored password when the field was left blank
+      // unless the user explicitly chose to clear it.
       await _credentials.mergeAndSave(
         source.id,
         RemoteCredentials(username: username, password: draft.password),
+        clearPassword: draft.clearPassword,
       );
     } on StateError catch (e, st) {
       ErrorLogger.log(
@@ -260,8 +264,12 @@ class _RemoteSourcesScreenState extends State<RemoteSourcesScreen> {
     try {
       final stored = await _credentials.read(source.id);
       provider = _factory(source, stored);
-      await provider.list('');
+      final ok = await provider.testConnection();
       latency = watch.elapsedMilliseconds;
+      if (!ok) {
+        isError = true;
+        message = RemoteSourcesStrings.loadFailed;
+      }
     } on AppError catch (e, st) {
       ErrorLogger.log(
         'Remote source test failed: ${e.code}',
@@ -323,6 +331,15 @@ class _RemoteSourcesScreenState extends State<RemoteSourcesScreen> {
         meta: {'authority': source.authority},
       );
       _notify(e.userMessage);
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Remote browser failed unexpectedly',
+        error: e,
+        stackTrace: st,
+        category: 'RemoteSources',
+        meta: {'authority': source.authority},
+      );
+      _notify(RemoteSourcesStrings.loadFailed);
     } finally {
       await provider?.close();
     }
