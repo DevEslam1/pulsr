@@ -31,6 +31,7 @@ class CategoryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
+    final isHighContrast = MediaQuery.maybeHighContrastOf(context) ?? false;
     return Semantics(
       button: true,
       label: '$title, $subtitle',
@@ -41,14 +42,22 @@ class CategoryCard extends StatelessWidget {
         child: AnimatedContainer(
           duration: context.motionMs(200),
           curve: context.motionCurve(PulsrMotion.enter),
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s14),
+          constraints: const BoxConstraints(
+            minHeight: AppSpacing.minTouchTarget,
+          ),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.s14,
+            vertical: AppSpacing.s8,
+          ),
           decoration: BoxDecoration(
             color:
                 isSelected ? color.withValues(alpha: 0.12) : p.surfaceContainer,
             borderRadius: AppRadii.r18All,
             border: Border.all(
-              color: isSelected ? color.withValues(alpha: 0.6) : p.hairline,
-              width: isSelected ? 1.5 : 1.0,
+              color: isSelected
+                  ? (isHighContrast ? color : color.withValues(alpha: 0.6))
+                  : (isHighContrast ? p.borderStrong : p.hairline),
+              width: isSelected || isHighContrast ? 1.5 : 1.0,
             ),
           ),
           child: Row(

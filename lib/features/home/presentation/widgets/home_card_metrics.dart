@@ -53,17 +53,18 @@ class HomeCardArtworkFrame extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
+    final isHighContrast = MediaQuery.maybeHighContrastOf(context) ?? false;
     final borderRadius = AppRadii.circular(radius);
     return Container(
       decoration: BoxDecoration(
         borderRadius: borderRadius,
-        boxShadow: PulsrElevation.level1(context),
+        boxShadow: isHighContrast ? null : PulsrElevation.level1(context),
       ),
       foregroundDecoration: BoxDecoration(
         borderRadius: borderRadius,
         border: Border.all(
-          color: p.hairline,
-          width: 1.0,
+          color: isHighContrast ? p.borderStrong : p.hairline,
+          width: isHighContrast ? 1.25 : 1.0,
         ),
       ),
       child: child,

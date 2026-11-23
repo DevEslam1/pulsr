@@ -313,6 +313,7 @@ class _RemoteSourcesScreenState extends State<RemoteSourcesScreen> {
       if (!mounted) return;
       await showModalBottomSheet<void>(
         context: context,
+        useRootNavigator: true,
         isScrollControlled: true,
         useSafeArea: true,
         backgroundColor: context.palette.surfaceContainer,
@@ -348,6 +349,7 @@ class _RemoteSourcesScreenState extends State<RemoteSourcesScreen> {
   Future<void> _discoverUpnp() async {
     final server = await showModalBottomSheet<UpnpServerDescription>(
       context: context,
+      useRootNavigator: true,
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: context.palette.surfaceContainer,

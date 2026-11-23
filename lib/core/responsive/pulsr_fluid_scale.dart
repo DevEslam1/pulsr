@@ -17,8 +17,11 @@ class PulsrFluidScale {
   /// Base scale factor derived from viewport tier and vertical space.
   static double factor(BuildContext context) {
     final vp = PulsrViewport.of(context);
+    // Short-height landscape phones (e.g. 844x390) cross medium/expanded width
+    // thresholds but still have compact vertical real estate.
+    if (vp.isShortHeight) return 0.85;
     return switch (vp.sizeClass) {
-      PulsrBreakpoint.compact => vp.isShortHeight ? 0.85 : 1.0,
+      PulsrBreakpoint.compact => 1.0,
       PulsrBreakpoint.medium => 1.0,
       PulsrBreakpoint.expanded => 1.1,
       PulsrBreakpoint.large => 1.2,

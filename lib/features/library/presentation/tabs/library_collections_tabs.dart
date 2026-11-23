@@ -86,7 +86,7 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
                           decoration: BoxDecoration(
                             borderRadius: AppRadii.r18All,
                             border: Border.all(
-                              color: p.hairline.withValues(alpha: 0.5),
+                              color: p.hairline,
                             ),
                           ),
                           child: Column(
@@ -192,8 +192,8 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
                     index: index,
                     groupKey: '${state.sortBy}-${state.ascending}',
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.sm,
+                      padding: EdgeInsets.symmetric(
+                        horizontal: Adaptive.pagePadding(context),
                         vertical: AppSpacing.xxs,
                       ),
                       child: Material(
@@ -341,7 +341,7 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
                           decoration: BoxDecoration(
                             borderRadius: AppRadii.r18All,
                             border: Border.all(
-                              color: p.hairline.withValues(alpha: 0.5),
+                              color: p.hairline,
                             ),
                           ),
                           child: Column(
@@ -406,8 +406,8 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
                     index: index,
                     groupKey: '${state.sortBy}-${state.ascending}',
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.sm,
+                      padding: EdgeInsets.symmetric(
+                        horizontal: Adaptive.pagePadding(context),
                         vertical: AppSpacing.xxs,
                       ),
                       child: Material(
@@ -496,7 +496,7 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
                   color: p.surfaceContainer.withValues(alpha: 0.7),
                   borderRadius: AppRadii.r12All,
                   border: Border.all(
-                    color: p.hairline.withValues(alpha: 0.5),
+                    color: p.hairline,
                   ),
                 ),
                 child: Row(
@@ -593,7 +593,7 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
               color: p.surfaceContainer.withValues(alpha: 0.7),
               borderRadius: AppRadii.r12All,
               border: Border.all(
-                color: p.hairline.withValues(alpha: 0.5),
+                color: p.hairline,
               ),
             ),
             child: Row(
@@ -674,7 +674,7 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
               color: p.surfaceContainer,
               borderRadius: AppRadii.r12All,
               border: Border.all(
-                color: p.hairline.withValues(alpha: 0.6),
+                color: p.hairline,
               ),
             ),
             child: Row(
@@ -726,6 +726,7 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
         icon: Icons.calendar_today_rounded,
       );
     }
+    final p = context.palette;
     return _chipCategoryGrid(
       context,
       count: years.length,
@@ -735,7 +736,7 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
           icon: Icons.calendar_today_rounded,
           title: '${y.year}',
           subtitle: context.l10n.tracksCount(y.songCount),
-          color: AppColors.skyBlue,
+          color: p.info,
           onTap: () => context.pushDebounced('/year?year=${y.year}', extra: y),
         );
       },
@@ -748,6 +749,8 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
     required Widget Function(BuildContext, int) builder,
   }) {
     final p = context.palette;
+    final textScale =
+        MediaQuery.textScalerOf(context).scale(1.0).clamp(1.0, 1.5);
     return RefreshIndicator(
       color: p.accent,
       backgroundColor: p.surfaceContainer,
@@ -772,7 +775,7 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
           ),
           crossAxisSpacing: 12,
           mainAxisSpacing: 12,
-          childAspectRatio: 3.4,
+          mainAxisExtent: (68.0 * textScale).roundToDouble(),
         ),
         itemCount: count,
         itemBuilder: builder,

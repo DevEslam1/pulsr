@@ -1,6 +1,9 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:go_router/go_router.dart';
 
+import '../router/app_router.dart';
+import 'pulsr_modal_tracker.dart';
+
 /// {@category DesignSystem}
 /// Wraps any screen in a predictive PopScope that ensures the physical/system
 /// back button returns to the previous route, or gracefully falls back to the
@@ -30,6 +33,13 @@ class PulsrPagePopScope extends StatelessWidget {
       canPop: canPop,
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
+        if (PulsrModalTracker.isModalOpen.value) {
+          final rootNav = rootNavigatorKey.currentState;
+          if (rootNav != null && rootNav.canPop()) {
+            rootNav.maybePop();
+            return;
+          }
+        }
         if (onPop != null) {
           onPop!();
           return;

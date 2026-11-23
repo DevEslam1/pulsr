@@ -208,20 +208,24 @@ class _PulsrBottomNavBarState extends State<PulsrBottomNavBar> {
                               AppBlur.canBlur(context,
                                   enableBlur: widget.enableBlur) &&
                               glassIntensity > 0.0;
+                          final topSurface =
+                              p.isDark ? p.surfaceContainerHigh : p.surfaceElevated;
+                          final bottomSurface =
+                              p.isDark ? p.surfaceContainer : p.surface;
                           final navContainer = DecoratedBox(
                             decoration: BoxDecoration(
                               borderRadius: navRadius,
-                              color: isCalm ? p.surfaceContainerHigh : null,
+                              color: isCalm ? topSurface : null,
                               gradient: isCalm
                                   ? null
                                   : LinearGradient(
                                       begin: Alignment.topCenter,
                                       end: Alignment.bottomCenter,
                                       colors: [
-                                        p.surfaceContainerHigh.withValues(
+                                        topSurface.withValues(
                                           alpha: allowBlur ? 0.88 : 1.0,
                                         ),
-                                        p.surfaceContainer.withValues(
+                                        bottomSurface.withValues(
                                           alpha: allowBlur ? 0.84 : 1.0,
                                         ),
                                       ],
@@ -380,6 +384,7 @@ class _NavTabItem extends StatelessWidget {
         embedded && !iconOnly ? 20.0 : (isTablet ? 24.0 : 22.0);
     final isRtl = Directionality.of(context) == TextDirection.rtl;
     final itemRadius = isTablet ? AppRadii.r22All : AppRadii.r18All;
+    final isCalm = p.isCalmDensity || GpuBudget.isEnabled;
 
     return Semantics(
       selected: isSelected,
@@ -393,10 +398,7 @@ class _NavTabItem extends StatelessWidget {
         child: Material(
           color: Colors.transparent,
           child: InkWell(
-            onTap: () {
-              PulsrHaptics.selectionClick();
-              onTap();
-            },
+            onTap: onTap,
             onLongPress: onLongPress != null
                 ? () {
                     PulsrHaptics.mediumImpact();
@@ -436,7 +438,7 @@ class _NavTabItem extends StatelessWidget {
                       : Colors.transparent,
                   width: 1.1,
                 ),
-                boxShadow: isSelected
+                boxShadow: isSelected && !isCalm
                     ? [
                         BoxShadow(
                           color: p.accent.withValues(alpha: 0.20),
@@ -461,7 +463,7 @@ class _NavTabItem extends StatelessWidget {
                           decoration: BoxDecoration(
                             color: p.accent,
                             borderRadius: AppRadii.r2All,
-                            boxShadow: isSelected
+                            boxShadow: isSelected && !isCalm
                                 ? [
                                     BoxShadow(
                                       color: p.accent.withValues(alpha: 0.55),
@@ -478,7 +480,7 @@ class _NavTabItem extends StatelessWidget {
                           child: Icon(
                             isSelected ? item.activeIcon : item.icon,
                             size: iconSize,
-                            color: isSelected ? p.accent : p.textTertiary,
+                            color: isSelected ? p.accent : p.textSecondary,
                           ),
                         ),
                       ],
@@ -497,9 +499,9 @@ class _NavTabItem extends StatelessWidget {
                           decoration: BoxDecoration(
                             color: isSelected
                                 ? p.accent
-                                : p.textTertiary.withValues(alpha: 0.22),
+                                : p.textTertiary.withValues(alpha: 0.24),
                             borderRadius: AppRadii.r2All,
-                            boxShadow: isSelected
+                            boxShadow: isSelected && !isCalm
                                 ? [
                                     BoxShadow(
                                       color: p.accent.withValues(alpha: 0.55),
@@ -516,7 +518,7 @@ class _NavTabItem extends StatelessWidget {
                           child: Icon(
                             isSelected ? item.activeIcon : item.icon,
                             size: iconSize,
-                            color: isSelected ? p.accent : p.textTertiary,
+                            color: isSelected ? p.accent : p.textSecondary,
                           ),
                         ),
                         const SizedBox(height: 1.5),
@@ -531,9 +533,7 @@ class _NavTabItem extends StatelessWidget {
                               fontWeight: isSelected
                                   ? FontWeight.w800
                                   : FontWeight.w500,
-                              color: isSelected
-                                  ? p.accent
-                                  : p.textTertiary.withValues(alpha: 0.85),
+                              color: isSelected ? p.accent : p.textSecondary,
                               letterSpacing: isRtl ? 0 : AppTracking.label,
                               fontFamily: Theme.of(context)
                                   .textTheme

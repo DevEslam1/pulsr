@@ -533,7 +533,7 @@ class _FavoritesHeaderCard extends StatelessWidget {
           if (showActionsRow) ...[
             Divider(
               height: 1,
-              color: p.hairline.withValues(alpha: 0.6),
+              color: p.hairline,
             ),
             Padding(
               padding: const EdgeInsets.symmetric(
@@ -804,10 +804,10 @@ class _FavoriteGridCard extends StatelessWidget {
                             ),
                             child: Text(
                               badge,
-                              style: TextStyle(
+                              style: const TextStyle(
                                 fontSize: AppFontSize.caption,
                                 fontWeight: FontWeight.w800,
-                                color: p.info,
+                                color: AppColors.qualityBadgeCyan,
                               ),
                             ),
                           ),

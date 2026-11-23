@@ -329,7 +329,7 @@ class _FolderBrowserTabState extends State<FolderBrowserTab> {
             shape: RoundedRectangleBorder(
               borderRadius: AppRadii.r12All,
               side: BorderSide(
-                color: p.hairline.withValues(alpha: 0.6),
+                color: p.hairline,
               ),
             ),
             child: InkWell(
@@ -404,7 +404,7 @@ class _FolderBrowserTabState extends State<FolderBrowserTab> {
                 ? p.error.withValues(alpha: 0.35)
                 : isDownloads
                     ? p.accent.withValues(alpha: 0.35)
-                    : p.hairline.withValues(alpha: 0.5),
+                    : p.hairline,
           ),
         ),
         child: InkWell(
@@ -610,7 +610,7 @@ class _FolderBrowserTabState extends State<FolderBrowserTab> {
                   ? p.error.withValues(alpha: 0.35)
                   : isDownloads
                       ? p.accent.withValues(alpha: 0.35)
-                      : p.hairline.withValues(alpha: 0.5),
+                      : p.hairline,
             ),
           ),
           child: Column(
@@ -638,7 +638,7 @@ class _FolderBrowserTabState extends State<FolderBrowserTab> {
                               decoration: BoxDecoration(
                                 gradient: LinearGradient(
                                   colors: [
-                                    p.accentContainer.withValues(alpha: 0.5),
+                                    p.accentContainer,
                                     p.surfaceContainerHigh,
                                   ],
                                   begin: Alignment.topLeft,
@@ -665,7 +665,7 @@ class _FolderBrowserTabState extends State<FolderBrowserTab> {
                           color: p.surfaceContainer.withValues(alpha: 0.85),
                           shape: BoxShape.circle,
                           border: Border.all(
-                            color: p.hairline.withValues(alpha: 0.6),
+                            color: p.hairline,
                             width: 1,
                           ),
                         ),
@@ -746,7 +746,7 @@ class _FolderBrowserTabState extends State<FolderBrowserTab> {
         color: p.surfaceContainer.withValues(alpha: 0.45),
         borderRadius: AppRadii.r16All,
         border: Border.all(
-          color: p.hairline.withValues(alpha: 0.4),
+          color: p.hairline,
         ),
       ),
       child: Row(

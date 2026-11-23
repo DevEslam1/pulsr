@@ -82,15 +82,32 @@ class PulsrTwoPaneScaffold extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final totalWidth = constraints.maxWidth;
-        final maxAllowedMaster = math.max(0.0, totalWidth - 80.0);
-        final baseMaster =
-            masterWidth ?? (totalWidth * listWidthRatio).clamp(280.0, 480.0);
-        final computedMasterWidth = baseMaster.clamp(0.0, maxAllowedMaster);
-
         final hasVerticalHinge = hinge != null &&
             hinge.bounds.width > 0 &&
             hinge.bounds.height > hinge.bounds.width &&
             hinge.bounds.width < totalWidth;
+
+        final maxAllowedMaster = math.max(
+          0.0,
+          totalWidth - (hasVerticalHinge ? hinge.bounds.width : 0.0) - 80.0,
+        );
+        double baseMaster =
+            masterWidth ?? (totalWidth * listWidthRatio).clamp(280.0, 480.0);
+        // When a foldable has a vertical hinge and no fixed masterWidth is
+        // requested, align the split directly onto the physical hinge seam
+        // whenever both panes keep comfortable reading widths (>= 240dp).
+        if (hasVerticalHinge && masterWidth == null) {
+          final leadingShellOffset = math.max(0.0, vp.width - totalWidth);
+          final isRtl = Directionality.of(context) == TextDirection.rtl;
+          final hingeStart = isRtl
+              ? (vp.width - hinge.bounds.right) - leadingShellOffset
+              : hinge.bounds.left - leadingShellOffset;
+          final trailingSpace = totalWidth - hingeStart - hinge.bounds.width;
+          if (hingeStart >= 240.0 && trailingSpace >= 240.0) {
+            baseMaster = hingeStart;
+          }
+        }
+        final computedMasterWidth = baseMaster.clamp(0.0, maxAllowedMaster);
 
         Widget body = Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -107,7 +124,9 @@ class PulsrTwoPaneScaffold extends StatelessWidget {
               child: Container(
                 margin: const EdgeInsets.all(AppSpacing.xs),
                 decoration: BoxDecoration(
-                  color: p.surfaceContainer.withValues(alpha: 0.5),
+                  color: p.isDark
+                      ? p.surfaceContainer.withValues(alpha: 0.65)
+                      : p.surface,
                   borderRadius: AppRadii.r20All,
                   border: Border.all(color: p.hairline),
                 ),

@@ -310,10 +310,11 @@ mixin LibrarySongsTab on State<LibraryScreen> {
                                           ),
                                           child: Text(
                                             badge,
-                                            style: TextStyle(
+                                            style: const TextStyle(
                                               fontSize: AppFontSize.caption,
                                               fontWeight: FontWeight.w800,
-                                              color: p.info,
+                                              color:
+                                                  AppColors.qualityBadgeCyan,
                                             ),
                                           ),
                                         ),

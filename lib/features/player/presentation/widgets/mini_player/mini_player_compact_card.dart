@@ -86,7 +86,9 @@ class MiniPlayerCompactCard extends StatelessWidget {
     final activeAccent = p.accent;
     final isTablet = Adaptive.isTablet(context);
     final playerRadius = isTablet ? AppRadii.r28All : AppRadii.r24All;
-    final isCalm = p.isCalmDensity || GpuBudget.isEnabled;
+    final isHighContrast = MediaQuery.highContrastOf(context) ||
+        p.hairline.a >= 0.38;
+    final isCalm = p.isCalmDensity || GpuBudget.isEnabled || isHighContrast;
     final allowMotion = PulsrMotion.shouldAnimate(context);
     final textScale =
         MediaQuery.textScalerOf(context).scale(1.0).clamp(1.0, 2.0);
@@ -363,8 +365,9 @@ class MiniPlayerCompactCard extends StatelessWidget {
                             width: swipeInFlight ? 34 : 28,
                             height: 3.0,
                             decoration: BoxDecoration(
-                              color: (p.isDark ? Colors.white : Colors.black)
-                                  .withValues(alpha: 0.20),
+                              color: p.textTertiary.withValues(
+                                alpha: isHighContrast ? 0.72 : 0.34,
+                              ),
                               borderRadius: AppRadii.r1_5All,
                             ),
                           ),
@@ -374,8 +377,9 @@ class MiniPlayerCompactCard extends StatelessWidget {
                               Icons.keyboard_arrow_up_rounded,
                               key: const ValueKey('dock_grab_chevron'),
                               size: 12,
-                              color: (p.isDark ? Colors.white : Colors.black)
-                                  .withValues(alpha: 0.38),
+                              color: p.textTertiary.withValues(
+                                alpha: isHighContrast ? 0.85 : 0.54,
+                              ),
                             ),
                           ],
                         ],

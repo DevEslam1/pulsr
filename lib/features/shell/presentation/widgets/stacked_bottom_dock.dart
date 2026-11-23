@@ -56,7 +56,13 @@ class _ModalGate extends StatelessWidget {
           curve: context.motionCurve(Curves.easeInOutCubic),
           offset: shouldHide ? const Offset(0, 1.4) : Offset.zero,
           child: RepaintBoundary(
-            child: IgnorePointer(ignoring: shouldHide, child: child),
+            child: ExcludeFocus(
+              excluding: shouldHide,
+              child: ExcludeSemantics(
+                excluding: shouldHide,
+                child: IgnorePointer(ignoring: shouldHide, child: child),
+              ),
+            ),
           ),
         );
       },
@@ -382,6 +388,11 @@ class StackedBottomDockState extends State<StackedBottomDock> {
               final isRtl = Directionality.of(context) == TextDirection.rtl;
               final startPad = isRtl ? rightPad : leftPad;
               final endPad = isRtl ? leftPad : rightPad;
+              final isCalmWide = p.isCalmDensity || GpuBudget.isEnabled;
+              final wideTopSurface =
+                  p.isDark ? p.surfaceContainerHigh : p.surfaceElevated;
+              final wideBottomSurface =
+                  p.isDark ? p.surfaceContainer : p.surface;
               return SafeArea(
                 top: false,
                 left: false,
@@ -401,28 +412,23 @@ class StackedBottomDockState extends State<StackedBottomDock> {
                       child: Container(
                         height: 56,
                         decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [
-                              p.surfaceContainerHigh,
-                              p.surfaceContainer,
-                            ],
-                          ),
+                          color: isCalmWide ? wideTopSurface : null,
+                          gradient: isCalmWide
+                              ? null
+                              : LinearGradient(
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                  colors: [
+                                    wideTopSurface,
+                                    wideBottomSurface,
+                                  ],
+                                ),
                           borderRadius: AppRadii.r24All,
                           border: Border.all(
                             color: p.hairline,
                             width: 1.0,
                           ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black
-                                  .withValues(alpha: p.isDark ? 0.35 : 0.08),
-                              blurRadius: 16,
-                              spreadRadius: -2,
-                              offset: const Offset(0, 6),
-                            ),
-                          ],
+                          boxShadow: PulsrElevation.level4(context),
                         ),
                         child: ClipRRect(
                           borderRadius: AppRadii.r24All,
@@ -444,7 +450,7 @@ class StackedBottomDockState extends State<StackedBottomDock> {
                                       end: Alignment.bottomCenter,
                                       colors: [
                                         p.hairline.withValues(alpha: 0.0),
-                                        p.hairline.withValues(alpha: 0.65),
+                                        p.hairline,
                                         p.hairline.withValues(alpha: 0.0),
                                       ],
                                     ),
@@ -574,9 +580,12 @@ class StackedBottomDockState extends State<StackedBottomDock> {
               onLongPress: _showDockStylePicker,
             );
 
+            final dockShadowRadius = isTablet ? AppRadii.r28All : AppRadii.r24All;
+
             if (isStacked && !isMiniBehind) {
               miniPlayerWidget = DecoratedBox(
                 decoration: BoxDecoration(
+                  borderRadius: dockShadowRadius,
                   boxShadow: stackedElevationShadow,
                 ),
                 child: miniPlayerWidget,
@@ -679,6 +688,7 @@ class StackedBottomDockState extends State<StackedBottomDock> {
             if (isStacked && isNavBarOnTop) {
               navBarWidget = DecoratedBox(
                 decoration: BoxDecoration(
+                  borderRadius: dockShadowRadius,
                   boxShadow: stackedElevationShadow,
                 ),
                 child: navBarWidget,

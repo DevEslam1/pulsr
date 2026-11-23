@@ -1781,8 +1781,8 @@ Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeProcessDirectFloatB
         return kDirectUsbRetry;
     }
     try {
+        constexpr size_t kMaxRetrySamples = 262144;
         struct PendingUsbRetry {
-            static constexpr size_t kMaxRetrySamples = 262144;
             uint64_t retryEpoch = 0;
             int64_t handle = 0;
             int frames = 0;

@@ -30,11 +30,14 @@ class DiscoveryChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = context.palette;
     final isCapsule = context.isCapsuleButtons;
+    final isHighContrast = MediaQuery.maybeHighContrastOf(context) ?? false;
     final chipRadius = context.buttonRadius(rectRadius: 6.0);
-    final tintedSurface = Color.alphaBlend(
-      iconColor.withValues(alpha: p.isDark ? 0.045 : 0.035),
-      p.surfaceContainerHigh,
-    );
+    final tintedSurface = isHighContrast
+        ? p.surfaceContainerHigh
+        : Color.alphaBlend(
+            iconColor.withValues(alpha: p.isDark ? 0.045 : 0.035),
+            p.surfaceContainerHigh,
+          );
     return PulsrPressable(
       onTap: onTap,
       pressedScale: 0.96,
@@ -64,10 +67,12 @@ class DiscoveryChip extends StatelessWidget {
                 color: tintedSurface,
                 borderRadius: AppRadii.full,
                 border: Border.all(
-                  color: p.borderSubtle,
-                  width: 1.0,
+                  color: isHighContrast ? p.borderStrong : p.borderSubtle,
+                  width: isHighContrast ? 1.25 : 1.0,
                 ),
-                boxShadow: p.isCalmDensity ? null : PulsrElevation.level1(p),
+                boxShadow: (p.isCalmDensity || isHighContrast)
+                    ? null
+                    : PulsrElevation.level1(p),
               ),
         child: Row(
           mainAxisSize: MainAxisSize.min,

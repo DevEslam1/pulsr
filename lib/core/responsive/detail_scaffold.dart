@@ -54,10 +54,14 @@ class DetailScaffold extends StatelessWidget {
         'DetailScaffold requires either body or sliverBody');
     final p = context.palette;
     final isLandscape = PulsrBreakpoint.isLandscape(context);
+    final screenWidth = MediaQuery.sizeOf(context).width;
     // Portrait tablets keep the single-column hero -> tracklist flow; a
-    // horizontal split at 800dp portrait crushes both panes. Matches the
-    // `isTwoPane` contract used by the rest of the app.
-    final shouldSplit = landscapeSplit && isLandscape;
+    // horizontal split at 800dp portrait crushes both panes. Narrow landscape
+    // multi-window slices (< 600dp wide) also stay single-column to avoid
+    // cramped panes.
+    final shouldSplit = landscapeSplit &&
+        isLandscape &&
+        screenWidth >= PulsrBreakpoint.medium.minWidth;
 
     final effectiveLeading = leading ?? const PulsrBackButton();
     final effectiveTitle =
@@ -111,6 +115,7 @@ class DetailScaffold extends StatelessWidget {
                   actions: actions,
                   backgroundColor: Colors.transparent,
                   elevation: 0,
+                  scrolledUnderElevation: 0,
                 ),
                 Expanded(
                   child: SingleChildScrollView(
@@ -191,6 +196,7 @@ class DetailScaffold extends StatelessWidget {
                 actions: actions,
                 backgroundColor: Colors.transparent,
                 elevation: 0,
+                scrolledUnderElevation: 0,
               ),
               Expanded(
                 child: scrollableContent,

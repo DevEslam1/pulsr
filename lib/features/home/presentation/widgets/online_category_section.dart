@@ -218,7 +218,11 @@ class _OnlineCategorySectionState extends State<OnlineCategorySection> {
         if (context.trackGridColumns > 1)
           PulsrStaticGrid(
             crossAxisCount: context.trackGridColumns,
-            mainAxisExtent: 72,
+            mainAxisExtent: (72.0 *
+                    MediaQuery.textScalerOf(context)
+                        .scale(1.0)
+                        .clamp(1.0, 1.5))
+                .roundToDouble(),
             crossAxisSpacing: 10,
             mainAxisSpacing: 4,
             padding:

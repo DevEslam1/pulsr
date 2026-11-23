@@ -422,7 +422,9 @@ extension _TabletPlayerBarSections on _TabletPlayerBarState {
                     ),
                   ],
                   border: Border.all(
-                    color: AppColors.specularAt(0.30),
+                    color: p.isDark
+                        ? AppColors.specularAt(0.30)
+                        : p.borderSubtle,
                     width: 1.2,
                   ),
                 ),
@@ -509,16 +511,13 @@ extension _TabletPlayerBarSections on _TabletPlayerBarState {
                             .clamp(0.0, maxMs),
                         semanticLabel: context.l10n.seekLabel,
                         activeColor: activeColor,
-                        inactiveColor:
-                            Theme.of(context).brightness == Brightness.dark
-                                ? (playerSliderStyle ==
-                                        PlayerSliderStyle.capsule
-                                    ? AppColors.specularAt(0.22)
-                                    : AppColors.specularStrong)
-                                : (playerSliderStyle ==
-                                        PlayerSliderStyle.capsule
-                                    ? AppColors.scrimAt(0.15)
-                                    : p.hairline.withValues(alpha: 0.8)),
+                        inactiveColor: p.isDark
+                            ? (playerSliderStyle == PlayerSliderStyle.capsule
+                                ? p.textPrimary.withValues(alpha: 0.22)
+                                : p.borderStrong)
+                            : (playerSliderStyle == PlayerSliderStyle.capsule
+                                ? p.textPrimary.withValues(alpha: 0.16)
+                                : p.textPrimary.withValues(alpha: 0.20)),
                         sliderStyle: playerSliderStyle,
                         isWavy: playerSliderStyle == PlayerSliderStyle.wavy,
                         animateWave: state.isPlaying,
@@ -669,7 +668,7 @@ extension _TabletPlayerBarSections on _TabletPlayerBarState {
                     Icons.settings_input_component_rounded,
                     size: 19,
                     color: currentOutputDevice?.isUsbDac == true
-                        ? AppColors.dacGold
+                        ? p.goldAccent
                         : p.textSecondary,
                   ),
                   tooltip: l10n.audioOutputAndDac,

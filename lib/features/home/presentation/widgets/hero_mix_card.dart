@@ -32,7 +32,8 @@ class HeroMixCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    final isCalm = p.isCalmDensity || GpuBudget.isEnabled;
+    final isHighContrast = MediaQuery.maybeHighContrastOf(context) ?? false;
+    final isCalm = p.isCalmDensity || GpuBudget.isEnabled || isHighContrast;
     final textScale =
         MediaQuery.textScalerOf(context).scale(1.0).clamp(1.0, 1.8);
     final effectiveHeight = math.max(
@@ -54,7 +55,12 @@ class HeroMixCard extends StatelessWidget {
           decoration: BoxDecoration(
             color: p.surfaceContainer,
             borderRadius: AppRadii.r24All,
-            border: Border.all(color: isCalm ? p.borderSubtle : p.hairline),
+            border: Border.all(
+              color: isHighContrast
+                  ? p.borderStrong
+                  : (isCalm ? p.borderSubtle : p.hairline),
+              width: isHighContrast ? 1.25 : 1.0,
+            ),
             boxShadow: isCalm ? null : PulsrElevation.level2(context),
           ),
           child: Stack(

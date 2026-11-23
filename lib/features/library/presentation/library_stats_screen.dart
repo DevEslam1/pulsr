@@ -753,7 +753,7 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
                                   ),
                                   if (!isLast)
                                     Divider(
-                                      color: p.hairline.withValues(alpha: 0.5),
+                                      color: p.hairline,
                                       height: 1,
                                       indent: 56,
                                     ),

@@ -6,12 +6,15 @@ import 'package:go_router/go_router.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
 
 import '../../../core/motion/pulsr_motion.dart';
+import '../../../core/responsive/pulsr_layout_metrics.dart';
+import '../../../core/router/app_router.dart';
 import '../../../core/services/system_ui_controller.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/theme/dynamic_theme_cubit.dart';
 import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/gesture_hint_overlay.dart';
+import '../../../core/widgets/pulsr_modal_tracker.dart';
 import '../../shell/presentation/widgets/player_shortcut_scope.dart';
 import '../../settings/cubit/settings_cubit.dart';
 import '../../settings/cubit/settings_state.dart';
@@ -109,6 +112,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
           Color customAccentColor,
           PlayerThemeMode playerThemeMode,
           AppThemeMode themeMode,
+          bool highContrast,
           bool canvasEnabled,
           bool canvasAsBackdrop,
         })>((c) => (
@@ -116,6 +120,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
           customAccentColor: c.state.customAccentColor,
           playerThemeMode: c.state.playerThemeMode,
           themeMode: c.state.themeMode,
+          highContrast: c.state.highContrast,
           canvasEnabled: c.state.canvasEnabled,
           canvasAsBackdrop: c.state.canvasAsBackdrop,
         ));
@@ -153,23 +158,37 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
                   backgroundColor: c.state.backgroundColor,
                 ));
 
-        final activeColor = settingsConfig.dynamicThemingEnabled
+        final p = context.palette;
+        final isDark = p.isDark;
+        final isHighContrast =
+            settingsConfig.highContrast || MediaQuery.highContrastOf(context);
+        final isAmoled = settingsConfig.themeMode == AppThemeMode.amoled ||
+            (isDark && p.bg == Colors.black);
+        final rawActiveColor = settingsConfig.dynamicThemingEnabled
             ? dynamicThemeConfig.primaryColor
             : settingsConfig.customAccentColor;
-        final isDark = Theme.of(context).brightness == Brightness.dark;
-        final isAmoled = settingsConfig.themeMode == AppThemeMode.amoled;
+        final activeColor = _resolveReadablePlayerAccent(
+          rawActiveColor,
+          p,
+          isHighContrast: isHighContrast,
+        );
         final isOverlayActive = state.isLyricsVisible || state.isQueueVisible;
-        final baseBgColor = isAmoled
-            ? Colors.black
-            : (settingsConfig.dynamicThemingEnabled
-                ? dynamicThemeConfig.backgroundColor
-                : (isDark
-                    ? AppColors.darkSurface
-                    : Theme.of(context).colorScheme.surface));
+        final baseBgColor = (isAmoled || isHighContrast)
+            ? p.bg
+            : (isDark
+                ? (settingsConfig.dynamicThemingEnabled
+                    ? dynamicThemeConfig.backgroundColor
+                    : p.bg)
+                : (settingsConfig.dynamicThemingEnabled
+                    ? Color.alphaBlend(
+                        activeColor.withValues(alpha: 0.07),
+                        p.bg,
+                      )
+                    : p.bg));
         final bgColor = isOverlayActive
-            ? (isAmoled
-                ? Colors.black
-                : (isDark ? context.palette.deepShade : baseBgColor))
+            ? ((isAmoled || isHighContrast)
+                ? p.bg
+                : (isDark ? p.deepShade : baseBgColor))
             : baseBgColor;
 
         final props = PlayerThemeProps(
@@ -191,10 +210,25 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
           child: ThemeRegistry.build(settingsConfig.playerThemeMode, props),
         );
 
+        final isSplitView = MediaQuery.sizeOf(context).width >=
+            PulsrLayoutMetrics.splitViewBreakpoint;
+
         return PopScope(
           canPop: false,
           onPopInvokedWithResult: (didPop, result) {
             if (didPop) return;
+            if (PulsrModalTracker.isModalOpen.value) {
+              final rootNav = rootNavigatorKey.currentState;
+              if (rootNav != null && rootNav.canPop()) {
+                rootNav.maybePop();
+                return;
+              }
+            }
+            if (!isSplitView &&
+                (state.isLyricsVisible || state.isQueueVisible)) {
+              cubit.resetOverlayViews();
+              return;
+            }
             _safePop(context);
           },
           child: Scaffold(
@@ -221,10 +255,13 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
                       ),
 
                     // Adaptive top status-bar legibility scrim (portrait only,
-                    // suppressed while full-screen lyrics/queue overlays are shown)
+                    // suppressed while full-screen lyrics/queue overlays are shown
+                    // or in pure-black AMOLED / High Contrast modes).
                     if (MediaQuery.orientationOf(context) !=
                             Orientation.landscape &&
-                        !isOverlayActive)
+                        !isOverlayActive &&
+                        !isAmoled &&
+                        !isHighContrast)
                       PositionedDirectional(
                         top: 0,
                         start: 0,
@@ -240,7 +277,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
                                   colors: [
                                     context.playerSurfacePalette.scrimStart
                                         .withValues(
-                                            alpha: isDark ? 0.45 : 0.14),
+                                            alpha: isDark ? 0.42 : 0.10),
                                     context.playerSurfacePalette.scrimStart
                                         .withValues(alpha: 0.0),
                                   ],
@@ -529,10 +566,14 @@ class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
                                       gradient: LinearGradient(
                                         colors: [
                                           Colors.transparent,
-                                          AppColors.specularAt(0.32),
+                                          context.palette.isDark
+                                              ? AppColors.specularAt(0.32)
+                                              : context.palette.borderStrong,
                                           widget.activeColor
                                               .withValues(alpha: 0.55),
-                                          AppColors.specularAt(0.32),
+                                          context.palette.isDark
+                                              ? AppColors.specularAt(0.32)
+                                              : context.palette.borderStrong,
                                           Colors.transparent,
                                         ],
                                       ),
@@ -546,7 +587,10 @@ class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
                                     decoration: BoxDecoration(
                                       color: _crossedThreshold
                                           ? widget.activeColor
-                                          : AppColors.specularAt(0.42),
+                                          : (context.palette.isDark
+                                              ? AppColors.specularAt(0.42)
+                                              : context.palette.textTertiary
+                                                  .withValues(alpha: 0.52)),
                                       borderRadius: BorderRadius.circular(99),
                                       boxShadow: _crossedThreshold
                                           ? [
@@ -589,7 +633,7 @@ class _NowPlayingGestureHintOverlay extends StatelessWidget {
     return PositionedDirectional(
       start: isTablet ? 32 : 16,
       end: isTablet ? 32 : 16,
-      bottom: isTablet ? 120 : 76,
+      bottom: isTablet ? 120 : 88,
       child: GestureHintOverlay(
         hintKey: 'now_playing_screen',
         message: context.l10n.nowPlayingSwipeHint,
@@ -597,4 +641,32 @@ class _NowPlayingGestureHintOverlay extends StatelessWidget {
       ),
     );
   }
+}
+
+double _contrastRatio(Color fg, Color bg) {
+  final l1 = fg.computeLuminance();
+  final l2 = bg.computeLuminance();
+  return l1 > l2 ? (l1 + 0.05) / (l2 + 0.05) : (l2 + 0.05) / (l1 + 0.05);
+}
+
+/// Calibrates raw artwork / custom accent colors so icons, active labels, and
+/// seek tracks clear WCAG AA (or AAA in High Contrast) against [p.surface].
+Color _resolveReadablePlayerAccent(
+  Color raw,
+  PulsrPalette p, {
+  required bool isHighContrast,
+}) {
+  final minContrast = isHighContrast ? 7.0 : 4.5;
+  if (_contrastRatio(raw, p.surface) >= minContrast) {
+    return raw;
+  }
+  final target = p.isDark ? Colors.white : Colors.black;
+  var candidate = raw;
+  for (var step = 0.08; step <= 0.88; step += 0.06) {
+    candidate = Color.lerp(raw, target, step) ?? raw;
+    if (_contrastRatio(candidate, p.surface) >= minContrast) {
+      return candidate;
+    }
+  }
+  return p.accent;
 }

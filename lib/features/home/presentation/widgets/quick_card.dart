@@ -26,7 +26,8 @@ class QuickCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    final isCalm = p.isCalmDensity || GpuBudget.isEnabled;
+    final isHighContrast = MediaQuery.maybeHighContrastOf(context) ?? false;
+    final isCalm = p.isCalmDensity || GpuBudget.isEnabled || isHighContrast;
     final isCompact = MediaQuery.sizeOf(context).width < 380;
 
     return Semantics(
@@ -47,15 +48,20 @@ class QuickCard extends StatelessWidget {
                 ? null
                 : LinearGradient(
                     colors: [
-                      color.withValues(alpha: 0.16),
-                      color.withValues(alpha: 0.03)
+                      color.withValues(alpha: p.isDark ? 0.16 : 0.09),
+                      color.withValues(alpha: p.isDark ? 0.03 : 0.015),
                     ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
+                    begin: AlignmentDirectional.topStart,
+                    end: AlignmentDirectional.bottomEnd,
                   ),
             color: p.surfaceContainer,
             borderRadius: AppRadii.r18All,
-            border: Border.all(color: isCalm ? p.borderSubtle : p.hairline),
+            border: Border.all(
+              color: isHighContrast
+                  ? p.borderStrong
+                  : (isCalm ? p.borderSubtle : p.hairline),
+              width: isHighContrast ? 1.25 : 1.0,
+            ),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,

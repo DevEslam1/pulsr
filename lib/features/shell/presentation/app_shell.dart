@@ -210,14 +210,14 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
       _backPressStopwatch
         ..stop()
         ..reset();
-      rootNav.pop();
+      await rootNav.maybePop();
       return;
     }
     if (rootNav != null && rootNav.canPop()) {
       _backPressStopwatch
         ..stop()
         ..reset();
-      rootNav.pop();
+      await rootNav.maybePop();
       return;
     }
 
@@ -346,8 +346,6 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
     required bool inspectorOpen,
     required bool extendedRail,
   }) {
-    final p = context.palette;
-
     // Phone / Compact Layout (bottom dock)
     if (!useRail) {
       return Scaffold(
@@ -475,7 +473,10 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
                                 heightIncludesSafeArea: true,
                                 child: PulsrErrorBoundary(
                                   category: 'Shell.branch',
-                                  child: widget.navigationShell,
+                                  child: KeyedSubtree(
+                                    key: _branchShellKey,
+                                    child: widget.navigationShell,
+                                  ),
                                 ),
                               ),
                             ),
@@ -486,25 +487,28 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
                                 context.motionCurve(Curves.easeOutCubic),
                             switchOutCurve:
                                 context.motionCurve(Curves.easeInCubic),
+                            transitionBuilder: (child, animation) =>
+                                SizeTransition(
+                              sizeFactor: animation,
+                              axis: Axis.horizontal,
+                              axisAlignment: -1.0,
+                              child: FadeTransition(
+                                opacity: animation,
+                                child: child,
+                              ),
+                            ),
                             child: inspectorOpen
-                                ? Row(
+                                ? FocusTraversalOrder(
                                     key:
                                         const ValueKey('tablet_side_inspector'),
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      VerticalDivider(
-                                        width: 1,
-                                        thickness: 1,
-                                        color: p.hairline,
+                                    order: const NumericFocusOrder(3.0),
+                                    child: PulsrDockAware(
+                                      heightIncludesSafeArea: true,
+                                      child: TabletSideInspector(
+                                        onClose: () => setState(() =>
+                                            _isSideInspectorOpen = false),
                                       ),
-                                      FocusTraversalOrder(
-                                        order: const NumericFocusOrder(3.0),
-                                        child: TabletSideInspector(
-                                          onClose: () => setState(() =>
-                                              _isSideInspectorOpen = false),
-                                        ),
-                                      ),
-                                    ],
+                                    ),
                                   )
                                 : const SizedBox.shrink(),
                           ),

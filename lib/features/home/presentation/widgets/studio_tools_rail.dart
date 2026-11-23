@@ -109,7 +109,7 @@ class StudioToolsRail extends StatelessWidget {
       (
         icon: Icons.insights_rounded,
         label: context.l10n.browseLibraryStats,
-        color: p.warning,
+        color: p.goldAccent,
         onTap: () => context.push('/library-stats'),
       ),
       (

@@ -2043,7 +2043,7 @@ class _LibraryScreenState extends State<LibraryScreen>
         color: p.surfaceContainer.withValues(alpha: 0.45),
         borderRadius: AppRadii.r18All,
         border: Border.all(
-          color: p.hairline.withValues(alpha: 0.5),
+          color: p.hairline,
           width: 1.0,
         ),
       ),

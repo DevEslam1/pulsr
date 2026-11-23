@@ -262,7 +262,7 @@ class _ArtworkGridScreenState extends State<ArtworkGridScreen> {
                                 decoration: BoxDecoration(
                                   borderRadius: cardRadius,
                                   border: Border.all(
-                                    color: p.hairline.withValues(alpha: 0.5),
+                                    color: p.hairline,
                                   ),
                                 ),
                                 child: Column(

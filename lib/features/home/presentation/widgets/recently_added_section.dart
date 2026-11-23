@@ -265,7 +265,11 @@ class _RecentlyAddedSectionState extends State<RecentlyAddedSection> {
             if (columns > 1)
               PulsrStaticGrid(
                 crossAxisCount: columns,
-                mainAxisExtent: 72,
+                mainAxisExtent: (72.0 *
+                        MediaQuery.textScalerOf(context)
+                            .scale(1.0)
+                            .clamp(1.0, 1.5))
+                    .roundToDouble(),
                 crossAxisSpacing: 10,
                 mainAxisSpacing: 4,
                 padding: EdgeInsets.symmetric(

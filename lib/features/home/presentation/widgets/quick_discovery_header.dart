@@ -72,7 +72,7 @@ class ActiveAudioOutputPill extends StatelessWidget {
       return (
         icon: Icons.album_rounded,
         label: '$dacName$rateSuffix',
-        accentColor: p.warning,
+        accentColor: p.goldAccent,
         isHiRes: true,
       );
     }
@@ -159,19 +159,23 @@ class ActiveAudioOutputPill extends StatelessWidget {
 
     final details = resolveOutputDetails(context, info);
     final accent = details.accentColor;
-    final restGradient = LinearGradient(
-      begin: AlignmentDirectional.topCenter,
-      end: AlignmentDirectional.bottomCenter,
-      colors: accent != null
-          ? [
-              accent.withValues(alpha: p.isDark ? 0.16 : 0.11),
-              accent.withValues(alpha: p.isDark ? 0.08 : 0.05),
-            ]
-          : [
-              p.surfaceElevated,
-              p.surfaceContainer,
-            ],
-    );
+    final isHighContrast = MediaQuery.maybeHighContrastOf(context) ?? false;
+    final flat = p.isCalmDensity || isHighContrast;
+    final restGradient = flat
+        ? null
+        : LinearGradient(
+            begin: AlignmentDirectional.topCenter,
+            end: AlignmentDirectional.bottomCenter,
+            colors: accent != null
+                ? [
+                    accent.withValues(alpha: p.isDark ? 0.16 : 0.11),
+                    accent.withValues(alpha: p.isDark ? 0.08 : 0.05),
+                  ]
+                : [
+                    p.surfaceElevated,
+                    p.surfaceContainer,
+                  ],
+          );
 
     return Semantics(
       button: true,
@@ -185,22 +189,32 @@ class ActiveAudioOutputPill extends StatelessWidget {
           duration: context.motion(PulsrDurations.state),
           curve: context.motionCurve(Curves.easeOutCubic),
           constraints: const BoxConstraints(
-            minHeight: 36.0,
+            minHeight: 40.0,
           ),
           padding: const EdgeInsetsDirectional.symmetric(
             horizontal: AppSpacing.s12,
             vertical: AppSpacing.s6,
           ),
           decoration: BoxDecoration(
+            color: flat
+                ? (accent != null
+                    ? Color.alphaBlend(
+                        accent.withValues(alpha: p.isDark ? 0.14 : 0.10),
+                        p.surfaceContainer,
+                      )
+                    : p.surfaceContainer)
+                : null,
             gradient: restGradient,
             borderRadius: AppRadii.full,
             border: Border.all(
-              color: accent != null
-                  ? accent.withValues(alpha: 0.34)
-                  : p.borderSubtle,
-              width: 1.0,
+              color: isHighContrast
+                  ? (accent ?? p.borderStrong)
+                  : (accent != null
+                      ? accent.withValues(alpha: 0.34)
+                      : p.borderSubtle),
+              width: isHighContrast ? 1.25 : 1.0,
             ),
-            boxShadow: p.isCalmDensity ? null : PulsrElevation.level1(p),
+            boxShadow: flat ? null : PulsrElevation.level1(p),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -293,6 +307,7 @@ class CompactSourceScopeSwitcher extends StatelessWidget {
     required bool isHighContrast,
   }) {
     final flat = p.isCalmDensity || isHighContrast;
+    final highlightTint = p.isDark ? p.textPrimary : p.surface;
     return BoxDecoration(
       color: p.accent,
       borderRadius: AppRadii.full,
@@ -302,18 +317,20 @@ class CompactSourceScopeSwitcher extends StatelessWidget {
               begin: AlignmentDirectional.topCenter,
               end: AlignmentDirectional.bottomCenter,
               colors: [
-                Color.lerp(p.accent, Colors.white, p.isDark ? 0.10 : 0.12)!,
+                Color.lerp(p.accent, highlightTint, p.isDark ? 0.10 : 0.12)!,
                 p.accent,
               ],
             ),
-      border: flat
-          ? null
-          : Border.all(
-              color: Colors.white.withValues(
-                alpha: (p.isDark ? 0.22 : 0.28) * p.specularScale,
-              ),
-              width: 1.0,
-            ),
+      border: isHighContrast
+          ? Border.all(color: p.borderStrong, width: 1.25)
+          : (flat
+              ? null
+              : Border.all(
+                  color: p.onAccent.withValues(
+                    alpha: (p.isDark ? 0.20 : 0.24) * p.specularScale,
+                  ),
+                  width: 1.0,
+                )),
       boxShadow: flat
           ? null
           : [

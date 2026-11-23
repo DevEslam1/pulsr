@@ -19,6 +19,7 @@ import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../core/widgets/pulsr_dock_tracker.dart';
+import '../../../core/widgets/pulsr_scroll_edge_fade.dart';
 import '../../../core/widgets/source_scope_switcher.dart';
 import '../../../core/responsive/pulsr_layout_metrics.dart';
 import '../../../core/config/app_config.dart';
@@ -600,8 +601,9 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                                                   AppSpacing.minTouchTarget,
                                               minHeight:
                                                   AppSpacing.minTouchTarget),
-                                          icon:
-                                              const Icon(Icons.close, size: 16),
+                                          icon: Icon(Icons.close,
+                                              size: 16,
+                                              color: p.textSecondary),
                                           tooltip: context.l10n.close,
                                           onPressed: () {
                                             if (mounted) {
@@ -718,7 +720,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
       (
         icon: Icons.insights_rounded,
         label: context.l10n.browseLibraryStats,
-        color: p.warning,
+        color: p.goldAccent,
         onTap: () => context.push('/library-stats'),
       ),
       (
@@ -981,6 +983,8 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
     HomeState homeState,
     bool isTablet,
   ) {
+    final isHighContrast = MediaQuery.maybeHighContrastOf(context) ?? false;
+    final flatChrome = p.isCalmDensity || isHighContrast;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1002,16 +1006,24 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
               padding: const EdgeInsets.symmetric(
                   horizontal: AppSpacing.md, vertical: AppSpacing.sm),
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    p.accent.withValues(alpha: 0.18),
-                    p.surfaceContainer,
-                  ],
-                  begin: AlignmentDirectional.topStart,
-                  end: AlignmentDirectional.bottomEnd,
-                ),
+                color: flatChrome ? p.surfaceContainer : null,
+                gradient: flatChrome
+                    ? null
+                    : LinearGradient(
+                        colors: [
+                          p.accent.withValues(alpha: p.isDark ? 0.18 : 0.11),
+                          p.surfaceContainer,
+                        ],
+                        begin: AlignmentDirectional.topStart,
+                        end: AlignmentDirectional.bottomEnd,
+                      ),
                 borderRadius: AppRadii.r20All,
-                border: Border.all(color: p.accent.withValues(alpha: 0.3)),
+                border: Border.all(
+                  color: isHighContrast
+                      ? p.borderStrong
+                      : p.accent.withValues(alpha: 0.3),
+                  width: isHighContrast ? 1.25 : 1.0,
+                ),
               ),
               child: Row(
                 children: [
@@ -1067,59 +1079,72 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
         const SizedBox(height: AppSpacing.sm),
 
         // ---------- Category Chips ----------
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          physics: const BouncingScrollPhysics(),
-          padding:
-              EdgeInsets.symmetric(horizontal: Adaptive.pagePadding(context)),
-          child: Row(
-            children: [
-              for (final cat in _onlineCategories)
-                Padding(
-                  padding: const EdgeInsetsDirectional.only(end: AppSpacing.s10),
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(minHeight: 40.0),
-                    child: ChoiceChip(
-                      showCheckmark: false,
-                      materialTapTargetSize: MaterialTapTargetSize.padded,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.s12,
-                        vertical: AppSpacing.s8,
+        PulsrScrollEdgeFade(
+          extent: 32,
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            padding:
+                EdgeInsets.symmetric(horizontal: Adaptive.pagePadding(context)),
+            child: Row(
+              children: [
+                for (final cat in _onlineCategories)
+                  Padding(
+                    padding:
+                        const EdgeInsetsDirectional.only(end: AppSpacing.s10),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(minHeight: 40.0),
+                      child: ChoiceChip(
+                        showCheckmark: false,
+                        materialTapTargetSize: MaterialTapTargetSize.padded,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.s12,
+                          vertical: AppSpacing.s8,
+                        ),
+                        avatar: cat == 'Recommended For You'
+                            ? Icon(Icons.auto_awesome_rounded,
+                                size: 15,
+                                color: _selectedOnlineCategory == cat
+                                    ? p.onAccent
+                                    : p.accent)
+                            : null,
+                        label: Text(_categoryLabel(context, cat)),
+                        selected: _selectedOnlineCategory == cat,
+                        onSelected: (selected) {
+                          PulsrHaptics.selectionClick();
+                          if (selected) {
+                            setState(() => _selectedOnlineCategory = cat);
+                            unawaited(_homeCubit.loadCategory(cat));
+                          }
+                        },
+                        selectedColor: p.accent,
+                        backgroundColor: p.surfaceContainerHigh,
+                        labelStyle: TextStyle(
+                          color: _selectedOnlineCategory == cat
+                              ? p.onAccent
+                              : p.textPrimary,
+                          fontWeight: _selectedOnlineCategory == cat
+                              ? FontWeight.w700
+                              : FontWeight.w600,
+                          fontSize: AppFontSize.label,
+                        ),
+                        side: _selectedOnlineCategory == cat
+                            ? (isHighContrast
+                                ? BorderSide(color: p.borderStrong, width: 1.25)
+                                : BorderSide.none)
+                            : BorderSide(
+                                color: isHighContrast
+                                    ? p.borderStrong
+                                    : p.borderSubtle,
+                                width: isHighContrast ? 1.25 : 1.0,
+                              ),
+                        shape: const RoundedRectangleBorder(
+                            borderRadius: AppRadii.full),
                       ),
-                      avatar: cat == 'Recommended For You'
-                          ? Icon(Icons.auto_awesome_rounded,
-                              size: 15,
-                              color: _selectedOnlineCategory == cat
-                                  ? p.onAccent
-                                  : p.accent)
-                          : null,
-                      label: Text(_categoryLabel(context, cat)),
-                      selected: _selectedOnlineCategory == cat,
-                      onSelected: (selected) {
-                        PulsrHaptics.selectionClick();
-                        if (selected) {
-                          setState(() => _selectedOnlineCategory = cat);
-                          unawaited(_homeCubit.loadCategory(cat));
-                        }
-                      },
-                      selectedColor: p.accent,
-                      backgroundColor: p.surfaceContainerHigh,
-                      labelStyle: TextStyle(
-                        color: _selectedOnlineCategory == cat
-                            ? p.onAccent
-                            : p.textPrimary,
-                        fontWeight: _selectedOnlineCategory == cat
-                            ? FontWeight.w700
-                            : FontWeight.w600,
-                        fontSize: AppFontSize.label,
-                      ),
-                      side: BorderSide.none,
-                      shape: const RoundedRectangleBorder(
-                          borderRadius: AppRadii.full),
                     ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
         ),
 

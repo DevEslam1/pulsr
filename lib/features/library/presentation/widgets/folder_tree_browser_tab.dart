@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:material_ui/material_ui.dart';
 import '../../../../core/errors/failures.dart';
 import '../../../../core/responsive/pulsr_layout_metrics.dart';
+import '../../../../core/utils/adaptive.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -288,8 +289,8 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
                     AppSpacing.minTouchTarget,
                     MediaQuery.textScalerOf(context).scale(42.0),
                   ),
-                  margin: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.sm,
+                  margin: EdgeInsets.symmetric(
+                    horizontal: Adaptive.pagePadding(context),
                     vertical: AppSpacing.xxs,
                   ),
                   padding: const EdgeInsets.symmetric(
@@ -300,7 +301,7 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
                     color: p.surfaceContainer,
                     borderRadius: AppRadii.r12All,
                     border: Border.all(
-                      color: p.hairline.withValues(alpha: 0.5),
+                      color: p.hairline,
                     ),
                   ),
                   child: ListView.separated(
@@ -373,9 +374,9 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
                 Expanded(
                   child: ListView(
                     padding: EdgeInsetsDirectional.fromSTEB(
-                      AppSpacing.md,
+                      Adaptive.pagePadding(context),
                       AppSpacing.xs,
-                      AppSpacing.md,
+                      Adaptive.pagePadding(context),
                       PulsrLayoutMetrics.scrollBottom(context),
                     ),
                     children: [
@@ -388,7 +389,7 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
                             shape: RoundedRectangleBorder(
                               borderRadius: AppRadii.r14All,
                               side: BorderSide(
-                                color: p.hairline.withValues(alpha: 0.5),
+                                color: p.hairline,
                               ),
                             ),
                             child: ListTile(
@@ -460,7 +461,7 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
                                 shape: RoundedRectangleBorder(
                                   borderRadius: AppRadii.r14All,
                                   side: BorderSide(
-                                    color: p.hairline.withValues(alpha: 0.5),
+                                    color: p.hairline,
                                   ),
                                 ),
                                 child: ListTile(
@@ -483,8 +484,7 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
                                           decoration: BoxDecoration(
                                             gradient: LinearGradient(
                                               colors: [
-                                                p.accentContainer
-                                                    .withValues(alpha: 0.5),
+                                                p.accentContainer,
                                                 p.surfaceContainerHigh,
                                               ],
                                               begin: Alignment.topLeft,

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'dart:collection';
 import 'package:material_ui/material_ui.dart';
 import 'package:pulsr/core/responsive/pulsr_layout_metrics.dart';
+import '../../../../core/utils/adaptive.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/aura_theme.dart';
@@ -190,9 +191,9 @@ class _GenreHierarchyViewState extends State<GenreHierarchyView> {
 
     return ListView(
       padding: EdgeInsetsDirectional.fromSTEB(
-        AppSpacing.md,
+        Adaptive.pagePadding(context),
         AppSpacing.xs,
-        AppSpacing.md,
+        Adaptive.pagePadding(context),
         PulsrLayoutMetrics.scrollBottom(context),
       ),
       children: [

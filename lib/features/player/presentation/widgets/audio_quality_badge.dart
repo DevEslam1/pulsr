@@ -120,8 +120,7 @@ class AudioQualityBadge extends StatelessWidget {
                 Text(
                   info.shortBadgeLabel,
                   style: TextStyle(
-                    color:
-                        isUsb ? AppColors.dacGold : context.palette.textPrimary,
+                    color: isUsb ? gold : palette.textPrimary,
                     fontSize: compact ? AppFontSize.caption : AppFontSize.label,
                     fontWeight: FontWeight.w800,
                     letterSpacing: AppTracking.overline,

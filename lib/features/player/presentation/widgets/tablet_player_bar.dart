@@ -220,6 +220,7 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                             height: maxAllowedHeight,
                             decoration: BoxDecoration(
                               color: p.surfaceContainer,
+                              borderRadius: barRadius,
                               border: Border.all(
                                 color: p.hairline,
                                 width: 1.0,

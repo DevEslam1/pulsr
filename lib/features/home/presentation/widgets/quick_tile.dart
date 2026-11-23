@@ -32,7 +32,8 @@ class QuickTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    final isCalm = p.isCalmDensity;
+    final isHighContrast = MediaQuery.maybeHighContrastOf(context) ?? false;
+    final isCalm = p.isCalmDensity || isHighContrast;
     final washStart = Color.alphaBlend(
       color.withValues(
         alpha: p.isDark
@@ -45,10 +46,12 @@ class QuickTile extends StatelessWidget {
       color.withValues(alpha: p.isDark ? 0.025 : 0.015),
       p.surfaceContainer,
     );
-    final specularBorder = Color.alphaBlend(
-      color.withValues(alpha: p.isDark ? 0.20 : 0.18),
-      p.borderSubtle,
-    );
+    final specularBorder = isHighContrast
+        ? p.borderStrong
+        : Color.alphaBlend(
+            color.withValues(alpha: p.isDark ? 0.20 : 0.18),
+            p.borderSubtle,
+          );
     final isPlayableAction = trailingIcon == Icons.play_arrow_rounded;
 
     return Semantics(
@@ -67,13 +70,19 @@ class QuickTile extends StatelessWidget {
             AppSpacing.s12,
           ),
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: AlignmentDirectional.topStart,
-              end: AlignmentDirectional.bottomEnd,
-              colors: [washStart, washEnd],
-            ),
+            color: isHighContrast ? p.surfaceContainer : null,
+            gradient: isHighContrast
+                ? null
+                : LinearGradient(
+                    begin: AlignmentDirectional.topStart,
+                    end: AlignmentDirectional.bottomEnd,
+                    colors: [washStart, washEnd],
+                  ),
             borderRadius: AppRadii.r18All,
-            border: Border.all(color: specularBorder, width: 1.0),
+            border: Border.all(
+              color: specularBorder,
+              width: isHighContrast ? 1.25 : 1.0,
+            ),
             boxShadow: isCalm ? null : PulsrElevation.level1(p),
           ),
           child: Row(

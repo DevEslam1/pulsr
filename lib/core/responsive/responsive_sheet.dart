@@ -63,23 +63,33 @@ class PulsrResponsiveSheet {
             availableHeight,
           );
 
-          return Center(
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                maxWidth: effectiveMaxWidth,
-                maxHeight: effectiveMaxHeight,
-              ),
-              child: Dialog(
-                backgroundColor: Colors.transparent,
-                elevation: 0,
-                insetPadding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.lg,
-                  vertical: AppSpacing.lg,
-                ),
-                child: PulsrResponsiveSheetContainer(
-                  isDialogMode: true,
-                  title: title ?? (titleText != null ? Text(titleText) : null),
-                  child: builder(ctx),
+          return AnimatedPadding(
+            duration: const Duration(milliseconds: 120),
+            curve: Curves.easeOut,
+            padding: EdgeInsets.only(bottom: media.viewInsets.bottom),
+            child: MediaQuery.removeViewInsets(
+              context: ctx,
+              removeBottom: true,
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: effectiveMaxWidth,
+                    maxHeight: effectiveMaxHeight,
+                  ),
+                  child: Dialog(
+                    backgroundColor: Colors.transparent,
+                    elevation: 0,
+                    insetPadding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.lg,
+                      vertical: AppSpacing.lg,
+                    ),
+                    child: PulsrResponsiveSheetContainer(
+                      isDialogMode: true,
+                      title:
+                          title ?? (titleText != null ? Text(titleText) : null),
+                      child: builder(ctx),
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -112,15 +122,9 @@ class PulsrResponsiveSheetContainer extends StatelessWidget {
     if (isDialogMode) {
       return GlassContainer.solid(
         borderRadius: AppRadii.dialogRadius,
-        color: p.surfaceContainerHigh,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: p.isDark ? 0.35 : 0.10),
-            blurRadius: 16,
-            spreadRadius: 0,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        color: p.surfaceElevated,
+        border: Border.all(color: p.borderSubtle),
+        boxShadow: PulsrElevation.level3(context),
         child: ClipRRect(
           borderRadius: AppRadii.dialogRadius,
           child: Material(
@@ -152,7 +156,11 @@ class PulsrResponsiveSheetContainer extends StatelessWidget {
                           ),
                         if (showCloseButton)
                           IconButton(
-                            icon: const Icon(Icons.close_rounded, size: 22),
+                            icon: Icon(
+                              Icons.close_rounded,
+                              size: 22,
+                              color: p.textSecondary,
+                            ),
                             tooltip: MaterialLocalizations.of(context)
                                 .closeButtonTooltip,
                             onPressed: () => Navigator.of(context).pop(),
