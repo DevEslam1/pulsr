@@ -293,5 +293,57 @@ void main() {
       service.setSleepTimer(null);
       await service.setEnabled(false);
     });
+
+    test('ambient sounds always work during Quran Mode even when allowDuringQuran is false',
+        () async {
+      final service = AmbientSoundService();
+      await service.init();
+      await service.setAllowDuringQuran(false);
+      service.onPlayerPlaybackStateChanged(true);
+      await service.toggleEffect(AmbientSoundEffect.rain);
+
+      service.setQuranModeActive(true);
+
+      expect(service.isSuppressedByQuran, isFalse);
+      expect(service.isEnabled, isTrue);
+      expect(service.isAudioPlaying, isTrue);
+
+      service.setQuranModeActive(false);
+      service.onPlayerPlaybackStateChanged(false);
+      await service.setEnabled(false);
+    });
+
+    test('allowDuringQuran auto-plays ambient sounds with Quran Mode and disables on exit',
+        () async {
+      final service = AmbientSoundService();
+      await service.init();
+      service.setQuranModeActive(false);
+      await service.setEnabled(false);
+
+      await service.setAllowDuringQuran(true);
+      expect(service.isEnabled, isFalse);
+
+      // Entering Quran Mode auto-enables ambient sounds.
+      service.setQuranModeActive(true);
+      await Future<void>.delayed(Duration.zero);
+      expect(service.isEnabled, isTrue);
+
+      // Exiting Quran Mode auto-disables ambient sounds.
+      service.setQuranModeActive(false);
+      await Future<void>.delayed(Duration.zero);
+      expect(service.isEnabled, isFalse);
+
+      // Enabling allowDuringQuran while Quran Mode is already active auto-enables immediately.
+      await service.setAllowDuringQuran(false);
+      service.setQuranModeActive(true);
+      expect(service.isEnabled, isFalse);
+      await service.setAllowDuringQuran(true);
+      expect(service.isEnabled, isTrue);
+
+      // Clean up
+      await service.setAllowDuringQuran(false);
+      service.setQuranModeActive(false);
+      await service.setEnabled(false);
+    });
   });
 }

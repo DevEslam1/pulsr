@@ -13,6 +13,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/di/injection.dart';
+import 'package:pulsr/core/services/ytm_account_models.dart';
 import 'package:pulsr/core/services/ytm_account_service.dart';
 import 'package:pulsr/core/services/ytm_browse_service.dart';
 import 'package:pulsr/core/services/ytm_client_version_resolver.dart';
@@ -344,7 +345,8 @@ void main() {
 
       final tracks = await _newService().getPlaylistTracks('LM');
       expect(tracks.single.videoId, 'dQw4w9WgXcQ');
-      expect(channelCalls.last.arguments, {'url': 'LL', 'limit': 100});
+      expect(channelCalls.last.arguments,
+          {'url': 'LL', 'limit': kYtmMaxPlaylistTracks});
     });
 
     test('a native failure degrades to an empty list', () async {

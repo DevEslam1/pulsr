@@ -164,15 +164,11 @@ class AmbientSoundService extends ChangeNotifier {
   bool _alwaysOnRadio = false;
   bool _isRadioPlaying = false;
 
-  /// True when the sounds should currently be audible: at least one effect is active,
-  /// the main player is playing, and Quran Mode is not asking for a clean, undisturbed recitation,
-  /// or when always-on radio mode is active while radio is playing.
-  bool get _shouldPlay =>
-      isEnabled &&
-      _isPlayerPlaying &&
-      (!_quranModeActive || _allowDuringQuran || (_alwaysOnRadio && _isRadioPlaying));
+  /// True when the sounds should currently be audible: at least one effect is active
+  /// and the main player is playing. Ambient sounds always work during Quran Mode.
+  bool get _shouldPlay => isEnabled && _isPlayerPlaying;
 
-  /// Whether ambient sounds keep playing while Quran Mode is on.
+  /// Whether ambient sounds automatically enable and play during Quran Mode.
   bool get allowDuringQuran => _allowDuringQuran;
 
   /// Whether ambient sounds are automatically enabled during radio and disabled for local/online tracks.
@@ -182,9 +178,8 @@ class AmbientSoundService extends ChangeNotifier {
   Set<AmbientSoundEffect> get savedUserEffects =>
       Set.unmodifiable(_savedUserEffects);
 
-  /// True when ambient sounds are held back because Quran Mode is on.
-  bool get isSuppressedByQuran =>
-      _quranModeActive && !_allowDuringQuran && !(_alwaysOnRadio && _isRadioPlaying);
+  /// Ambient sounds are never suppressed by Quran Mode.
+  bool get isSuppressedByQuran => false;
 
   /// Called when the player track changes. Handles auto-enable / auto-disable
   /// when [alwaysOnRadio] is active.
@@ -195,7 +190,7 @@ class AmbientSoundService extends ChangeNotifier {
     if (_alwaysOnRadio) {
       if (isRadio && !isEnabled) {
         unawaited(setEnabled(true));
-      } else if (!isRadio && isEnabled) {
+      } else if (!isRadio && !(_allowDuringQuran && _quranModeActive) && isEnabled) {
         unawaited(setEnabled(false));
       }
     }
@@ -210,28 +205,37 @@ class AmbientSoundService extends ChangeNotifier {
     if (value) {
       if (_isRadioPlaying && !isEnabled) {
         await setEnabled(true);
-      } else if (!_isRadioPlaying && isEnabled) {
+      } else if (!_isRadioPlaying && !(_allowDuringQuran && _quranModeActive) && isEnabled) {
         await setEnabled(false);
       }
     }
   }
 
   /// Called by the player when Quran Mode turns on or off.
+  /// When [allowDuringQuran] is enabled, auto-plays ambient sounds with Quran Mode
+  /// and disables them when Quran Mode turns off (unless kept on by [alwaysOnRadio]).
   void setQuranModeActive(bool active) {
     if (_quranModeActive == active) return;
-    final before = _shouldPlay;
     _quranModeActive = active;
     notifyListeners();
-    if (before != _shouldPlay) unawaited(_applyPlayerState());
+    if (_allowDuringQuran) {
+      if (active && !isEnabled) {
+        unawaited(setEnabled(true));
+      } else if (!active && !(_alwaysOnRadio && _isRadioPlaying) && isEnabled) {
+        unawaited(setEnabled(false));
+      }
+    }
   }
 
+  /// Sets whether ambient sounds should automatically enable and play with Quran Mode.
   Future<void> setAllowDuringQuran(bool allow) async {
     if (_allowDuringQuran == allow) return;
-    final before = _shouldPlay;
     _allowDuringQuran = allow;
     notifyListeners();
-    if (before != _shouldPlay) unawaited(_applyPlayerState());
     _persist();
+    if (allow && _quranModeActive && !isEnabled) {
+      await setEnabled(true);
+    }
   }
 
   double _masterVolume = 1.0;

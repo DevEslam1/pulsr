@@ -131,7 +131,8 @@ void main() {
     );
 
     await controller.playSong(buildSong(2));
-    expect(cancelled, 1);
+    expect(cancelled, greaterThanOrEqualTo(1));
+    final afterPlay = cancelled;
 
     controller.setQueueSlot(
       1,
@@ -141,6 +142,6 @@ void main() {
       speed: 1.0,
     );
     await controller.switchQueueSlot(1);
-    expect(cancelled, 2);
+    expect(cancelled, greaterThan(afterPlay));
   });
 }

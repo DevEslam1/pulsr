@@ -387,7 +387,7 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
         ensureScratch(preSizeFrames * channels);
         final double maxRatio = willSrc ? Math.max(1.0, (double) target / (double) inRate) : 1.0;
         final int maxOutFrames = willSrc
-                ? (int) Math.ceil(preSizeFrames * maxRatio) + (int) Math.ceil(64.0 * maxRatio) + 32
+                ? (int) Math.ceil(preSizeFrames * maxRatio) + (int) Math.ceil(256.0 * maxRatio) + 32
                 : preSizeFrames;
         ensureGainScratch(maxOutFrames);
         if (willSrc) {
@@ -646,7 +646,7 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
                 final double ratio = (double) outputAudioFormat.sampleRate
                         / (double) inputAudioFormat.sampleRate;
                 final int maxOut = (int) Math.ceil(frameCount * ratio)
-                        + (int) Math.ceil(64.0 * ratio) + 32;
+                        + (int) Math.ceil(256.0 * ratio) + 32;
                 FloatBuffer resampled = ensureResampleScratch(maxOut * channelCount);
                 if (tapSrcFailure != null) throw tapSrcFailure;
                 final int got;

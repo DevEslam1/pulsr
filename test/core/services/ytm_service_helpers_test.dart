@@ -14,6 +14,7 @@ import 'package:http/testing.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/di/injection.dart';
 import 'package:pulsr/core/errors/ytm_error_classifier.dart';
+import 'package:pulsr/core/services/ytm_account_models.dart';
 import 'package:pulsr/core/services/ytm_account_service.dart';
 import 'package:pulsr/core/services/ytm_browse_service.dart';
 import 'package:pulsr/core/services/ytm_service.dart';
@@ -625,7 +626,8 @@ void main() {
             }
           : null;
       await _newService().getPlaylistTracks('LM');
-      expect(channelCalls.last.arguments, {'url': 'LL', 'limit': 100});
+      expect(channelCalls.last.arguments,
+          {'url': 'LL', 'limit': kYtmMaxPlaylistTracks});
     });
 
     test('blank input is empty and a native failure degrades gracefully',
