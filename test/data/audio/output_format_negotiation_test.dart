@@ -16,7 +16,6 @@ void main() {
     int maxDepth = 16,
     OutputRoute route = wired,
     bool bitPerfect = false,
-    int oversample = 1,
   }) =>
       negotiateOutputFormat(
         request: OutputFormatRequest(
@@ -24,7 +23,6 @@ void main() {
           trackBitDepth: trackDepth,
           requestedSampleRate: reqRate,
           requestedBitDepth: reqDepth,
-          oversampleMultiplier: oversample,
         ),
         deviceSampleRates: rates,
         deviceMaxBitDepth: maxDepth,
@@ -128,63 +126,6 @@ void main() {
       );
       expect(d.sampleRate, 44100);
       expect(d.reason, OutputFormatReason.deviceFloorLimited);
-    });
-
-    test('Remaster 2x oversampling requests trackRate * 2 when supported', () {
-      final d = run(
-        trackRate: 44100,
-        rates: const [44100, 48000, 88200, 96000, 176400, 192000],
-        oversample: 2,
-      );
-      expect(d.sampleRate, 88200);
-      expect(d.reason, OutputFormatReason.oversampled);
-      expect(d.isBelowTrackRate, isFalse);
-    });
-
-    test('Remaster 4x oversampling requests trackRate * 4 when supported', () {
-      final d = run(
-        trackRate: 48000,
-        rates: const [44100, 48000, 96000, 192000, 384000],
-        oversample: 4,
-      );
-      expect(d.sampleRate, 192000);
-      expect(d.reason, OutputFormatReason.oversampled);
-      expect(d.isBelowTrackRate, isFalse);
-    });
-
-    test('Remaster 8x oversampling requests trackRate * 8 when supported', () {
-      final d = run(
-        trackRate: 44100,
-        rates: const [44100, 88200, 176400, 352800],
-        oversample: 8,
-      );
-      expect(d.sampleRate, 352800);
-      expect(d.reason, OutputFormatReason.oversampled);
-      expect(d.isBelowTrackRate, isFalse);
-    });
-
-    test('Remaster oversampling steps down when highest tier unsupported', () {
-      // User asks 8x (352.8k) but DAC only supports up to 176.4k (4x)
-      final d = run(
-        trackRate: 44100,
-        rates: const [44100, 88200, 176400],
-        oversample: 8,
-      );
-      expect(d.sampleRate, 176400);
-      expect(d.reason, OutputFormatReason.oversampleRateLimited);
-      expect(d.isBelowTrackRate, isFalse);
-    });
-
-    test('Remaster oversampling falls back to 2x if 4x is unsupported', () {
-      // User asks 4x (176.4k) but DAC only supports up to 96k (88.2k for 44.1k family)
-      final d = run(
-        trackRate: 44100,
-        rates: const [44100, 48000, 88200, 96000],
-        oversample: 4,
-      );
-      expect(d.sampleRate, 88200);
-      expect(d.reason, OutputFormatReason.oversampleRateLimited);
-      expect(d.isBelowTrackRate, isFalse);
     });
   });
 

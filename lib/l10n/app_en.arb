@@ -11064,5 +11064,13 @@
   "settingsQuickControls": "Quick Controls",
   "@settingsQuickControls": {
     "description": "Heading above the Settings Quick Controls strip"
+  },
+  "settingsDisableBlurTitle": "Disable Blur",
+  "@settingsDisableBlurTitle": {
+    "description": "Title for the Appearance toggle that disables backdrop and glass blur"
+  },
+  "settingsDisableBlurSubtitle": "Turn off backdrop and glass blur across all screens and sheets for smoother performance",
+  "@settingsDisableBlurSubtitle": {
+    "description": "Subtitle for the Disable Blur toggle"
   }
 }

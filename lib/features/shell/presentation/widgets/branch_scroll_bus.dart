@@ -26,6 +26,8 @@ class BranchScrollBus {
       <int, List<ScrollController>>{};
   final Map<int, List<BranchReselectCallback>> _listeners =
       <int, List<BranchReselectCallback>>{};
+  final Map<int, List<bool Function()>> _backHandlers =
+      <int, List<bool Function()>>{};
 
   /// Registers [controller] for [branchIndex] and returns an unregister hook.
   VoidCallback registerController(
@@ -68,11 +70,43 @@ class BranchScrollBus {
     };
   }
 
+  /// Registers an intra-branch back handler for [branchIndex] and returns an
+  /// unregister hook. Returning `true` from [handler] consumes the back press.
+  VoidCallback registerBackHandler(
+    int branchIndex,
+    bool Function() handler,
+  ) {
+    final list =
+        _backHandlers.putIfAbsent(branchIndex, () => <bool Function()>[]);
+    if (!list.contains(handler)) {
+      list.add(handler);
+    }
+    return () {
+      final entries = _backHandlers[branchIndex];
+      if (entries == null) return;
+      entries.remove(handler);
+      if (entries.isEmpty) {
+        _backHandlers.remove(branchIndex);
+      }
+    };
+  }
+
+  /// Asks the active [branchIndex]'s registered back handlers to handle back.
+  bool handleBranchBack(int branchIndex) {
+    final handlers = _backHandlers[branchIndex];
+    if (handlers == null || handlers.isEmpty) return false;
+    for (final handler in List<bool Function()>.from(handlers).reversed) {
+      if (handler()) return true;
+    }
+    return false;
+  }
+
   /// Clears all registered controllers and listeners (for test teardown).
   @visibleForTesting
   void clear() {
     _controllers.clear();
     _listeners.clear();
+    _backHandlers.clear();
   }
 
   /// Notifies listeners and scrolls the active branch to the top.

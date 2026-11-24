@@ -6565,5 +6565,7 @@
   "checkForUpdatesTitle": "التحقق من التحديثات",
   "checkForUpdatesSubtitle": "التحقق من إصدارات GitHub بحثاً عن نسخة جديدة",
   "badgeHiRes": "عالي الدقة",
-  "settingsQuickControls": "عناصر التحكم السريعة"
+  "settingsQuickControls": "عناصر التحكم السريعة",
+  "settingsDisableBlurTitle": "تعطيل الضبابية",
+  "settingsDisableBlurSubtitle": "إيقاف تأثير الضبابية في جميع الشاشات والقوائم لأداء أكثر سلاسة"
 }

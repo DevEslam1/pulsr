@@ -1006,7 +1006,8 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
   Future<int> importYtmPlaylistAsFavorites(String rawUrl) async {
     final ytmService = _resolvedYtmService;
     if (ytmService == null) return -1;
-    var tracks = await ytmService.getPlaylistTracks(rawUrl);
+    var tracks = await ytmService.getPlaylistTracks(rawUrl,
+        limit: kYtmMaxPlaylistTracks);
     if (tracks.isEmpty &&
         (rawUrl.contains('list=LM') ||
             rawUrl.contains('list=LL') ||
@@ -1014,7 +1015,8 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
             rawUrl == 'LL')) {
       final ytmAccount = _resolvedYtmAccountService;
       if (ytmAccount != null && ytmAccount.isLoggedIn) {
-        tracks = await ytmAccount.fetchLikedSongs();
+        tracks = await ytmAccount.fetchLikedSongs(
+            maxTracks: kYtmMaxPlaylistTracks);
       }
     }
     if (tracks.isEmpty) return 0;
@@ -1037,7 +1039,8 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
 
     final List<YtmTrack> tracks;
     try {
-      tracks = await accountService.fetchLikedSongs();
+      tracks =
+          await accountService.fetchLikedSongs(maxTracks: kYtmMaxPlaylistTracks);
     } catch (e, st) {
       ErrorLogger.log('Failed to sync YTM account likes',
           error: e, stackTrace: st, category: 'LibraryCubit');

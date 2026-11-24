@@ -98,14 +98,6 @@ class Wave1NativeHardeningTest {
             isAccessible = true
         }
 
-        // H-03: PcmToDsd alone must NOT engage DSP active interlock or mark active effects.
-        setField(plugin, "remasterPcmToDsdEnabled", true)
-        assertFalse(computeDspActive.invoke(plugin) as Boolean)
-        setField(plugin, "isNativeDspLoaded", false)
-        assertFalse(hasActiveEffects.invoke(plugin) as Boolean)
-        setField(plugin, "isNativeDspLoaded", true)
-        setField(plugin, "remasterPcmToDsdEnabled", false)
-
         // H-05: DVC active marks computeDspActive() == true and syncDspActiveRouting propagates to PulsrOutputRouting.
         setField(plugin, "dvcEnabled", true)
         assertTrue(plugin.applyDvcRuntimeState(true))

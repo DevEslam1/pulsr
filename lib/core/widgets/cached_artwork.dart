@@ -681,7 +681,7 @@ class _CachedArtworkState extends State<CachedArtwork> {
                   fit: BoxFit.cover,
                   alignment: widget.alignment,
                   filterQuality:
-                      isHq ? FilterQuality.high : FilterQuality.medium,
+                      isHq ? FilterQuality.medium : FilterQuality.low,
                   errorBuilder: (context, error, stackTrace) => placeholder,
                 )
               : SizedBox(

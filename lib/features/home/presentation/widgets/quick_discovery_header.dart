@@ -790,7 +790,7 @@ class QuickDiscoveryHeader extends StatelessWidget {
                     size: 22,
                   ),
                   tooltip: context.l10n.settings,
-                  onPressed: onSettingsTap ?? () => context.push('/settings'),
+                  onPressed: onSettingsTap ?? () => context.go('/settings'),
                 ),
               ],
             ),

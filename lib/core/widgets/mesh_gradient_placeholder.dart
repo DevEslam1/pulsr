@@ -1,8 +1,6 @@
 // lib/core/widgets/mesh_gradient_placeholder.dart
 import 'dart:math' as math;
-import 'dart:ui' show ImageFilter;
 import 'package:material_ui/material_ui.dart';
-import '../constants/app_blur.dart';
 import '../constants/app_colors.dart';
 import '../constants/app_radii.dart';
 import '../constants/app_typography.dart';
@@ -268,8 +266,6 @@ class MeshGradientPlaceholder extends StatelessWidget {
         final computedFontSize = (discSize * 0.42).clamp(10.0, 28.0);
         final isArabic = _arabicChars.hasMatch(initials);
         final bool isCardSize = effectiveSize >= 72.0;
-        final bool useBlur = isCardSize && AppBlur.canBlur(context);
-        final double blurSigma = AppBlur.clampSigma(AppBlur.chip);
 
         Widget centerContent;
         if (icon != null) {
@@ -306,7 +302,10 @@ class MeshGradientPlaceholder extends StatelessWidget {
           );
         }
 
-        Widget medallionCore = Container(
+        // Skip per-card BackdropFilter so scrolling grids/lists avoid dozens
+        // of live blur passes; the translucent medallion gradient preserves
+        // the frosted-glass look over the mesh background.
+        final Widget medallionCore = Container(
           width: discSize,
           height: discSize,
           decoration: BoxDecoration(
@@ -317,10 +316,10 @@ class MeshGradientPlaceholder extends StatelessWidget {
               colors: [
                 Color.alphaBlend(
                   palette.tertiary.withValues(alpha: 0.16),
-                  AppColors.specularAt(useBlur ? 0.20 : 0.16),
+                  AppColors.specularAt(0.16),
                 ),
-                AppColors.scrimAt(useBlur ? 0.22 : 0.34),
-                AppColors.scrimAt(useBlur ? 0.38 : 0.48),
+                AppColors.scrimAt(0.34),
+                AppColors.scrimAt(0.48),
               ],
               stops: const [0.0, 0.52, 1.0],
             ),
@@ -350,13 +349,6 @@ class MeshGradientPlaceholder extends StatelessWidget {
             ],
           ),
         );
-
-        if (useBlur && blurSigma > 0) {
-          medallionCore = BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma),
-            child: medallionCore,
-          );
-        }
 
         return ClipRRect(
           borderRadius: AppRadii.circular(effectiveRadius),

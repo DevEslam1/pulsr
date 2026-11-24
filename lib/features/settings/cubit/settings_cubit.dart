@@ -10,6 +10,7 @@ import 'package:injectable/injectable.dart';
 import 'package:mutex/mutex.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/bloc/base_cubit.dart';
+import '../../../core/constants/app_blur.dart';
 import '../../../core/constants/channels.dart';
 import '../../../core/errors/app_error.dart';
 import '../../../core/constants/prefs_keys.dart';
@@ -501,6 +502,8 @@ class SettingsCubit extends PulsrCubit<SettingsState>
           prefs.getBool(PrefsKeys.hapticsEnabled) ?? current.hapticsEnabled,
       liquidGlassTint:
           prefs.getDouble(_keyLiquidGlassTint) ?? current.liquidGlassTint,
+      disableBlur:
+          prefs.getBool(PrefsKeys.disableBlur) ?? current.disableBlur,
       languageCode: prefs.getString(_keyLanguageCode) ?? current.languageCode,
       customAccentColorValue: customAccentValue,
       customThemeRadius:
@@ -1022,6 +1025,11 @@ class SettingsCubit extends PulsrCubit<SettingsState>
           loadedState =
               loadedState.copyWith(liquidGlassTint: previous.liquidGlassTint);
         }
+        if (reconciledDirty.contains('disableBlur')) {
+          loadedState =
+              loadedState.copyWith(disableBlur: previous.disableBlur);
+        }
+        AppBlur.setDisabled(loadedState.disableBlur);
         if (reconciledDirty.contains('languageCode')) {
           loadedState =
               loadedState.copyWith(languageCode: previous.languageCode);
@@ -1651,6 +1659,13 @@ class SettingsCubit extends PulsrCubit<SettingsState>
     final clamped = value.clamp(0.0, 1.0);
     safeEmit(state.copyWith(liquidGlassTint: clamped));
     await SettingsCache().setDouble(_keyLiquidGlassTint, clamped);
+  }
+
+  Future<void> setDisableBlur(bool value) async {
+    markDirty('disableBlur');
+    AppBlur.setDisabled(value);
+    safeEmit(state.copyWith(disableBlur: value));
+    await SettingsCache().setBool(PrefsKeys.disableBlur, value);
   }
 
   /// Keeps the Android status/nav bars in sync with the app theme so a

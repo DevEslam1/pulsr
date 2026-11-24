@@ -18,24 +18,6 @@
     "acceptanceTest": "Device + capture"
   },
   {
-    "feature": "Remaster",
-    "uiEntry": "RemasterControlCard",
-    "stateOwner": "EqualizerManager/DspConfig",
-    "persistence": "oversample prefs",
-    "backendCall": "Config snapshot + sink reopen",
-    "statusSource": "OutputVerdict not-bit-perfect",
-    "acceptanceTest": "Measurement + device"
-  },
-  {
-    "feature": "PCM-to-DSD",
-    "uiEntry": "Remaster card",
-    "stateOwner": "NativeDsdController",
-    "persistence": "prefs mode",
-    "backendCall": "LocalDSD session",
-    "statusSource": "OutputVerdict",
-    "acceptanceTest": "Device soak"
-  },
-  {
     "feature": "FIR",
     "uiEntry": "AutoEQ sheet",
     "stateOwner": "HeadphoneProfilesRepository",

@@ -24,7 +24,7 @@ class _CleanAmbientBackdrop extends StatelessWidget {
     final p = context.palette;
     final isDark = p.isDark;
     final canBlur = AppBlur.canBlur(context);
-    final double sigma = AppBlur.clampSigma(AppBlur.maxSigma);
+    final double sigma = AppBlur.clampSigma(AppBlur.standard);
 
     final isHighContrast =
         p.isHighContrast || MediaQuery.highContrastOf(context);
@@ -95,6 +95,8 @@ class _CleanAmbientBackdrop extends StatelessWidget {
                       remoteUrl: song!.remoteArtworkUrl ?? song!.artworkUri,
                       type: ArtworkType.AUDIO,
                       size: 320,
+                      cacheWidth: 96,
+                      cacheHeight: 96,
                       highQuality: false,
                       borderRadius: 0,
                     ),

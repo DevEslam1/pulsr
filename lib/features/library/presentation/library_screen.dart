@@ -1674,7 +1674,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                       p: p,
                       onTap: () {
                         Navigator.of(sheetContext).pop();
-                        context.push('/settings');
+                        context.go('/settings');
                       },
                     ),
                   ],

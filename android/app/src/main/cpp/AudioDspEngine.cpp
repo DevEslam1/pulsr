@@ -82,7 +82,6 @@ void SanitizeSnapshot(DspParamSnapshot& s) {
     s.resampler.inRate = clampFinite(s.resampler.inRate, 8000.0, 768000.0, 48000.0);
     s.resampler.outRate = clampFinite(s.resampler.outRate, 8000.0, 768000.0, 48000.0);
     s.resampler.quality = clampInt(s.resampler.quality, 0, 3);
-    s.resampler.tapSrcQuality = clampInt(s.resampler.tapSrcQuality, 0, 3);
 
     s.saturation.drive = clampFinite(s.saturation.drive, 0.0, 1.0, 0.0);
     s.saturation.mix = clampFinite(s.saturation.mix, 0.0, 1.0, 0.5);
@@ -272,16 +271,6 @@ void SanitizeSnapshot(DspParamSnapshot& s) {
         clampFinite(s.bypassCompare.gainCompensationLinear, 0.001, 16.0, 1.0);
     s.bypassCompare.gainCompensationDb =
         clampFinite(s.bypassCompare.gainCompensationDb, -60.0, 24.0, 0.0);
-
-    s.oversample.multiplier =
-        (s.oversample.multiplier == 2 || s.oversample.multiplier == 4 || s.oversample.multiplier == 8)
-            ? s.oversample.multiplier : 1;
-    s.oversample.kernel = clampInt(s.oversample.kernel, 0, 3);
-    s.oversample.enabled = (s.oversample.multiplier > 1);
-
-    s.pcmToDsd.rate =
-        (s.pcmToDsd.rate == 128 || s.pcmToDsd.rate == 256) ? s.pcmToDsd.rate : 64;
-    s.pcmToDsd.order = clampInt(s.pcmToDsd.order, 1, 5);
 
     // §8.9: HRTF geometry is sanitized here as well as in the JNI setters so a
     // snapshot published by a test/restore path can never ask the control-side
@@ -543,7 +532,6 @@ bool DspEngineRegistry::registerEngine(AudioDspEngine* engine) {
     engine->setPerformanceProfile(tmpl.getPerformanceProfile());
     engine->setThermalLevel(tmpl.getThermalLevel());
     engine->setReverbThreadingMode(tmpl.getReverbThreadingMode());
-    engine->setTapSrcQualityAtomic(tmpl.tapSrcQuality());
     const uint32_t nativeDeg = tmpl.getNativeAutoDegradedStages();
     if (nativeDeg != 0) {
         engine->triggerStageAutoDegrade(nativeDeg);
@@ -646,12 +634,6 @@ bool DspEngineRegistry::isLowPowerBypassed() {
     std::lock_guard<std::mutex> lock(mutex_);
     AudioDspEngine* engine = selectActiveEngineLocked();
     return engine != nullptr && engine->isLowPowerBypassed();
-}
-
-int DspEngineRegistry::getActiveOversampleFactor() {
-    std::lock_guard<std::mutex> lock(mutex_);
-    AudioDspEngine* engine = selectActiveEngineLocked();
-    return engine ? engine->activeOversampleFactor() : 1;
 }
 
 void DspEngineRegistry::unregisterEngine(AudioDspEngine* engine) {
@@ -959,15 +941,6 @@ void DspEngineRegistry::setReverbThreadingMode(ReverbThreadingMode mode) {
     AudioDspEngine::instance().setReverbThreadingMode(mode);
 }
 
-void DspEngineRegistry::setTapSrcQuality(int quality) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    for (auto* engine : engines_) {
-        if (engine && engine != &AudioDspEngine::instance()) {
-            engine->setTapSrcQualityAtomic(quality);
-        }
-    }
-}
-
 void DspEngineRegistry::drainRetireQueues() {
     std::lock_guard<std::mutex> lock(mutex_);
     AudioDspEngine::instance().drainRetireQueue();
@@ -1092,10 +1065,6 @@ void AudioDspEngine::publishParams(std::shared_ptr<const DspParamSnapshot> snaps
     if (snapshot->generation >= snapshotGeneration_.load()) {
         snapshotGeneration_.store(snapshot->generation);
     }
-    if (this == &AudioDspEngine::instance()) {
-        tapSrcQuality_.store(mutableSnap->resampler.tapSrcQuality,
-                             std::memory_order_release);
-    }
     mutableSnap->generation = ++snapshotGeneration_;
     swapCurrentLocked(std::const_pointer_cast<const DspParamSnapshot>(mutableSnap));
 }
@@ -1136,8 +1105,6 @@ void AudioDspEngine::resetInternal(const DspParamSnapshot& current) {
     // flush path. A DSP snapshot reset runs AFTER tap conversion and must not
     // discard that converter's queued samples or phase.
     panner_.reset();
-    tapOversampler_.reset();
-    resetPcmToDsd();
     dsdDecoder_.reset();
     saturation_.reset();
     stereoWidth_.reset();
@@ -1187,29 +1154,17 @@ void AudioDspEngine::reset() {
 
 namespace {
 
-// Tap-kernel geometry per quality step. The default (2) is 256 taps,
-// which measures about -130 dB THD+N for 44.1 -> 48 kHz; step 3 doubles
-// it for offline-grade conversion at ~4x the multiply cost.
-int TapTapsForQuality(int quality) {
-    static const int kTaps[4] = {64, 128, 256, 512};
-    return kTaps[quality < 0 ? 0 : (quality > 3 ? 3 : quality)];
-}
-
-int TapPhasesForQuality(int quality) {
-    static const int kPhases[4] = {256, 512, 1024, 2048};
-    return kPhases[quality < 0 ? 0 : (quality > 3 ? 3 : quality)];
-}
+// Default tap-side SincResampler kernel: 256 taps / 1024 phases (~-130 dB THD+N).
+constexpr int kTapTaps = 256;
+constexpr int kTapPhases = 1024;
 
 }  // namespace
 
 void AudioDspEngine::prepareTapResampler(double srcRate, double dstRate, int channels) {
     // Called only by the serialized player configure/flush lifecycle. Do not
     // publish these fields through the independently changing DSP snapshot.
-    activeOversampleFactor_.store(1, std::memory_order_relaxed);
     tapChannels_ = 0;
     tapSrcEngaged_ = false;
-    tapUseOversampler_ = false;
-    tapOversampler_.release();
     if (!std::isfinite(srcRate) || !std::isfinite(dstRate) ||
         srcRate < 8000.0 || srcRate > 768000.0 ||
         dstRate < 8000.0 || dstRate > 768000.0 ||
@@ -1230,38 +1185,6 @@ void AudioDspEngine::prepareTapResampler(double srcRate, double dstRate, int cha
         return;
     }
 
-    // Remaster: If oversampling is requested or active, and dstRate / srcRate is
-    // an integer power of 2 (2x, 4x, 8x), use Oversampler with the selected kernel.
-    const auto snap = getParams();
-    const int osMult = snap ? (snap->oversample.enabled ? snap->oversample.multiplier : 1) : oversampleMultiplier_;
-    const int osKern = snap ? snap->oversample.kernel : oversampleKernel_;
-    const int srcQuality = tapSrcQuality_.load(std::memory_order_acquire);
-    preparedTapSrcQuality_ = srcQuality;
-    const int factor = static_cast<int>(std::round(expansion));
-    if ((factor == 2 || factor == 4 || factor == 8) &&
-        std::abs(dstRate - srcRate * factor) < 0.5 &&
-        osMult > 1) {
-        pulsr::OversampleKernel kernel = pulsr::OversampleKernel::Sharp;
-        switch (osKern) {
-            case 1: kernel = pulsr::OversampleKernel::Slow; break;
-            case 2: kernel = pulsr::OversampleKernel::MinimumPhase; break;
-            case 3: kernel = pulsr::OversampleKernel::Apodizing; break;
-            default: kernel = pulsr::OversampleKernel::Sharp; break;
-        }
-        if (tapOversampler_.configure(channels, factor, kernel)) {
-            tapOversampler_.reset();
-            tapUseOversampler_ = true;
-            activeOversampleFactor_.store(factor, std::memory_order_relaxed);
-            tapChannels_ = channels;
-            tapChunkFrames_ = std::min(kTapInputFrames, 512);
-            for (int ch = 0; ch < channels; ++ch) {
-                tapPlaneIn_[ch].resize(kTapInputFrames);
-                tapPlaneOut_[ch].resize(std::max(kTapOutputFrames, kTapInputFrames * factor));
-            }
-            return;
-        }
-    }
-
     // Real playback spans at most a few octaves (44.1 <-> 48 <-> 96 <-> 192
     // <-> 384). Beyond +/-4 octaves the kernel's transition band is wider
     // than the band itself, so the tap refuses rather than pretending: the
@@ -1274,9 +1197,7 @@ void AudioDspEngine::prepareTapResampler(double srcRate, double dstRate, int cha
         return;
     }
 
-    if (!tapResampler_.configure(channels, TapTapsForQuality(srcQuality),
-                                 TapPhasesForQuality(srcQuality),
-                                 srcRate, dstRate)) {
+    if (!tapResampler_.configure(channels, kTapTaps, kTapPhases, srcRate, dstRate)) {
         tapResampler_.release();
         return;
     }
@@ -1289,244 +1210,10 @@ void AudioDspEngine::prepareTapResampler(double srcRate, double dstRate, int cha
     tapChannels_ = channels;
 }
 
-void AudioDspEngine::setTapSrcQualityAtomic(int quality) {
-    const int clamped = quality < 0 ? 0 : (quality > 3 ? 3 : quality);
-    tapSrcQuality_.store(clamped, std::memory_order_release);
-}
-
-void AudioDspEngine::setTapSrcQuality(int quality) {
-    const int clamped = quality < 0 ? 0 : (quality > 3 ? 3 : quality);
-    tapSrcQuality_.store(clamped, std::memory_order_release);
-    // Publish through the snapshot (which broadcasts to all registered render
-    // engines). Never call prepareTapResampler() on the control thread here:
-    // doing so races with resampleForTap() on the active render thread
-    // (BUG-P2-1). The render/tap thread observes the updated quality and
-    // reconfigures tapResampler_ safely on its own thread.
-    updateParams([clamped](DspParamSnapshot& snap) {
-        snap.resampler.tapSrcQuality = clamped;
-    });
-    if (this == &AudioDspEngine::instance()) {
-        DspEngineRegistry::instance().setTapSrcQuality(clamped);
-    }
-}
-
-int AudioDspEngine::tapSrcQuality() const {
-    return tapSrcQuality_.load(std::memory_order_acquire);
-}
-
-void AudioDspEngine::setOversampleMultiplier(int multiplier) {
-    const int clamped = (multiplier == 2 || multiplier == 4 || multiplier == 8) ? multiplier : 1;
-    oversampleMultiplier_ = clamped;
-    updateParams([clamped](DspParamSnapshot& snap) {
-        snap.oversample.multiplier = clamped;
-        snap.oversample.enabled = (clamped > 1);
-    });
-}
-
-void AudioDspEngine::setOversampleKernel(int kernel) {
-    const int clamped = kernel < 0 ? 0 : (kernel > 3 ? 3 : kernel);
-    oversampleKernel_ = clamped;
-    updateParams([clamped](DspParamSnapshot& snap) {
-        snap.oversample.kernel = clamped;
-    });
-}
-
-void AudioDspEngine::setPcmToDsdEnabled(bool enabled) {
-    pcmToDsdEnabled_ = enabled;
-    updateParams([enabled](DspParamSnapshot& snap) {
-        snap.pcmToDsd.enabled = enabled;
-    });
-}
-
-void AudioDspEngine::setPcmToDsdRate(int rate) {
-    const int clamped = (rate == 128 || rate == 256) ? rate : 64;
-    pcmToDsdRate_ = clamped;
-    updateParams([clamped](DspParamSnapshot& snap) {
-        snap.pcmToDsd.rate = clamped;
-    });
-}
-
-void AudioDspEngine::setPcmToDsdOrder(int order) {
-    const int clamped = std::clamp(order, 1, 5);
-    pcmToDsdOrder_ = clamped;
-    updateParams([clamped](DspParamSnapshot& snap) {
-        snap.pcmToDsd.order = clamped;
-    });
-}
-
 void AudioDspEngine::setLowPowerEnabled(bool enabled) {
     updateParams([enabled](DspParamSnapshot& snap) {
         snap.lowPower.enabled = enabled;
     });
-}
-
-int AudioDspEngine::oversampleMultiplier() const {
-    auto snap = getParams();
-    return snap ? snap->oversample.multiplier : oversampleMultiplier_;
-}
-
-int AudioDspEngine::oversampleKernel() const {
-    auto snap = getParams();
-    return snap ? snap->oversample.kernel : oversampleKernel_;
-}
-
-bool AudioDspEngine::isPcmToDsdEnabled() const {
-    auto snap = getParams();
-    return snap ? snap->pcmToDsd.enabled : pcmToDsdEnabled_;
-}
-
-int AudioDspEngine::pcmToDsdRate() const {
-    auto snap = getParams();
-    return snap ? snap->pcmToDsd.rate : pcmToDsdRate_;
-}
-
-int AudioDspEngine::pcmToDsdOrder() const {
-    auto snap = getParams();
-    return snap ? snap->pcmToDsd.order : pcmToDsdOrder_;
-}
-
-bool AudioDspEngine::preparePcmToDsd(double pcmRate, int dsdMultiple, int order, int containerBits) {
-    if (!std::isfinite(pcmRate) || pcmRate < 8000.0) return false;
-    const int mult = (dsdMultiple == 128 || dsdMultiple == 256) ? dsdMultiple : 64;
-    const int ord = std::clamp(order, 1, 5);
-    const int bits = (containerBits == 32) ? 32 : 24;
-
-    if (!sdmModulator_.configure(pcmRate, mult, ord)) {
-        return false;
-    }
-    pcmToDsdInputRate_ = pcmRate;
-    pcmToDsdRate_ = mult;
-    pcmToDsdOrder_ = ord;
-    pcmToDsdContainerBits_ = bits;
-    dopMarker_ = pulsr::kDopMarkerA;
-
-    // Pre-allocate planar DSD and PCM buffers for the modulator chunk size
-    const int maxDsdBytesPerChunk = pulsr::SdmModulator::kPcmChunk * (256 / 8);
-    sdmDsdBufL_.resize(static_cast<size_t>(maxDsdBytesPerChunk));
-    sdmDsdBufR_.resize(static_cast<size_t>(maxDsdBytesPerChunk));
-    pcmDsdInL_.resize(pulsr::SdmModulator::kPcmChunk);
-    pcmDsdInR_.resize(pulsr::SdmModulator::kPcmChunk);
-    return true;
-}
-
-void AudioDspEngine::resetPcmToDsd() {
-    sdmModulator_.reset();
-    dopMarker_ = pulsr::kDopMarkerA;
-}
-
-void AudioDspEngine::releasePcmToDsd() {
-    sdmModulator_.release();
-    pcmToDsdInputRate_ = 0.0;
-    dopMarker_ = pulsr::kDopMarkerA;
-}
-
-int AudioDspEngine::convertPcmToDsdDoP(const float* inInterleaved, int inFrames,
-                                       uint8_t* outDop, int maxOutBytes, int containerBits,
-                                       int& consumedFrames) {
-    consumedFrames = 0;
-    if (!inInterleaved || !outDop || inFrames <= 0 || maxOutBytes <= 0 || !sdmModulator_.isConfigured()) {
-        return -1;
-    }
-
-    const int bits = (containerBits == 32) ? 32 : 24;
-    const size_t bytesPerDopFrame = (bits == 32) ? 8 : 6;
-    const int dsdMultiple = sdmModulator_.dsdMultiple();
-    // DoP frames per input frame = (dsdMultiple / 8) / 2 = dsdMultiple / 16
-    const size_t dopBytesPerPcmFrame = static_cast<size_t>(dsdMultiple / 16) * bytesPerDopFrame;
-
-    int totalOutBytes = 0;
-    while (consumedFrames < inFrames) {
-        const int remainingOut = maxOutBytes - totalOutBytes;
-        if (static_cast<size_t>(remainingOut) < dopBytesPerPcmFrame) {
-            break; // Backpressure: caller capacity filled
-        }
-        const int capacityInFrames = static_cast<int>(remainingOut / dopBytesPerPcmFrame);
-        const int chunk = std::min({pulsr::SdmModulator::kPcmChunk, capacityInFrames, inFrames - consumedFrames});
-        if (chunk <= 0) break;
-
-        for (int i = 0; i < chunk; ++i) {
-            pcmDsdInL_[size_t(i)] = inInterleaved[size_t((consumedFrames + i) * 2 + 0)];
-            pcmDsdInR_[size_t(i)] = inInterleaved[size_t((consumedFrames + i) * 2 + 1)];
-        }
-
-        const float* planes[2] = {pcmDsdInL_.data(), pcmDsdInR_.data()};
-        const int dsdBytesWritten = sdmModulator_.process(
-            planes, chunk, sdmDsdBufL_.data(), sdmDsdBufR_.data(), static_cast<int>(sdmDsdBufL_.size()));
-        if (dsdBytesWritten < 0) {
-            return totalOutBytes > 0 ? totalOutBytes : -1;
-        }
-
-        size_t dopChunkBytes = 0;
-        uint8_t nextMarker = dopMarker_;
-        const bool framed = pulsr::FrameDopPlanar(
-            sdmDsdBufL_.data(), sdmDsdBufR_.data(), static_cast<size_t>(dsdBytesWritten),
-            bits, /*reverseBits=*/true, outDop + totalOutBytes,
-            static_cast<size_t>(remainingOut), &dopChunkBytes, dopMarker_, &nextMarker);
-
-        if (!framed) {
-            return totalOutBytes > 0 ? totalOutBytes : -1;
-        }
-        dopMarker_ = nextMarker;
-        totalOutBytes += static_cast<int>(dopChunkBytes);
-        consumedFrames += chunk;
-    }
-    return totalOutBytes;
-}
-
-int AudioDspEngine::convertPcmToDsdNative(const float* inInterleaved, int inFrames,
-                                         uint8_t* outDsd, int maxOutBytes, int bytesPerSample,
-                                         int& consumedFrames) {
-    consumedFrames = 0;
-    if (!inInterleaved || !outDsd || inFrames <= 0 || maxOutBytes <= 0 || !sdmModulator_.isConfigured()) {
-        return -1;
-    }
-    if (bytesPerSample != 2 && bytesPerSample != 4) return -1;
-
-    const int dsdMultiple = sdmModulator_.dsdMultiple();
-    const int dsdBytesPerPcmFrame = dsdMultiple / 8; // per channel
-    const int outBytesPerPcmFrame = dsdBytesPerPcmFrame * 2; // stereo
-
-    int totalOutBytes = 0;
-    while (consumedFrames < inFrames) {
-        const int remainingOut = maxOutBytes - totalOutBytes;
-        if (remainingOut < outBytesPerPcmFrame) {
-            break; // Backpressure
-        }
-        const int capacityInFrames = remainingOut / outBytesPerPcmFrame;
-        const int chunk = std::min({pulsr::SdmModulator::kPcmChunk, capacityInFrames, inFrames - consumedFrames});
-        if (chunk <= 0) break;
-
-        for (int i = 0; i < chunk; ++i) {
-            pcmDsdInL_[size_t(i)] = inInterleaved[size_t((consumedFrames + i) * 2 + 0)];
-            pcmDsdInR_[size_t(i)] = inInterleaved[size_t((consumedFrames + i) * 2 + 1)];
-        }
-
-        const float* planes[2] = {pcmDsdInL_.data(), pcmDsdInR_.data()};
-        const int dsdBytesWritten = sdmModulator_.process(
-            planes, chunk, sdmDsdBufL_.data(), sdmDsdBufR_.data(), static_cast<int>(sdmDsdBufL_.size()));
-        if (dsdBytesWritten < 0) {
-            return totalOutBytes > 0 ? totalOutBytes : -1;
-        }
-
-        for (int offset = 0; offset + bytesPerSample <= dsdBytesWritten; offset += bytesPerSample) {
-            if (totalOutBytes + bytesPerSample * 2 > maxOutBytes) break;
-            const int writtenL = pulsr::PackDsdBitsToWords(
-                sdmDsdBufL_.data() + offset, bytesPerSample,
-                outDsd + totalOutBytes, maxOutBytes - totalOutBytes, bytesPerSample);
-            if (writtenL <= 0) break;
-            totalOutBytes += writtenL;
-            const int writtenR = pulsr::PackDsdBitsToWords(
-                sdmDsdBufR_.data() + offset, bytesPerSample,
-                outDsd + totalOutBytes, maxOutBytes - totalOutBytes, bytesPerSample);
-            if (writtenR <= 0) {
-                totalOutBytes -= writtenL;
-                break;
-            }
-            totalOutBytes += writtenR;
-        }
-        consumedFrames += chunk;
-    }
-    return totalOutBytes;
 }
 
 int AudioDspEngine::resampleForTap(const float* in, int inFrames, float* out,
@@ -1546,58 +1233,7 @@ int AudioDspEngine::resampleForTap(const float* in, int inFrames, float* out,
         return inFrames;
     }
 
-    // Remaster integer oversampling path (2x / 4x / 8x)
-    if (tapUseOversampler_) {
-        if (in == out || !tapOversampler_.isConfigured()) return -1;
-        tapSrcEngaged_ = true;
-        const int factor = tapOversampler_.factor();
-        if (factor <= 0) return -1;
-
-        int consumedTotal = 0;
-        int produced = 0;
-        while (consumedTotal < inFrames) {
-            const int remainingOut = maxOutFrames - produced;
-            if (remainingOut < factor) {
-                return produced > 0 ? produced : -1;
-            }
-            const int capacityChunk = remainingOut / factor;
-            const int slice = std::min({tapChunkFrames_, capacityChunk, inFrames - consumedTotal});
-            if (slice <= 0) return produced > 0 ? produced : -1;
-
-            for (int f = 0; f < slice; ++f) {
-                const float* src = in + static_cast<size_t>(consumedTotal + f) * channels;
-                for (int ch = 0; ch < channels; ++ch) tapPlaneIn_[ch][size_t(f)] = src[ch];
-            }
-
-            const float* inPlanes[kTapMaxChannels];
-            float* outPlanes[kTapMaxChannels];
-            for (int ch = 0; ch < channels; ++ch) {
-                inPlanes[ch] = tapPlaneIn_[ch].data();
-                outPlanes[ch] = tapPlaneOut_[ch].data();
-            }
-
-            const int got = tapOversampler_.process(inPlanes, outPlanes, slice);
-            if (got < 0) return -1;
-
-            for (int f = 0; f < got; ++f) {
-                float* dst = out + static_cast<size_t>(produced + f) * channels;
-                for (int ch = 0; ch < channels; ++ch) dst[ch] = tapPlaneOut_[ch][size_t(f)];
-            }
-            consumedTotal += slice;
-            produced += got;
-        }
-        return produced;
-    }
-
     if (in == out || !tapResampler_.isConfigured()) return -1;
-    const int targetQuality = tapSrcQuality_.load(std::memory_order_acquire);
-    if (targetQuality != preparedTapSrcQuality_) {
-        if (tapResampler_.configure(channels, TapTapsForQuality(targetQuality),
-                                    TapPhasesForQuality(targetQuality),
-                                    srcRate, dstRate)) {
-            preparedTapSrcQuality_ = targetQuality;
-        }
-    }
     tapSrcEngaged_ = true;
 
     const double ratio = dstRate / srcRate;
@@ -2250,7 +1886,6 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
     const bool lowPowerInterlockOk = (snapshot->activeStages == 0) &&
                                      !snapshot->eq.enabled &&
                                      (std::abs(snapshot->eq.preampDb) < 0.001) &&
-                                     !snapshot->oversample.enabled &&
                                      !snapshot->hrtf.enabled &&
                                      !snapshot->directVolume.enabled &&
                                      !snapshot->replayGain.enabled &&
@@ -3107,11 +2742,7 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
     // real delay the position tracker must know about when the tap converts
     // the source rate to the device rate ahead of this chain.
     if (tapSrcEngaged_) {
-        if (tapUseOversampler_) {
-            blockLatency += tapOversampler_.latencyFrames();
-        } else {
-            blockLatency += tapResampler_.latencyFrames();
-        }
+        blockLatency += tapResampler_.latencyFrames();
     }
     effectiveLatencyFrames_.store(blockLatency, std::memory_order_release);
 

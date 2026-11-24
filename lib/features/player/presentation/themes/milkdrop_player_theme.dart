@@ -894,7 +894,7 @@ class _MilkdropGlassCapsule extends StatelessWidget {
     final isFav = song?.isFavorite == true;
 
     final allowBlur = !isPreview && AppBlur.canBlur(context);
-    final sigma = AppBlur.clampSigma(AppBlur.dock);
+    final sigma = AppBlur.clampSigma(AppBlur.chip);
     final clampedRadius = capsuleRadius.clamp(14.0, 36.0);
     final clampedArtRadius = artRadius.clamp(4.0, 22.0);
     final corners = AppRadii.circular(clampedRadius);

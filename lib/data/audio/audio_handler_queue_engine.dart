@@ -919,6 +919,24 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
   }
 
   // --- QUEUE & PLAYBACK COMMANDS ---
+  /// Immediately cancels any in-flight queue/source load (e.g. a stalled
+  /// online stream resolution or ExoPlayer prepare over VPN) so a subsequent
+  /// track selection (such as a local song) can take over without waiting for
+  /// network or player timeouts.
+  void preemptPendingLoad() {
+    ++_loadQueueGeneration;
+    ++_playGeneration;
+    _pendingPlaybackStart = false;
+    _gaplessTargetIndex = null;
+    _gaplessLoaded = false;
+    cancelPrefetches();
+    cancelActiveResolvingSources();
+    unawaited(_activePlayer.stop().catchError((_) {}));
+    unawaited(_crossfadeManager
+        .cancel(_inactivePlayer, _activePlayer, restoreVolume: _volume)
+        .catchError((_) {}));
+  }
+
   Future<void> loadQueue(List<SongsTableData> songs,
       {int initialIndex = 0,
       Duration? initialPosition,

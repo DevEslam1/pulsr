@@ -51,7 +51,7 @@ void main() {
       expect(volumeDecision.reason, equals(FeatureBlockReason.dsdDomain));
     });
 
-    test('Bit-perfect exclusivity blocks DSP and Remaster', () {
+    test('Bit-perfect exclusivity blocks DSP', () {
       final dspDecision = gate.evaluate(
         AudioFeature.dsp,
         backend: BackendCapabilities.localPcm,
@@ -59,14 +59,6 @@ void main() {
       );
       expect(dspDecision.isBlocked, isTrue);
       expect(dspDecision.reason, equals(FeatureBlockReason.bitPerfectExclusivity));
-
-      final remasterDecision = gate.evaluate(
-        AudioFeature.remaster,
-        backend: BackendCapabilities.localPcm,
-        bitPerfectActive: true,
-      );
-      expect(remasterDecision.isBlocked, isTrue);
-      expect(remasterDecision.reason, equals(FeatureBlockReason.bitPerfectExclusivity));
     });
 
     test('Low-power interlock blocks low-power when DSP is active, and vice versa', () {

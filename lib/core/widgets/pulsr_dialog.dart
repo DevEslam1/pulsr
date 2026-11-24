@@ -68,7 +68,7 @@ class PulsrDialogHelper {
         context: context,
         barrierDismissible: barrierDismissible,
         barrierColor: effectiveBarrier,
-        builder: builder,
+        builder: (ctx) => PulsrModalBackGuard(child: builder(ctx)),
       ),
     );
     return trackManually ? future.whenComplete(PulsrModalTracker.pop) : future;

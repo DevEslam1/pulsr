@@ -120,7 +120,7 @@ class MiniPlayerCompactCard extends StatelessWidget {
         child: ClipRRect(
           borderRadius: playerRadius,
           child: GlassContainer(
-            blur: AppBlur.standard,
+            blur: AppBlur.chip,
             opacity: p.isDark ? 0.62 : 0.80,
             borderRadius: playerRadius,
             border: Border.all(

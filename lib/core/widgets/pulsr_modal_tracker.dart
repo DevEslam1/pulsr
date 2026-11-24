@@ -98,3 +98,57 @@ class PulsrModalObserver extends NavigatorObserver {
       route.settings.name == 'now-playing' ||
       route.settings.name == '/now-playing';
 }
+
+/// Ensures system Back closes the topmost modal sheet/dialog on the root
+/// navigator BEFORE `GoRouter` pops an underlying pushed `StatefulShellBranch`
+/// route (such as `context.push('/settings')`).
+///
+/// Uses a `ChildBackButtonDispatcher` with `takePriority()` so it outranks
+/// `StatefulShellRoute`'s branch `ChildBackButtonDispatcher` (plain
+/// `BackButtonListener` only adds a callback on the parent dispatcher, which
+/// runs *after* prioritized child dispatchers).
+class PulsrModalBackGuard extends StatefulWidget {
+  final Widget child;
+
+  const PulsrModalBackGuard({super.key, required this.child});
+
+  @override
+  State<PulsrModalBackGuard> createState() => _PulsrModalBackGuardState();
+}
+
+class _PulsrModalBackGuardState extends State<PulsrModalBackGuard> {
+  ChildBackButtonDispatcher? _dispatcher;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final parent = Router.maybeOf(context)?.backButtonDispatcher;
+    if (parent != null && _dispatcher == null) {
+      _dispatcher = parent.createChildBackButtonDispatcher()
+        ..addCallback(_handleBack)
+        ..takePriority();
+    }
+  }
+
+  Future<bool> _handleBack() async {
+    if (!mounted) return false;
+    final route = ModalRoute.of(context);
+    if (route == null || !route.isCurrent) return false;
+    await Navigator.of(context).maybePop();
+    return true;
+  }
+
+  @override
+  void dispose() {
+    final dispatcher = _dispatcher;
+    if (dispatcher != null) {
+      dispatcher.removeCallback(_handleBack);
+      dispatcher.parent.forget(dispatcher);
+    }
+    _dispatcher = null;
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
+}

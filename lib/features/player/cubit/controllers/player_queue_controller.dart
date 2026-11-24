@@ -117,6 +117,8 @@ class PlayerQueueController {
   // Async guards for coordination
   final AsyncGuard _mediaItemResolutionGuard = AsyncGuard();
   final AsyncGuard _localMatchSwapGuard = AsyncGuard();
+  int _playRequestToken = 0;
+  Completer<void>? _activeLoadCancel;
 
   AsyncGuard get mediaItemResolutionGuard => _mediaItemResolutionGuard;
   AsyncGuard get localMatchSwapGuard => _localMatchSwapGuard;
@@ -193,5 +195,9 @@ class PlayerQueueController {
     }
     _mediaItemResolutionGuard.invalidate();
     _localMatchSwapGuard.invalidate();
+    if (_activeLoadCancel != null && !_activeLoadCancel!.isCompleted) {
+      _activeLoadCancel!.complete();
+    }
+    _activeLoadCancel = null;
   }
 }

@@ -25,7 +25,6 @@ import '../../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../../core/widgets/pulsr_dialog.dart';
 import '../../../../core/widgets/pulsr_segmented_control.dart';
 import '../../../../core/widgets/pulsr_toast.dart';
-import '../../../../data/audio/audio_effects_channel.dart';
 import '../../../../data/audio/audio_handler.dart';
 import '../../../../data/audio/bit_perfect_chain.dart';
 import '../../../../data/audio/dsd_decoder_helper.dart';
@@ -270,8 +269,6 @@ class AudioQualitySheet extends StatelessWidget {
       isDsdDop: DsdDecoderHelper.dsdDopActive,
       isDsdNative: DsdDecoderHelper.dsdNativeActive ||
           (usb.streamingActive && usb.dsdActive),
-      oversamplingActive: AudioEffectsChannel().activeOversampleMultiplier > 1,
-      pcmToDsdActive: AudioEffectsChannel().isPcmToDsdActive,
     ));
     return verdict.state;
   }

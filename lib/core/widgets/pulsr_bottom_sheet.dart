@@ -11,7 +11,6 @@ import 'package:pulsr/core/constants/app_typography.dart';
 
 import '../constants/app_radii.dart';
 import '../motion/pulsr_motion.dart';
-import '../performance/gpu_budget.dart';
 import '../responsive/pulsr_layout_metrics.dart';
 import '../theme/aura_theme.dart';
 import '../utils/adaptive.dart';
@@ -186,25 +185,27 @@ class PulsrSheetHelper {
                     child: built,
                   );
         if (!isDismissible) {
-          return sheetWidget;
+          return PulsrModalBackGuard(child: sheetWidget);
         }
-        return Stack(
-          children: [
-            Positioned.fill(
-              child: Semantics(
-                label: MaterialLocalizations.of(ctx).modalBarrierDismissLabel,
-                button: true,
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () {
-                    PulsrHaptics.lightImpact();
-                    Navigator.of(ctx).maybePop();
-                  },
+        return PulsrModalBackGuard(
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: Semantics(
+                  label: MaterialLocalizations.of(ctx).modalBarrierDismissLabel,
+                  button: true,
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () {
+                      PulsrHaptics.lightImpact();
+                      Navigator.of(ctx).maybePop();
+                    },
+                  ),
                 ),
               ),
-            ),
-            sheetWidget,
-          ],
+              sheetWidget,
+            ],
+          ),
         );
       },
     );
@@ -369,7 +370,7 @@ class PulsrBottomSheetContainer extends StatelessWidget {
     // but never below the legibility floor. High Contrast and GPU Saver stay
     // solid so text contrast is never compromised.
     final rawSurface = p.isDark ? p.surfaceContainer : p.surfaceElevated;
-    final baseSurfaceColor = (GpuBudget.isGpuSaverActive || isHighContrast)
+    final baseSurfaceColor = (!AppBlur.canBlur(context) || isHighContrast)
         ? rawSurface
         : rawSurface.withValues(alpha: p.isDark ? 0.88 : 0.94);
 
@@ -398,8 +399,8 @@ class PulsrBottomSheetContainer extends StatelessWidget {
           borderRadius: effectiveBorderRadius,
           child: BackdropFilter(
             filter: ImageFilter.blur(
-              sigmaX: AppBlur.sheet,
-              sigmaY: AppBlur.sheet,
+              sigmaX: AppBlur.chip,
+              sigmaY: AppBlur.chip,
             ),
             enabled: !isHighContrast && AppBlur.canBlur(context),
             child: Container(
@@ -419,11 +420,8 @@ class PulsrBottomSheetContainer extends StatelessWidget {
                           : p.hairline),
                   width: isHighContrast ? 1.5 : AppStrokes.hairline,
                 ),
-                boxShadow: PulsrElevation.level3(context),
               ),
-              child: ClipRRect(
-                borderRadius: effectiveBorderRadius,
-                child: PulsrSheetScope(
+              child: PulsrSheetScope(
             isDialog: isDialog,
             child: Stack(
               children: [
@@ -516,7 +514,6 @@ class PulsrBottomSheetContainer extends StatelessWidget {
           ),
         ),
       ),
-    ),
     ),
     ),
     );

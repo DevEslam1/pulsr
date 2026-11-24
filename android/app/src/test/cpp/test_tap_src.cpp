@@ -48,7 +48,6 @@ std::unique_ptr<AudioDspEngine> makeEngine(double srcRate = 44100.0,
     // of priming); pin it so a change to the engine default cannot silently
     // rewrite what "ratio" and "latency" mean here. The higher steps are
     // covered by the kernel matrix below.
-    engine->setTapSrcQuality(0);
     engine->prepareTapResampler(srcRate, dstRate, channels);
     return engine;
 }
@@ -88,7 +87,7 @@ double toneMagnitude(const std::vector<float>& buf, int frames, int channels,
 // Group delay of the default 128-tap tap kernel, in input frames.
 // The old 64-tap SincResampler had 32; latency is part of the contract
 // this test pins, so it is named here instead of repeated as a literal.
-constexpr int kTapLatencyFrames = 32;
+constexpr int kTapLatencyFrames = 128;
 
 int maxOutBound(int inFrames, double srcRate, double dstRate) {
     const double ratio = dstRate / srcRate;
@@ -118,36 +117,6 @@ int main() {
               "equal rates must be a bit-identical copy");
     }
 
-    {
-        // 44.1k -> 48k: every kernel step the UI offers must convert at the
-        // same ratio; only the priming delay grows with the kernel length.
-        // This is the only place the engine's 256-tap default is exercised.
-        const int tapsForQuality[4] = {64, 128, 256, 512};
-        for (int quality = 0; quality < 4; ++quality) {
-            auto engine = std::make_unique<AudioDspEngine>();
-            engine->setTapSrcQuality(quality);
-            engine->prepareTapResampler(44100.0, 48000.0, 2);
-            const int inFrames = 1024;
-            int totalIn = 0, totalOut = 0;
-            for (int b = 0; b < 64; ++b) {
-                const auto input = sine(inFrames, 2, 44100.0, 997.0,
-                                        2.0 * M_PI * 997.0 * totalIn / 44100.0);
-                const int maxOut = maxOutBound(inFrames, 44100.0, 48000.0);
-                std::vector<float> out(static_cast<size_t>(maxOut) * 2);
-                const int got = engine->resampleForTap(input.data(), inFrames,
-                                                       out.data(), maxOut, 2,
-                                                       44100.0, 48000.0);
-                check(got > 0, "every quality step must produce output");
-                totalIn += inFrames;
-                totalOut += got;
-            }
-            const double ratio = 48000.0 / 44100.0;
-            const double expected =
-                static_cast<double>(totalIn - tapsForQuality[quality] / 2) * ratio;
-            check(std::abs(totalOut - expected) <= ratio + 2.0,
-                  "every quality step must convert at the 48/44.1 ratio");
-        }
-    }
 
     {
         // 44.1k -> 48k: steady-state output ratio and tone fidelity. The first
@@ -169,7 +138,7 @@ int main() {
             totalOut += got;
             if (b == 63) tail.assign(out.begin(), out.begin() + static_cast<size_t>(got) * channels);
         }
-        const double expected = static_cast<double>(totalIn) * 48000.0 / 44100.0;
+        const double expected = static_cast<double>(totalIn - kTapLatencyFrames) * 48000.0 / 44100.0;
         check(std::abs(totalOut - expected) < 96.0,
               "cumulative output frames must track the 48/44.1 ratio");
         const double mag = toneMagnitude(tail, tail.size() / channels, channels,
@@ -222,7 +191,7 @@ int main() {
         std::vector<float> out(static_cast<size_t>(maxOut) * channels);
         const int got = engine->resampleForTap(input.data(), frames, out.data(),
                                                maxOut, channels, 44100.0, 48000.0);
-        const double expected = static_cast<double>(frames) * 48000.0 / 44100.0;
+        const double expected = static_cast<double>(frames - kTapLatencyFrames) * 48000.0 / 44100.0;
         check(std::abs(got - expected) < 96.0,
               "a block larger than the FIFO must convert without dropping frames");
         bool finite = true;
@@ -246,7 +215,7 @@ int main() {
         int totalOut = 0;
         totalOut = engine->resampleForTap(input.data(), frames, out.data(),
                                           maxOut, channels, 96000.0, 48000.0);
-        check(std::abs(totalOut - frames / 2.0) < 64.0,
+        check(std::abs(totalOut - (frames - kTapLatencyFrames) / 2.0) < 64.0,
               "96k -> 48k must halve the frame count");
         // Skip the onset/offset: a gated sine starts and ends on a step whose
         // broadband transient legitimately leaks past the stopband. Measure
@@ -270,7 +239,7 @@ int main() {
         std::vector<float> outUp(static_cast<size_t>(maxUp) * channels);
         const int gotUp = engine->resampleForTap(up.data(), frames, outUp.data(),
                                                  maxUp, channels, 44100.0, 48000.0);
-        check(std::abs(gotUp - frames * 48000.0 / 44100.0) < 96.0,
+        check(std::abs(gotUp - (frames - kTapLatencyFrames) * 48000.0 / 44100.0) < 96.0,
               "first rate pair must convert at the 48/44.1 ratio");
 
         const auto down = sine(frames, channels, 48000.0, 997.0);
@@ -279,7 +248,7 @@ int main() {
         engine->prepareTapResampler(48000.0, 44100.0, channels);
         const int gotDown = engine->resampleForTap(down.data(), frames, outDown.data(),
                                                    maxDown, channels, 48000.0, 44100.0);
-        check(std::abs(gotDown - frames * 44100.0 / 48000.0) < 96.0,
+        check(std::abs(gotDown - (frames - kTapLatencyFrames) * 44100.0 / 48000.0) < 96.0,
               "switching rates must reconfigure and convert at the new ratio");
     }
 
@@ -309,7 +278,6 @@ int main() {
 
     {
         auto unprepared = std::make_unique<AudioDspEngine>();
-        unprepared->setTapSrcQuality(0); // same kernel as makeEngine()
         std::vector<float> input(512 * 2, 0.25f), out(2048 * 2, 123.0f);
         check(unprepared->resampleForTap(input.data(), 512, out.data(), 2048,
                                          2, 44100.0, 48000.0) < 0,
@@ -341,9 +309,6 @@ int main() {
         // First audio call (no warmup), rate/channel switches and blocks far
         // larger than scratch/FIFO all execute with zero render allocations.
         auto engine = std::make_unique<AudioDspEngine>();
-        // Pin the 64-tap kernel: this block's expectations are written in terms
-        // of its 32-frame priming delay.
-        engine->setTapSrcQuality(0);
         const double pairs[][2] = {{44100, 48000}, {96000, 44100},
                                    {48000, 768000}, {768000, 48000},
                                    {767999, 768000}, {48000, 48000}};
@@ -455,140 +420,6 @@ int main() {
               "sub-Hz configuration changes must prepare the requested ratio and kernel exactly");
     }
 
-    {
-        // Remaster oversampling & reconstruction filters (P1-5):
-        // 2x / 4x / 8x oversampling through AudioDspEngine with reconstruction
-        // filter kernels (Sharp, Slow/NOS, MinimumPhase, Apodizing).
-        auto engine = std::make_unique<AudioDspEngine>();
-        check(engine->oversampleMultiplier() == 1, "default oversample multiplier is 1 (off)");
-        check(engine->oversampleKernel() == 0, "default oversample kernel is 0 (Sharp)");
-
-        engine->setOversampleMultiplier(2);
-        check(engine->oversampleMultiplier() == 2, "setOversampleMultiplier(2) stored");
-        engine->setOversampleKernel(1);
-        check(engine->oversampleKernel() == 1, "setOversampleKernel(1) stored");
-
-        // Prepare 2x oversampling: 44.1 kHz input -> 88.2 kHz output
-        engine->prepareTapResampler(44100.0, 88200.0, 2);
-        check(engine->activeOversampleFactor() == 2,
-              "active oversample factor is derived from the prepared tap");
-
-        constexpr int frames = 2048;
-        const auto input = sine(frames, 2, 44100.0, 1000.0);
-        const int outCap = frames * 4;
-        std::vector<float> output(outCap * 2);
-
-        gTapRtAllocs.store(0);
-        gTapRtGuard.store(true);
-        const int outFrames = engine->resampleForTap(input.data(), frames, output.data(), outCap,
-                                                     2, 44100.0, 88200.0);
-        gTapRtGuard.store(false);
-
-        check(gTapRtAllocs.load() == 0, "resampleForTap oversampling must allocate zero heap blocks in RT");
-        check(outFrames == frames * 2, "2x oversampling must produce exactly 2x frame count");
-
-        // Verify that 1000 Hz tone is preserved after 2x oversampling
-        const double mag = toneMagnitude(output, outFrames, 2, 88200.0, 1000.0, 64);
-        check(std::abs(mag - 0.5) < 0.05, "1000 Hz tone magnitude preserved after 2x reconstruction");
-
-        // Test 4x oversampling
-        engine->setOversampleMultiplier(4);
-        engine->setOversampleKernel(2); // MinimumPhase
-        engine->prepareTapResampler(44100.0, 176400.0, 2);
-        check(engine->activeOversampleFactor() == 4,
-              "active oversample factor follows a 4x tap reconfigure");
-        std::vector<float> output4x(frames * 8 * 2);
-        const int out4x = engine->resampleForTap(input.data(), frames, output4x.data(), frames * 8,
-                                                 2, 44100.0, 176400.0);
-        check(out4x == frames * 4, "4x oversampling must produce exactly 4x frame count");
-
-        // Test 8x oversampling
-        engine->setOversampleMultiplier(8);
-        engine->setOversampleKernel(3); // Apodizing
-        engine->prepareTapResampler(44100.0, 352800.0, 2);
-        check(engine->activeOversampleFactor() == 8,
-              "active oversample factor follows an 8x tap reconfigure");
-        std::vector<float> output8x(frames * 16 * 2);
-        const int out8x = engine->resampleForTap(input.data(), frames, output8x.data(), frames * 16,
-                                                 2, 44100.0, 352800.0);
-        check(out8x == frames * 8, "8x oversampling must produce exactly 8x frame count");
-
-        // Test PCM->DSD configuration & backpressure
-        check(!engine->isPcmToDsdEnabled(), "PCM->DSD disabled by default");
-        engine->setPcmToDsdEnabled(true);
-        check(engine->isPcmToDsdEnabled(), "PCM->DSD enabled");
-        engine->setPcmToDsdRate(128);
-        check(engine->pcmToDsdRate() == 128, "PCM->DSD rate is 128");
-        engine->setPcmToDsdOrder(4);
-        check(engine->pcmToDsdOrder() == 4, "PCM->DSD order is 4");
-        engine->preparePcmToDsd(44100.0, 128, 4, 24);
-
-        // Convert PCM block to DoP frames
-        std::vector<uint8_t> dopBytes(frames * 8);
-        int consumed = 0;
-        const int dopCount = engine->convertPcmToDsdDoP(input.data(), frames, dopBytes.data(),
-                                                        static_cast<int>(dopBytes.size()), 24, consumed);
-        check(dopCount > 0 && consumed > 0, "convertPcmToDsdDoP emitted framed DoP frames");
-
-        // Reverting oversampling restores normal tap state
-        engine->setOversampleMultiplier(1);
-        engine->setPcmToDsdEnabled(false);
-        check(engine->oversampleMultiplier() == 1, "oversampleMultiplier restored to 1");
-        check(!engine->isPcmToDsdEnabled(), "PCM->DSD disabled restored");
-        engine->prepareTapResampler(44100.0, 44100.0, 2);
-        check(engine->activeOversampleFactor() == 1,
-              "a locked-rate tap reports no active oversampling");
-
-        // Non-zero kernel with multiplier==1 must NOT engage Oversampler on a 2x SRC rate pair
-        engine->setOversampleMultiplier(1);
-        engine->setOversampleKernel(2);
-        engine->prepareTapResampler(44100.0, 88200.0, 2);
-        check(!engine->isTapOversamplerEngaged(),
-              "oversampleKernel != 0 with multiplier==1 must use SincResampler, not Oversampler");
-        check(engine->activeOversampleFactor() == 1,
-              "oversampleKernel != 0 with multiplier==1 must report factor 1");
-
-        // Native PCM->DSD 32-bit packing groups 4 bytes per channel word [L0..3, R0..3]
-        engine->setPcmToDsdEnabled(true);
-        engine->setPcmToDsdRate(64);
-        engine->preparePcmToDsd(44100.0, 64, 4, 24);
-        std::vector<uint8_t> dsdOut(frames * 16, 0);
-        int nativeConsumed = 0;
-        const int nativeBytes = engine->convertPcmToDsdNative(
-            input.data(), frames, dsdOut.data(), static_cast<int>(dsdOut.size()), 4, nativeConsumed);
-        check(nativeBytes > 0 && nativeConsumed > 0 && (nativeBytes % 8) == 0,
-              "convertPcmToDsdNative(bps=4) produces complete 8-byte stereo DSD_U32 frames");
-
-        // BUG-P2-1: setTapSrcQuality() on the singleton control engine must
-        // propagate to registered render engines and rebuild the tap resampler
-        // on the render thread without a control/render data race.
-        {
-            auto& registry = DspEngineRegistry::instance();
-            auto renderEngine = std::make_unique<AudioDspEngine>();
-            const int64_t handle =
-                static_cast<int64_t>(reinterpret_cast<intptr_t>(renderEngine.get()));
-            AudioDspEngine::instance().setTapSrcQuality(0);
-            check(registry.registerEngine(renderEngine.get()),
-                  "register render engine for tap SRC quality broadcast test");
-            check(renderEngine->tapSrcQuality() == 0,
-                  "registered engine inherits initial tapSrcQuality from singleton");
-            renderEngine->prepareTapResampler(44100.0, 48000.0, 2);
-
-            AudioDspEngine::instance().setTapSrcQuality(2);
-            check(renderEngine->tapSrcQuality() == 2,
-                  "setTapSrcQuality on singleton broadcasts immediately to registered engine");
-            const int maxOut = maxOutBound(1024, 44100.0, 48000.0);
-            std::vector<float> tapOut(static_cast<size_t>(maxOut) * 2);
-            const int got = renderEngine->resampleForTap(
-                input.data(), 1024, tapOut.data(), maxOut, 2, 44100.0, 48000.0);
-            check(got > 0, "render engine reconfigures tap resampler to new quality on render thread");
-
-            const int slot = registry.beginTeardown(handle);
-            registry.waitForRenderers(slot);
-            registry.unregisterEngine(renderEngine.get());
-            registry.finishTeardown(slot);
-        }
-    }
 
     if (gFailures != 0) {
         std::cout << "[FAIL] " << gFailures << " tap SRC check(s) failed." << std::endl;

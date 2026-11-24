@@ -851,9 +851,6 @@ class _DspInspectorSheetState extends State<DspInspectorSheet>
                     isDsdDop: DsdDecoderHelper.dsdDopActive,
                     isDsdNative: DsdDecoderHelper.dsdNativeActive ||
                         (usb.streamingActive && usb.dsdActive),
-                    oversamplingActive:
-                        AudioEffectsChannel().activeOversampleMultiplier > 1,
-                    pcmToDsdActive: AudioEffectsChannel().isPcmToDsdActive,
                   ));
                   final v = OutputPathVerdict.of(currentOutputDevice,
                       dspActive: isDspActive || isEqEnabled,

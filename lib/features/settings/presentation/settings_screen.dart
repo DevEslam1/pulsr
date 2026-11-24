@@ -11,6 +11,7 @@ import '../../../core/widgets/pulsr_segmented_control.dart';
 import '../../../core/motion/pulsr_motion.dart';
 import '../../../core/constants/app_radii.dart';
 import '../../../core/di/injection.dart';
+import '../../../core/router/app_router.dart';
 import '../../../core/services/missing_artwork_service.dart';
 import '../../../core/services/sound_feedback_service.dart';
 import '../../../core/services/ytm_account_service.dart';
@@ -21,6 +22,7 @@ import '../../../core/responsive/breakpoints.dart';
 import '../../../core/responsive/pulsr_layout_metrics.dart';
 import '../../../core/widgets/gestures_sheet.dart';
 import '../../../core/widgets/pulsr_dialog.dart';
+import '../../../core/widgets/pulsr_modal_tracker.dart';
 import '../../../core/widgets/pulsr_pressable.dart';
 import '../../../core/widgets/pulsr_search_field.dart';
 import '../../../core/widgets/pulsr_scroll_edge_fade.dart';
@@ -28,6 +30,8 @@ import '../../../core/widgets/pulsr_slider.dart';
 import '../../../core/widgets/pulsr_switch.dart';
 import '../../auth/presentation/ytm_web_login_sheet.dart';
 import '../../extras/presentation/extras_screen.dart';
+import '../../shell/presentation/nav_destinations.dart';
+import '../../shell/presentation/widgets/branch_scroll_bus.dart';
 import '../../shell/presentation/widgets/dock_style_picker_sheet.dart';
 import '../../shell/presentation/widgets/dock_style_controller.dart';
 import '../cubit/settings_accessibility_ext.dart';
@@ -158,10 +162,29 @@ class SettingsScreenState extends State<SettingsScreen>
   String _selectedCategoryId = 'all';
   @override
   String _searchQuery = '';
+  VoidCallback? _unregisterBackHandler;
+
+  bool _handleBackToAll() {
+    if (!mounted) return false;
+    final isLandscapePhone =
+        context.isLandscape && MediaQuery.sizeOf(context).height < 500;
+    final isTabletView = !isLandscapePhone &&
+        ((context.breakpoint >= PulsrBreakpoint.medium &&
+                (context.isLandscape || Adaptive.widthOf(context) >= 700)) ||
+            context.isTwoPane);
+    if (isTabletView) return false;
+    if (_selectedCategoryId != 'all') {
+      _selectCategory('all');
+      return true;
+    }
+    return false;
+  }
 
   @override
   void initState() {
     super.initState();
+    _unregisterBackHandler = BranchScrollBus.instance
+        .registerBackHandler(settingsDestinationIndex, _handleBackToAll);
     _categories =
         _categoryIds.map((id) => _Category(id, _iconFor(id))).toList();
     _restoreLastCategory();
@@ -198,6 +221,8 @@ class SettingsScreenState extends State<SettingsScreen>
 
   @override
   void dispose() {
+    _unregisterBackHandler?.call();
+    _unregisterBackHandler = null;
     _searchDebounce?.cancel();
     _scrollController.dispose();
     _searchController.dispose();
@@ -259,15 +284,30 @@ class SettingsScreenState extends State<SettingsScreen>
                   ? 'sound'
                   : selectedCategoryId;
 
-          return Scaffold(
-            body: SafeArea(
-              bottom: false,
-              child: FocusTraversalGroup(
-                policy: OrderedTraversalPolicy(),
-                child: isTabletView
-                    ? _buildTabletLayout(
-                        context, state, cubit, effectiveCategoryId)
-                    : _buildPhoneLayout(context, state, cubit),
+          final canPopDirectly = isTabletView || _selectedCategoryId == 'all';
+          return PopScope(
+            canPop: canPopDirectly,
+            onPopInvokedWithResult: (didPop, _) {
+              if (didPop) return;
+              if (PulsrModalTracker.isModalOpen.value) {
+                final rootNav = rootNavigatorKey.currentState;
+                if (rootNav != null && rootNav.canPop()) {
+                  rootNav.maybePop();
+                  return;
+                }
+              }
+              _handleBackToAll();
+            },
+            child: Scaffold(
+              body: SafeArea(
+                bottom: false,
+                child: FocusTraversalGroup(
+                  policy: OrderedTraversalPolicy(),
+                  child: isTabletView
+                      ? _buildTabletLayout(
+                          context, state, cubit, effectiveCategoryId)
+                      : _buildPhoneLayout(context, state, cubit),
+                ),
               ),
             ),
           );

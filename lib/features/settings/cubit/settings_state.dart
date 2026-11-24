@@ -145,6 +145,7 @@ abstract class SettingsState with _$SettingsState {
     @Default(false) bool reduceMotion,
     @Default(true) bool hapticsEnabled,
     @Default(0.80) double liquidGlassTint,
+    @Default(false) bool disableBlur,
     @Default('system') String languageCode,
     @Default(0xFF9B9EF5) int customAccentColorValue,
     // Custom Theme Studio shape controls. Applied to the now-playing chrome

@@ -1090,7 +1090,8 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
         ));
 
     try {
-      final tracks = await account.fetchLikedSongs();
+      final tracks =
+          await account.fetchLikedSongs(maxTracks: kYtmMaxPlaylistTracks);
       if (_disposed || isClosed) return;
       // An empty result is valid when nothing was cached yet; if cached tracks
       // already exist, preserve them against an ambiguous empty response.
@@ -1330,7 +1331,8 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
       if (accountService != null) {
         try {
           details =
-              await accountService.fetchPlaylistDetails(input, maxTracks: 200);
+              await accountService.fetchPlaylistDetails(input,
+                  maxTracks: kYtmMaxPlaylistTracks);
         } catch (e, st) {
           ErrorLogger.log(
               'fetchPlaylistDetails failed, falling back to public tracks',
@@ -1344,7 +1346,8 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
       List<YtmTrack> tracks = details?.tracks ?? const [];
       if (tracks.isEmpty) {
         final ytmService = getIt<YtmService>();
-        tracks = await ytmService.getPlaylistTracks(input, limit: 200);
+        tracks = await ytmService.getPlaylistTracks(input,
+            limit: kYtmMaxPlaylistTracks);
         if (_disposed || isClosed) return;
       }
 

@@ -151,8 +151,6 @@ BitPerfectChainAssessment assessBitPerfectChain({
   required int outputBitDepth,
   bool isDsdDop = false,
   bool isDsdNative = false,
-  bool oversamplingActive = false,
-  bool pcmToDsdActive = false,
   bool samplesModified = false,
 
   /// The live chain took an observed integer path (the Media3 sink's integer
@@ -206,28 +204,6 @@ BitPerfectChainAssessment assessBitPerfectChain({
       outputSampleRate: outputSampleRate,
       outputBitDepth: outputBitDepth,
       reasonCode: 'dop_carrier_not_measured',
-    );
-  }
-
-  if (oversamplingActive) {
-    return BitPerfectChainAssessment(
-      verdict: BitPerfectChainVerdict.unverified,
-      sourceSampleRate: sourceSampleRate,
-      sourceBitDepth: sourceBitDepth,
-      outputSampleRate: outputSampleRate,
-      outputBitDepth: outputBitDepth,
-      reasonCode: 'oversampling_active',
-    );
-  }
-
-  if (pcmToDsdActive) {
-    return BitPerfectChainAssessment(
-      verdict: BitPerfectChainVerdict.unverified,
-      sourceSampleRate: sourceSampleRate,
-      sourceBitDepth: sourceBitDepth,
-      outputSampleRate: outputSampleRate,
-      outputBitDepth: outputBitDepth,
-      reasonCode: 'pcm_to_dsd_active',
     );
   }
 

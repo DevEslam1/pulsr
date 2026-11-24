@@ -951,7 +951,7 @@ class YtmService {
   }
 
   Future<List<YtmTrack>> getPlaylistTracks(String urlOrId,
-      {int limit = 100}) async {
+      {int limit = kYtmMaxPlaylistTracks}) async {
     final cleanInput = urlOrId.trim();
     if (cleanInput.isEmpty) return const [];
 

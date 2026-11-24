@@ -15,7 +15,6 @@ import 'platform_audio_capabilities.dart';
 
 export 'platform_audio_capabilities.dart';
 
-part 'audio_effects_channel_remaster_ext.dart';
 part 'audio_effects_channel_telemetry.dart';
 
 /// One STREAM_MUSIC level together with the route it belongs to.
@@ -1536,10 +1535,12 @@ class AudioEffectsChannel with _AudioEffectsChannelTelemetryMixin {
   /// Resampler quality: 0 = Fast (linear), 1 = Standard (16-tap),
   /// 2 = High (32-tap), 3 = Ultra (64-tap). Best-effort on Android only.
   Future<void> setSincResamplerQuality(int quality) async {
+    _userSincQuality = quality.clamp(0, 3);
     if (!_isAndroid) return;
+    final effective = _liveStreamBypass ? 0 : _userSincQuality!;
     try {
       await _invokeNativeSetter('setSincResamplerQuality', {
-        'quality': quality.clamp(0, 3),
+        'quality': effective,
       });
     } catch (e, st) {
       ErrorLogger.log(
@@ -1552,154 +1553,24 @@ class AudioEffectsChannel with _AudioEffectsChannelTelemetryMixin {
     }
   }
 
-  // --- TAP-SIDE SAMPLE-RATE CONVERSION ---
-
-  /// Conversion kernel when the sink rate differs from the track rate:
-  /// 0..3 = 64/128/256/512-tap. Never throws: [_invokeNativeSetter] has already
-  /// logged the refusal, so false simply means "no DSP tap on this platform".
-  Future<bool> setTapSrcQuality(int quality) async {
-    if (!_isAndroid) return false;
+  /// Probes the platform MediaCodec list for a decoder that advertises [mime].
+  /// Returns false off Android and on any bridge failure: unknown support must
+  /// never be reported as playable.
+  Future<bool> probeAudioDecoder(String mime, {int sampleRate = 0}) async {
+    // iOS AVFoundation decodes ALAC natively; the MediaCodec path is Android.
+    if (!_isAndroid) return PlatformCapabilities.isIOS;
     try {
-      await _invokeNativeSetter('setTapSrcQuality',
-          {'quality': quality.clamp(0, 3)});
-      return true;
-    } on PlatformException {
-      return false;
-    } on MissingPluginException {
-      return false;
-    } on TimeoutException {
-      return false;
-    }
-  }
-
-  /// Current conversion quality (0..3), or null when unavailable.
-  Future<int?> getTapSrcQuality() async {
-    if (!_isAndroid) return null;
-    try {
-      final quality = await _channel
-          .invokeMethod<int>('getTapSrcQuality')
+      final result = await _channel
+          .invokeMethod<bool>('probeAudioDecoder', {
+            'mime': mime,
+            if (sampleRate > 0) 'sampleRate': sampleRate,
+          })
           .timeout(const Duration(seconds: 2));
-      return quality?.clamp(0, 3);
+      return result ?? false;
     } catch (e, st) {
-      ErrorLogger.log('getTapSrcQuality failed',
+      ErrorLogger.log('probeAudioDecoder($mime) failed',
           error: e, stackTrace: st, category: 'AudioEffectsChannel');
-      return null;
-    }
-  }
-
-  int _cachedOversampleMultiplier = 1;
-  int _activeOversampleMultiplier = 1;
-  int _cachedOversampleKernel = 0;
-  bool _cachedPcmToDsdEnabled = false;
-  int _cachedPcmToDsdRate = 64;
-  int _cachedPcmToDsdOrder = 5;
-
-  int get currentOversampleMultiplier => _cachedOversampleMultiplier;
-
-  /// Factor the native tap actually configured on the active render engine.
-  /// This is derived state: it is 1 while bit-perfect disarms the tap, while a
-  /// DAC refuses the oversampled rate, or before the sink is rebuilt.
-  int get activeOversampleMultiplier => _activeOversampleMultiplier;
-  int get currentOversampleKernel => _cachedOversampleKernel;
-  bool get isPcmToDsdActive => _cachedPcmToDsdEnabled;
-  int get currentPcmToDsdRate => _cachedPcmToDsdRate;
-  int get currentPcmToDsdOrder => _cachedPcmToDsdOrder;
-
-  /// Refreshes [activeOversampleMultiplier] from the native engine.
-  Future<int> refreshActiveOversampleMultiplier() async {
-    if (!_isAndroid) {
-      _activeOversampleMultiplier = 1;
-      return 1;
-    }
-    try {
-      final mult = await _channel
-          .invokeMethod<int>('getActiveOversampleMultiplier')
-          .timeout(const Duration(seconds: 6));
-      _activeOversampleMultiplier =
-          (mult == 2 || mult == 4 || mult == 8) ? mult! : 1;
-      return _activeOversampleMultiplier;
-    } catch (e, st) {
-      ErrorLogger.log('getActiveOversampleMultiplier failed',
-          error: e, stackTrace: st, category: 'AudioEffectsChannel');
-      return _activeOversampleMultiplier;
-    }
-  }
-
-  /// Remaster oversampling multiplier (1 = off, 2 = 2x, 4 = 4x, 8 = 8x).
-  ///
-  /// The cache is only updated after the native engine acknowledges the
-  /// request. A refused request leaves both the UI and the status on the last
-  /// state the engine actually has.
-  Future<bool> setOversampleMultiplier(int multiplier) async {
-    final valid = (multiplier == 2 || multiplier == 4 || multiplier == 8)
-        ? multiplier
-        : 1;
-    if (!_isAndroid) return false;
-    try {
-      await _invokeNativeSetter('setOversampleMultiplier', {
-        'multiplier': valid,
-      });
-      _cachedOversampleMultiplier = valid;
-      if (valid == 1) _activeOversampleMultiplier = 1;
-      return true;
-    } on PlatformException {
       return false;
-    } on MissingPluginException {
-      return false;
-    } on TimeoutException {
-      return false;
-    }
-  }
-
-  Future<int> getOversampleMultiplier() async {
-    if (!_isAndroid) return _cachedOversampleMultiplier;
-    try {
-      final mult = await _channel
-          .invokeMethod<int>('getOversampleMultiplier')
-          .timeout(const Duration(seconds: 2));
-      final res = (mult == 2 || mult == 4 || mult == 8) ? mult! : 1;
-      _cachedOversampleMultiplier = res;
-      return res;
-    } catch (e, st) {
-      ErrorLogger.log('getOversampleMultiplier failed',
-          error: e, stackTrace: st, category: 'AudioEffectsChannel');
-      return _cachedOversampleMultiplier;
-    }
-  }
-
-  /// Remaster reconstruction filter kernel:
-  /// 0 = Sharp, 1 = Slow Roll-off, 2 = MinimumPhase, 3 = Apodizing.
-  Future<bool> setOversampleKernel(int kernel) async {
-    final valid = kernel.clamp(0, 3);
-    if (!_isAndroid) return false;
-    try {
-      await _invokeNativeSetter('setOversampleKernel', {
-        'kernel': valid,
-      });
-      _cachedOversampleKernel = valid;
-      return true;
-    } on PlatformException {
-      return false;
-    } on MissingPluginException {
-      return false;
-    } on TimeoutException {
-      return false;
-    }
-  }
-
-  Future<int> getOversampleKernel() async {
-    if (!_isAndroid) return _cachedOversampleKernel;
-    try {
-      final kernel = await _channel
-          .invokeMethod<int>('getOversampleKernel')
-          .timeout(const Duration(seconds: 2));
-      final res = kernel?.clamp(0, 3) ?? 0;
-      _cachedOversampleKernel = res;
-      return res;
-    } catch (e, st) {
-      ErrorLogger.log('getOversampleKernel failed',
-          error: e, stackTrace: st, category: 'AudioEffectsChannel');
-      return _cachedOversampleKernel;
     }
   }
 
@@ -2563,11 +2434,18 @@ class AudioEffectsChannel with _AudioEffectsChannelTelemetryMixin {
     required bool isBluetooth,
     bool allowBluetoothDither = false,
   }) async {
+    _lastDitherArgs = (
+      enabled: enabled,
+      targetBitDepth: targetBitDepth,
+      isBluetooth: isBluetooth,
+      allowBluetoothDither: allowBluetoothDither,
+    );
     if (!_isAndroid) return false;
     try {
       final bool? applied =
           await _channel.invokeMethod<bool>('setDitherParams', {
-        'enabled': enabled,
+        // Live radio streams bypass TPDF dither: it adds audible noise there.
+        'enabled': enabled && !_liveStreamBypass,
         'targetBitDepth': targetBitDepth,
         'isBluetooth': isBluetooth,
         'allowBluetoothDither': allowBluetoothDither,
@@ -2581,6 +2459,50 @@ class AudioEffectsChannel with _AudioEffectsChannelTelemetryMixin {
         category: 'AudioEffectsChannel',
       );
       return false;
+    }
+  }
+
+  // --- LIVE STREAM (RADIO) BYPASS ---
+
+  bool _liveStreamBypass = false;
+  ({
+    bool enabled,
+    int targetBitDepth,
+    bool isBluetooth,
+    bool allowBluetoothDither
+  })? _lastDitherArgs;
+  int? _userSincQuality;
+
+  /// Whether TPDF dither and resampler quality are currently
+  /// forced off because a live radio stream is playing.
+  bool get liveStreamBypass => _liveStreamBypass;
+
+  /// Forces TPDF dither and resampler quality to neutral while a live radio
+  /// stream plays (they introduce audible noise on radio), and restores the
+  /// user's saved values when a non-radio track plays again. Idempotent; the
+  /// user's stored settings are never modified.
+  Future<void> setLiveStreamBypass(bool bypass) async {
+    if (_liveStreamBypass == bypass) return;
+    _liveStreamBypass = bypass;
+    if (!_isAndroid) return;
+    final dither = _lastDitherArgs;
+    if (dither != null) {
+      await setDitherParams(
+        enabled: dither.enabled,
+        targetBitDepth: dither.targetBitDepth,
+        isBluetooth: dither.isBluetooth,
+        allowBluetoothDither: dither.allowBluetoothDither,
+      );
+    }
+    final sinc = _userSincQuality;
+    if (bypass) {
+      try {
+        await _invokeNativeSetter('setSincResamplerQuality', {'quality': 0});
+      } catch (_) {}
+    } else if (sinc != null) {
+      try {
+        await setSincResamplerQuality(sinc);
+      } catch (_) {}
     }
   }
 

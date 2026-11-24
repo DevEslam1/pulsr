@@ -121,6 +121,45 @@ class YtmResolvingSource extends StreamAudioSource {
   /// loops indefinitely during a bot-cooldown window.
   Object? _permanentFailure;
   DateTime? _permanentFailureAt;
+  bool _cancelled = false;
+  final Completer<void> _cancelCompleter = Completer<void>();
+
+  /// Whether this source has been explicitly cancelled by a newer track load.
+  bool get isCancelled => _cancelled;
+
+  /// Immediately aborts any in-flight [request] awaiting stream resolution or
+  /// byte fetching (e.g. when the user switches to a local track while a VPN
+  /// request is stalled), without invoking [onError] or latching a failure.
+  void cancel() {
+    if (_cancelled) return;
+    _cancelled = true;
+    if (!_cancelCompleter.isCompleted) {
+      _cancelCompleter.complete();
+    }
+    _discardInner();
+  }
+
+  Future<T> _raceCancel<T>(Future<T> future) {
+    if (_cancelled) {
+      future.then<void>((_) {}, onError: (_) {});
+      return Future<T>.error(const _YtmSourceCancelledException());
+    }
+    final completer = Completer<T>();
+    future.then(
+      (value) {
+        if (!completer.isCompleted) completer.complete(value);
+      },
+      onError: (Object err, StackTrace st) {
+        if (!completer.isCompleted) completer.completeError(err, st);
+      },
+    );
+    _cancelCompleter.future.then((_) {
+      if (!completer.isCompleted) {
+        completer.completeError(const _YtmSourceCancelledException());
+      }
+    });
+    return completer.future;
+  }
 
   /// How long a recorded permanent failure latches before the source is allowed
   /// one fresh resolve. Long enough to break ExoPlayer's every-few-seconds retry
@@ -153,6 +192,9 @@ class YtmResolvingSource extends StreamAudioSource {
 
   @override
   Future<StreamAudioResponse> request([int? start, int? end]) async {
+    if (_cancelled) {
+      throw const _YtmSourceCancelledException();
+    }
     // Short-circuit immediately on permanent failures: a BOT_CHALLENGE or
     // VIDEO_GONE that already fired once cannot resolve on re-request. Without
     // this guard, ExoPlayer retries the just_audio proxy on every HTTP 500,
@@ -194,11 +236,14 @@ class YtmResolvingSource extends StreamAudioSource {
       // itself for the lock's full 60 s timeout: on a first play whose URL
       // answered 403 immediately, the "single fast re-resolve" this class
       // exists for became a minute of silence.
-      final inner = await _ensureInner();
+      final inner = await _raceCancel(_ensureInner());
       try {
-        return await _withPathLockIfUncached(
-            () => _requestOnce(inner, start, end));
+        return await _raceCancel(_withPathLockIfUncached(
+            () => _requestOnce(inner, start, end)));
       } catch (byteErr) {
+        if (_cancelled || byteErr is _YtmSourceCancelledException) {
+          throw const _YtmSourceCancelledException();
+        }
         final burned = isUrlBurned(byteErr);
 
         debugPrint(
@@ -222,12 +267,16 @@ class YtmResolvingSource extends StreamAudioSource {
         }
 
         try {
-          final freshInner = await _ensureInner(forceRefresh: burned);
+          final freshInner =
+              await _raceCancel(_ensureInner(forceRefresh: burned));
           // Outside the lock held above, so this acquisition is fresh rather
           // than a re-entry against ourselves.
-          return await _withPathLockIfUncached(
-              () => _requestOnce(freshInner, start, end));
+          return await _raceCancel(_withPathLockIfUncached(
+              () => _requestOnce(freshInner, start, end)));
         } catch (retryErr) {
+          if (_cancelled || retryErr is _YtmSourceCancelledException) {
+            throw const _YtmSourceCancelledException();
+          }
           // Classify failure to ensure structured diagnostics
           final classified = YtmErrorClassifier.classify(retryErr);
           debugPrint(
@@ -254,6 +303,7 @@ class YtmResolvingSource extends StreamAudioSource {
         }
       }
     } catch (err) {
+      if (_cancelled || err is _YtmSourceCancelledException) rethrow;
       if (err == _permanentFailure) rethrow; // already recorded above
       _discardInner();
       final classified = YtmErrorClassifier.classify(err);
@@ -830,4 +880,11 @@ class _PathLockEntry {
   final Future<void> future;
   final DateTime createdAt;
   _PathLockEntry(this.future, this.createdAt);
+}
+
+class _YtmSourceCancelledException implements Exception {
+  const _YtmSourceCancelledException();
+
+  @override
+  String toString() => 'YtmResolvingSource cancelled (loading interrupted)';
 }

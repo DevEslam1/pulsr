@@ -18,6 +18,7 @@ import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'core/performance/gpu_budget.dart';
+import 'core/constants/app_blur.dart';
 import 'core/utils/platform_capabilities.dart';
 import 'core/config/app_config.dart';
 import 'core/constants/app_typography.dart';
@@ -273,6 +274,7 @@ Future<void> main() async {
           error: e, stackTrace: st, category: 'Startup');
     }
     GpuBudget.setEnabled(prefs.getBool('setting_reduce_motion') ?? false);
+    AppBlur.setDisabled(prefs.getBool(PrefsKeys.disableBlur) ?? false);
     PulsrHaptics.setEnabled(prefs.getBool(PrefsKeys.hapticsEnabled) ?? true);
   } catch (_) {}
   // Warm native audio capability cache (best-effort, never blocks).
@@ -1380,6 +1382,7 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
                 bool highContrast,
                 bool reduceMotion,
                 bool dimWhitePoint,
+                bool disableBlur,
                 AppButtonStyle appButtonStyle
               })>(
             selector: (state) => (
@@ -1391,6 +1394,7 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
               highContrast: state.highContrast,
               reduceMotion: state.reduceMotion,
               dimWhitePoint: state.dimWhitePoint,
+              disableBlur: state.disableBlur,
               appButtonStyle: state.appButtonStyle,
             ),
             builder: (context, settingsConfig) {

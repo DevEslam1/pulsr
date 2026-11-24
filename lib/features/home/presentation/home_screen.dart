@@ -544,7 +544,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                                       ),
                                       tooltip: context.l10n.settings,
                                       onPressed: () =>
-                                          context.push('/settings'),
+                                          context.go('/settings'),
                                     ),
                                   ],
                                 ),

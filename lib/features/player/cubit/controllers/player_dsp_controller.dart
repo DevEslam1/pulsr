@@ -15,7 +15,6 @@ import '../../../../core/utils/error_logger.dart';
 import '../../../../core/utils/l10n_holder.dart';
 import '../../../../core/utils/safe_file_path.dart';
 import '../../../../data/audio/audio_handler.dart';
-import '../../../../data/audio/audio_effects_channel.dart';
 import '../../../../data/audio/equalizer_manager.dart';
 import '../../../../data/audio/bit_perfect_chain.dart';
 import '../../../../data/audio/bluetooth_quality_policy.dart';

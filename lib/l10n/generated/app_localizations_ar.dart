@@ -12608,4 +12608,11 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get settingsQuickControls => 'عناصر التحكم السريعة';
+
+  @override
+  String get settingsDisableBlurTitle => 'تعطيل الضبابية';
+
+  @override
+  String get settingsDisableBlurSubtitle =>
+      'إيقاف تأثير الضبابية في جميع الشاشات والقوائم لأداء أكثر سلاسة';
 }

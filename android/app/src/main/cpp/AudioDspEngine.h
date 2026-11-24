@@ -8,8 +8,6 @@
 #include "ConvolutionReverb.h"
 #include "SincResampler.h"
 #include "HighQualityResampler.h"
-#include "Oversampler.h"
-#include "SdmModulator.h"
 #include "DopFramer.h"
 #include "DsdNativePacker.h"
 #include "DsdDecoder.h"
@@ -297,45 +295,10 @@ public:
     // propagates through the parameter snapshot to all registered engines, and
     // applies on the render/tap thread so control threads never race
     // resampleForTap().
-    void setTapSrcQuality(int quality);
-    // Lock-free atomic update used by DspEngineRegistry fan-out (avoids
-    // redundant snapshot publications on registered render engines).
-    void setTapSrcQualityAtomic(int quality);
-    int tapSrcQuality() const;
-
-    // ---- Remaster: Reconstruction Filter & Output Oversampling ----
-    void setOversampleMultiplier(int multiplier);
-    int oversampleMultiplier() const;
-    void setOversampleKernel(int kernel);
-    int oversampleKernel() const;
-    bool isTapOversamplerEngaged() const { return tapUseOversampler_; }
-    /// Factor actually configured on this engine's tap, 1 when no oversampler
-    /// is engaged. Derived telemetry, safe to read from the control thread.
-    int activeOversampleFactor() const {
-        return activeOversampleFactor_.load(std::memory_order_relaxed);
-    }
-
-    // ---- Remaster: Real-Time PCM -> DSD Modulator ----
-    void setPcmToDsdEnabled(bool enabled);
-    bool isPcmToDsdEnabled() const;
-    void setPcmToDsdRate(int rate);
-    int pcmToDsdRate() const;
-    void setPcmToDsdOrder(int order);
-    int pcmToDsdOrder() const;
 
     // ---- Low-Power Interlocked Bypass ----
     void setLowPowerEnabled(bool enabled);
     bool isLowPowerBypassed() const { return lowPowerBypassed_.load(std::memory_order_relaxed); }
-
-    bool preparePcmToDsd(double pcmRate, int dsdMultiple, int order, int containerBits = 24);
-    void resetPcmToDsd();
-    void releasePcmToDsd();
-    int convertPcmToDsdDoP(const float* inInterleaved, int inFrames,
-                           uint8_t* outDop, int maxOutBytes, int containerBits,
-                           int& consumedFrames);
-    int convertPcmToDsdNative(const float* inInterleaved, int inFrames,
-                             uint8_t* outDsd, int maxOutBytes, int bytesPerSample,
-                             int& consumedFrames);
 
     void reset();
     void publishParams(std::shared_ptr<const DspParamSnapshot> snapshot);
@@ -499,35 +462,11 @@ private:
     int tapChannels_ = 0;
     int tapChunkFrames_ = 0;
     bool tapSrcEngaged_ = false;
-    // 0 = 64 taps, 1 = 128, 2 = 256 (default), 3 = 512.
-    // The default matches the documented baseline: 256 taps / 1024 phases.
-    std::atomic<int> tapSrcQuality_{2};
-    int preparedTapSrcQuality_ = 2;
     static constexpr int kTapMaxChannels = 8;
     static constexpr int kTapInputFrames = 2048;
     static constexpr int kTapOutputFrames = 4096;
     std::vector<float> tapPlaneIn_[kTapMaxChannels];
     std::vector<float> tapPlaneOut_[kTapMaxChannels];
-
-    // Remaster: Output oversampler and reconstruction filters
-    pulsr::Oversampler tapOversampler_;
-    bool tapUseOversampler_ = false;
-    std::atomic<int> activeOversampleFactor_{1};
-    int oversampleMultiplier_ = 1;  // 1 = Off, 2 = 2x, 4 = 4x, 8 = 8x
-    int oversampleKernel_ = 0;      // 0 = Sharp, 1 = Slow, 2 = MinimumPhase, 3 = Apodizing
-
-    // Remaster: Real-Time PCM -> DSD modulator
-    pulsr::SdmModulator sdmModulator_;
-    bool pcmToDsdEnabled_ = false;
-    int pcmToDsdRate_ = 64;         // 64, 128, 256
-    int pcmToDsdOrder_ = 5;        // 1..5
-    int pcmToDsdContainerBits_ = 24;
-    double pcmToDsdInputRate_ = 0.0;
-    uint8_t dopMarker_ = pulsr::kDopMarkerA;
-    std::vector<uint8_t> sdmDsdBufL_;
-    std::vector<uint8_t> sdmDsdBufR_;
-    std::vector<float> pcmDsdInL_;
-    std::vector<float> pcmDsdInR_;
 
     SpatialPanner panner_;
     DsdDecoder dsdDecoder_;
@@ -710,15 +649,11 @@ public:
     // Control thread only: takes the registry lock.
     bool wasLastBlockBitPerfect();
     bool wasSafetySuppressed();
-    /// Oversampling factor on the engine that actually renders, or 1 when no
-    /// live engine has an oversampler engaged. Control thread only.
-    int getActiveOversampleFactor();
     double getAppliedSampleRate();
     uint64_t getLastAppliedGeneration();
     void setPerformanceProfile(DspPerformanceProfile profile);
     void setThermalLevel(int level);
     void setReverbThreadingMode(ReverbThreadingMode mode);
-    void setTapSrcQuality(int quality);
     void drainRetireQueues();
 
     // Measured chain-of-custody, control-thread API. These operate on the engine

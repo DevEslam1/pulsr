@@ -134,8 +134,6 @@ struct ResamplerParamSet {
     // 1 = Standard (16-tap polyphase), 2 = High (32-tap), 3 = Ultra (64-tap,
     // full table; the historical behaviour and default).
     int quality = 3;
-    // Tap-side SincResampler kernel quality: 0..3 -> 64/128/256/512 taps.
-    int tapSrcQuality = 2;
 };
 
 struct SaturationParamSet {
@@ -434,20 +432,6 @@ struct HrtfBinauralParamSet {
     std::shared_ptr<const pulsr::HrirQuad> customIr;
 };
 
-// Remaster: Reconstruction Filter & Output Oversampling (2x/4x/8x)
-struct OversampleParamSet {
-    bool enabled = false;
-    int multiplier = 1; // 1 = off, 2 = 2x, 4 = 4x, 8 = 8x
-    int kernel = 0;     // 0 = Sharp, 1 = Slow, 2 = MinimumPhase, 3 = Apodizing
-};
-
-// Remaster: Real-Time PCM -> DSD Modulator (SDM 1st-5th order)
-struct PcmToDsdParamSet {
-    bool enabled = false;
-    int rate = 64;      // 64 (DSD64), 128 (DSD128), 256 (DSD256)
-    int order = 5;      // 1..5 SDM filter order
-};
-
 struct LowPowerParamSet {
     bool enabled = false;
 };
@@ -483,8 +467,6 @@ struct DspParamSnapshot {
     BypassCompareParamSet bypassCompare;
     DacVoicingParamSet dacVoicing;
     HrtfBinauralParamSet hrtf;
-    OversampleParamSet oversample;
-    PcmToDsdParamSet pcmToDsd;
     LowPowerParamSet lowPower;
 };
 

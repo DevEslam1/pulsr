@@ -22309,6 +22309,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Quick Controls'**
   String get settingsQuickControls;
+
+  /// Title for the Appearance toggle that disables backdrop and glass blur
+  ///
+  /// In en, this message translates to:
+  /// **'Disable Blur'**
+  String get settingsDisableBlurTitle;
+
+  /// Subtitle for the Disable Blur toggle
+  ///
+  /// In en, this message translates to:
+  /// **'Turn off backdrop and glass blur across all screens and sheets for smoother performance'**
+  String get settingsDisableBlurSubtitle;
 }
 
 class _AppLocalizationsDelegate

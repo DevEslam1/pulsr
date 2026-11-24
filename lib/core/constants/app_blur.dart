@@ -25,8 +25,8 @@ abstract class AppBlur {
   /// 12.0 — standard glass container blur.
   static const double standard = 12.0;
 
-  /// 14.0 — floating bottom navigation pill blur.
-  static const double nav = 14.0;
+  /// 10.0 — floating bottom navigation pill blur.
+  static const double nav = 10.0;
 
   /// 16.0 — modal dialog glass blur.
   static const double dialog = 16.0;
@@ -45,9 +45,21 @@ abstract class AppBlur {
   /// so text over arbitrary artwork maintains WCAG AA (>= 4.5:1) contrast.
   static const double solidFallbackMinAlpha = 0.94;
 
+  /// Global user-preference override: when true, all [BackdropFilter] and
+  /// [ImageFilter.blur] passes are disabled app-wide.
+  static final ValueNotifier<bool> disabled = ValueNotifier<bool>(false);
+
+  static bool get isBlurDisabled => disabled.value;
+
+  static void setDisabled(bool value) {
+    if (disabled.value != value) disabled.value = value;
+  }
+
   /// Returns `true` when backdrop/image blur is allowed for the current frame.
   static bool canBlur(BuildContext context, {bool enableBlur = true}) {
-    if (!enableBlur || GpuBudget.isGpuSaverActive) return false;
+    if (!enableBlur || GpuBudget.isGpuSaverActive || isBlurDisabled) {
+      return false;
+    }
     final media = MediaQuery.maybeOf(context);
     if (media != null && media.highContrast) return false;
     return true;

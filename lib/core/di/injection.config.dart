@@ -285,13 +285,6 @@ extension GetItInjectableX on _i174.GetIt {
     );
     gh.lazySingleton<_i593.DownloadService>(() =>
         _i593.DownloadService(lyricsRepository: gh<_i133.LyricsRepository>()));
-    gh.lazySingleton<_i169.YtmClientVersionResolver>(
-        () => _i169.YtmClientVersionResolver(gh<_i519.Client>()));
-    gh.singleton<_i41.SettingsCubit>(() => _i41.SettingsCubit(
-          scannerService: gh<_i483.MediaScannerService>(),
-          hiResAudioService: gh<_i451.HiResAudioService>(),
-          secureStorage: gh<_i558.FlutterSecureStorage>(),
-        ));
     gh.factory<_i1046.PlayerDependencies>(() => _i1046.PlayerDependencies(
           settingsCubit: gh<_i41.SettingsCubit>(),
           widgetService: gh<_i42.WidgetService>(),
@@ -312,12 +305,35 @@ extension GetItInjectableX on _i174.GetIt {
           mediaScannerService: gh<_i483.MediaScannerService>(),
           ytmService: gh<_i391.YtmService>(),
         ));
-    gh.lazySingleton<_i742.YtDownloadService>(() => _i742.YtDownloadService(
-          gh<_i497.HttpClient>(),
-          gh<_i391.YtmService>(),
-          gh<_i483.MediaScannerService>(),
-          gh<_i320.IMusicRepository>(),
+    gh.lazySingleton<_i169.YtmClientVersionResolver>(
+        () => _i169.YtmClientVersionResolver(gh<_i519.Client>()));
+    gh.factory<_i633.LibraryCubit>(() => _i633.LibraryCubit(
+          getSongsUseCase: gh<_i168.GetSongsUseCase>(),
+          getAlbumsUseCase: gh<_i496.GetAlbumsUseCase>(),
+          getArtistsUseCase: gh<_i602.GetArtistsUseCase>(),
+          getGenresUseCase: gh<_i486.GetGenresUseCase>(),
+          getYearsUseCase: gh<_i651.GetYearsUseCase>(),
+          getFavoritesUseCase: gh<_i117.GetFavoritesUseCase>(),
+          toggleFavoriteUseCase: gh<_i800.ToggleFavoriteUseCase>(),
+          folderUseCases: gh<_i1017.FolderUseCases>(),
+          musicRepository: gh<_i320.IMusicRepository>(),
+          ytmService: gh<_i391.YtmService>(),
+          ytmAccountService: gh<_i631.YtmAccountService>(),
         ));
+    gh.factory<_i984.SearchCubit>(() => _i984.SearchCubit(
+          searchUseCase: gh<_i644.SearchMusicUseCase>(),
+          folderUseCases: gh<_i1017.FolderUseCases>(),
+          musicRepository: gh<_i320.IMusicRepository>(),
+        ));
+    gh.lazySingleton<_i742.YtDownloadService>(
+      () => _i742.YtDownloadService(
+        gh<_i497.HttpClient>(),
+        gh<_i391.YtmService>(),
+        gh<_i483.MediaScannerService>(),
+        gh<_i320.IMusicRepository>(),
+      ),
+      dispose: (i) => i.dispose(),
+    );
     gh.factory<_i918.AuthCubit>(() => _i918.AuthCubit(
           gh<_i535.AuthService>(),
           gh<_i225.CloudSyncService>(),
@@ -333,20 +349,10 @@ extension GetItInjectableX on _i174.GetIt {
       ),
       dispose: (i) => i.dispose(),
     );
-    gh.factory<_i984.SearchCubit>(() => _i984.SearchCubit(
-          searchUseCase: gh<_i644.SearchMusicUseCase>(),
-          folderUseCases: gh<_i1017.FolderUseCases>(),
-        ));
-    gh.factory<_i633.LibraryCubit>(() => _i633.LibraryCubit(
-          getSongsUseCase: gh<_i168.GetSongsUseCase>(),
-          getAlbumsUseCase: gh<_i496.GetAlbumsUseCase>(),
-          getArtistsUseCase: gh<_i602.GetArtistsUseCase>(),
-          getGenresUseCase: gh<_i486.GetGenresUseCase>(),
-          getYearsUseCase: gh<_i651.GetYearsUseCase>(),
-          getFavoritesUseCase: gh<_i117.GetFavoritesUseCase>(),
-          toggleFavoriteUseCase: gh<_i800.ToggleFavoriteUseCase>(),
-          folderUseCases: gh<_i1017.FolderUseCases>(),
-          musicRepository: gh<_i320.IMusicRepository>(),
+    gh.singleton<_i41.SettingsCubit>(() => _i41.SettingsCubit(
+          scannerService: gh<_i483.MediaScannerService>(),
+          hiResAudioService: gh<_i451.HiResAudioService>(),
+          secureStorage: gh<_i558.FlutterSecureStorage>(),
         ));
     gh.factory<_i790.SmartPlaylistBuilderCubit>(
         () => _i790.SmartPlaylistBuilderCubit(

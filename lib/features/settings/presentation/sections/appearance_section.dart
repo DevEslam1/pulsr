@@ -427,68 +427,82 @@ mixin SettingsAppearanceSection
           ),
         ],
         _divider(p),
-        Padding(
-          padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.md, vertical: AppSpacing.sm),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+        _switchTile(
+          context,
+          Icons.blur_off_rounded,
+          context.l10n.settingsDisableBlurTitle,
+          context.l10n.settingsDisableBlurSubtitle,
+          value: state.disableBlur,
+          onChanged: cubit.setDisableBlur,
+        ),
+        Opacity(
+          opacity: state.disableBlur ? 0.45 : 1.0,
+          child: IgnorePointer(
+            ignoring: state.disableBlur,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.blur_on_rounded, size: 22, color: p.accent),
-                  const SizedBox(width: AppSpacing.s14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          context.l10n.settingsLiquidGlassTitle,
-                          style: TextStyle(
-                            color: p.textPrimary,
-                            fontWeight: FontWeight.w700,
-                            fontSize: AppFontSize.callout,
-                          ),
+                  Row(
+                    children: [
+                      Icon(Icons.blur_on_rounded, size: 22, color: p.accent),
+                      const SizedBox(width: AppSpacing.s14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              context.l10n.settingsLiquidGlassTitle,
+                              style: TextStyle(
+                                color: p.textPrimary,
+                                fontWeight: FontWeight.w700,
+                                fontSize: AppFontSize.callout,
+                              ),
+                            ),
+                            const SizedBox(height: AppSpacing.s2),
+                            Text(
+                              context.l10n.settingsLiquidGlassSubtitle,
+                              style: TextStyle(
+                                color: p.textSecondary,
+                                fontSize: AppFontSize.label,
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: AppSpacing.s2),
-                        Text(
-                          context.l10n.settingsLiquidGlassSubtitle,
-                          style: TextStyle(
-                            color: p.textSecondary,
-                            fontSize: AppFontSize.label,
-                          ),
+                      ),
+                      Text(
+                        '${(state.liquidGlassTint * 100).round()}%',
+                        style: TextStyle(
+                          color: p.accent,
+                          fontWeight: FontWeight.w800,
+                          fontSize: AppFontSize.bodySmall,
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                  Text(
-                    '${(state.liquidGlassTint * 100).round()}%',
-                    style: TextStyle(
-                      color: p.accent,
-                      fontWeight: FontWeight.w800,
-                      fontSize: AppFontSize.bodySmall,
+                  const SizedBox(height: AppSpacing.xs),
+                  SliderTheme(
+                    data: SliderTheme.of(context).copyWith(
+                      activeTrackColor: p.accent,
+                      inactiveTrackColor: p.accent.withValues(alpha: 0.15),
+                      thumbColor: p.accent,
+                      overlayColor: p.accent.withValues(alpha: 0.12),
+                      trackHeight: 3,
+                    ),
+                    child: Slider(
+                      value: state.liquidGlassTint,
+                      min: 0.0,
+                      max: 1.0,
+                      divisions: 20,
+                      onChanged: cubit.previewLiquidGlassTint,
+                      onChangeEnd: cubit.setLiquidGlassTint,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: AppSpacing.xs),
-              SliderTheme(
-                data: SliderTheme.of(context).copyWith(
-                  activeTrackColor: p.accent,
-                  inactiveTrackColor: p.accent.withValues(alpha: 0.15),
-                  thumbColor: p.accent,
-                  overlayColor: p.accent.withValues(alpha: 0.12),
-                  trackHeight: 3,
-                ),
-                child: Slider(
-                  value: state.liquidGlassTint,
-                  min: 0.0,
-                  max: 1.0,
-                  divisions: 20,
-                  onChanged: cubit.previewLiquidGlassTint,
-                  onChangeEnd: cubit.setLiquidGlassTint,
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ],

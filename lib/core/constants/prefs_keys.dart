@@ -33,6 +33,7 @@ class PrefsKeys {
   static const String soundFeedbackEnabled = 'setting_sound_feedback_enabled';
   static const String hapticsEnabled = 'setting_haptics_enabled';
   static const String liquidGlassTint = 'setting_liquid_glass_tint';
+  static const String disableBlur = 'setting_disable_blur';
   static const String headphoneSafetyEnabled =
       'setting_headphone_safety_enabled';
   // Weekly sound-dose budget as a fraction of the EN 62368-1 reference
@@ -339,11 +340,6 @@ class PrefsKeys {
   // 2 = High (32-tap), 3 = Ultra (64-tap, default).
   static const String sincResamplerQuality = 'setting_sinc_resampler_quality';
 
-  // Tap-side conversion kernel, owned by the DSP tap (not the sinc stage):
-  // -1 = off (the platform converter runs), 0..3 = 64/128/256/512-tap. Mirrors
-  // the native TapTapsForQuality ladder so the two can never drift.
-  static const String tapSrcQuality = 'setting_tap_src_quality';
-
   // BPM-synced crossfade: align crossfade duration to the nearest
   // 2/4/8/16/32 beats of the incoming track when a BPM value is known.
   static const String bpmSyncCrossfadeEnabled =
@@ -373,18 +369,6 @@ class PrefsKeys {
   // 32-bit containers for DACs that require 32-bit frames). Only used when
   // [dsdOutputMode] is 'dop' on a DoP-capable USB DAC.
   static const String dopContainerBits = 'setting_dop_container_bits';
-
-  // Remaster suite: Output oversampling (PCM), reconstruction filter kernel, and PCM->DSD
-  static const String remasterOversampleMultiplier =
-      'setting_remaster_oversample_multiplier';
-  static const String remasterFilterKernel =
-      'setting_remaster_filter_kernel';
-  static const String remasterPcmToDsdEnabled =
-      'setting_remaster_pcm_to_dsd_enabled';
-  static const String remasterPcmToDsdRate =
-      'setting_remaster_pcm_to_dsd_rate';
-  static const String remasterPcmToDsdOrder =
-      'setting_remaster_pcm_to_dsd_order';
 
   // Smart Audio: 'auto' adapts AutoEQ + output quality to the connected device
   // and track; 'manual' leaves the user's explicit choices untouched.

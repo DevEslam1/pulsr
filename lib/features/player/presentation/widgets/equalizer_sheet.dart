@@ -6,8 +6,6 @@ import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import '../../../../core/constants/prefs_keys.dart';
 import '../../../../core/constants/app_radii.dart';
 import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/performance/gpu_budget.dart';
@@ -61,7 +59,6 @@ part 'eq_sheet_shell.dart';
 part 'eq_band_slider_column.dart';
 part 'eq_preset_carousel.dart';
 part 'eq_advanced_controls.dart';
-part 'remaster_control_card.dart';
 part 'eq_ab_compare_bar.dart';
 part 'eq/eq_shell_header.dart';
 part 'eq/eq_device_profile_bar.dart';
@@ -360,32 +357,34 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                 maxHeight: MediaQuery.sizeOf(context).height *
                     (context.isLandscape ? 0.95 : 0.84),
               ),
-              child: Material(
-                color: p.surface,
-                borderRadius: context.isLandscape
-                    ? AppRadii.r24All
-                    : const BorderRadius.vertical(
-                        top: Radius.circular(AppRadii.r28)),
-                clipBehavior: Clip.antiAlias,
-                child: SafeArea(
-                  top: false,
-                  child: context.isLandscape
-                      ? _buildLandscapeLayout(
-                          context,
-                          cubit,
-                          state,
-                          p,
-                          dspBlockedGlobal,
-                          isStudio,
-                        )
-                      : _buildPortraitLayout(
-                          context,
-                          cubit,
-                          state,
-                          p,
-                          dspBlockedGlobal,
-                          isStudio,
-                        ),
+              child: RepaintBoundary(
+                child: Material(
+                  color: p.surface,
+                  borderRadius: context.isLandscape
+                      ? AppRadii.r24All
+                      : const BorderRadius.vertical(
+                          top: Radius.circular(AppRadii.r28)),
+                  clipBehavior: Clip.antiAlias,
+                  child: SafeArea(
+                    top: false,
+                    child: context.isLandscape
+                        ? _buildLandscapeLayout(
+                            context,
+                            cubit,
+                            state,
+                            p,
+                            dspBlockedGlobal,
+                            isStudio,
+                          )
+                        : _buildPortraitLayout(
+                            context,
+                            cubit,
+                            state,
+                            p,
+                            dspBlockedGlobal,
+                            isStudio,
+                          ),
+                  ),
                 ),
               ),
             ),

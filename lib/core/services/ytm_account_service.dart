@@ -1302,7 +1302,8 @@ class YtmAccountService {
   }
 
   /// Fetches private Liked Music playlist (VLLM, FEmusic_liked_videos, LM).
-  Future<List<YtmTrack>> fetchLikedSongs({int maxTracks = 200}) {
+  Future<List<YtmTrack>> fetchLikedSongs(
+      {int maxTracks = kYtmMaxPlaylistTracks}) {
     if (!isLoggedIn) {
       return Future.error(
         const YtmException('YTM_AUTH', 'Not signed in to YouTube Music'),
@@ -1324,7 +1325,8 @@ class YtmAccountService {
     return future;
   }
 
-  Future<List<YtmTrack>> _fetchLikedSongsImpl({int maxTracks = 200}) async {
+  Future<List<YtmTrack>> _fetchLikedSongsImpl(
+      {int maxTracks = kYtmMaxPlaylistTracks}) async {
     try {
       await _maybeHydrateNativeCookies();
 
@@ -1597,7 +1599,7 @@ class YtmAccountService {
   /// Fetches details and tracks for any YouTube / YouTube Music playlist by URL or ID.
   Future<YtmPlaylistDetails?> fetchPlaylistDetails(
     String urlOrId, {
-    int maxTracks = 200,
+    int maxTracks = kYtmMaxPlaylistTracks,
   }) async {
     final rawInput = urlOrId.trim();
     if (rawInput.isEmpty) return null;
@@ -1859,7 +1861,7 @@ class YtmAccountService {
   /// Convenience method to fetch only tracks for a playlist by URL or ID.
   Future<List<YtmTrack>> fetchPlaylistTracks(
     String urlOrId, {
-    int maxTracks = 200,
+    int maxTracks = kYtmMaxPlaylistTracks,
   }) async {
     final details = await fetchPlaylistDetails(urlOrId, maxTracks: maxTracks);
     return details?.tracks ?? const [];
@@ -2847,13 +2849,51 @@ class YtmAccountService {
       return _extractTokenFromShelfContinuations(playlistCont);
     }
 
-    // 2. Initial browse response: musicPlaylistShelfRenderer or musicShelfRenderer
+    // 2. Modern InnerTube continuation response: onResponseReceivedActions[].appendContinuationItemsAction.continuationItems[]
+    final actions = root['onResponseReceivedActions'];
+    if (actions is List) {
+      for (final action in actions) {
+        if (action is Map<String, dynamic>) {
+          final append = action['appendContinuationItemsAction']
+              as Map<String, dynamic>?;
+          final items = append?['continuationItems'];
+          if (items is List) {
+            final token = _extractTokenFromItems(items);
+            if (token != null) return token;
+          }
+        }
+      }
+    }
+
+    // 3. Initial browse response: musicPlaylistShelfRenderer or musicShelfRenderer
     final playlistShelf = _findShelfNode(root, 'musicPlaylistShelfRenderer') ??
         _findShelfNode(root, 'musicShelfRenderer');
     if (playlistShelf != null) {
       return _extractTokenFromShelfContinuations(playlistShelf);
     }
 
+    return null;
+  }
+
+  String? _extractTokenFromItems(List<dynamic> items) {
+    for (var i = items.length - 1; i >= 0; i--) {
+      final item = items[i];
+      if (item is! Map<String, dynamic>) continue;
+      final contItem = item['continuationItemRenderer'];
+      if (contItem is Map<String, dynamic>) {
+        final contEndpoint = contItem['continuationEndpoint'];
+        if (contEndpoint is Map<String, dynamic>) {
+          final token =
+              contEndpoint['continuationCommand']?['token'] as String?;
+          if (token != null && token.isNotEmpty) return token;
+        }
+        final contCmd = contItem['continuationCommand'];
+        if (contCmd is Map<String, dynamic>) {
+          final token = contCmd['token'] as String?;
+          if (token != null && token.isNotEmpty) return token;
+        }
+      }
+    }
     return null;
   }
 
@@ -2881,6 +2921,11 @@ class YtmAccountService {
         }
       }
     }
+    // Modern InnerTube places continuationItemRenderer inside shelf['contents'].
+    final contents = shelf['contents'];
+    if (contents is List && contents.isNotEmpty) {
+      return _extractTokenFromItems(contents);
+    }
     return null;
   }
 
@@ -2898,45 +2943,55 @@ class YtmAccountService {
     if (playlistCont != null) {
       final contents = playlistCont['contents'];
       if (contents is List) {
-        final tracks = <YtmTrack>[];
-        for (final item in contents) {
-          if (item is Map<String, dynamic>) {
-            final renderer = item['musicResponsiveListItemRenderer']
-                as Map<String, dynamic>?;
-            if (renderer != null) {
-              final track = _parseListItemRenderer(renderer);
-              if (track != null) tracks.add(track);
-            }
-          }
-        }
-        return tracks;
+        return _parseTrackItems(contents);
       }
     }
 
-    // 2. Check for initial browse response: musicPlaylistShelfRenderer or musicShelfRenderer
+    // 2. Check for modern InnerTube continuation response: onResponseReceivedActions
+    final actions = root['onResponseReceivedActions'];
+    if (actions is List) {
+      final tracks = <YtmTrack>[];
+      for (final action in actions) {
+        if (action is Map<String, dynamic>) {
+          final append = action['appendContinuationItemsAction']
+              as Map<String, dynamic>?;
+          final items = append?['continuationItems'];
+          if (items is List) {
+            tracks.addAll(_parseTrackItems(items));
+          }
+        }
+      }
+      if (tracks.isNotEmpty) return tracks;
+    }
+
+    // 3. Check for initial browse response: musicPlaylistShelfRenderer or musicShelfRenderer
     final playlistShelf = _findShelfNode(root, 'musicPlaylistShelfRenderer') ??
         _findShelfNode(root, 'musicShelfRenderer');
     if (playlistShelf != null) {
       final contents = playlistShelf['contents'];
       if (contents is List) {
-        final tracks = <YtmTrack>[];
-        for (final item in contents) {
-          if (item is Map<String, dynamic>) {
-            final renderer = item['musicResponsiveListItemRenderer']
-                as Map<String, dynamic>?;
-            if (renderer != null) {
-              final track = _parseListItemRenderer(renderer);
-              if (track != null) tracks.add(track);
-            }
-          }
-        }
-        return tracks;
+        return _parseTrackItems(contents);
       }
     }
 
-    // 3. Fallback: For Next endpoint (playlistPanelVideoRenderer) or generic browse,
+    // 4. Fallback: For Next endpoint (playlistPanelVideoRenderer) or generic browse,
     // parse while strictly ignoring Suggestions and card carousels.
     return _parseInnertubePlaylistTracks(root, ignoreSuggestions: true);
+  }
+
+  List<YtmTrack> _parseTrackItems(List<dynamic> items) {
+    final tracks = <YtmTrack>[];
+    for (final item in items) {
+      if (item is Map<String, dynamic>) {
+        final renderer =
+            item['musicResponsiveListItemRenderer'] as Map<String, dynamic>?;
+        if (renderer != null) {
+          final track = _parseListItemRenderer(renderer);
+          if (track != null) tracks.add(track);
+        }
+      }
+    }
+    return tracks;
   }
 
   /// Reads the account `datasyncId` from `responseContext.mainAppWebResponseContext.datasyncId`

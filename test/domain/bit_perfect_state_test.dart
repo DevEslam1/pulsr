@@ -21,8 +21,6 @@ BitPerfectState _resolve({
   bool samplesModified = false,
   bool channelsAltered = false,
   bool isDsdDop = false,
-  bool oversamplingActive = false,
-  bool pcmToDsdActive = false,
   bool sourceLossy = false,
   bool sourceCodecUnconfirmed = false,
   bool rateVerified = true,
@@ -49,8 +47,6 @@ BitPerfectState _resolve({
       samplesModified: samplesModified,
       channelsAltered: channelsAltered,
       isDsdDop: isDsdDop,
-      oversamplingActive: oversamplingActive,
-      pcmToDsdActive: pcmToDsdActive,
       sourceLossy: sourceLossy,
       sourceCodecUnconfirmed: sourceCodecUnconfirmed,
       rateVerified: rateVerified,
@@ -217,30 +213,6 @@ void main() {
     test('a DoP carrier is reported as unmeasured', () {
       final state = _resolve(isDsdDop: true);
       expect(state.reasonCode, 'dop_carrier_not_measured');
-    });
-
-    test('active oversampling degrades bit-perfect and names reason', () {
-      final state = _resolve(oversamplingActive: true);
-      expect(state.tier, BitPerfectTier.degraded);
-      expect(state.isVerified, isFalse);
-      expect(state.reasonCode, 'oversampling_active');
-
-      // Restoring oversampling to false restores active verified bit-perfect
-      final restored = _resolve(oversamplingActive: false);
-      expect(restored.tier, BitPerfectTier.active);
-      expect(restored.isVerified, isTrue);
-    });
-
-    test('active PCM->DSD degrades bit-perfect and names reason', () {
-      final state = _resolve(pcmToDsdActive: true);
-      expect(state.tier, BitPerfectTier.degraded);
-      expect(state.isVerified, isFalse);
-      expect(state.reasonCode, 'pcm_to_dsd_active');
-
-      // Restoring PCM->DSD to false restores active verified bit-perfect
-      final restored = _resolve(pcmToDsdActive: false);
-      expect(restored.tier, BitPerfectTier.active);
-      expect(restored.isVerified, isTrue);
     });
 
     test('an unverified rate is not a rate mismatch', () {

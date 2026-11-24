@@ -8,7 +8,6 @@ import 'playback_backend.dart';
 
 enum AudioFeature {
   dsp,
-  remaster,
   bitPerfect,
   nativeDsd,
   dop,
@@ -69,7 +68,6 @@ class FeatureGate {
     // 1. Remote backend gating (Cast / UPnP): local DSP does not apply to original stream
     if (backend.isRemote) {
       if (feature == AudioFeature.dsp ||
-          feature == AudioFeature.remaster ||
           feature == AudioFeature.hrtf ||
           feature == AudioFeature.crossfeed) {
         return const FeatureGateDecision.blocked(
@@ -96,7 +94,6 @@ class FeatureGate {
     }
     if (isDsdMode) {
       if (feature == AudioFeature.dsp ||
-          feature == AudioFeature.remaster ||
           feature == AudioFeature.hrtf ||
           feature == AudioFeature.crossfeed ||
           feature == AudioFeature.multichannel ||
@@ -105,7 +102,7 @@ class FeatureGate {
         return const FeatureGateDecision.blocked(
           reason: FeatureBlockReason.dsdDomain,
           userMessage:
-              'DSP, Remaster, multichannel, crossfade, and ReplayGain cannot be processed in the 1-bit DSD domain.',
+              'DSP, multichannel, crossfade, and ReplayGain cannot be processed in the 1-bit DSD domain.',
         );
       }
       if (feature == AudioFeature.softwareVolume &&
@@ -121,7 +118,6 @@ class FeatureGate {
     // 3. Bit-perfect exclusivity
     if (bitPerfectActive) {
       if (feature == AudioFeature.dsp ||
-          feature == AudioFeature.remaster ||
           feature == AudioFeature.hrtf ||
           feature == AudioFeature.crossfeed ||
           feature == AudioFeature.replayGain ||
@@ -145,7 +141,6 @@ class FeatureGate {
     }
     if (lowPowerActive &&
         (feature == AudioFeature.dsp ||
-            feature == AudioFeature.remaster ||
             feature == AudioFeature.hrtf ||
             feature == AudioFeature.crossfeed)) {
       return const FeatureGateDecision.blocked(

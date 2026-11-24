@@ -4,11 +4,11 @@ import 'dart:math' as math;
 import 'package:material_ui/material_ui.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
 
+import '../constants/app_blur.dart';
 import '../constants/app_radii.dart';
 import '../constants/app_spacing.dart';
 import '../constants/app_typography.dart';
 import '../motion/pulsr_motion.dart';
-import '../performance/gpu_budget.dart';
 import '../responsive/pulsr_layout_metrics.dart';
 import '../responsive/pulsr_responsive_tokens.dart';
 import '../theme/aura_theme.dart';
@@ -277,7 +277,7 @@ class PulsrAdaptiveSheet extends StatelessWidget {
             p.isHighContrast;
 
     final rawSurface = p.isDark ? p.surface : p.surfaceElevated;
-    final baseSurfaceColor = (GpuBudget.isGpuSaverActive || isHighContrast)
+    final baseSurfaceColor = (!AppBlur.canBlur(context) || isHighContrast)
         ? rawSurface
         : rawSurface.withValues(alpha: p.isDark ? 0.96 : 0.98);
 

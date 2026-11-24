@@ -385,8 +385,6 @@ int main() {
         snap->activeStages = 0;
         snap->eq.enabled = false;
         snap->eq.preampDb = 0.0;
-        snap->oversample.enabled = false;
-        snap->pcmToDsd.enabled = false;
         snap->hrtf.enabled = false;
         snap->lowPower.enabled = true;
         engine->publishParams(snap);
@@ -420,16 +418,8 @@ int main() {
         engine->processInterleaved(work.data(), frames, channels);
         check(!engine->isLowPowerBypassed(), "low power bypass must not engage when activeStages > 0");
 
-        // Interlock: Oversampling must block low-power bypass
-        snap->activeStages = 0;
-        snap->oversample.enabled = true;
-        engine->publishParams(snap);
-        work = input;
-        engine->processInterleaved(work.data(), frames, channels);
-        check(!engine->isLowPowerBypassed(), "low power bypass must not engage when remaster/oversample is enabled");
-
         // Interlock: DVC, ReplayGain, Headphone Safety, Direct USB gain must block low-power bypass
-        snap->oversample.enabled = false;
+        snap->activeStages = 0;
         snap->directVolume.enabled = true;
         snap->directVolume.gainLinear = 0.5;
         engine->publishParams(snap);
@@ -461,25 +451,10 @@ int main() {
               "Crossfeed must be suppressed while HRTF binaural virtualization is active");
     }
 
-    // H-03 & M-12: pcmToDsd.enabled does not falsely veto low-power bypass,
-    // and auto-degrading an active EQ stage allows its fade-out ramp to finish
+    // M-12: auto-degrading an active EQ stage allows its fade-out ramp to finish
     // so !eq().isRamping() settles and never wedges low-power bypass afterwards.
     {
         auto engine = makeEngine();
-        auto snap = baseSnapshot();
-        snap->activeStages = 0;
-        snap->eq.enabled = false;
-        snap->eq.preampDb = 0.0;
-        snap->oversample.enabled = false;
-        snap->hrtf.enabled = false;
-        snap->lowPower.enabled = true;
-        snap->pcmToDsd.enabled = true;
-        engine->publishParams(snap);
-        auto work = makeSignal(frames, channels);
-        engine->processInterleaved(work.data(), frames, channels);
-        check(engine->isLowPowerBypassed(),
-              "H-03: pcmToDsd flag alone must not block low-power bypass");
-
         auto eqSnap = baseSnapshot();
         eqSnap->lowPower.enabled = true;
         eqSnap->activeStages = STAGE_EQ;
@@ -490,6 +465,7 @@ int main() {
         eqSnap->eq.bands[0].gainDb = 6.0;
         eqSnap->eq.bands[0].q = 1.0;
         engine->publishParams(eqSnap);
+        std::vector<float> work;
         for (int b = 0; b < 8; ++b) {
             work = makeSignal(frames, channels);
             engine->processInterleaved(work.data(), frames, channels);
@@ -508,7 +484,6 @@ int main() {
         cleanSnap->activeStages = 0;
         cleanSnap->eq.enabled = false;
         cleanSnap->eq.preampDb = 0.0;
-        cleanSnap->oversample.enabled = false;
         cleanSnap->hrtf.enabled = false;
         cleanSnap->lowPower.enabled = true;
         engine->publishParams(cleanSnap);

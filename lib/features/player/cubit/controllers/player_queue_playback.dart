@@ -12,15 +12,26 @@ extension PlayerQueuePlaybackExtension on PlayerQueueController {
     bool openPlayerIfPlaying = true,
     bool preservePlaybackState = false,
     int? queueIndex,
-  }) =>
-      _queueMutex.protect(() => _playSongLocked(
-            song,
-            queue: queue,
-            initialPosition: initialPosition,
-            openPlayerIfPlaying: openPlayerIfPlaying,
-            preservePlaybackState: preservePlaybackState,
-            queueIndex: queueIndex,
-          ));
+  }) {
+    final requestToken = ++_playRequestToken;
+    _cancelPendingSeek();
+    final pendingCancel = _activeLoadCancel;
+    if (pendingCancel != null && !pendingCancel.isCompleted) {
+      pendingCancel.complete();
+    }
+    try {
+      _audioHandler.preemptPendingLoad();
+    } catch (_) {}
+    return _queueMutex.protect(() => _playSongLocked(
+          song,
+          queue: queue,
+          initialPosition: initialPosition,
+          openPlayerIfPlaying: openPlayerIfPlaying,
+          preservePlaybackState: preservePlaybackState,
+          queueIndex: queueIndex,
+          requestToken: requestToken,
+        ));
+  }
 
   /// [preservePlaybackState] — when true (queue shuffle / history jump) the
   /// engine load keeps the current play/pause state instead of auto-playing.
@@ -31,7 +42,9 @@ extension PlayerQueuePlaybackExtension on PlayerQueueController {
     bool openPlayerIfPlaying = true,
     bool preservePlaybackState = false,
     int? queueIndex,
+    int? requestToken,
   }) async {
+    if (requestToken != null && requestToken != _playRequestToken) return;
     _cancelPendingSeek();
     final initialState = _getState();
     if (openPlayerIfPlaying &&
@@ -269,9 +282,12 @@ extension PlayerQueuePlaybackExtension on PlayerQueueController {
 
     _updateWidgetThrottled(force: true);
     _invalidateQueueSyncResolution();
+    if (requestToken != null && requestToken != _playRequestToken) return;
 
+    final loadCancel = Completer<void>();
+    _activeLoadCancel = loadCancel;
     try {
-      await _audioHandler.loadQueue(
+      final loadFuture = _audioHandler.loadQueue(
         effectiveQueue,
         initialIndex: effectiveIndex,
         initialPosition: startPos,
@@ -279,6 +295,20 @@ extension PlayerQueuePlaybackExtension on PlayerQueueController {
         // while the player is paused.
         autoPlay: preservePlaybackState ? state.isPlaying : true,
       );
+      await Future.any<void>([
+        loadFuture.catchError((Object e, StackTrace st) {
+          if (loadCancel.isCompleted ||
+              (requestToken != null && requestToken != _playRequestToken)) {
+            return;
+          }
+          Error.throwWithStackTrace(e, st);
+        }),
+        loadCancel.future,
+      ]);
+      if (identical(_activeLoadCancel, loadCancel)) {
+        _activeLoadCancel = null;
+      }
+      if (requestToken != null && requestToken != _playRequestToken) return;
       _invalidateQueueSyncResolution();
       if (_mediaItemResolutionGuard.isValid(capturedGen) && !_isClosed()) {
         if (_onTrackChangedSideEffects != null) {
@@ -288,6 +318,14 @@ extension PlayerQueuePlaybackExtension on PlayerQueueController {
         }
       }
     } catch (e, st) {
+      if (identical(_activeLoadCancel, loadCancel)) {
+        _activeLoadCancel = null;
+      }
+      if (requestToken != null && requestToken != _playRequestToken) {
+        _mediaItemResolutionGuard.invalidate();
+        _localMatchSwapGuard.invalidate();
+        return;
+      }
       _latencyTracker?.finishWithError(e, stage: PlaybackStage.sourceSet);
       ErrorLogger.log('Load queue failed for song ${song.id}',
           error: e, stackTrace: st, category: 'PlayerQueueController');

@@ -232,6 +232,16 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
       return;
     }
 
+    // 2.5. Let the active branch consume intra-screen back (e.g. Settings
+    // category tab -> "All") before popping tab history.
+    if (BranchScrollBus.instance
+        .handleBranchBack(widget.navigationShell.currentIndex)) {
+      _backPressStopwatch
+        ..stop()
+        ..reset();
+      return;
+    }
+
     // 3. Back navigation through tab history until Home:
     if (_tabHistory.length > 1) {
       _backPressStopwatch
@@ -322,14 +332,19 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
           isInspectorOpenOverride: inspectorOpen,
         ),
         child: PlayerShortcutScope.wrapPlayer(
-          child: A11yLiveAnnouncer(
-            child: _buildShellContent(
-              context,
-              layoutDelegate: layoutDelegate,
-              useRail: useRail,
-              canShowInspector: canShowInspector,
-              inspectorOpen: inspectorOpen,
-              extendedRail: extendedRail,
+          child: TickerMode(
+            // Pause background tab and mini-player tickers while a full-screen
+            // route (such as NowPlayingScreen, which is opaque: false) sits on top.
+            enabled: ModalRoute.of(context)?.isCurrent ?? true,
+            child: A11yLiveAnnouncer(
+              child: _buildShellContent(
+                context,
+                layoutDelegate: layoutDelegate,
+                useRail: useRail,
+                canShowInspector: canShowInspector,
+                inspectorOpen: inspectorOpen,
+                extendedRail: extendedRail,
+              ),
             ),
           ),
         ),

@@ -102,8 +102,6 @@ class BitPerfectOutputFacts {
 
   final bool isDsdDop;
   final bool isDsdNative;
-  final bool oversamplingActive;
-  final bool pcmToDsdActive;
   final bool sourceLossy;
   final bool sourceCodecUnconfirmed;
 
@@ -134,8 +132,6 @@ class BitPerfectOutputFacts {
     this.rateVerified = true,
     this.isDsdDop = false,
     this.isDsdNative = false,
-    this.oversamplingActive = false,
-    this.pcmToDsdActive = false,
     this.sourceLossy = false,
     this.sourceCodecUnconfirmed = false,
     this.failureReason,
@@ -203,8 +199,6 @@ BitPerfectState resolveBitPerfectOutput(BitPerfectOutputFacts facts) {
     channelsAltered: facts.channelsAltered,
     isDsdDop: facts.isDsdDop,
     isDsdNative: facts.isDsdNative,
-    oversamplingActive: facts.oversamplingActive,
-    pcmToDsdActive: facts.pcmToDsdActive,
     sourceLossy: facts.sourceLossy,
     sourceCodecUnconfirmed: facts.sourceCodecUnconfirmed,
     rateVerified: facts.rateVerified,

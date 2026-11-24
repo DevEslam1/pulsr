@@ -118,7 +118,6 @@ abstract final class AudioProfileKeys {
     PrefsKeys.aaudioTargetBufferMs: AudioProfileValueType.integer,
     PrefsKeys.sincResamplerEnabled: AudioProfileValueType.boolean,
     PrefsKeys.sincResamplerQuality: AudioProfileValueType.integer,
-    PrefsKeys.tapSrcQuality: AudioProfileValueType.integer,
     PrefsKeys.usbHardwareVolumeEnabled: AudioProfileValueType.boolean,
     PrefsKeys.dvcEnabled: AudioProfileValueType.boolean,
     PrefsKeys.bluetoothHiResEnabled: AudioProfileValueType.boolean,

@@ -5,12 +5,12 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('Wiring Matrix Architecture Guard', () {
-    test('Wiring matrix contract contains all 14 mandatory sections with required fields', () {
+    test('Wiring matrix contract contains all 12 mandatory sections with required fields', () {
       final file = File('test/fixtures/contracts/wiring_matrix.json');
       expect(file.existsSync(), isTrue, reason: 'Wiring matrix fixture must exist');
 
       final rawList = jsonDecode(file.readAsStringSync()) as List<dynamic>;
-      expect(rawList.length, 14, reason: 'Wiring matrix must cover all 14 Section 8 features');
+      expect(rawList.length, 12, reason: 'Wiring matrix must cover all 12 Section 8 features');
 
       final requiredKeys = [
         'feature',
@@ -25,8 +25,6 @@ void main() {
       final expectedFeatures = {
         'Native DSD',
         'DoP',
-        'Remaster',
-        'PCM-to-DSD',
         'FIR',
         'HRTF',
         'MCH/LFE',

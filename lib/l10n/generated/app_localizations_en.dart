@@ -12690,4 +12690,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsQuickControls => 'Quick Controls';
+
+  @override
+  String get settingsDisableBlurTitle => 'Disable Blur';
+
+  @override
+  String get settingsDisableBlurSubtitle =>
+      'Turn off backdrop and glass blur across all screens and sheets for smoother performance';
 }

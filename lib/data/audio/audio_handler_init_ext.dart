@@ -48,40 +48,6 @@ extension _PulsrAudioInitExt on PulsrAudioHandler {
       ErrorLogger.log('Failed to restore DAC voicing preference',
           error: e, stackTrace: st, category: 'AudioHandler');
     }
-    // Restore the tap-side SRC kernel. The in-chain sinc stage no longer
-    // converts anything (a fixed-size block cannot change rate), so the tap is
-    // the only converter and the stored 64/128/256/512-tap choice has to reach
-    // native before the first track is prepared.
-    try {
-      await AudioEffectsChannel().setTapSrcQuality(
-        _cachedPrefs?.getInt(PrefsKeys.tapSrcQuality) ?? 2,
-      );
-    } catch (e, st) {
-      ErrorLogger.log('Failed to restore tap SRC quality',
-          error: e, stackTrace: st, category: 'AudioHandler');
-    }
-    // Restore Remaster suite settings (oversampling, reconstruction filter kernel, PCM->DSD).
-    try {
-      final oversampleMultiplier =
-          _cachedPrefs?.getInt(PrefsKeys.remasterOversampleMultiplier) ?? 1;
-      final filterKernel =
-          _cachedPrefs?.getInt(PrefsKeys.remasterFilterKernel) ?? 0;
-      final pcmToDsdEnabled =
-          _cachedPrefs?.getBool(PrefsKeys.remasterPcmToDsdEnabled) ?? false;
-      final pcmToDsdRate =
-          _cachedPrefs?.getInt(PrefsKeys.remasterPcmToDsdRate) ?? 64;
-      final pcmToDsdOrder =
-          _cachedPrefs?.getInt(PrefsKeys.remasterPcmToDsdOrder) ?? 5;
-
-      await AudioEffectsChannel().setOversampleMultiplier(oversampleMultiplier);
-      await AudioEffectsChannel().setOversampleKernel(filterKernel);
-      await AudioEffectsChannel().setPcmToDsdEnabled(pcmToDsdEnabled);
-      await AudioEffectsChannel().setPcmToDsdRate(pcmToDsdRate);
-      await AudioEffectsChannel().setPcmToDsdOrder(pcmToDsdOrder);
-    } catch (e, st) {
-      ErrorLogger.log('Failed to restore Remaster settings',
-          error: e, stackTrace: st, category: 'AudioHandler');
-    }
     // Restore Direct Volume Control. Only the system-stream pinning needs to
     // happen here; per-track gain is applied by _calculateReplayGainVolume.
     try {

@@ -367,6 +367,20 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
     return _buildResolvingYoutubeSource(song: song, tag: tag);
   }
 
+  final List<YtmResolvingSource> _activeResolvingSources = [];
+
+  /// Immediately cancels all tracked [YtmResolvingSource] instances so any
+  /// in-flight stream resolution or byte fetch aborts without waiting for
+  /// network/VPN timeouts.
+  void cancelActiveResolvingSources() {
+    if (_activeResolvingSources.isEmpty) return;
+    final snapshot = List<YtmResolvingSource>.from(_activeResolvingSources);
+    _activeResolvingSources.clear();
+    for (final src in snapshot) {
+      src.cancel();
+    }
+  }
+
   YtmResolvingSource _buildResolvingYoutubeSource({
     required SongsTableData song,
     required MediaItem tag,
@@ -403,6 +417,8 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
       onError: (error) => _handleStreamResolutionError(song, error),
       tag: tag,
     );
+    _activeResolvingSources.removeWhere((s) => s.isCancelled);
+    _activeResolvingSources.add(source);
     return source;
   }
 
@@ -464,9 +480,6 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
       rate,
       [_playerA, _playerB, _prefetchPlayer],
     );
-    // Status is derived from the engine; refresh after every tap reconfigure
-    // so the quality sheet never reports a requested factor as active.
-    await AudioEffectsChannel().refreshActiveOversampleMultiplier();
   }
 
   /// Restores optional native playback quality without blocking initialization.

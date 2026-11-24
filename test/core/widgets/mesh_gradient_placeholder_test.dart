@@ -140,7 +140,7 @@ void main() {
       expect(find.byType(MeshGradientPlaceholder), findsNWidgets(2));
       expect(find.text('مر'), findsOneWidget);
       expect(find.text('PU'), findsOneWidget);
-      expect(find.byType(BackdropFilter), findsNWidgets(2));
+      expect(find.byType(BackdropFilter), findsNothing);
     });
 
     testWidgets('skips BackdropFilter under high contrast accessibility mode',

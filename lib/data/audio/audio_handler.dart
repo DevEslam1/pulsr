@@ -674,6 +674,14 @@ class PulsrAudioHandler extends BaseAudioHandler
       unawaited(_syncDopToEffectsEngine(isDop));
     }
     unawaited(_pushNativeReplayGain(song));
+    // Radio is a live, lossy-transcoded stream: TPDF dither and conversion quality
+    // only add audible noise there, so bypass them and restore the user's saved
+    // settings for any non-live track.
+    try {
+      unawaited(AudioEffectsChannel()
+          .setLiveStreamBypass(SongSource.isLive(song.source))
+          .catchError((_) {}));
+    } catch (_) {}
     // Always re-sync output/Direct-USB/hardware volume on track change so a
     // newly opened or reconfigured Bit-Perfect/Direct-USB sink never starts at
     // full scale (1.0) waiting for a physical volume key press.

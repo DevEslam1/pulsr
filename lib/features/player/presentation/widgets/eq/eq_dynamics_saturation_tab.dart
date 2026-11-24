@@ -2,7 +2,7 @@ part of '../equalizer_sheet.dart';
 
 /// Pro Rack Tab 3: Dynamics & Saturation — Studio Dynamics, Lookahead Limiter,
 /// Harmonic Saturation, Sub Crossover, Multichannel Bass, Dynamic Bass,
-/// Dynamic EQ, Loudness Contour, TPDF Dither, Conversion Quality, and Remaster.
+/// Dynamic EQ, Loudness Contour, and TPDF Dither.
 extension _EqDynamicsSaturationTab on _EqualizerSheetState {
   Widget _buildDynamicsSaturationTab(
     BuildContext context,
@@ -63,20 +63,6 @@ extension _EqDynamicsSaturationTab on _EqualizerSheetState {
 
           // TPDF Dither
           _buildDitherCard(context, state, cubit, dspBlocked, p),
-          const SizedBox(height: AppSpacing.md),
-
-          // Conversion Quality (tap-side SRC kernel)
-          ConversionQualityCard(
-            blockedReason: dspBlocked,
-            nativeAvailable: _nativePcmEffectsAvailable,
-          ),
-          const SizedBox(height: AppSpacing.md),
-
-          // Remaster Suite
-          RemasterControlCard(
-            blockedReason: dspBlocked,
-            nativeAvailable: _nativePcmEffectsAvailable,
-          ),
         ],
       ),
     );

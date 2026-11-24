@@ -65,11 +65,11 @@ void main() {
         .thenAnswer((_) => const Stream<SettingsState>.empty());
 
     dynamicThemeCubit = _MockDynamicThemeCubit();
-    when(() => dynamicThemeCubit.state)
-        .thenReturn(const DynamicThemeState());
+    when(() => dynamicThemeCubit.state).thenReturn(const DynamicThemeState());
     when(() => dynamicThemeCubit.stream)
         .thenAnswer((_) => const Stream<DynamicThemeState>.empty());
-    when(() => dynamicThemeCubit.updateFromSong(any())).thenAnswer((_) async {});
+    when(() => dynamicThemeCubit.updateFromSong(any()))
+        .thenAnswer((_) async {});
   });
 
   tearDown(() async {
@@ -676,6 +676,223 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(NowPlayingScreen), findsNothing);
     expect(find.text('Open Now Playing'), findsOneWidget);
+
+    await teardownRouterApp(tester, router);
+  });
+
+  testWidgets(
+      'Android predictive back gesture closes PulsrSheetHelper sheet on StatefulShellRoute tab without leaving tab',
+      (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    late StatefulNavigationShell capturedShell;
+    final router = GoRouter(
+      navigatorKey: rootNavigatorKey,
+      observers: [PulsrModalObserver()],
+      initialLocation: '/',
+      routes: [
+        StatefulShellRoute.indexedStack(
+          builder: (context, state, navigationShell) {
+            capturedShell = navigationShell;
+            return AppShell(navigationShell: navigationShell);
+          },
+          branches: [
+            StatefulShellBranch(
+              routes: [
+                GoRoute(
+                  path: '/',
+                  builder: (context, state) => const Scaffold(
+                    body: Center(child: Text('Home Tab')),
+                  ),
+                ),
+              ],
+            ),
+            StatefulShellBranch(
+              routes: [
+                GoRoute(
+                  path: '/settings',
+                  builder: (context, state) => Scaffold(
+                    body: Center(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          PulsrSheetHelper.showPulsrSheet<void>(
+                            context: context,
+                            builder: (_) => const SizedBox(
+                              height: 200,
+                              child: Center(child: Text('Settings Sheet')),
+                            ),
+                          );
+                        },
+                        child: const Text('Open Settings Sheet'),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MultiBlocProvider(
+        providers: [
+          BlocProvider<PlayerCubit>.value(value: playerCubit),
+          BlocProvider<SettingsCubit>.value(value: settingsCubit),
+          BlocProvider<DynamicThemeCubit>.value(value: dynamicThemeCubit),
+        ],
+        child: MaterialApp.router(
+          theme: AuraTheme.darkTheme,
+          localizationsDelegates: appLocalizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          routerConfig: router,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    capturedShell.goBranch(1);
+    await tester.pumpAndSettle();
+    expect(capturedShell.currentIndex, 1);
+
+    await tester.tap(find.text('Open Settings Sheet'));
+    await tester.pumpAndSettle();
+    expect(find.text('Settings Sheet'), findsOneWidget);
+    expect(PulsrModalTracker.isModalOpen.value, isTrue);
+
+    // Simulate Android 14+ predictive back gesture via SystemChannels.backGesture
+    final codec = const StandardMethodCodec();
+    await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .handlePlatformMessage(
+      SystemChannels.backGesture.name,
+      codec.encodeMethodCall(const MethodCall('startBackGesture', {
+        'touchOffset': [0.0, 400.0],
+        'progress': 0.0,
+        'swipeEdge': 0,
+      })),
+      (_) {},
+    );
+    await tester.pump();
+    await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .handlePlatformMessage(
+      SystemChannels.backGesture.name,
+      codec.encodeMethodCall(const MethodCall('commitBackGesture')),
+      (_) {},
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Settings Sheet'), findsNothing);
+    expect(PulsrModalTracker.isModalOpen.value, isFalse);
+    expect(capturedShell.currentIndex, 1);
+    expect(find.text('Open Settings Sheet'), findsOneWidget);
+
+    await teardownRouterApp(tester, router);
+  });
+
+  testWidgets(
+      'system back closes Equalizer-style sheet opened on context.push(/settings) branch without popping Settings',
+      (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    final router = GoRouter(
+      navigatorKey: rootNavigatorKey,
+      observers: [PulsrModalObserver()],
+      initialLocation: '/',
+      routes: [
+        StatefulShellRoute.indexedStack(
+          builder: (context, state, navigationShell) {
+            return AppShell(navigationShell: navigationShell);
+          },
+          branches: [
+            StatefulShellBranch(
+              routes: [
+                GoRoute(
+                  path: '/',
+                  builder: (context, state) => Scaffold(
+                    body: Center(
+                      child: ElevatedButton(
+                        onPressed: () => context.push('/settings'),
+                        child: const Text('Push Settings'),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            StatefulShellBranch(
+              routes: [
+                GoRoute(
+                  path: '/settings',
+                  builder: (context, state) => Scaffold(
+                    body: Center(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          PulsrSheetHelper.showPulsrSheet<void>(
+                            context: context,
+                            wrapWithContainer: false,
+                            builder: (_) => const SizedBox(
+                              height: 300,
+                              child: Center(child: Text('Equalizer Sheet')),
+                            ),
+                          );
+                        },
+                        child: const Text('Open Equalizer Sheet'),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MultiBlocProvider(
+        providers: [
+          BlocProvider<PlayerCubit>.value(value: playerCubit),
+          BlocProvider<SettingsCubit>.value(value: settingsCubit),
+          BlocProvider<DynamicThemeCubit>.value(value: dynamicThemeCubit),
+        ],
+        child: MaterialApp.router(
+          theme: AuraTheme.darkTheme,
+          localizationsDelegates: appLocalizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          routerConfig: router,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Push Settings branch just like HomeScreen's settings gear icon.
+    await tester.tap(find.text('Push Settings'));
+    await tester.pumpAndSettle();
+    expect(find.text('Open Equalizer Sheet'), findsOneWidget);
+
+    // Open Equalizer-style modal sheet on top of pushed Settings branch.
+    await tester.tap(find.text('Open Equalizer Sheet'));
+    await tester.pumpAndSettle();
+    expect(find.text('Equalizer Sheet'), findsOneWidget);
+    expect(PulsrModalTracker.isModalOpen.value, isTrue);
+
+    // 1st back closes ONLY the sheet; Settings stays open!
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text('Equalizer Sheet'), findsNothing);
+    expect(PulsrModalTracker.isModalOpen.value, isFalse);
+    expect(find.text('Open Equalizer Sheet'), findsOneWidget);
+
+    // 2nd back leaves Settings back to Home.
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text('Open Equalizer Sheet'), findsNothing);
+    expect(find.text('Push Settings'), findsOneWidget);
 
     await teardownRouterApp(tester, router);
   });

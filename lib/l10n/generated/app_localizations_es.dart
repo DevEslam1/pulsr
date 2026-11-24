@@ -12804,4 +12804,11 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get settingsQuickControls => 'Controles rápidos';
+
+  @override
+  String get settingsDisableBlurTitle => 'Desactivar desenfoque';
+
+  @override
+  String get settingsDisableBlurSubtitle =>
+      'Desactiva el desenfoque de fondo en pantallas y hojas para un rendimiento más fluido';
 }

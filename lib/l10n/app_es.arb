@@ -6565,5 +6565,7 @@
   "checkForUpdatesTitle": "Buscar actualizaciones",
   "checkForUpdatesSubtitle": "Buscar nuevas versiones en las publicaciones de GitHub",
   "badgeHiRes": "Alta res.",
-  "settingsQuickControls": "Controles rápidos"
+  "settingsQuickControls": "Controles rápidos",
+  "settingsDisableBlurTitle": "Desactivar desenfoque",
+  "settingsDisableBlurSubtitle": "Desactiva el desenfoque de fondo en pantallas y hojas para un rendimiento más fluido"
 }

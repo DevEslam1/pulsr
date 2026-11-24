@@ -102,9 +102,7 @@ class _SongTileState extends State<SongTile> {
                         ? p.surfaceContainer.withValues(alpha: 0.55)
                         : Colors.transparent)));
 
-        final materialRow = AnimatedContainer(
-          duration: context.motionMs(200),
-          curve: context.motionCurve(PulsrMotion.enter),
+        final materialRow = Container(
           decoration: BoxDecoration(
             color: resolvedBg,
             borderRadius: AppRadii.r16All,

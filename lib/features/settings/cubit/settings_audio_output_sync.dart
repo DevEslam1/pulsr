@@ -270,9 +270,6 @@ extension SettingsAudioOutputSync on SettingsAudioActions {
     // across syncs.
     final isPrimaryOutput = info != null && !info.isUsbDac && !info.isBluetooth;
     final mixerRate = isPrimaryOutput ? (info.nativeSampleRate ?? 0) : 0;
-    final trackRate = trackSampleRate ??
-        getIt<PulsrAudioHandler>().currentSong?.sampleRate ??
-        0;
     final rate = decideTapSrcTargetRate(
       enabled: state.outputFormatNegotiationEnabled,
       nativeSampleRate: mixerRate,
@@ -282,14 +279,11 @@ extension SettingsAudioOutputSync on SettingsAudioActions {
       isBluetooth: info?.isBluetooth ?? false,
       isSpeaker: info?.isSpeaker ?? false,
       deviceSampleRates: info?.supportedSampleRates ?? const <int>[],
-      remasterMultiplier: AudioEffectsChannel().currentOversampleMultiplier,
-      trackSampleRate: trackRate,
     );
     if (!force && rate == _lastTapSrcTargetRate) return;
     _lastTapSrcTargetRate = rate;
     try {
       await getIt<PulsrAudioHandler>().setTapSrcRate(rate);
-      await AudioEffectsChannel().refreshActiveOversampleMultiplier();
     } catch (e, st) {
       _lastTapSrcTargetRate = null;
       ErrorLogger.log('Failed to sync tap-side SRC rate ($rate)',

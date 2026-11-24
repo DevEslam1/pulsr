@@ -837,7 +837,8 @@ class _KaraokeSyncedLineTile extends StatelessWidget {
             fontStyle: isBackground ? FontStyle.italic : FontStyle.normal,
             height: 1.32,
             letterSpacing: isActive ? AppTracking.heading : AppTracking.title,
-            color: isActive ? activeColor : p.textSecondary,
+            color: (isActive ? activeColor : p.textSecondary)
+                .withValues(alpha: lineOpacity),
             shadows: (isActive && !p.isCalmDensity)
                 ? [
                     Shadow(
@@ -862,17 +863,18 @@ class _KaraokeSyncedLineTile extends StatelessWidget {
                 fontSize: AppFontSize.body,
                 fontWeight: FontWeight.w500,
                 fontStyle: FontStyle.italic,
-                color: isActive
-                    ? activeColor.withValues(alpha: 0.90)
-                    : p.textTertiary,
+                color: (isActive
+                        ? activeColor.withValues(alpha: 0.90)
+                        : p.textTertiary)
+                    .withValues(alpha: lineOpacity),
               ),
             ),
           ),
       ],
     );
 
-    if (blurSigma > 0.0 && AppBlur.canBlur(context)) {
-      final clamped = AppBlur.clampSigma(blurSigma);
+    if (blurSigma >= 0.8 && AppBlur.canBlur(context)) {
+      final clamped = AppBlur.clampSigma(blurSigma).clamp(0.0, AppBlur.chip);
       content = ImageFiltered(
         imageFilter: ui.ImageFilter.blur(sigmaX: clamped, sigmaY: clamped),
         child: content,
@@ -893,35 +895,30 @@ class _KaraokeSyncedLineTile extends StatelessWidget {
             constraints: const BoxConstraints(
               minHeight: AppSpacing.minTouchTarget,
             ),
-            child: AnimatedOpacity(
+            child: AnimatedContainer(
               duration: context.motionMs(260),
               curve: context.motionCurve(Curves.easeOutCubic),
-              opacity: lineOpacity,
-              child: AnimatedContainer(
+              padding: EdgeInsets.symmetric(
+                vertical: isCompact ? AppSpacing.s6 : AppSpacing.s10,
+                horizontal: AppSpacing.sm,
+              ),
+              decoration: isActive
+                  ? BoxDecoration(
+                      borderRadius: AppRadii.r16All,
+                      color: activeColor.withValues(
+                        alpha: p.isDark ? 0.10 : 0.08,
+                      ),
+                    )
+                  : null,
+              alignment:
+                  alignEnd ? Alignment.centerRight : Alignment.centerLeft,
+              child: AnimatedScale(
+                scale: isActive ? 1.03 : 0.97,
                 duration: context.motionMs(260),
                 curve: context.motionCurve(Curves.easeOutCubic),
-                padding: EdgeInsets.symmetric(
-                  vertical: isCompact ? AppSpacing.s6 : AppSpacing.s10,
-                  horizontal: AppSpacing.sm,
-                ),
-                decoration: isActive
-                    ? BoxDecoration(
-                        borderRadius: AppRadii.r16All,
-                        color: activeColor.withValues(
-                          alpha: p.isDark ? 0.10 : 0.08,
-                        ),
-                      )
-                    : null,
                 alignment:
                     alignEnd ? Alignment.centerRight : Alignment.centerLeft,
-                child: AnimatedScale(
-                  scale: isActive ? 1.03 : 0.97,
-                  duration: context.motionMs(260),
-                  curve: context.motionCurve(Curves.easeOutCubic),
-                  alignment:
-                      alignEnd ? Alignment.centerRight : Alignment.centerLeft,
-                  child: content,
-                ),
+                child: content,
               ),
             ),
           ),
@@ -1378,7 +1375,7 @@ class _KaraokeFloatingPill extends StatelessWidget {
     final cubit = props.cubit;
     final l10n = context.l10n;
     final allowBlur = !isPreview && AppBlur.canBlur(context);
-    final sigma = AppBlur.clampSigma(AppBlur.dock);
+    final sigma = AppBlur.clampSigma(AppBlur.standard);
     final clampedRadius = pillRadius.clamp(12.0, 36.0);
     final corners = AppRadii.circular(clampedRadius);
 

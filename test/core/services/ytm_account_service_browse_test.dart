@@ -972,6 +972,65 @@ void main() {
           ['plTrack0001', 'plTrack0002']);
     });
 
+    test(
+        'follows continuationItemRenderer inside contents and onResponseReceivedActions',
+        () async {
+      final service = await loggedIn();
+      handler = (request) async {
+        final body = jsonDecode(request.body) as Map<String, dynamic>;
+        if (body['continuation'] == 'contItemTok2') {
+          return _json(200, {
+            'onResponseReceivedActions': [
+              {
+                'appendContinuationItemsAction': {
+                  'continuationItems': [
+                    _responsiveTrack(videoId: 'plTrack0002', title: 'Second'),
+                    {
+                      'continuationItemRenderer': {
+                        'continuationEndpoint': {
+                          'continuationCommand': {'token': 'contItemTok3'},
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+          });
+        }
+        if (body['continuation'] == 'contItemTok3') {
+          return _json(200, {
+            'onResponseReceivedActions': [
+              {
+                'appendContinuationItemsAction': {
+                  'continuationItems': [
+                    _responsiveTrack(videoId: 'plTrack0003', title: 'Third'),
+                  ],
+                },
+              },
+            ],
+          });
+        }
+        return _json(200, {
+          ..._header(title: 'Modern Paged'),
+          ..._shelf([
+            _responsiveTrack(videoId: 'plTrack0001', title: 'First'),
+            {
+              'continuationItemRenderer': {
+                'continuationEndpoint': {
+                  'continuationCommand': {'token': 'contItemTok2'},
+                },
+              },
+            },
+          ]),
+        });
+      };
+
+      final details = await service.fetchPlaylistDetails('VLPLmodern');
+      expect(details!.tracks.map((t) => t.videoId).toList(),
+          ['plTrack0001', 'plTrack0002', 'plTrack0003']);
+    });
+
     test('uses the editable header shape and the /next fallback', () async {
       final service = await loggedIn();
       handler = (request) async {

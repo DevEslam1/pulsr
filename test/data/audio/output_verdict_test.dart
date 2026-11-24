@@ -73,28 +73,5 @@ void main() {
       expect(verdict.isBitPerfect, isFalse);
     });
 
-    test('refuses bit-perfect when Remaster oversampling is active', () {
-      final obs = LiveOutputObservation(
-        output: const AudioOutputInfo(
-          deviceName: 'USB DAC',
-          isUsbDac: true,
-          sampleRate: 192000,
-          bitDepth: 24,
-          isBitPerfectActive: false,
-          sinkSampleRate: 192000,
-          sinkBitDepth: 24,
-        ),
-        directStreamingActive: true,
-        taggedSampleRate: 48000,
-        taggedBitDepth: 24,
-        bitPerfectOutput: true,
-        strictBitPerfect: false,
-        bypassDspOnBitPerfect: true,
-        oversamplingActive: true,
-      );
-
-      final OutputVerdict verdict = resolveLiveOutputVerdict(obs);
-      expect(verdict.isBitPerfect, isFalse);
-    });
   });
 }

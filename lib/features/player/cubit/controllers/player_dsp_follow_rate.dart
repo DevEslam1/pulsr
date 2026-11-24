@@ -42,13 +42,6 @@ extension PlayerDspFollowRate on PlayerDspController {
         // dither, balance, ReplayGain and DVC, so a dithered chain could be
         // recorded as a verified bit-perfect session.
         final dspSlice = _getState().dsp;
-        // Derived from the engine, not the request: bit-perfect, a refused DAC
-        // rate or a not-yet-rebuilt sink all leave the factor at 1.
-        await AudioEffectsChannel().refreshActiveOversampleMultiplier();
-        if (_isClosed() || _isStaleFollowRequest(song)) return;
-        final oversampleMult =
-            AudioEffectsChannel().activeOversampleMultiplier;
-        final pcmToDsd = AudioEffectsChannel().isPcmToDsdActive;
         final verdict = resolveLiveOutputVerdict(LiveOutputObservation(
           output: outputDevice,
           directStreamingActive: usbSnapshot.streamingActive,
@@ -76,8 +69,6 @@ extension PlayerDspFollowRate on PlayerDspController {
           isDsdDop: DsdDecoderHelper.dsdDopActive,
           isDsdNative: DsdDecoderHelper.dsdNativeActive ||
               (usbSnapshot.streamingActive && usbSnapshot.dsdActive),
-          oversamplingActive: oversampleMult > 1,
-          pcmToDsdActive: pcmToDsd,
         ));
         final bitPerfectState = verdict.state;
         final sourceRate = verdict.sourceSampleRate;
@@ -354,7 +345,6 @@ extension PlayerDspFollowRate on PlayerDspController {
             trackBitDepth: depth,
             requestedSampleRate: rate,
             requestedBitDepth: depth,
-            oversampleMultiplier: oversampleMult,
           ),
           deviceSampleRates: advertised.isEmpty ? <int>[rate] : advertised,
           deviceMaxBitDepth: depth,

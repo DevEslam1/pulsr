@@ -158,12 +158,6 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     // without changing the loadHrtfSofa bool contract.
     @Volatile private var hrtfSofaLastError: String? = null
 
-    @Volatile private var remasterOversampleMultiplier = 1
-    @Volatile private var remasterOversampleKernel = 0
-    @Volatile private var remasterPcmToDsdEnabled = false
-    @Volatile private var remasterPcmToDsdRate = 64
-    @Volatile private var remasterPcmToDsdOrder = 5
-
     @Volatile private var isLimiterEnabled = false
     @Volatile private var limiterLookaheadMs = DspParamRanges.limiterLookaheadMs.defaultValue
     @Volatile private var limiterThresholdDb = -0.2
@@ -649,21 +643,6 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private external fun nativeSetStereoBalance(balance: Double)
     private external fun nativeSetMonoMix(mono: Boolean)
     private external fun nativeSetSincResamplerEnabled(enabled: Boolean)
-    // Tap-side SRC kernel size (0..3 -> 64/128/256/512 taps). The engine
-    // rebuilds it on the control thread; the audio callback never reallocates.
-    private external fun nativeSetTapSrcQuality(quality: Int)
-    private external fun nativeGetTapSrcQuality(): Int
-    private external fun nativeSetOversampleMultiplier(multiplier: Int)
-    private external fun nativeGetOversampleMultiplier(): Int
-    private external fun nativeGetActiveOversampleMultiplier(): Int
-    private external fun nativeSetOversampleKernel(kernel: Int)
-    private external fun nativeGetOversampleKernel(): Int
-    private external fun nativeSetPcmToDsdEnabled(enabled: Boolean)
-    private external fun nativeIsPcmToDsdEnabled(): Boolean
-    private external fun nativeSetPcmToDsdRate(rate: Int)
-    private external fun nativeGetPcmToDsdRate(): Int
-    private external fun nativeSetPcmToDsdOrder(order: Int)
-    private external fun nativeGetPcmToDsdOrder(): Int
     private external fun nativeSetSaturationEnabled(enabled: Boolean)
     private external fun nativeSetSaturationParams(drive: Double, mix: Double, tilt: Double, mode: Int, multiband: Boolean)
     private external fun nativeSetSaturationMultiband(multiband: Boolean)
@@ -1079,21 +1058,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             StagePowerSpec(STAGE_HEADPHONE_SAFETY, "headphoneSafety", "Headphone Safety Limiter", 3.5, false),
             StagePowerSpec(STAGE_CHANNEL_MANAGER, "channelManager", "Channel Manager (${channelManagerChannelCount}ch)", chMgrWeight, false),
             StagePowerSpec(STAGE_DAC_VOICING, "dacVoicing", "DAC Voicing (4x OS)", 16.0, true),
-            // Remaster runs outside the stage bitmask; the drain estimator
-            // selects it by feature state instead of bit membership.
-            StagePowerSpec(0, "remaster", "Output Oversampling (Remaster)", 6.0, true),
             StagePowerSpec(STAGE_HRTF, "hrtf", "HRTF Binaural Convolution", 9.0, true),
         )
-    }
-
-    private fun activeRemasterFactor(): Int {
-        if (!isNativeDspLoaded) return 1
-        val live = try {
-            nativeGetActiveOversampleMultiplier()
-        } catch (_: Throwable) {
-            1
-        }
-        return maxOf(live, remasterOversampleMultiplier)
     }
 
     /** Single source of truth for "is the DSP chain audible right now?". */
@@ -1102,10 +1068,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             return false
         }
         if (Integer.bitCount(activeDspStages) > 0) return true
-        // H-03: PcmToDsd is offline-engine-only (not on the playback route), so
-        // it must not falsely mark playback DSP active or block bit-perfect bypass.
         // H-05: DVC and ReplayGain actively scale PCM samples inside the engine.
-        return activeRemasterFactor() > 1 || isHrtfBinauralEnabled || dvcActive || isReplayGainEnabled
+        return isHrtfBinauralEnabled || dvcActive || isReplayGainEnabled
     }
 
     /**
@@ -1128,7 +1092,6 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         val activeCount = Integer.bitCount(stages)
         val dspActive = computeDspActive()
         syncDspActiveRouting()
-        val remasterFactor = activeRemasterFactor()
 
         val lowPowerBypass = if (isNativeDspLoaded) {
             try { nativeIsLowPowerBypassed() } catch (_: Exception) { false }
@@ -1144,7 +1107,6 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         if (dspActive) {
             val activeSpecs = stagePowerSpecs().filter { spec ->
                 when (spec.stageId) {
-                    "remaster" -> remasterFactor > 1
                     "hrtf" -> isHrtfBinauralEnabled
                     else -> (stages and spec.bit) != 0
                 }
@@ -1190,13 +1152,11 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             "effectiveStageCount" to if (dspActive) {
                 stagePowerSpecs().count { spec ->
                     when (spec.stageId) {
-                        "remaster" -> remasterFactor > 1
                         "hrtf" -> isHrtfBinauralEnabled
                         else -> (stages and spec.bit) != 0
                     }
                 }
             } else 0,
-            "remasterFactor" to remasterFactor,
             "hrtfActive" to isHrtfBinauralEnabled,
             "rollingRtf" to rtf,
             "baselineMahPerHour" to baselineMahPerHr,
@@ -2465,8 +2425,6 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         }
         safeCall(TAG, "nativeSetBypassCompare") { nativeSetBypassCompare(false, 0.0) }
         safeCall(TAG, "nativeSetHrtfBinauralEnabled") { nativeSetHrtfBinauralEnabled(false) }
-        safeCall(TAG, "nativeSetOversampleMultiplier") { nativeSetOversampleMultiplier(1) }
-        safeCall(TAG, "nativeSetPcmToDsdEnabled") { nativeSetPcmToDsdEnabled(false) }
         safeCall(TAG, "nativeSetBitPerfectParams") {
             nativeSetBitPerfectParams(isBitPerfectBypassActive, isBitPerfectBypassActive && isDopActive)
         }
@@ -2926,13 +2884,6 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             pushNativeHrtfElevation(hrtfElevation)
             pushNativeHrtfBinauralEnabled(isHrtfBinauralEnabled && !isCrossfeedEnabled)
         }
-        safeCall(TAG, "restoreRemaster") {
-            nativeSetOversampleKernel(remasterOversampleKernel)
-            nativeSetOversampleMultiplier(remasterOversampleMultiplier)
-            nativeSetPcmToDsdOrder(remasterPcmToDsdOrder)
-            nativeSetPcmToDsdRate(remasterPcmToDsdRate)
-            nativeSetPcmToDsdEnabled(remasterPcmToDsdEnabled)
-        }
         safeCall(TAG, "restoreLimiter") {
             pushNativeLimiterParams(
                 limiterLookaheadMs, limiterThresholdDb, limiterReleaseMs, limiterTruePeakMode,
@@ -3110,15 +3061,11 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     isBitPerfectBypassActive = bypass
                     isDopActive = targetDop
                     if (bypass) {
-                        // Immediately disable virtualizer/loudness/bass + remaster/native stages
+                        // Immediately disable virtualizer/loudness/bass/dynamics
                         try { virtualizer?.enabled = false } catch (_: Exception) {}
                         try { loudnessEnhancer?.enabled = false } catch (_: Exception) {}
                         try { bassBoost?.enabled = false } catch (_: Exception) {}
                         try { dynamicsProcessing?.enabled = false } catch (_: Exception) {}
-                        if (isNativeDspLoaded) {
-                            try { nativeSetOversampleMultiplier(1) } catch (_: Exception) {}
-                            try { nativeSetPcmToDsdEnabled(false) } catch (_: Exception) {}
-                        }
                         recalculateActiveStages()
                     } else {
                         recalculateActiveStages()
@@ -3222,14 +3169,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 "awaitDspControlUpdates",
                 "setReverbCrossChannel", "loadImpulseResponse", "setCacheBudgetBytes",
                 "getAutoDegradedStages", "setStereoBalance", "setMonoMix",
-                "setSincResamplerEnabled", "setTapSrcQuality", "getTapSrcQuality",
+                "setSincResamplerEnabled",
                 "probeAudioDecoder",
-                "setOversampleMultiplier", "getOversampleMultiplier",
-                "getActiveOversampleMultiplier",
-                "setOversampleKernel", "getOversampleKernel",
-                "setPcmToDsdEnabled", "isPcmToDsdEnabled",
-                "setPcmToDsdRate", "getPcmToDsdRate",
-                "setPcmToDsdOrder", "getPcmToDsdOrder",
                 "setSaturationEnabled", "setSaturationParams", "setSaturationMultiband",
                 "setDacVoicingEnabled", "setDacVoicingParams",
                 "setStereoWidthEnabled", "setStereoWidthParams",
@@ -4456,37 +4397,6 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     result.success(true)
                 }
 
-                // Tap-side SRC kernel. The in-chain sinc stage no longer
-                // converts anything (the block contract is N-in/N-out), so the
-                // tap is the only converter and this is its quality knob.
-                "setTapSrcQuality" -> {
-                    val quality = (call.argument<Int>("quality") ?: 2).coerceIn(0, 3)
-                    if (!isNativeDspLoaded) {
-                        result.success(false)
-                        return
-                    }
-                    try {
-                        nativeSetTapSrcQuality(quality)
-                        result.success(true)
-                    } catch (e: Exception) {
-                        Log.w(TAG, "nativeSetTapSrcQuality failed: ${e.message}")
-                        result.error("NATIVE_ERROR", e.message, null)
-                    }
-                }
-                "getTapSrcQuality" -> {
-                    if (!isNativeDspLoaded) {
-                        result.success(null)
-                        return
-                    }
-                    result.success(
-                        try {
-                            nativeGetTapSrcQuality()
-                        } catch (e: Exception) {
-                            Log.w(TAG, "nativeGetTapSrcQuality failed: ${e.message}")
-                            null
-                        }
-                    )
-                }
                 "probeAudioDecoder" -> {
                     val mime = call.argument<String>("mime")?.trim()?.lowercase()
                     val sampleRate = call.argument<Int>("sampleRate") ?: 0
@@ -4495,186 +4405,6 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                         return
                     }
                     result.success(platformHasDecoder(mime, sampleRate))
-                }
-
-                // Remaster: Output Oversampling & Reconstruction Filter Suite
-                "setOversampleMultiplier" -> {
-                    val multiplier = (call.argument<Int>("multiplier") ?: 1).let {
-                        if (it == 2 || it == 4 || it == 8) it else 1
-                    }
-                    if (!isNativeDspLoaded) {
-                        result.success(false)
-                        return
-                    }
-                    if (isBitPerfectBypassActive && multiplier > 1) {
-                        result.success(false)
-                        return
-                    }
-                    try {
-                        remasterOversampleMultiplier = multiplier
-                        nativeSetOversampleMultiplier(multiplier)
-                        cachedDebugReport = null
-                        syncDspActiveRouting()
-                        result.success(true)
-                    } catch (e: Exception) {
-                        Log.w(TAG, "nativeSetOversampleMultiplier failed: ${e.message}")
-                        result.error("NATIVE_ERROR", e.message, null)
-                    }
-                }
-                "getOversampleMultiplier" -> {
-                    if (!isNativeDspLoaded) {
-                        result.success(1)
-                        return
-                    }
-                    result.success(
-                        try {
-                            nativeGetOversampleMultiplier()
-                        } catch (e: Exception) {
-                            Log.w(TAG, "nativeGetOversampleMultiplier failed: ${e.message}")
-                            1
-                        }
-                    )
-                }
-                "getActiveOversampleMultiplier" -> {
-                    if (!isNativeDspLoaded) {
-                        result.success(1)
-                        return
-                    }
-                    result.success(
-                        try {
-                            nativeGetActiveOversampleMultiplier()
-                        } catch (e: Exception) {
-                            Log.w(TAG, "nativeGetActiveOversampleMultiplier failed: ${e.message}")
-                            1
-                        }
-                    )
-                }
-                "setOversampleKernel" -> {
-                    val kernel = (call.argument<Int>("kernel") ?: 0).coerceIn(0, 3)
-                    if (!isNativeDspLoaded) {
-                        result.success(false)
-                        return
-                    }
-                    try {
-                        remasterOversampleKernel = kernel
-                        nativeSetOversampleKernel(kernel)
-                        cachedDebugReport = null
-                        result.success(true)
-                    } catch (e: Exception) {
-                        Log.w(TAG, "nativeSetOversampleKernel failed: ${e.message}")
-                        result.error("NATIVE_ERROR", e.message, null)
-                    }
-                }
-                "getOversampleKernel" -> {
-                    if (!isNativeDspLoaded) {
-                        result.success(0)
-                        return
-                    }
-                    result.success(
-                        try {
-                            nativeGetOversampleKernel()
-                        } catch (e: Exception) {
-                            Log.w(TAG, "nativeGetOversampleKernel failed: ${e.message}")
-                            0
-                        }
-                    )
-                }
-                "setPcmToDsdEnabled" -> {
-                    val enabled = call.argument<Boolean>("enabled") ?: false
-                    if (!isNativeDspLoaded) {
-                        result.success(false)
-                        return
-                    }
-                    if (isBitPerfectBypassActive && enabled) {
-                        result.success(false)
-                        return
-                    }
-                    try {
-                        remasterPcmToDsdEnabled = enabled
-                        nativeSetPcmToDsdEnabled(enabled)
-                        cachedDebugReport = null
-                        syncDspActiveRouting()
-                        result.success(true)
-                    } catch (e: Exception) {
-                        Log.w(TAG, "nativeSetPcmToDsdEnabled failed: ${e.message}")
-                        result.error("NATIVE_ERROR", e.message, null)
-                    }
-                }
-                "isPcmToDsdEnabled" -> {
-                    if (!isNativeDspLoaded) {
-                        result.success(false)
-                        return
-                    }
-                    result.success(
-                        try {
-                            nativeIsPcmToDsdEnabled()
-                        } catch (e: Exception) {
-                            Log.w(TAG, "nativeIsPcmToDsdEnabled failed: ${e.message}")
-                            false
-                        }
-                    )
-                }
-                "setPcmToDsdRate" -> {
-                    val rate = (call.argument<Int>("rate") ?: 64).let {
-                        if (it == 128 || it == 256) it else 64
-                    }
-                    if (!isNativeDspLoaded) {
-                        result.success(false)
-                        return
-                    }
-                    try {
-                        remasterPcmToDsdRate = rate
-                        nativeSetPcmToDsdRate(rate)
-                        cachedDebugReport = null
-                        result.success(true)
-                    } catch (e: Exception) {
-                        Log.w(TAG, "nativeSetPcmToDsdRate failed: ${e.message}")
-                        result.error("NATIVE_ERROR", e.message, null)
-                    }
-                }
-                "getPcmToDsdRate" -> {
-                    if (!isNativeDspLoaded) {
-                        result.success(64)
-                        return
-                    }
-                    result.success(
-                        try {
-                            nativeGetPcmToDsdRate()
-                        } catch (e: Exception) {
-                            Log.w(TAG, "nativeGetPcmToDsdRate failed: ${e.message}")
-                            64
-                        }
-                    )
-                }
-                "setPcmToDsdOrder" -> {
-                    val order = (call.argument<Int>("order") ?: 5).coerceIn(1, 5)
-                    if (!isNativeDspLoaded) {
-                        result.success(false)
-                        return
-                    }
-                    try {
-                        remasterPcmToDsdOrder = order
-                        nativeSetPcmToDsdOrder(order)
-                        cachedDebugReport = null
-                        result.success(true)
-                    } catch (e: Exception) {
-                        Log.w(TAG, "nativeSetPcmToDsdOrder failed: ${e.message}")
-                        result.error("NATIVE_ERROR", e.message, null)
-                    }
-                }
-                "getPcmToDsdOrder" -> {
-                    if (!isNativeDspLoaded) {
-                        result.success(5)
-                        return
-                    }
-                    result.success(
-                        try {
-                            nativeGetPcmToDsdOrder()
-                        } catch (e: Exception) {
-                            Log.w(TAG, "nativeGetPcmToDsdOrder failed: ${e.message}")
-                            5
-                        }
-                    )
                 }
 
                 // Sinc Resampler (enable-true and quality/rates rejected at top of dispatch)
@@ -7291,8 +7021,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     isLiveProgEnabled ||
                     isDitherEnabled ||
                     isReplayGainEnabled ||
-                    dvcActive ||
-                    activeRemasterFactor() > 1
+                    dvcActive
             )
 
             return halActive || nativeActive

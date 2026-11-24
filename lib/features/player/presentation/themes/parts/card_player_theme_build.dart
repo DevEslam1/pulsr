@@ -290,7 +290,7 @@ class _SpatialBlurredCanvas extends StatelessWidget {
     final p = context.palette;
     final isDark = p.isDark;
     final canBlur = AppBlur.canBlur(context);
-    final double sigma = AppBlur.clampSigma(AppBlur.maxSigma);
+    final double sigma = AppBlur.clampSigma(AppBlur.standard);
 
     final hsl = HSLColor.fromColor(activeColor);
     final accentLift = hsl
@@ -327,6 +327,8 @@ class _SpatialBlurredCanvas extends StatelessWidget {
                                 song!.remoteArtworkUrl ?? song!.artworkUri,
                             type: ArtworkType.AUDIO,
                             size: double.infinity,
+                            cacheWidth: 96,
+                            cacheHeight: 96,
                             highQuality: false,
                           ),
                         ),
@@ -936,7 +938,7 @@ class _SpatialGlassControlCard extends StatelessWidget {
     final activeColor = props.activeColor;
     final isDark = p.isDark;
     final canBlur = AppBlur.canBlur(context);
-    final double sigma = AppBlur.clampSigma(AppBlur.sheet);
+    final double sigma = AppBlur.clampSigma(AppBlur.standard);
     final BorderRadius corners = AppRadii.circular(cardRadius);
 
     final Color glassFill = canBlur
