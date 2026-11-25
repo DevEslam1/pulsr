@@ -342,7 +342,7 @@ int main() {
               "WriteInterleaved must be refused in DSD mode");
         check(UsbAudioSinkTestAccess::lastError(sink) == ENOTSUP,
               "a PCM write in DSD mode must report ENOTSUP");
-        uint8_t pcm[16] = {0};
+        uint8_t pcm[32] = {0};
         check(!sink.WritePcm(pcm, 4, 2, 32, 88200, 80), "WritePcm must be refused in DSD mode");
         check(UsbAudioSinkTestAccess::writeCount(sink) == pcmWritesBefore,
               "refused PCM writes must not alter the DSD ring");
