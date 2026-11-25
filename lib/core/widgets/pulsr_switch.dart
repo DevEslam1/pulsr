@@ -13,6 +13,7 @@ import 'pulsr_pressable.dart';
 
 import '../utils/l10n_extensions.dart';
 import '../utils/pulsr_haptics.dart';
+
 /// {@category DesignSystem}
 enum PulsrSwitchSize {
   small,

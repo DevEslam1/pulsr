@@ -111,7 +111,8 @@ void main() {
     expect(response.status, 403);
   });
 
-  test('returns 403 when the token is missing or the path is not a token', () async {
+  test('returns 403 when the token is missing or the path is not a token',
+      () async {
     final withoutToken = await fetch('/media');
     final extraSegment = await fetch('/media/token-1/extra');
 
@@ -262,7 +263,8 @@ void main() {
     );
   });
 
-  test('coalesces concurrent start calls and skips VPN/TUN interfaces when selecting LAN IPv4',
+  test(
+      'coalesces concurrent start calls and skips VPN/TUN interfaces when selecting LAN IPv4',
       () async {
     final raceServer = MediaHttpServer();
     addTearDown(raceServer.stop);
@@ -273,10 +275,17 @@ void main() {
     expect(raceServer.isRunning, isTrue);
     expect(raceServer.port, isPositive);
 
-    final picked = MediaHttpServer.selectPreferredIpv4(<({String name, List<InternetAddress> addresses})>[
+    final picked = MediaHttpServer
+        .selectPreferredIpv4(<({String name, List<InternetAddress> addresses})>[
       (name: 'tun0', addresses: <InternetAddress>[InternetAddress('10.8.0.2')]),
-      (name: 'wg0', addresses: <InternetAddress>[InternetAddress('100.64.0.5')]),
-      (name: 'wlan0', addresses: <InternetAddress>[InternetAddress('192.168.1.42')]),
+      (
+        name: 'wg0',
+        addresses: <InternetAddress>[InternetAddress('100.64.0.5')]
+      ),
+      (
+        name: 'wlan0',
+        addresses: <InternetAddress>[InternetAddress('192.168.1.42')]
+      ),
     ]);
     expect(picked, '192.168.1.42');
   });

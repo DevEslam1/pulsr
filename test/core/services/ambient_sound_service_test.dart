@@ -135,7 +135,8 @@ void main() {
       }
     });
 
-    test('enforces maxConcurrentEffects by rotating out oldest effect', () async {
+    test('enforces maxConcurrentEffects by rotating out oldest effect',
+        () async {
       final service = AmbientSoundService();
 
       await service.toggleEffect(AmbientSoundEffect.rain);
@@ -240,7 +241,8 @@ void main() {
       expect(service.activeEffects, isEmpty);
     });
 
-    test('setEnabled(true) restores previously active effects or defaults to rain',
+    test(
+        'setEnabled(true) restores previously active effects or defaults to rain',
         () async {
       final service = AmbientSoundService();
       // First enable ocean
@@ -260,13 +262,14 @@ void main() {
       await service.setEnabled(false);
     });
 
-    test('_executePersist produces no unhandled async errors when prefs.set* fail',
+    test(
+        '_executePersist produces no unhandled async errors when prefs.set* fail',
         () async {
       final uncaught = <Object>[];
       AmbientSoundService.prefsProvider =
           () async => _ThrowingSharedPreferences();
-      addTearDown(
-          () => AmbientSoundService.prefsProvider = SharedPreferences.getInstance);
+      addTearDown(() =>
+          AmbientSoundService.prefsProvider = SharedPreferences.getInstance);
 
       await runZonedGuarded(() async {
         await AmbientSoundService().executePersistForTesting();
@@ -278,7 +281,8 @@ void main() {
       expect(uncaught, isEmpty);
     });
 
-    test('setSleepTimer replaces previous timer via epoch and does not cancel early',
+    test(
+        'setSleepTimer replaces previous timer via epoch and does not cancel early',
         () async {
       final service = AmbientSoundService();
       await service.init();
@@ -294,7 +298,8 @@ void main() {
       await service.setEnabled(false);
     });
 
-    test('ambient sounds always work during Quran Mode even when allowDuringQuran is false',
+    test(
+        'ambient sounds always work during Quran Mode even when allowDuringQuran is false',
         () async {
       final service = AmbientSoundService();
       await service.init();
@@ -313,7 +318,8 @@ void main() {
       await service.setEnabled(false);
     });
 
-    test('allowDuringQuran auto-plays ambient sounds with Quran Mode and disables on exit',
+    test(
+        'allowDuringQuran auto-plays ambient sounds with Quran Mode and disables on exit',
         () async {
       final service = AmbientSoundService();
       await service.init();

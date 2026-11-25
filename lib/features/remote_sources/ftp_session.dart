@@ -229,9 +229,12 @@ class FtpSession {
         throw errors.mapReply(ack, command.split(' ').first);
       }
       transferStarted = ack.isIntermediate;
-      await for (final chunk in data.cast<List<int>>().transform(
-        const Utf8Decoder(allowMalformed: true),
-      ).timeout(_timeout)) {
+      await for (final chunk in data
+          .cast<List<int>>()
+          .transform(
+            const Utf8Decoder(allowMalformed: true),
+          )
+          .timeout(_timeout)) {
         buffer.write(chunk);
         if (buffer.length > maxListingBytes) {
           throw const RemoteProtocolError(

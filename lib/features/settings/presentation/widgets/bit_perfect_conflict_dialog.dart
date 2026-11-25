@@ -14,6 +14,7 @@ import '../../cubit/settings_cubit.dart';
 import '../../cubit/settings_state.dart';
 
 import '../../../../core/errors/app_error.dart';
+
 class _Conflict {
   const _Conflict(this.label, this.disable);
   final String label;

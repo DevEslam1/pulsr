@@ -12,6 +12,7 @@ import 'package:pulsr/features/settings/presentation/widgets/settings_hero_card.
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 class MockAuthCubit extends Mock implements AuthCubit {}
 
 class MockUser extends Mock implements User {}

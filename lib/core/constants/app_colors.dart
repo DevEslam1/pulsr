@@ -6,21 +6,29 @@ import 'package:material_ui/material_ui.dart';
 abstract class AppColors {
   // Brand accents — Pulsr Crimson default brand palette (#E11D48 / #F43F5E)
   // with optional dynamic Aura tinting extracted from currently playing track artwork.
-  static const Color crimson = Color(0xFFE11D48); // Deep Pulsr Crimson (matching app icon)
-  static const Color crimsonLight = Color(0xFFF43F5E); // Vibrant Pulsr Crimson / Rose-500
-  static const Color crimsonSoft = Color(0xFFFDA4AF); // Soft crimson tint for secondary pills/badges
+  static const Color crimson =
+      Color(0xFFE11D48); // Deep Pulsr Crimson (matching app icon)
+  static const Color crimsonLight =
+      Color(0xFFF43F5E); // Vibrant Pulsr Crimson / Rose-500
+  static const Color crimsonSoft =
+      Color(0xFFFDA4AF); // Soft crimson tint for secondary pills/badges
   static const Color primary = crimson; // Color(0xFFE11D48)
   static const Color secondary = crimsonLight; // Color(0xFFF43F5E)
   static const Color lightPrimary = crimson;
-  static const Color ctaLavender = crimsonSoft; // Harmonized soft crimson/rose CTA tone (formerly lavender)
-  static const Color ctaCrimson = crimsonLight; // Primary Listen Now CTA tone (#F43F5E)
-  static const Color listenNowCta = crimsonLight; // Harmonized Listen Now CTA tone
-  static const Color focusFlow = Color(0xFFFB7185); // Harmonized Focus Flow sister rose tone
+  static const Color ctaLavender =
+      crimsonSoft; // Harmonized soft crimson/rose CTA tone (formerly lavender)
+  static const Color ctaCrimson =
+      crimsonLight; // Primary Listen Now CTA tone (#F43F5E)
+  static const Color listenNowCta =
+      crimsonLight; // Harmonized Listen Now CTA tone
+  static const Color focusFlow =
+      Color(0xFFFB7185); // Harmonized Focus Flow sister rose tone
 
   // Status
   static const Color error = Color(0xFFFF5252);
   static const Color success = Color(0xFF4CAF50);
-  static const Color favorite = Color(0xFFF43F5E); // Harmonized Pulsr Crimson / Rose
+  static const Color favorite =
+      Color(0xFFF43F5E); // Harmonized Pulsr Crimson / Rose
   static const Color warning = Color(0xFFFFB300);
   static const Color info = Color(0xFF40A9FF);
 
@@ -80,16 +88,24 @@ abstract class AppColors {
   static const Color background = Color(0xFF090A0E); // Base elevation (#090A0E)
   static const Color surface = Color(0xFF13151C); // Surface elevation (#13151C)
   static const Color card = Color(0xFF1C1F29); // Elevated surface (#1C1F29)
-  static const Color surfaceLight = Color(0xFF1C1F29); // Elevated surface (#1C1F29)
-  static const Color surfaceElevated = Color(0xFF1C1F29); // Explicit elevated surface token (#1C1F29)
-  static const Color outline = Color(0x0FFFFFFF); // Shifted from heavy grey to ultra-subtle hairline (0.06 white)
-  static const Color hairlineBorder = Color(0x0FFFFFFF); // Colors.white.withValues(alpha: 0.06)
-  static const Color hairline = Color(0x0FFFFFFF); // Colors.white.withValues(alpha: 0.06)
+  static const Color surfaceLight =
+      Color(0xFF1C1F29); // Elevated surface (#1C1F29)
+  static const Color surfaceElevated =
+      Color(0xFF1C1F29); // Explicit elevated surface token (#1C1F29)
+  static const Color outline = Color(
+      0x0FFFFFFF); // Shifted from heavy grey to ultra-subtle hairline (0.06 white)
+  static const Color hairlineBorder =
+      Color(0x0FFFFFFF); // Colors.white.withValues(alpha: 0.06)
+  static const Color hairline =
+      Color(0x0FFFFFFF); // Colors.white.withValues(alpha: 0.06)
   static const Color textPrimary = Color(0xFFEDEFF7);
   static const Color textSecondary = Color(0xFF98A0B3);
-  static const Color onPrimary = Color(0xFFFFFFFF); // Clean white text on Pulsr Crimson
-  static const Color accentGlow = Color(0x33E11D48); // 20% alpha Pulsr Crimson glow
-  static const Color divider = Color(0x0FFFFFFF); // Ultra-subtle hairline divider (0.06 white)
+  static const Color onPrimary =
+      Color(0xFFFFFFFF); // Clean white text on Pulsr Crimson
+  static const Color accentGlow =
+      Color(0x33E11D48); // 20% alpha Pulsr Crimson glow
+  static const Color divider =
+      Color(0x0FFFFFFF); // Ultra-subtle hairline divider (0.06 white)
 
   // Light surfaces (legacy)
   static const Color lightBackground = Color(0xFFF4F6FB);
@@ -98,16 +114,21 @@ abstract class AppColors {
   static const Color lightTextPrimary = Color(0xFF141724);
   static const Color lightTextSecondary = Color(0xFF5F6A82);
   static const Color lightOutline = Color(0xFFD8DFEC);
-  static const Color lightSecondary = Color(0xFFBE123C); // Deep Pulsr Crimson for light mode
+  static const Color lightSecondary =
+      Color(0xFFBE123C); // Deep Pulsr Crimson for light mode
 
   // Audio-quality badge identity tones (harmonized cohesive palette).
-  static const Color qualityBadgeRose = Color(0xFFE11D48); // DSD / Master / Pulsr Crimson
-  static const Color qualityBadgeCyan = Color(0xFF38BDF8); // Lossless tier (refined ice blue)
+  static const Color qualityBadgeRose =
+      Color(0xFFE11D48); // DSD / Master / Pulsr Crimson
+  static const Color qualityBadgeCyan =
+      Color(0xFF38BDF8); // Lossless tier (refined ice blue)
   static const Color qualityBadgeSky = Color(0xFF38BDF8); // AAC / Radio tier
   static const Color qualityBadgeBlue = Color(0xFF818CF8); // High quality tier
-  static const Color qualityBadgeSlate = Color(0xFF94A3B8); // Standard quality / neutral slate
+  static const Color qualityBadgeSlate =
+      Color(0xFF94A3B8); // Standard quality / neutral slate
   static const Color qualityBadgeAmber = Color(0xFFF59E0B); // MQA / Studio tier
-  static const Color qualityBadgeIndigo = Color(0xFFFB7185); // Stream / Lossless sister rose
+  static const Color qualityBadgeIndigo =
+      Color(0xFFFB7185); // Stream / Lossless sister rose
 
   // Cache-category identity + service brand tones.
   static const Color cacheLyrics = Color(0xFF9C27B0);

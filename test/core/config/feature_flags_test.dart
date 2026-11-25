@@ -70,7 +70,8 @@ void main() {
     }
     final pct = enabled * 100 / samples;
     expect(pct, inInclusiveRange(2.5, 8.0),
-        reason: 'deterministic bucket should approximate the cohort, got $pct%');
+        reason:
+            'deterministic bucket should approximate the cohort, got $pct%');
   });
 
   test('25% and 100% stages widen the same bucket set', () async {

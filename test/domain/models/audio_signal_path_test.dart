@@ -116,7 +116,9 @@ void main() {
       expect(path.toChainString(), contains('-> PCM 24-bit Packed'));
     });
 
-    test('2. External USB-C DAC is UAC2 Isochronous but unverified without a state', () {
+    test(
+        '2. External USB-C DAC is UAC2 Isochronous but unverified without a state',
+        () {
       final path = AudioSignalPath.fromOutputInfo(
         sourceCodec: 'WAV',
         sourceSampleRate: 384000,
@@ -146,7 +148,8 @@ void main() {
       expect(path.hardwareSummary, isNot(contains('Bit-Perfect')));
     });
 
-    test('3. USB-C Digital Audio adapter preserves encodings & channel caps', () {
+    test('3. USB-C Digital Audio adapter preserves encodings & channel caps',
+        () {
       final path = AudioSignalPath.fromOutputInfo(
         sourceCodec: 'ALAC',
         sourceSampleRate: 96000,
@@ -176,7 +179,9 @@ void main() {
       expect(path.driverPath, 'Media3 Float DSP');
     });
 
-    test('4. Bluetooth Hi-Res path reports LDAC bitrate, sample rate, and depth', () {
+    test(
+        '4. Bluetooth Hi-Res path reports LDAC bitrate, sample rate, and depth',
+        () {
       final path = AudioSignalPath.fromOutputInfo(
         sourceCodec: 'FLAC',
         sourceSampleRate: 96000,
@@ -317,7 +322,9 @@ void main() {
       expect(directRoute.hardwareSummary, isNot(contains('Bit-Perfect')));
     });
 
-    test('computes hardwareChannels from output effectiveOutputChannels and decodedChannelCount', () {
+    test(
+        'computes hardwareChannels from output effectiveOutputChannels and decodedChannelCount',
+        () {
       final multiOutput = _usbDacOutput.copyWith(outputChannels: 6);
       final path6 = AudioSignalPath.fromOutputInfo(
         sourceCodec: 'FLAC',
@@ -327,7 +334,8 @@ void main() {
       );
       expect(path6.hardwareChannels, 6);
 
-      final fallbackOutput = _usbDacOutput.copyWith(outputChannels: 0, decodedChannelCount: 8);
+      final fallbackOutput =
+          _usbDacOutput.copyWith(outputChannels: 0, decodedChannelCount: 8);
       final pathFallback = AudioSignalPath.fromOutputInfo(
         sourceCodec: 'FLAC',
         sourceSampleRate: 96000,
@@ -376,7 +384,9 @@ void main() {
   });
 
   group('AudioSignalPath unprobed PCM encoding fallback', () {
-    test('infers PCM 24-bit from effectiveDecDepth when decodedPcmEncoding is 0', () {
+    test(
+        'infers PCM 24-bit from effectiveDecDepth when decodedPcmEncoding is 0',
+        () {
       final path = AudioSignalPath.fromOutputInfo(
         sourceCodec: 'FLAC',
         sourceSampleRate: 96000,
@@ -394,7 +404,9 @@ void main() {
       expect(path.decoderSummary, isNot(contains('PCM Unprobed')));
     });
 
-    test('infers PCM 16-bit from sourceBitDepth when output has no bit depth and encoding is 0', () {
+    test(
+        'infers PCM 16-bit from sourceBitDepth when output has no bit depth and encoding is 0',
+        () {
       final path = AudioSignalPath.fromOutputInfo(
         sourceCodec: 'MP3',
         sourceSampleRate: 44100,
@@ -412,7 +424,8 @@ void main() {
       expect(path.decoderSummary, isNot(contains('PCM Unprobed')));
     });
 
-    test('retains PCM Unprobed only when bit depth is completely unknown (0)', () {
+    test('retains PCM Unprobed only when bit depth is completely unknown (0)',
+        () {
       final path = AudioSignalPath.fromOutputInfo(
         sourceCodec: 'AAC',
         sourceSampleRate: 0,
@@ -452,7 +465,9 @@ void main() {
       unityGain: true,
     );
 
-    test('DSP Active overrides verified Bit-Perfect claim and reflects in status tag and summary', () {
+    test(
+        'DSP Active overrides verified Bit-Perfect claim and reflects in status tag and summary',
+        () {
       final path = AudioSignalPath.fromOutputInfo(
         sourceCodec: 'FLAC',
         sourceSampleRate: 96000,
@@ -468,7 +483,9 @@ void main() {
       expect(path.hardwareSummary, isNot(contains('Bit-Perfect')));
     });
 
-    test('EQ active reflects 32-bit Float DSP (EQ Active) in hardware summary and status tag', () {
+    test(
+        'EQ active reflects 32-bit Float DSP (EQ Active) in hardware summary and status tag',
+        () {
       final path = AudioSignalPath.fromOutputInfo(
         sourceCodec: 'FLAC',
         sourceSampleRate: 96000,
@@ -498,11 +515,14 @@ void main() {
 
       expect(path.isBitPerfect, isFalse);
       expect(path.statusTag, '32-bit Float DSP (Limiter Active)');
-      expect(path.hardwareSummary, contains('(32-bit Float DSP (Limiter Active))'));
+      expect(path.hardwareSummary,
+          contains('(32-bit Float DSP (Limiter Active))'));
       expect(path.hardwareSummary, isNot(contains('Bit-Perfect')));
     });
 
-    test('dspProcessing flag engages DSP transparency without Bit-Perfect claim', () {
+    test(
+        'dspProcessing flag engages DSP transparency without Bit-Perfect claim',
+        () {
       final path = AudioSignalPath.fromOutputInfo(
         sourceCodec: 'FLAC',
         sourceSampleRate: 96000,
@@ -518,7 +538,8 @@ void main() {
       expect(path.hardwareSummary, isNot(contains('Bit-Perfect')));
     });
 
-    test('BitPerfectState with samples_modified reason reflects DSP Active', () {
+    test('BitPerfectState with samples_modified reason reflects DSP Active',
+        () {
       final modifiedState = resolveBitPerfectState(
         requested: true,
         sinkActive: true,

@@ -58,17 +58,21 @@ void main() {
         bitPerfectActive: true,
       );
       expect(dspDecision.isBlocked, isTrue);
-      expect(dspDecision.reason, equals(FeatureBlockReason.bitPerfectExclusivity));
+      expect(
+          dspDecision.reason, equals(FeatureBlockReason.bitPerfectExclusivity));
     });
 
-    test('Low-power interlock blocks low-power when DSP is active, and vice versa', () {
+    test(
+        'Low-power interlock blocks low-power when DSP is active, and vice versa',
+        () {
       final lowPowerDecision = gate.evaluate(
         AudioFeature.lowPower,
         backend: BackendCapabilities.localPcm,
         dspActive: true,
       );
       expect(lowPowerDecision.isBlocked, isTrue);
-      expect(lowPowerDecision.reason, equals(FeatureBlockReason.lowPowerInterlock));
+      expect(lowPowerDecision.reason,
+          equals(FeatureBlockReason.lowPowerInterlock));
 
       final dspDecision = gate.evaluate(
         AudioFeature.dsp,
@@ -86,7 +90,8 @@ void main() {
         crossfeedActive: true,
       );
       expect(hrtfDecision.isBlocked, isTrue);
-      expect(hrtfDecision.reason, equals(FeatureBlockReason.hrtfCrossfeedExclusivity));
+      expect(hrtfDecision.reason,
+          equals(FeatureBlockReason.hrtfCrossfeedExclusivity));
 
       final crossfeedDecision = gate.evaluate(
         AudioFeature.crossfeed,
@@ -94,7 +99,8 @@ void main() {
         hrtfActive: true,
       );
       expect(crossfeedDecision.isBlocked, isTrue);
-      expect(crossfeedDecision.reason, equals(FeatureBlockReason.hrtfCrossfeedExclusivity));
+      expect(crossfeedDecision.reason,
+          equals(FeatureBlockReason.hrtfCrossfeedExclusivity));
     });
 
     test('Multichannel > 2 channels blocked on AAudio route', () {

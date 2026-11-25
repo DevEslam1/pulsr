@@ -294,7 +294,8 @@ void main() {
           equals(Duration.zero));
     });
 
-    test('finishWithError scrubs PII and start skips disabled Sentry spans', () {
+    test('finishWithError scrubs PII and start skips disabled Sentry spans',
+        () {
       tracker.start(videoId: 'secretVid123');
       clock.advance(const Duration(milliseconds: 25));
       final report = tracker.finishWithError(

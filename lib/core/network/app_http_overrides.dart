@@ -157,18 +157,19 @@ class AppHttpOverrides extends HttpOverrides {
   /// and password hash. Clears attempts whenever credentials change so updating
   /// credentials in Settings works immediately on long-lived [HttpClient]s.
   @visibleForTesting
-  static Future<bool> Function(String host, int port, String scheme, String? realm)
+  static Future<bool> Function(
+          String host, int port, String scheme, String? realm)
       createProxyAuthenticator({
     required ProxyConfig Function() configProvider,
-    void Function(String host, int port, String realm, HttpClientBasicCredentials credentials)?
+    void Function(String host, int port, String realm,
+            HttpClientBasicCredentials credentials)?
         onAddCredentials,
   }) {
     final authAttempts = <String, int>{};
     String? lastCreds;
     return (host, port, scheme, realm) async {
       final config = configProvider();
-      final currentCreds =
-          '${config.username}:${config.password.hashCode}';
+      final currentCreds = '${config.username}:${config.password.hashCode}';
       if (lastCreds != currentCreds) {
         authAttempts.clear();
         lastCreds = currentCreds;
@@ -474,7 +475,8 @@ class AppHttpOverrides extends HttpOverrides {
           (targetPort >> 8) & 0xFF,
           targetPort & 0xFF,
         ]);
-      } else if (parsedIp != null && parsedIp.type == InternetAddressType.IPv6) {
+      } else if (parsedIp != null &&
+          parsedIp.type == InternetAddressType.IPv6) {
         socket.add([
           0x05, // VER
           0x01, // CMD: CONNECT
@@ -577,8 +579,9 @@ class AppHttpOverrides extends HttpOverrides {
           }
         } else {
           final colonIdx = requestTarget.lastIndexOf(':');
-          targetHost =
-              colonIdx > 0 ? requestTarget.substring(0, colonIdx) : requestTarget;
+          targetHost = colonIdx > 0
+              ? requestTarget.substring(0, colonIdx)
+              : requestTarget;
           targetPort = colonIdx > 0
               ? (int.tryParse(requestTarget.substring(colonIdx + 1)) ?? 443)
               : 443;

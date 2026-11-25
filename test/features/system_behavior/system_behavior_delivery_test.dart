@@ -90,7 +90,8 @@ void main() {
 
       expect(delivered, isTrue);
       expect(port.calls, contains('usb:false'));
-      expect(port.calls.indexOf('usb:false'), lessThan(port.calls.indexOf('pause')));
+      expect(port.calls.indexOf('usb:false'),
+          lessThan(port.calls.indexOf('pause')));
       expect(port.pauseCount, 1);
     });
 
@@ -117,7 +118,8 @@ void main() {
       final resumed = await service.handleAudioFocusGain();
       expect(resumed, isTrue);
       expect(port.calls, contains('usb:true'));
-      expect(port.calls.indexOf('usb:true'), lessThan(port.calls.lastIndexOf('play')));
+      expect(port.calls.indexOf('usb:true'),
+          lessThan(port.calls.lastIndexOf('play')));
     });
 
     test('duck-vs-pause honours the notification policy', () async {
@@ -200,8 +202,7 @@ void main() {
       final handler = _BridgeHandler();
       runtime.attachToHandler(handler);
 
-      final delivered =
-          await handler.hooks!.onAudioFocusLoss(permanent: false);
+      final delivered = await handler.hooks!.onAudioFocusLoss(permanent: false);
 
       expect(delivered, isFalse,
           reason: 'nothing was playing, so the handler keeps its own path');

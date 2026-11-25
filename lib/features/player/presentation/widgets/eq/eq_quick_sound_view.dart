@@ -1,4 +1,4 @@
-﻿part of '../equalizer_sheet.dart';
+part of '../equalizer_sheet.dart';
 
 /// Normal-mode (`ExperienceMode.normal`) Quick Sound Studio:
 /// interactive EQ curve, Preset Carousel, 3 macro tone sliders (Warmth/Bass,
@@ -313,9 +313,8 @@ extension _EqQuickSoundView on _EqualizerSheetState {
                 selectedColor: p.accent.withValues(alpha: 0.22),
                 backgroundColor: p.surfaceContainer,
                 side: BorderSide(
-                  color: isSelected
-                      ? p.accent.withValues(alpha: 0.5)
-                      : p.hairline,
+                  color:
+                      isSelected ? p.accent.withValues(alpha: 0.5) : p.hairline,
                 ),
                 labelStyle: TextStyle(
                   color: isSelected ? p.accent : p.textSecondary,
@@ -461,5 +460,4 @@ extension _EqQuickSoundView on _EqualizerSheetState {
       ),
     );
   }
-
 }

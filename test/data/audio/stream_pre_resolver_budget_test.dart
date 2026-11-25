@@ -28,8 +28,8 @@ void main() {
     );
   }
 
-  List<SongsTableData> makeQueue(int count) => List<SongsTableData>.generate(
-      count, (i) => makeSong(i + 1, 'v${i + 1}'));
+  List<SongsTableData> makeQueue(int count) =>
+      List<SongsTableData>.generate(count, (i) => makeSong(i + 1, 'v${i + 1}'));
 
   YtmStream makeStream(String videoId) => YtmStream(
         videoId: videoId,

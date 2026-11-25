@@ -17,6 +17,7 @@ import 'package:pulsr/features/settings/cubit/settings_cubit.dart';
 import 'support/settings_section_harness.dart';
 
 class _MockAmbientSoundService extends Mock implements AmbientSoundService {}
+
 class _MockMediaScannerService extends Mock implements MediaScannerService {}
 
 void main() {
@@ -52,34 +53,41 @@ void main() {
     test('bitPerfectSourceBlockedReason allows MP3 for Bit-Perfect mode', () {
       // MP3 allows bit-perfect
       expect(
-        AudioConflicts.bitPerfectSourceBlockedReason(path: '/music/song.mp3', bitDepth: 16),
+        AudioConflicts.bitPerfectSourceBlockedReason(
+            path: '/music/song.mp3', bitDepth: 16),
         isNull,
       );
       expect(
-        AudioConflicts.bitPerfectSourceBlockedReason(codec: 'mp3', bitDepth: 16),
+        AudioConflicts.bitPerfectSourceBlockedReason(
+            codec: 'mp3', bitDepth: 16),
         isNull,
       );
       expect(
-        AudioConflicts.bitPerfectSourceBlockedReason(mimeType: 'audio/mpeg', bitDepth: 16),
+        AudioConflicts.bitPerfectSourceBlockedReason(
+            mimeType: 'audio/mpeg', bitDepth: 16),
         isNull,
       );
       // But radio is still blocked
       expect(
-        AudioConflicts.bitPerfectSourceBlockedReason(path: '/music/song.mp3', isRadio: true),
+        AudioConflicts.bitPerfectSourceBlockedReason(
+            path: '/music/song.mp3', isRadio: true),
         contains('Live radio and lossy streams'),
       );
       // Other lossy codecs remain blocked
       expect(
-        AudioConflicts.bitPerfectSourceBlockedReason(codec: 'aac', bitDepth: 16),
+        AudioConflicts.bitPerfectSourceBlockedReason(
+            codec: 'aac', bitDepth: 16),
         contains('Live radio and lossy streams'),
       );
       expect(
-        AudioConflicts.bitPerfectSourceBlockedReason(codec: 'opus', bitDepth: 16),
+        AudioConflicts.bitPerfectSourceBlockedReason(
+            codec: 'opus', bitDepth: 16),
         contains('Live radio and lossy streams'),
       );
       // strictBitPerfect or requireConfirmedCodec requires confirmed codec on ambiguous containers
       expect(
-        AudioConflicts.bitPerfectSourceBlockedReason(path: '/music/song.m4a', bitDepth: 16),
+        AudioConflicts.bitPerfectSourceBlockedReason(
+            path: '/music/song.m4a', bitDepth: 16),
         isNull,
       );
       expect(
@@ -100,7 +108,9 @@ void main() {
       );
     });
 
-    test('producerChannels == 1 does not force mono when DAC only advertises stereo formats', () async {
+    test(
+        'producerChannels == 1 does not force mono when DAC only advertises stereo formats',
+        () async {
       int? streamingChannels;
       final messenger =
           TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
@@ -112,7 +122,10 @@ void main() {
           };
         }
         if (call.method == 'getAudioOutputInfo') {
-          return <String, dynamic>{'deviceName': 'SPACETOUCH USB Audio', 'isUsbDac': true};
+          return <String, dynamic>{
+            'deviceName': 'SPACETOUCH USB Audio',
+            'isUsbDac': true
+          };
         }
         if (call.method == 'setOutputDevice') {
           return <String, dynamic>{'success': true};
@@ -165,7 +178,8 @@ void main() {
       expect(streamingChannels, 2);
     });
 
-    test('_pushBitPerfectBypass disables AmbientSoundService when enabled', () async {
+    test('_pushBitPerfectBypass disables AmbientSoundService when enabled',
+        () async {
       final mockAmbient = _MockAmbientSoundService();
       when(() => mockAmbient.isEnabled).thenReturn(true);
       when(() => mockAmbient.setEnabled(false)).thenAnswer((_) async {});
@@ -182,7 +196,10 @@ void main() {
           };
         }
         if (call.method == 'getAudioOutputInfo') {
-          return <String, dynamic>{'deviceName': 'SPACETOUCH USB Audio', 'isUsbDac': true};
+          return <String, dynamic>{
+            'deviceName': 'SPACETOUCH USB Audio',
+            'isUsbDac': true
+          };
         }
         if (call.method == 'setOutputDevice') {
           return <String, dynamic>{'success': true};
@@ -231,7 +248,8 @@ void main() {
       ));
 
       await cubit.setBitPerfectOutput(true);
-      verify(() => mockAmbient.setEnabled(false)).called(greaterThanOrEqualTo(1));
+      verify(() => mockAmbient.setEnabled(false))
+          .called(greaterThanOrEqualTo(1));
     });
   });
 }

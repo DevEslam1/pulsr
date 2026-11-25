@@ -76,8 +76,7 @@ abstract final class UsbErgonomicsStrings {
   static String get altResetHint => _l10n().usbErgoAltResetHint;
 
   /// Switch title for ignoring the feedback endpoint.
-  static String get disableFeedbackTitle =>
-      _l10n().usbErgoDisableFeedbackTitle;
+  static String get disableFeedbackTitle => _l10n().usbErgoDisableFeedbackTitle;
 
   /// Switch hint for ignoring the feedback endpoint.
   static String get disableFeedbackHint => _l10n().usbErgoDisableFeedbackHint;
@@ -137,8 +136,7 @@ abstract final class UsbErgonomicsStrings {
   static String get hidClaimed => _l10n().usbErgoHidClaimed;
 
   /// HID status when the interfaces are claimed without consumer controls.
-  static String get hidClaimedNoConsumer =>
-      _l10n().usbErgoHidClaimedNoConsumer;
+  static String get hidClaimedNoConsumer => _l10n().usbErgoHidClaimedNoConsumer;
 
   /// Action that returns the interface to alternate setting 0.
   static String get resetAltAction => _l10n().usbErgoResetAltAction;

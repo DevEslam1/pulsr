@@ -146,17 +146,18 @@ mixin SettingsSearchResults
       for (final id in clusterOrder) id: <_SearchItem>[],
     };
     for (final item in results) {
-      final cid = item.clusterId.isNotEmpty
-          ? item.clusterId
-          : _defaultClusterFor(item);
+      final cid =
+          item.clusterId.isNotEmpty ? item.clusterId : _defaultClusterFor(item);
       (grouped[cid] ??= <_SearchItem>[]).add(item);
     }
 
-    final rows = <({bool isHeader, String clusterId, int count, _SearchItem? item})>[];
+    final rows =
+        <({bool isHeader, String clusterId, int count, _SearchItem? item})>[];
     for (final cid in clusterOrder) {
       final bucket = grouped[cid];
       if (bucket == null || bucket.isEmpty) continue;
-      rows.add((isHeader: true, clusterId: cid, count: bucket.length, item: null));
+      rows.add(
+          (isHeader: true, clusterId: cid, count: bucket.length, item: null));
       for (final item in bucket) {
         rows.add((isHeader: false, clusterId: cid, count: 0, item: item));
       }
@@ -344,7 +345,8 @@ mixin SettingsSearchResults
                     final sec = parsed?.queryParameters['section'];
                     if (sec != null && sec.isNotEmpty) {
                       (this as SettingsScreenState)._applyDeepLink(
-                        categoryId: parsed?.queryParameters['category'] ?? catId,
+                        categoryId:
+                            parsed?.queryParameters['category'] ?? catId,
                         sectionId: sec,
                       );
                     }
@@ -775,9 +777,16 @@ mixin SettingsSearchResults
           PlayerSliderStyle.minimal => context.l10n.sliderStyleMinimalTitle,
         },
         icon: Icons.linear_scale_rounded,
-        keywords: ['slider', 'seekbar', 'seek bar', 'wavy', 'capsule', 'normal'],
-        onTap: () => showSliderStylePickerSheet(
-            context, cubit, state.playerSliderStyle),
+        keywords: [
+          'slider',
+          'seekbar',
+          'seek bar',
+          'wavy',
+          'capsule',
+          'normal'
+        ],
+        onTap: () =>
+            showSliderStylePickerSheet(context, cubit, state.playerSliderStyle),
       ),
       _SearchItem(
         categoryId: 'look',
@@ -803,8 +812,8 @@ mixin SettingsSearchResults
           'style',
           'radio button'
         ],
-        onTap: () => showButtonStylePickerSheet(
-            context, cubit, state.appButtonStyle),
+        onTap: () =>
+            showButtonStylePickerSheet(context, cubit, state.appButtonStyle),
       ),
       _SearchItem(
         categoryId: 'look',

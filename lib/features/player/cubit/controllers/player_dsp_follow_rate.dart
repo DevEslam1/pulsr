@@ -233,7 +233,8 @@ extension PlayerDspFollowRate on PlayerDspController {
             .where((d) => d == 16 || d == 24 || d == 32)
             .toSet();
         final dacMaxDepth = dacSupportedDepths.isNotEmpty
-            ? dacSupportedDepths.fold<int>(0, (prev, elem) => elem > prev ? elem : prev)
+            ? dacSupportedDepths.fold<int>(
+                0, (prev, elem) => elem > prev ? elem : prev)
             : 0;
         final deviceDepth = (directOwned && dacMaxDepth > 0)
             ? dacMaxDepth
@@ -241,8 +242,7 @@ extension PlayerDspFollowRate on PlayerDspController {
         final isKnownMp3 =
             AudioConflicts.isMp3(path: song.path, codec: song.codec);
         final rawDepth = effectiveSourceBitDepth(
-            tagged: song.bitDepth ?? 0,
-            decoded: device?.decodedBitDepth ?? 0);
+            tagged: song.bitDepth ?? 0, decoded: device?.decodedBitDepth ?? 0);
         final effectiveSourceDepth =
             (directOwned && rawDepth <= 0 && isKnownMp3) ? 16 : rawDepth;
         var depth = resolveFollowBitDepth(
@@ -251,7 +251,8 @@ extension PlayerDspFollowRate on PlayerDspController {
               directStreaming ? usb.lastStatus.streamingBitDepth : 0,
           deviceBitDepth: deviceDepth,
         );
-        if (dacSupportedDepths.isNotEmpty && !dacSupportedDepths.contains(depth)) {
+        if (dacSupportedDepths.isNotEmpty &&
+            !dacSupportedDepths.contains(depth)) {
           if (depth > 24 && dacSupportedDepths.contains(24)) {
             depth = 24;
           } else if (dacSupportedDepths.contains(16)) {
@@ -266,9 +267,10 @@ extension PlayerDspFollowRate on PlayerDspController {
         final dacSupportsMono = usb.lastStatus.advertisedFormats.any(
           (f) => ((f['channels'] as num?)?.toInt() ?? 0) == 1,
         );
-        final trackChannels = (producerChannels > 0 && (producerChannels != 1 || dacSupportsMono))
-            ? producerChannels
-            : 2;
+        final trackChannels =
+            (producerChannels > 0 && (producerChannels != 1 || dacSupportsMono))
+                ? producerChannels
+                : 2;
         final route =
             '${activeDevice?.id}|${usb.lastStatus.deviceId}|${device?.activeDeviceType}'
             '|${settings.bitPerfectOutput}|${settings.strictBitPerfect}'

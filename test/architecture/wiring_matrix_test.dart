@@ -5,12 +5,16 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('Wiring Matrix Architecture Guard', () {
-    test('Wiring matrix contract contains all 12 mandatory sections with required fields', () {
+    test(
+        'Wiring matrix contract contains all 12 mandatory sections with required fields',
+        () {
       final file = File('test/fixtures/contracts/wiring_matrix.json');
-      expect(file.existsSync(), isTrue, reason: 'Wiring matrix fixture must exist');
+      expect(file.existsSync(), isTrue,
+          reason: 'Wiring matrix fixture must exist');
 
       final rawList = jsonDecode(file.readAsStringSync()) as List<dynamic>;
-      expect(rawList.length, 12, reason: 'Wiring matrix must cover all 12 Section 8 features');
+      expect(rawList.length, 12,
+          reason: 'Wiring matrix must cover all 12 Section 8 features');
 
       final requiredKeys = [
         'feature',
@@ -46,7 +50,8 @@ void main() {
         for (final k in requiredKeys) {
           expect(map.containsKey(k), isTrue, reason: 'Row missing key: $k');
           expect(map[k], isA<String>());
-          expect((map[k] as String).trim(), isNotEmpty, reason: 'Row key $k must not be empty');
+          expect((map[k] as String).trim(), isNotEmpty,
+              reason: 'Row key $k must not be empty');
         }
 
         observedFeatures.add(map['feature'] as String);

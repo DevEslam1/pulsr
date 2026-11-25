@@ -220,7 +220,8 @@ extension _YtmLoginFormView on _YtmWebLoginSheetState {
         ),
         child: Row(
           children: [
-            Icon(Icons.check_circle_outline_rounded, size: 18, color: p.success),
+            Icon(Icons.check_circle_outline_rounded,
+                size: 18, color: p.success),
             const SizedBox(width: AppSpacing.xs),
             Expanded(
               child: Text(
@@ -258,8 +259,8 @@ extension _YtmLoginFormView on _YtmWebLoginSheetState {
             Expanded(
               child: Text(
                 context.l10n.confirmAccount,
-                style:
-                    TextStyle(fontSize: AppFontSize.label, color: p.textPrimary),
+                style: TextStyle(
+                    fontSize: AppFontSize.label, color: p.textPrimary),
               ),
             ),
           ],

@@ -450,7 +450,11 @@ class TestPulsrAudioHandler extends BaseAudioHandler
     double? lookaheadMs,
   }) async {}
   @override
-  Future<void> setReverb(bool enabled, {int? preset, double? wetDry, double? predelayMs, double? damping}) async {}
+  Future<void> setReverb(bool enabled,
+      {int? preset,
+      double? wetDry,
+      double? predelayMs,
+      double? damping}) async {}
   @override
   Future<bool> loadCustomImpulseResponse(List<double> irSamples) async => true;
   @override
@@ -1086,7 +1090,8 @@ void main() {
         expect(cubit.state.queueHistory.map((s) => s.id), contains(201));
 
         // Play second occurrence of duplicate song with queueIndex
-        await cubit.playSong(song1, queue: [song1, song2, song1], queueIndex: 2);
+        await cubit.playSong(song1,
+            queue: [song1, song2, song1], queueIndex: 2);
         expect(cubit.state.currentIndex, equals(2));
         expect(cubit.state.queueHistory.map((s) => s.id), contains(202));
 

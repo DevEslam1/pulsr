@@ -1225,8 +1225,8 @@ class AudioEffectsChannel with _AudioEffectsChannelTelemetryMixin {
   Future<bool> loadHrtfSofa(String path) async {
     if (!_isAndroid) return false;
     try {
-      final ok = await _channel.invokeMethod<bool>('loadHrtfSofa', {'path': path})
-          .timeout(const Duration(seconds: 5));
+      final ok = await _channel.invokeMethod<bool>(
+          'loadHrtfSofa', {'path': path}).timeout(const Duration(seconds: 5));
       if (ok != true) {
         // Fetch the native reason once for the caller/log; the bool contract is
         // unchanged so existing callers keep working.
@@ -1560,12 +1560,10 @@ class AudioEffectsChannel with _AudioEffectsChannelTelemetryMixin {
     // iOS AVFoundation decodes ALAC natively; the MediaCodec path is Android.
     if (!_isAndroid) return PlatformCapabilities.isIOS;
     try {
-      final result = await _channel
-          .invokeMethod<bool>('probeAudioDecoder', {
-            'mime': mime,
-            if (sampleRate > 0) 'sampleRate': sampleRate,
-          })
-          .timeout(const Duration(seconds: 2));
+      final result = await _channel.invokeMethod<bool>('probeAudioDecoder', {
+        'mime': mime,
+        if (sampleRate > 0) 'sampleRate': sampleRate,
+      }).timeout(const Duration(seconds: 2));
       return result ?? false;
     } catch (e, st) {
       ErrorLogger.log('probeAudioDecoder($mime) failed',
@@ -1829,7 +1827,8 @@ class AudioEffectsChannel with _AudioEffectsChannelTelemetryMixin {
 
   // --- MULTICHANNEL CHANNEL MANAGER & LFE CROSSOVER ---
 
-  Future<void> setChannelManagerEnabled(bool enabled, {int channelCount = 2}) async {
+  Future<void> setChannelManagerEnabled(bool enabled,
+      {int channelCount = 2}) async {
     if (!_isAndroid) return;
     try {
       await _invokeNativeSetter('setChannelManagerEnabled', {
@@ -1873,7 +1872,8 @@ class AudioEffectsChannel with _AudioEffectsChannelTelemetryMixin {
   Future<Map<String, dynamic>?> getChannelManagerState() async {
     if (!_isAndroid) return null;
     try {
-      final res = await _channel.invokeMapMethod<String, dynamic>('getChannelManagerState')
+      final res = await _channel
+          .invokeMapMethod<String, dynamic>('getChannelManagerState')
           .timeout(const Duration(seconds: 3));
       return res;
     } catch (e, st) {
@@ -1941,7 +1941,8 @@ class AudioEffectsChannel with _AudioEffectsChannelTelemetryMixin {
   Future<Map<String, dynamic>?> getLfeCrossoverState() async {
     if (!_isAndroid) return null;
     try {
-      final res = await _channel.invokeMapMethod<String, dynamic>('getLfeCrossoverState')
+      final res = await _channel
+          .invokeMapMethod<String, dynamic>('getLfeCrossoverState')
           .timeout(const Duration(seconds: 3));
       return res;
     } catch (e, st) {
@@ -2514,9 +2515,8 @@ class AudioEffectsChannel with _AudioEffectsChannelTelemetryMixin {
   Future<bool> setDacVoicingEnabled(bool enabled) async {
     if (!_isAndroid) return false;
     try {
-      final applied = await _channel
-          .invokeMethod<bool>('setDacVoicingEnabled', {'enabled': enabled})
-          .timeout(const Duration(seconds: 5));
+      final applied = await _channel.invokeMethod<bool>('setDacVoicingEnabled',
+          {'enabled': enabled}).timeout(const Duration(seconds: 5));
       return applied ?? true;
     } catch (e, st) {
       ErrorLogger.log(
@@ -2539,8 +2539,7 @@ class AudioEffectsChannel with _AudioEffectsChannelTelemetryMixin {
   }) async {
     if (!_isAndroid || !voicingAmount.isFinite) return false;
     try {
-      final applied = await _channel
-          .invokeMethod<bool>('setDacVoicingParams', {
+      final applied = await _channel.invokeMethod<bool>('setDacVoicingParams', {
         'character': character.clamp(0, 2),
         'voicingAmount': voicingAmount.clamp(0.0, 1.0),
       }).timeout(const Duration(seconds: 5));

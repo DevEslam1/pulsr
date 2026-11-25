@@ -182,7 +182,8 @@ class YtmOAuthService {
     await init();
     if (_accessToken == null || _accessToken!.isEmpty) return false;
     final exp = _expiresAt;
-    if (exp != null && exp.difference(DateTime.now()) > const Duration(minutes: 2)) {
+    if (exp != null &&
+        exp.difference(DateTime.now()) > const Duration(minutes: 2)) {
       return true;
     }
     // The token is (nearly) expired or has unknown expiry and cannot be

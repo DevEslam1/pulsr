@@ -20,6 +20,7 @@ import '../cubit/library_cubit.dart';
 import '../cubit/library_state.dart';
 
 import '../../../core/utils/pulsr_haptics.dart';
+
 class ArtworkGridScreen extends StatefulWidget {
   const ArtworkGridScreen({super.key});
 
@@ -125,7 +126,8 @@ class _ArtworkGridScreenState extends State<ArtworkGridScreen> {
                     ),
                     padding: EdgeInsets.zero,
                     icon: const Icon(Icons.zoom_out_rounded, size: 18),
-                    color: activeCols < maxCols ? p.textPrimary : p.textTertiary,
+                    color:
+                        activeCols < maxCols ? p.textPrimary : p.textTertiary,
                     tooltip: context.l10n.zoomOut,
                     onPressed: activeCols < maxCols
                         ? () => _updateColumns(
@@ -155,7 +157,8 @@ class _ArtworkGridScreenState extends State<ArtworkGridScreen> {
                     ),
                     padding: EdgeInsets.zero,
                     icon: const Icon(Icons.zoom_in_rounded, size: 18),
-                    color: activeCols > minCols ? p.textPrimary : p.textTertiary,
+                    color:
+                        activeCols > minCols ? p.textPrimary : p.textTertiary,
                     tooltip: context.l10n.zoomIn,
                     onPressed: activeCols > minCols
                         ? () => _updateColumns(
@@ -202,7 +205,8 @@ class _ArtworkGridScreenState extends State<ArtworkGridScreen> {
             final displayCount =
                 albums.length > _visibleCount ? _visibleCount : albums.length;
             final spacing = isCompactWall ? 6.0 : 10.0;
-            final cardRadius = isCompactWall ? AppRadii.r10All : AppRadii.r14All;
+            final cardRadius =
+                isCompactWall ? AppRadii.r10All : AppRadii.r14All;
             final artworkRadius = isCompactWall ? 10.0 : 14.0;
 
             return RefreshIndicator(

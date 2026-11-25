@@ -50,8 +50,7 @@ void main() {
       final EqPreset preset = AutoEqParametricParser.toPreset(parsed);
 
       expect(preset.name, AutoEqParametricParser.defaultProfileName);
-      expect(preset.gains,
-          [5.9, 5.5, -1.4, -2.0, -2.7, 2.2, -1.8, 0.9, -1.5]);
+      expect(preset.gains, [5.9, 5.5, -1.4, -2.0, -2.7, 2.2, -1.8, 0.9, -1.5]);
       expect(preset.customFrequencies,
           [21, 105, 109, 181, 1837, 3032, 4291, 6700, 10000]);
       expect(preset.qFactors,
@@ -111,8 +110,8 @@ Filter 4: ON LSC Fc 500 Hz Gain 1.5 dB Q 0.7
         parsed.warnings.any((w) => w.contains('unsupported filter type "xyz"')),
         isTrue,
       );
-      expect(parsed.warnings.any((w) => w.contains('unrecognised line')),
-          isTrue);
+      expect(
+          parsed.warnings.any((w) => w.contains('unrecognised line')), isTrue);
     });
 
     test('clamps out-of-range values and reports each clamp', () {
@@ -315,7 +314,8 @@ Filter 2: ON PK Fc 100 Hz Gain 1.0 dB Q 1.0
         'AKG K371',
       );
       expect(
-        AutoEqParametricParser.profileNameFromPath('/tmp/Sennheiser HD 600.txt'),
+        AutoEqParametricParser.profileNameFromPath(
+            '/tmp/Sennheiser HD 600.txt'),
         'Sennheiser HD 600',
       );
     });
@@ -333,8 +333,7 @@ Filter 2: ON PK Fc 100 Hz Gain 1.0 dB Q 1.0
     });
 
     test('tolerates BOM, CRLF and comment lines', () async {
-      final file = File(
-          '${directory.path}${Platform.pathSeparator}'
+      final file = File('${directory.path}${Platform.pathSeparator}'
           'Sennheiser HD 600 ParametricEQ.txt');
       const content = '\uFEFF# exported by AutoEQ\r\n'
           '// reference correction\r\n'

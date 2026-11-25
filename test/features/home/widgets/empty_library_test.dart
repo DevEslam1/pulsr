@@ -16,6 +16,7 @@ import 'package:pulsr/features/home/presentation/widgets/empty_library.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 class _MockScanner extends Mock implements MediaScannerService {}
 
 void main() {

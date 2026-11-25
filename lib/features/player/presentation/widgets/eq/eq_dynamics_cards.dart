@@ -1,4 +1,4 @@
-﻿part of '../equalizer_sheet.dart';
+part of '../equalizer_sheet.dart';
 
 /// Dynamics & Saturation stage cards used by Pro Rack Tab 3:
 /// Harmonic Saturation, Sub Crossover, Dynamic Bass, Loudness Contour, Dither.
@@ -72,7 +72,8 @@ extension _EqDynamicsCards on _EqualizerSheetState {
                 value: available && state.isSaturationEnabled,
                 activeTrackColor: p.accent,
                 activeThumbColor: p.onAccent,
-                onChanged: !available ? null : (val) => cubit.setSaturation(val),
+                onChanged:
+                    !available ? null : (val) => cubit.setSaturation(val),
               ),
             ],
           ),
@@ -495,5 +496,4 @@ extension _EqDynamicsCards on _EqualizerSheetState {
       ),
     );
   }
-
 }

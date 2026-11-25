@@ -167,8 +167,8 @@ void main() {
       );
 
       // Renders the selected target and paints the chart without exceptions.
-      expect(find.text(HeadphoneTargetCurve.harmanInEar2019.name),
-          findsOneWidget);
+      expect(
+          find.text(HeadphoneTargetCurve.harmanInEar2019.name), findsOneWidget);
       expect(tester.takeException(), isNull);
 
       await tester.tap(find.text(HeadphoneTargetCurve.harmanInEar2019.name));
@@ -198,8 +198,7 @@ void main() {
           findsOneWidget);
     });
 
-    testWidgets('fits a fixed-height host without overflowing',
-        (tester) async {
+    testWidgets('fits a fixed-height host without overflowing', (tester) async {
       // eq_sheet_shell gives the chart a 52 px slot inside a 64 px container;
       // the overlaid selector must not add height to that slot.
       await tester.pumpWidget(

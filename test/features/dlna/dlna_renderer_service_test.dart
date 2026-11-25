@@ -120,7 +120,8 @@ void main() {
         const SsdpResponse(
           location: 'http://192.168.1.5:5555/description.xml',
           searchTarget: 'urn:schemas-upnp-org:device:MediaRenderer:1',
-          usn: 'uuid:mock-renderer::urn:schemas-upnp-org:device:MediaRenderer:1',
+          usn:
+              'uuid:mock-renderer::urn:schemas-upnp-org:device:MediaRenderer:1',
           server: 'Test/1.0 UPnP/1.1',
           sourceAddress: '192.168.1.5',
           maxAgeSeconds: 1800,
@@ -187,7 +188,8 @@ void main() {
     expect(metadata, contains('<upnp:artist>Artist</upnp:artist>'));
     expect(metadata, contains('<upnp:album>Album</upnp:album>'));
 
-    final actions = requests.map(_actionOf).where((action) => action.isNotEmpty);
+    final actions =
+        requests.map(_actionOf).where((action) => action.isNotEmpty);
     expect(
       actions.toList().sublist(actions.toList().indexOf('SetAVTransportURI')),
       containsAllInOrder(<String>['SetAVTransportURI', 'Play']),
@@ -252,13 +254,15 @@ void main() {
     await service.previous();
 
     final actions = requests.map(_actionOf).toList();
-    expect(actions, containsAll(<String>[
-      'SetAVTransportURI',
-      'Play',
-      'SetNextAVTransportURI',
-      'Next',
-      'Previous',
-    ]));
+    expect(
+        actions,
+        containsAll(<String>[
+          'SetAVTransportURI',
+          'Play',
+          'SetNextAVTransportURI',
+          'Next',
+          'Previous',
+        ]));
   });
 
   test('polls the renderer for position while playing', () async {
@@ -275,7 +279,8 @@ void main() {
     expect(service.state, DlnaState.playing);
   });
 
-  test('keeps polling and reports buffering on TRANSITIONING and connecting on unknown',
+  test(
+      'keeps polling and reports buffering on TRANSITIONING and connecting on unknown',
       () async {
     service = buildService(pollInterval: const Duration(milliseconds: 30));
     addTearDown(service.dispose);
@@ -300,7 +305,8 @@ void main() {
     expect(service.state, DlnaState.connecting);
   });
 
-  test('switching renderers probes the new device before stopping the previous one',
+  test(
+      'switching renderers probes the new device before stopping the previous one',
       () async {
     service = buildService();
     addTearDown(service.dispose);
@@ -374,7 +380,8 @@ void main() {
       final client = HttpClient();
       try {
         final request = await client.getUrl(
-          Uri.parse('http://127.0.0.1:${service.mediaServer.port}/media/$token'),
+          Uri.parse(
+              'http://127.0.0.1:${service.mediaServer.port}/media/$token'),
         );
         final response = await request.close();
         await response.drain<void>();
@@ -448,7 +455,8 @@ void main() {
           sourceAddress: '192.168.1.5',
         ),
       ]),
-      httpClient: MockClient((_) async => http.Response(oversized.toString(), 200)),
+      httpClient:
+          MockClient((_) async => http.Response(oversized.toString(), 200)),
       discoveryTimeout: const Duration(milliseconds: 10),
       localAddressResolver: (host, port) async => InternetAddress.loopbackIPv4,
     );
@@ -495,7 +503,8 @@ void main() {
     expect(requests.map(_actionOf), contains('Stop'));
   });
 
-  test('playUrl and queueUrl reject invalid URLs with DLNA_INVALID_URL', () async {
+  test('playUrl and queueUrl reject invalid URLs with DLNA_INVALID_URL',
+      () async {
     service = buildService();
     addTearDown(service.dispose);
     await service.discover();
@@ -514,7 +523,8 @@ void main() {
     expect(service.lastError?.code, 'DLNA_INVALID_URL');
   });
 
-  test('aborts between setAvTransportUri and play on sequence change', () async {
+  test('aborts between setAvTransportUri and play on sequence change',
+      () async {
     final setUriStarted = Completer<void>();
     final allowSetUriFinish = Completer<void>();
     final executedActions = <String>[];
@@ -582,7 +592,8 @@ void main() {
               Uri.parse('http://192.168.1.5:5555/control/avt-$suffix'),
         );
 
-    test('failed switch leaves previous renderer intact and retry retries new device',
+    test(
+        'failed switch leaves previous renderer intact and retry retries new device',
         () async {
       var failDeviceB = true;
       final client = MockClient((request) async {
@@ -631,14 +642,16 @@ void main() {
       expect(testService.lastError, isNull);
     });
 
-    test('playUrl rejects private/loopback/DNS-rebinding targets via RemoteTargetPolicy',
+    test(
+        'playUrl rejects private/loopback/DNS-rebinding targets via RemoteTargetPolicy',
         () async {
       final client = MockClient((_) async => http.Response(_soap(''), 200));
       final testService = DlnaRendererService(
         httpClient: client,
         pollInterval: const Duration(minutes: 1),
-        dnsLookup: (host) async =>
-            host == 'rebind.net' ? <String>['10.0.0.5'] : <String>['93.184.216.34'],
+        dnsLookup: (host) async => host == 'rebind.net'
+            ? <String>['10.0.0.5']
+            : <String>['93.184.216.34'],
       );
       addTearDown(testService.dispose);
       await testService.select(deviceFor('a'));
@@ -653,7 +666,8 @@ void main() {
       expect(testService.lastError?.code, 'DLNA_INVALID_URL');
     });
 
-    test('requires two consecutive stopped polls and keeps polling while paused',
+    test(
+        'requires two consecutive stopped polls and keeps polling while paused',
         () async {
       var polls = 0;
       transportState = 'PLAYING';
@@ -703,7 +717,8 @@ void main() {
       expect(testService.state, DlnaState.stopped);
     });
 
-    test('GetMediaInfo populates title/duration on select and playQueue steps next/previous',
+    test(
+        'GetMediaInfo populates title/duration on select and playQueue steps next/previous',
         () async {
       final client = MockClient((request) async {
         requests.add(request);
@@ -744,8 +759,9 @@ void main() {
       expect(testService.nowPlayingTitle, 'External Track');
       expect(testService.duration, const Duration(minutes: 4, seconds: 12));
 
-      final secondFile = File('${tempDir.path}${Platform.pathSeparator}song2.mp3')
-        ..writeAsBytesSync(const <int>[1, 2, 3]);
+      final secondFile =
+          File('${tempDir.path}${Platform.pathSeparator}song2.mp3')
+            ..writeAsBytesSync(const <int>[1, 2, 3]);
       await testService.playQueue(<DlnaQueueTrack>[
         DlnaQueueTrack(path: mediaFile.path, title: 'First'),
         DlnaQueueTrack(path: secondFile.path, title: 'Second'),

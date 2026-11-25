@@ -90,7 +90,8 @@ class MediaHttpServer {
     this.maxConcurrentRequests = 8,
     InternetAddress? bindAddress,
   })  : assert(maxEntries > 0, 'maxEntries must be positive'),
-        assert(maxConcurrentRequests > 0, 'maxConcurrentRequests must be positive'),
+        assert(maxConcurrentRequests > 0,
+            'maxConcurrentRequests must be positive'),
         _defaultBindAddress = bindAddress ?? InternetAddress.anyIPv4;
 
   /// Bound port, or `null` before [start].
@@ -435,7 +436,8 @@ class MediaHttpServer {
 
     if (source.isFile) {
       try {
-        await response.addStream(File(source.filePath!).openRead(start, end + 1));
+        await response
+            .addStream(File(source.filePath!).openRead(start, end + 1));
       } on FileSystemException catch (error, stackTrace) {
         ErrorLogger.log(
           'DLNA media file read failed',
@@ -560,7 +562,8 @@ class MediaHttpServer {
         includeLoopback: false,
       );
       final preferred = selectPreferredIpv4(
-        interfaces.map((iface) => (name: iface.name, addresses: iface.addresses)),
+        interfaces
+            .map((iface) => (name: iface.name, addresses: iface.addresses)),
       );
       if (preferred != null) return preferred;
     } on SocketException catch (error, stackTrace) {

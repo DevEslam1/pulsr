@@ -15,7 +15,9 @@ void main() {
     SharedPreferences.setMockInitialValues({});
   });
 
-  test('0.7 tieredShuffle passes queueIndex: currIdx to preserve active slot with past duplicate', () async {
+  test(
+      '0.7 tieredShuffle passes queueIndex: currIdx to preserve active slot with past duplicate',
+      () async {
     final handler = RecordingAudioHandler();
 
     final songAPast = buildSong(42, title: 'Song A (Past Duplicate)');

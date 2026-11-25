@@ -21,6 +21,7 @@ import 'package:pulsr/l10n/generated/app_localizations.dart';
 import '../../helpers/test_song_factory.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 class _MockPlayerCubit extends Mock implements PlayerCubit {}
 
 class _MockSettingsCubit extends Mock implements SettingsCubit {}
@@ -99,7 +100,8 @@ void main() {
   }
 
   group('MilkdropPlayerTheme Tests', () {
-    testWidgets('renders full-screen MilkdropRenderer canvas with preset switcher and glass capsule',
+    testWidgets(
+        'renders full-screen MilkdropRenderer canvas with preset switcher and glass capsule',
         (tester) async {
       tester.view.physicalSize = const Size(390, 844);
       tester.view.devicePixelRatio = 1.0;

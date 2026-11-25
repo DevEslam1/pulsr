@@ -30,9 +30,8 @@ extension _CardPlayerThemeBuild on CardPlayerTheme {
     final textScale =
         MediaQuery.textScalerOf(context).scale(1.0).clamp(1.0, 2.0);
 
-    final Color topBarSurface = isDark
-        ? AppColors.scrimAt(0.30)
-        : p.surface.withValues(alpha: 0.72);
+    final Color topBarSurface =
+        isDark ? AppColors.scrimAt(0.30) : p.surface.withValues(alpha: 0.72);
     final Color topBarBorder = p.hairline;
 
     return PlayerSurfaceShell(
@@ -124,21 +123,20 @@ extension _CardPlayerThemeBuild on CardPlayerTheme {
           isPreview: isPreview,
         );
 
-        final Widget? volumeBar = (!isPreview &&
-                (isInSplitView || context.isTablet) &&
-                !isVeryShort)
-            ? Padding(
-                padding: const EdgeInsetsDirectional.only(
-                  start: AppSpacing.md,
-                  end: AppSpacing.md,
-                  bottom: AppSpacing.xs,
-                ),
-                child: PlayerVolumeBar(
-                  cubit: cubit,
-                  activeColor: activeColor,
-                ),
-              )
-            : null;
+        final Widget? volumeBar =
+            (!isPreview && (isInSplitView || context.isTablet) && !isVeryShort)
+                ? Padding(
+                    padding: const EdgeInsetsDirectional.only(
+                      start: AppSpacing.md,
+                      end: AppSpacing.md,
+                      bottom: AppSpacing.xs,
+                    ),
+                    child: PlayerVolumeBar(
+                      cubit: cubit,
+                      activeColor: activeColor,
+                    ),
+                  )
+                : null;
 
         final double horizontalInset =
             (constraints.maxWidth * 0.045).clamp(12.0, 24.0);
@@ -621,11 +619,12 @@ class _SpatialCardDeckState extends State<_SpatialCardDeck>
     final activeColor = widget.props.activeColor;
     final isDark = p.isDark;
     final neighbors = resolveQueueNeighbors(state);
-    final swipePref = context.select<SettingsCubit, NowPlayingArtworkSwipeAction>(
+    final swipePref =
+        context.select<SettingsCubit, NowPlayingArtworkSwipeAction>(
       (c) => c.state.nowPlayingArtworkSwipe,
     );
-    final bool allowSwipe = !widget.isPreview &&
-        swipePref == NowPlayingArtworkSwipeAction.nextPrev;
+    final bool allowSwipe =
+        !widget.isPreview && swipePref == NowPlayingArtworkSwipeAction.nextPrev;
     final BorderRadius cardCorners = AppRadii.circular(widget.cardRadius);
     final bool motionEnabled = !widget.isPreview && context.motionEnabled;
     final Duration motionDuration =
@@ -674,7 +673,8 @@ class _SpatialCardDeckState extends State<_SpatialCardDeck>
             final double translateX = sign * peekOffset * (1.0 - reveal * 0.45);
             final double translateY = (1.0 - reveal) * 8.0;
             final double angle = sign * 0.068 * (1.0 - reveal * 0.7);
-            final double dimAlpha = (isDark ? 0.44 : 0.28) * (1.0 - reveal * 0.55);
+            final double dimAlpha =
+                (isDark ? 0.44 : 0.28) * (1.0 - reveal * 0.55);
 
             return ExcludeSemantics(
               child: IgnorePointer(
@@ -704,7 +704,8 @@ class _SpatialCardDeckState extends State<_SpatialCardDeck>
                               ? null
                               : [
                                   BoxShadow(
-                                    color: AppColors.scrimAt(isDark ? 0.36 : 0.14),
+                                    color:
+                                        AppColors.scrimAt(isDark ? 0.36 : 0.14),
                                     blurRadius: 18,
                                     offset: const Offset(0, 8),
                                   ),
@@ -774,8 +775,7 @@ class _SpatialCardDeckState extends State<_SpatialCardDeck>
           );
 
           final double activeScale =
-              ((widget.isPreview || isPlaying) ? 1.0 : 0.95) -
-                  absRatio * 0.04;
+              ((widget.isPreview || isPlaying) ? 1.0 : 0.95) - absRatio * 0.04;
           final double activeTilt = dragRatio * 0.11;
 
           final Widget activeCard = GestureDetector(
@@ -789,8 +789,8 @@ class _SpatialCardDeckState extends State<_SpatialCardDeck>
             onHorizontalDragUpdate: allowSwipe
                 ? (details) {
                     setState(() {
-                      _dragDx = (_dragDx + details.delta.dx)
-                          .clamp(-maxDrag, maxDrag);
+                      _dragDx =
+                          (_dragDx + details.delta.dx).clamp(-maxDrag, maxDrag);
                     });
                   }
                 : null,
@@ -853,8 +853,8 @@ class _SpatialCardDeckState extends State<_SpatialCardDeck>
                               ? CachedArtwork(
                                   id: song.id,
                                   albumId: song.albumId,
-                                  remoteUrl: song.remoteArtworkUrl ??
-                                      song.artworkUri,
+                                  remoteUrl:
+                                      song.remoteArtworkUrl ?? song.artworkUri,
                                   type: ArtworkType.AUDIO,
                                   size: cardSize,
                                   borderRadius: widget.cardRadius,
@@ -868,8 +868,8 @@ class _SpatialCardDeckState extends State<_SpatialCardDeck>
                                   child: Icon(
                                     Icons.music_note_rounded,
                                     size: 72,
-                                    color: p.textSecondary
-                                        .withValues(alpha: 0.45),
+                                    color:
+                                        p.textSecondary.withValues(alpha: 0.45),
                                   ),
                                 ),
                         ),
@@ -1190,7 +1190,8 @@ class _SpatialGlassScrubberState extends State<_SpatialGlassScrubber> {
         final double effectiveMs =
             (_dragMs ?? position.inMilliseconds.toDouble()).clamp(0.0, safeMax);
         final double progress = (effectiveMs / safeMax).clamp(0.0, 1.0);
-        final Duration effectiveDuration = Duration(milliseconds: effectiveMs.round());
+        final Duration effectiveDuration =
+            Duration(milliseconds: effectiveMs.round());
 
         Duration clampSeek(Duration delta) {
           final target = effectiveDuration + delta;
@@ -1199,12 +1200,12 @@ class _SpatialGlassScrubberState extends State<_SpatialGlassScrubber> {
           return target;
         }
 
-        String seekLabel(Duration v) =>
-            '${Formatters.formatDuration(v)} / '
+        String seekLabel(Duration v) => '${Formatters.formatDuration(v)} / '
             '${Formatters.formatDuration(widget.duration)}';
 
-        final double trackHeight =
-            isDragging ? (widget.isCompact ? 9.0 : 10.0) : (widget.isCompact ? 5.0 : 6.0);
+        final double trackHeight = isDragging
+            ? (widget.isCompact ? 9.0 : 10.0)
+            : (widget.isCompact ? 5.0 : 6.0);
         final Color trackBg = isDark
             ? AppColors.specularAt(0.16)
             : p.textPrimary.withValues(alpha: 0.14);
@@ -1216,8 +1217,7 @@ class _SpatialGlassScrubberState extends State<_SpatialGlassScrubber> {
               slider: true,
               label: context.l10n.seekLabel,
               value: seekLabel(effectiveDuration),
-              increasedValue:
-                  seekLabel(clampSeek(const Duration(seconds: 10))),
+              increasedValue: seekLabel(clampSeek(const Duration(seconds: 10))),
               decreasedValue:
                   seekLabel(clampSeek(const Duration(seconds: -10))),
               onIncrease: () => widget.props.cubit
@@ -1231,21 +1231,21 @@ class _SpatialGlassScrubberState extends State<_SpatialGlassScrubber> {
                   return GestureDetector(
                     behavior: HitTestBehavior.opaque,
                     onTapUp: (details) {
-                      final frac =
-                          _fractionFor(details.localPosition.dx, width, direction);
+                      final frac = _fractionFor(
+                          details.localPosition.dx, width, direction);
                       PulsrHaptics.selectionClick();
-                      widget.props.cubit
-                          .seek(Duration(milliseconds: (frac * safeMax).round()));
+                      widget.props.cubit.seek(
+                          Duration(milliseconds: (frac * safeMax).round()));
                     },
                     onHorizontalDragStart: (details) {
                       PulsrHaptics.selectionClick();
-                      final frac =
-                          _fractionFor(details.localPosition.dx, width, direction);
+                      final frac = _fractionFor(
+                          details.localPosition.dx, width, direction);
                       setState(() => _dragMs = frac * safeMax);
                     },
                     onHorizontalDragUpdate: (details) {
-                      final frac =
-                          _fractionFor(details.localPosition.dx, width, direction);
+                      final frac = _fractionFor(
+                          details.localPosition.dx, width, direction);
                       setState(() => _dragMs = frac * safeMax);
                     },
                     onHorizontalDragEnd: (_) {
@@ -1256,7 +1256,8 @@ class _SpatialGlassScrubberState extends State<_SpatialGlassScrubber> {
                       }
                       setState(() => _dragMs = null);
                     },
-                    onHorizontalDragCancel: () => setState(() => _dragMs = null),
+                    onHorizontalDragCancel: () =>
+                        setState(() => _dragMs = null),
                     child: SizedBox(
                       height: widget.isCompact ? 30.0 : 36.0,
                       width: double.infinity,

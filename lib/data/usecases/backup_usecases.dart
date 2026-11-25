@@ -156,12 +156,10 @@ class ExportBackupUseCase {
       'customThemeRadius':
           prefs.getDouble('setting_custom_theme_radius') ?? 18.0,
       'customThemeGlow': prefs.getBool('setting_custom_theme_glow') ?? true,
-      'miniPlayerSwipeLeft':
-          prefs.getString('setting_mini_player_swipe_left'),
+      'miniPlayerSwipeLeft': prefs.getString('setting_mini_player_swipe_left'),
       'miniPlayerSwipeRight':
           prefs.getString('setting_mini_player_swipe_right'),
-      'nowPlayingDoubleTap':
-          prefs.getString('setting_now_playing_double_tap'),
+      'nowPlayingDoubleTap': prefs.getString('setting_now_playing_double_tap'),
       'nowPlayingArtworkSwipe':
           prefs.getString('setting_now_playing_artwork_swipe'),
       'dockStackMode': prefs.getString(PrefsKeys.dockStackMode),
@@ -1140,8 +1138,7 @@ class ImportBackupUseCase {
       // EQ keys: restored through the live EqualizerManager keys so audio
       // applies the backup's EQ immediately without an app restart.
       if (settings.containsKey('eqEnabled')) {
-        await prefs.setBool(
-            PrefsKeys.eqEnabled, settings['eqEnabled'] == true);
+        await prefs.setBool(PrefsKeys.eqEnabled, settings['eqEnabled'] == true);
         restoredSettingsCount++;
       }
       if (settings['eqGains'] is String) {
@@ -1167,18 +1164,18 @@ class ImportBackupUseCase {
         restoredSettingsCount++;
       }
       if (settings['eqCustom32Frequencies'] is String) {
-        await prefs.setString(PrefsKeys.eqCustom32Frequencies,
-            settings['eqCustom32Frequencies']);
+        await prefs.setString(
+            PrefsKeys.eqCustom32Frequencies, settings['eqCustom32Frequencies']);
         restoredSettingsCount++;
       }
       if (settings['eqCustom64Frequencies'] is String) {
-        await prefs.setString(PrefsKeys.eqCustom64Frequencies,
-            settings['eqCustom64Frequencies']);
+        await prefs.setString(
+            PrefsKeys.eqCustom64Frequencies, settings['eqCustom64Frequencies']);
         restoredSettingsCount++;
       }
       if (settings['playbackSpeed'] is num) {
-        await prefs.setDouble(
-            'setting_playback_speed', (settings['playbackSpeed'] as num).toDouble());
+        await prefs.setDouble('setting_playback_speed',
+            (settings['playbackSpeed'] as num).toDouble());
         restoredSettingsCount++;
       }
 
@@ -1261,9 +1258,8 @@ class ImportBackupUseCase {
         } catch (_) {}
       }
 
-      final autoDeviceProfiles =
-          data['setting_auto_device_profiles_enabled'] ??
-              settingsMap['setting_auto_device_profiles_enabled'];
+      final autoDeviceProfiles = data['setting_auto_device_profiles_enabled'] ??
+          settingsMap['setting_auto_device_profiles_enabled'];
       if (autoDeviceProfiles is bool) {
         await prefs.setBool(
             'setting_auto_device_profiles_enabled', autoDeviceProfiles);

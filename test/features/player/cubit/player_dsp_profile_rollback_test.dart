@@ -32,7 +32,8 @@ class _ChainAudioHandler extends RecordingAudioHandler {
   Future<void> setPreamp(double preampDb) async => chain.add('setPreamp');
 
   @override
-  Future<void> setVolumeBoost(double value) async => chain.add('setVolumeBoost');
+  Future<void> setVolumeBoost(double value) async =>
+      chain.add('setVolumeBoost');
 
   @override
   Future<void> setBassBoost(double amount) async => chain.add('setBassBoost');
@@ -112,10 +113,10 @@ class _ChainAudioHandler extends RecordingAudioHandler {
 
   @override
   Future<void> setReverb(bool enabled,
-          {int? preset,
-          double? wetDry,
-          double? predelayMs,
-          double? damping}) async {
+      {int? preset,
+      double? wetDry,
+      double? predelayMs,
+      double? damping}) async {
     chain.add('setReverb');
     if (failReverb) throw StateError('reverb unavailable');
   }
@@ -271,8 +272,8 @@ void main() {
     // The apply phase pushes whatever the profile stages request (and stops at
     // its own failure). The rollback begins after the apply phase's headphone
     // step and must push every engine setter in table order.
-    final rollback =
-        handler.chain.sublist(handler.chain.indexOf('applyHeadphoneProfile') + 1);
+    final rollback = handler.chain
+        .sublist(handler.chain.indexOf('applyHeadphoneProfile') + 1);
     const expectedRollback = <String>[
       'setEqualizerEnabled',
       'applyPreset',
@@ -352,8 +353,8 @@ void main() {
         reason: 'a failing stage must not abort later restore steps');
     expect(handler.chain, contains('setLiveProg'));
     expect(handler.chain, contains('applyHeadphoneProfile'));
-    final rollback =
-        handler.chain.sublist(handler.chain.indexOf('applyHeadphoneProfile') + 1);
+    final rollback = handler.chain
+        .sublist(handler.chain.indexOf('applyHeadphoneProfile') + 1);
     expect(rollback.indexOf('setReverb'),
         lessThan(rollback.indexOf('setDynamicBass')),
         reason: 'isolation preserves the table order');

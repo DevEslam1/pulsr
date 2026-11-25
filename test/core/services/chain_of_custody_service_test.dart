@@ -13,7 +13,8 @@ void main() {
       service = ChainOfCustodyService();
     });
 
-    test('config-only report keeps header identity separate from content', () async {
+    test('config-only report keeps header identity separate from content',
+        () async {
       final headerBytes = [0x4F, 0x67, 0x67, 0x53, 0x00, 0x02]; // "OggS" header
       final report = await service.generateReport(
         trackId: 'track-42',
@@ -285,9 +286,9 @@ void main() {
     test('editing any reported field invalidates the certificate digest', () {
       final original = buildReport();
       final tamperedJson = original.toJson()
-        ..['measurement'] = (original.toJson()['measurement'] as Map)
-            .cast<String, dynamic>()
-          ..['bitExactMeasured'] = true;
+        ..['measurement'] =
+            (original.toJson()['measurement'] as Map).cast<String, dynamic>()
+        ..['bitExactMeasured'] = true;
       // Re-serializing a mutated report must not reproduce the original digest.
       final tampered = ChainOfCustodyReport(
         trackId: original.trackId,
@@ -334,7 +335,8 @@ void main() {
     });
   });
 
-  test('_canonicalize encodes map keys with quotes and backslashes as valid JSON',
+  test(
+      '_canonicalize encodes map keys with quotes and backslashes as valid JSON',
       () {
     final canonical = ChainOfCustodyReport.canonicalizeForTesting({
       'b"quoted\\key': 1,

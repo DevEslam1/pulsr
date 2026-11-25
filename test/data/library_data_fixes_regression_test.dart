@@ -88,7 +88,8 @@ void main() {
 
     tearDown(() async => db.close());
 
-    test('notContains and startsWith evaluate accurately in SQL and Unicode Dart',
+    test(
+        'notContains and startsWith evaluate accurately in SQL and Unicode Dart',
         () async {
       final engine = SmartPlaylistEngine(db);
 
@@ -161,7 +162,8 @@ void main() {
     });
   });
 
-  group('MediaScanner & MusicRepository fixes (BUG-P1-20, BUG-P2-36, BUG-P2-37)',
+  group(
+      'MediaScanner & MusicRepository fixes (BUG-P1-20, BUG-P2-36, BUG-P2-37)',
       () {
     late AppDatabase db;
     late MusicRepository repo;
@@ -181,7 +183,8 @@ void main() {
       await db.close();
     });
 
-    test('rescanSingleFile parses N/M track/disc and ISO year and persists discNumber',
+    test(
+        'rescanSingleFile parses N/M track/disc and ISO year and persists discNumber',
         () async {
       await db.into(db.songsTable).insert(
             SongsTableCompanion.insert(
@@ -237,12 +240,12 @@ void main() {
       });
       await repo.toggleFolderExclusion('/music/hidden');
 
-      final genreSongs = (await repo.watchGenreSongs('Rock').first)
-          .getOrElse((_) => const []);
+      final genreSongs =
+          (await repo.watchGenreSongs('Rock').first).getOrElse((_) => const []);
       expect(genreSongs.map((s) => s.id), [1]);
 
-      final yearSongs = (await repo.watchYearSongs(2024).first)
-          .getOrElse((_) => const []);
+      final yearSongs =
+          (await repo.watchYearSongs(2024).first).getOrElse((_) => const []);
       expect(yearSongs.map((s) => s.id), [1]);
     });
   });
@@ -266,7 +269,8 @@ void main() {
 
     test('validates discNumber and restores dirty state on undo()', () async {
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(channel, (call) async => <String, dynamic>{});
+          .setMockMethodCallHandler(
+              channel, (call) async => <String, dynamic>{});
 
       final cubit = TagEditorCubit(
         song: createTestSong(id: 1, title: 'Song', path: '/music/s.mp3'),
@@ -300,8 +304,10 @@ void main() {
         return <String, dynamic>{};
       });
 
-      final a = createTestSong(id: 1, title: 'A', artist: 'Old', path: '/music/A.mp3');
-      final b = createTestSong(id: 2, title: 'B', artist: 'Old', path: '/music/B.mp3');
+      final a = createTestSong(
+          id: 1, title: 'A', artist: 'Old', path: '/music/A.mp3');
+      final b = createTestSong(
+          id: 2, title: 'B', artist: 'Old', path: '/music/B.mp3');
 
       final cubit1 = TagEditorCubit(
         song: a,
@@ -315,8 +321,10 @@ void main() {
       await cubit1.close();
 
       final prefs = await SharedPreferences.getInstance();
-      expect(prefs.getStringList(TagEditorCubit.batchCheckpointKey), ['/music/A.mp3']);
-      expect(prefs.getString(TagEditorCubit.batchCheckpointPayloadKey), isNotNull);
+      expect(prefs.getStringList(TagEditorCubit.batchCheckpointKey),
+          ['/music/A.mp3']);
+      expect(
+          prefs.getString(TagEditorCubit.batchCheckpointPayloadKey), isNotNull);
 
       final cubit2 = TagEditorCubit(
         song: a,
@@ -341,7 +349,8 @@ void main() {
 
     tearDown(() async => db.close());
 
-    test('matches Windows backslash paths and allocates negative IDs for YTM tracks',
+    test(
+        'matches Windows backslash paths and allocates negative IDs for YTM tracks',
         () async {
       await db.into(db.songsTable).insert(
             SongsTableCompanion.insert(
@@ -381,7 +390,8 @@ void main() {
   });
 
   group('LyricsTranslationService fixes (BUG-P3-8)', () {
-    test('skips romanization API for English lyrics containing emojis', () async {
+    test('skips romanization API for English lyrics containing emojis',
+        () async {
       var requests = 0;
       final client = MockClient((req) async {
         requests++;

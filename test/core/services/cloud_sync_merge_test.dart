@@ -14,16 +14,20 @@ void main() {
       final now = DateTime.now();
       final ts = Timestamp.fromDate(now);
       final data = <String, dynamic>{'modifiedAt': ts};
-      expect(CloudSyncService.extractCloudTimestamp(data), ts.millisecondsSinceEpoch);
+      expect(CloudSyncService.extractCloudTimestamp(data),
+          ts.millisecondsSinceEpoch);
     });
 
-    test('extractCloudTimestamp falls back to deviceTimestamp when modifiedAt is missing', () {
+    test(
+        'extractCloudTimestamp falls back to deviceTimestamp when modifiedAt is missing',
+        () {
       const devTime = 1699999999000;
       final data = <String, dynamic>{'deviceTimestamp': devTime};
       expect(CloudSyncService.extractCloudTimestamp(data), devTime);
     });
 
-    test('extractCloudTimestamp returns 0 when no timestamp fields are present', () {
+    test('extractCloudTimestamp returns 0 when no timestamp fields are present',
+        () {
       expect(CloudSyncService.extractCloudTimestamp({}), 0);
     });
 
@@ -31,7 +35,8 @@ void main() {
       const local = 1000;
       const staleCloud = 500;
       expect(
-        CloudSyncService.shouldCloudWin(cloudTimestamp: staleCloud, localTimestamp: local),
+        CloudSyncService.shouldCloudWin(
+            cloudTimestamp: staleCloud, localTimestamp: local),
         isFalse,
       );
     });
@@ -40,21 +45,32 @@ void main() {
       const local = 500;
       const newerCloud = 1000;
       expect(
-        CloudSyncService.shouldCloudWin(cloudTimestamp: newerCloud, localTimestamp: local),
+        CloudSyncService.shouldCloudWin(
+            cloudTimestamp: newerCloud, localTimestamp: local),
         isTrue,
       );
     });
 
     test('shouldCloudWin: cloud wins when local timestamp is null or zero', () {
-      expect(CloudSyncService.shouldCloudWin(cloudTimestamp: 100, localTimestamp: null), isTrue);
-      expect(CloudSyncService.shouldCloudWin(cloudTimestamp: 100, localTimestamp: 0), isTrue);
+      expect(
+          CloudSyncService.shouldCloudWin(
+              cloudTimestamp: 100, localTimestamp: null),
+          isTrue);
+      expect(
+          CloudSyncService.shouldCloudWin(
+              cloudTimestamp: 100, localTimestamp: 0),
+          isTrue);
     });
 
     test('shouldCloudWin: equal timestamps break ties in favor of cloud', () {
-      expect(CloudSyncService.shouldCloudWin(cloudTimestamp: 1000, localTimestamp: 1000), isTrue);
+      expect(
+          CloudSyncService.shouldCloudWin(
+              cloudTimestamp: 1000, localTimestamp: 1000),
+          isTrue);
     });
 
-    test('local favorite modification timestamp persists across restart simulation',
+    test(
+        'local favorite modification timestamp persists across restart simulation',
         () async {
       SharedPreferences.setMockInitialValues({});
       CloudSyncService.clearLocalModifiedFavoritesForTesting();
@@ -63,8 +79,8 @@ void main() {
       await CloudSyncService.flushLocalModifiedFavoritesForTesting();
 
       CloudSyncService.simulateRestartForTesting();
-      final restored =
-          await CloudSyncService.localFavoriteModifiedAtForTesting('fav-restart-1');
+      final restored = await CloudSyncService.localFavoriteModifiedAtForTesting(
+          'fav-restart-1');
 
       expect(restored, equals(5000));
       expect(

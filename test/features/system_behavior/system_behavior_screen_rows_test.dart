@@ -31,7 +31,8 @@ void main() {
   testWidgets('fade, curve and step rows are exposed', (tester) async {
     await pumpScreen(tester);
 
-    expect(find.text(SystemBehaviorStrings.fadeOutOnPauseMsTitle), findsOneWidget);
+    expect(
+        find.text(SystemBehaviorStrings.fadeOutOnPauseMsTitle), findsOneWidget);
 
     // The list is taller than the 600 px test surface; scroll each row in.
     await tester.scrollUntilVisible(
@@ -57,8 +58,8 @@ void main() {
   testWidgets('choosing the logarithmic curve persists it', (tester) async {
     final settings = await pumpScreen(tester);
 
-    await tester.ensureVisible(
-        find.text(SystemBehaviorStrings.curveLogarithmic));
+    await tester
+        .ensureVisible(find.text(SystemBehaviorStrings.curveLogarithmic));
     await tester.pumpAndSettle();
     await tester.tap(find.text(SystemBehaviorStrings.curveLogarithmic));
     await tester.pumpAndSettle();

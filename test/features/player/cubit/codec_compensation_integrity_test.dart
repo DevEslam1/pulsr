@@ -23,7 +23,9 @@ void main() {
     SharedPreferences.setMockInitialValues({});
   });
 
-  test('0.5 applying preset while codec compensation is active yields exact preset gains', () async {
+  test(
+      '0.5 applying preset while codec compensation is active yields exact preset gains',
+      () async {
     final handler = RecordingAudioHandler();
     final settingsCubit = _MockSettingsCubit();
 
@@ -60,7 +62,8 @@ void main() {
     await controller.applyCodecAwareMusicCompensation();
 
     // Verify compensation altered the initial flat gains
-    expect(state.eqPreset.gains, isNot(equals(EqPreset.defaultPresets.first.gains)));
+    expect(state.eqPreset.gains,
+        isNot(equals(EqPreset.defaultPresets.first.gains)));
 
     // 2. Now user applies a new preset (e.g. Bass Boost or Electronic) while comp was active
     final targetPreset = EqPreset.defaultPresets[1]; // non-flat preset
@@ -71,7 +74,9 @@ void main() {
     expect(state.eqPreset.gains, equals(targetPreset.gains));
   });
 
-  test('0.5 user-enabled EQ while comp active is never force-disabled on comp deactivation', () async {
+  test(
+      '0.5 user-enabled EQ while comp active is never force-disabled on comp deactivation',
+      () async {
     final handler = RecordingAudioHandler();
     final settingsCubit = _MockSettingsCubit();
 
@@ -88,7 +93,8 @@ void main() {
     );
 
     var currentDevice = lossyBtDevice;
-    when(() => settingsCubit.state).thenAnswer((_) => SettingsState(currentOutputDevice: currentDevice));
+    when(() => settingsCubit.state)
+        .thenAnswer((_) => SettingsState(currentOutputDevice: currentDevice));
     when(() => settingsCubit.stream).thenAnswer((_) => const Stream.empty());
 
     var state = const PlayerState(

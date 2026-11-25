@@ -51,8 +51,8 @@ void main() {
         .thenAnswer((_) async => null);
 
     channel = MethodChannel(PulsrChannels.tagEditor);
-    handler = (call) async =>
-        call.method == 'readTags' ? <String, dynamic>{} : true;
+    handler =
+        (call) async => call.method == 'readTags' ? <String, dynamic>{} : true;
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, (call) => handler!(call));
     addTearDown(() async {
@@ -63,7 +63,8 @@ void main() {
   });
 
   group('C-10: _pushHistory before artwork & metadata mutations', () {
-    test('removeArtworkImage, applyMetadataResult, and autoFetchBatchTags can be undone',
+    test(
+        'removeArtworkImage, applyMetadataResult, and autoFetchBatchTags can be undone',
         () async {
       final s = createTestSong(
         id: 1,
@@ -145,9 +146,11 @@ void main() {
     });
   });
 
-  group('C-12: batch dirty flags survive partial failure and reset on full success',
+  group(
+      'C-12: batch dirty flags survive partial failure and reset on full success',
       () {
-    test('retains _batchArtistEdited when first save partially fails', () async {
+    test('retains _batchArtistEdited when first save partially fails',
+        () async {
       var failFirst = true;
       final writtenPayloads = <Map<dynamic, dynamic>>[];
       handler = (call) async {
@@ -189,7 +192,8 @@ void main() {
     });
   });
 
-  group('H-37 & M-05: CUE/online guards, rescan warning, warning dialog, temp cleanup',
+  group(
+      'H-37 & M-05: CUE/online guards, rescan warning, warning dialog, temp cleanup',
       () {
     test('rejects CUE virtual tracks and un-downloaded YouTube tracks',
         () async {

@@ -18,7 +18,8 @@ import '../../core/errors/app_error.dart';
 
 class TagEditorCubit extends PulsrCubit<TagEditorState> {
   static const String batchCheckpointKey = 'batch_tag_checkpoint';
-  static const String batchCheckpointPayloadKey = 'batch_tag_checkpoint_payload';
+  static const String batchCheckpointPayloadKey =
+      'batch_tag_checkpoint_payload';
   static const MethodChannel _channel = MethodChannel(PulsrChannels.tagEditor);
   final MediaScannerService _scannerService;
   final MetadataSearchService _metadataSearchService;
@@ -202,10 +203,9 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
       _batchDiscEdited = map['batchDiscEdited'] == true;
       _batchCommentEdited = map['batchCommentEdited'] == true;
 
-      final restoredFields = (map['userEditedFields'] as List?)
-              ?.whereType<String>()
-              .toSet() ??
-          <String>{};
+      final restoredFields =
+          (map['userEditedFields'] as List?)?.whereType<String>().toSet() ??
+              <String>{};
       if (_batchArtistEdited) restoredFields.add('artist');
       if (_batchAlbumEdited) restoredFields.add('album');
       if (_batchGenreEdited) restoredFields.add('genre');
@@ -880,8 +880,11 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
               await CachedArtwork.invalidate(id: s.id);
             } catch (e, st) {
               hadRescanError = true;
-              ErrorLogger.log('Tag write succeeded but rescan failed for ${s.path}',
-                  error: e, stackTrace: st, category: 'TagEditor');
+              ErrorLogger.log(
+                  'Tag write succeeded but rescan failed for ${s.path}',
+                  error: e,
+                  stackTrace: st,
+                  category: 'TagEditor');
             }
             taggedSongs.add(s);
             pendingPaths.remove(s.path);
@@ -1028,8 +1031,11 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
         await CachedArtwork.invalidate(id: state.song.id);
       } catch (e, st) {
         rescanWarning = true;
-        ErrorLogger.log('Tag write succeeded but rescan failed for ${state.song.path}',
-            error: e, stackTrace: st, category: 'TagEditor');
+        ErrorLogger.log(
+            'Tag write succeeded but rescan failed for ${state.song.path}',
+            error: e,
+            stackTrace: st,
+            category: 'TagEditor');
       }
 
       _userEditedFields.clear();

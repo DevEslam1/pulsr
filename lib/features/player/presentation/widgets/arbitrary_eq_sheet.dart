@@ -55,8 +55,8 @@ class _ArbitraryEqSheetState extends State<ArbitraryEqSheet> {
       text: current.isNotEmpty ? current : _presets.values.first,
     );
     _textController.addListener(_onTextChanged);
-    _linearPhase = cubit.state.arbitraryEqLinearPhase ||
-        cubit.isArbitraryEqLinearPhase;
+    _linearPhase =
+        cubit.state.arbitraryEqLinearPhase || cubit.isArbitraryEqLinearPhase;
     _lastCanonicalLinearPhase = cubit.state.arbitraryEqLinearPhase;
   }
 

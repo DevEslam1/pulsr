@@ -182,12 +182,14 @@ enum UsbRenderMode {
 class UsbExclusiveStatus {
   final bool attached;
   final bool permitted;
+
   /// Android UsbDevice.deviceId, NOT AudioDeviceInfo.id.
   final int? deviceId;
   final bool hardwareVolumeApplied;
   final int streamingSampleRate;
   final int streamingBitDepth;
   final int streamingChannels;
+
   /// Last successfully forwarded raw integer source depth; zero is nonraw.
   final int rawPcmBitDepth;
   final String? deviceName;
@@ -210,6 +212,7 @@ class UsbExclusiveStatus {
   final List<int> supportedRates;
   final int? lastError;
   final int? lastStreamErrorCode;
+
   /// Frames written to the wire while the render tap's channel count differed
   /// from the sink's. Non-zero means output is not sample-identical (channels
   /// were duplicated, silenced or dropped) and must be surfaced.
@@ -414,8 +417,8 @@ class UsbExclusiveStatus {
       streamingSampleRate: i(map['streamingSampleRate']) ?? 0,
       streamingBitDepth: i(map['streamingBitDepth']) ?? 0,
       streamingChannels: i(map['streamingChannels']) ?? 0,
-      rawPcmBitDepth: map['streamingActive'] == true
-          ? (i(map['rawPcmBitDepth']) ?? 0) : 0,
+      rawPcmBitDepth:
+          map['streamingActive'] == true ? (i(map['rawPcmBitDepth']) ?? 0) : 0,
       deviceName: map['deviceName'] as String?,
       vendorId: i(map['vendorId']),
       productId: i(map['productId']),
@@ -423,9 +426,8 @@ class UsbExclusiveStatus {
       uacLabel: (map['uacLabel'] as String?) ?? 'none',
       hasVolumeControl: map['hasVolumeControl'] == true,
       hasMuteControl: map['hasMuteControl'] == true,
-      hardwareMute: map['hardwareMute'] is bool
-          ? map['hardwareMute'] as bool
-          : null,
+      hardwareMute:
+          map['hardwareMute'] is bool ? map['hardwareMute'] as bool : null,
       exclusiveActive: map['exclusiveActive'] == true,
       exclusiveSupported: map['exclusiveSupported'] == true,
       hardwareVolumeDb: d(map['hardwareVolumeDb']),
@@ -444,7 +446,8 @@ class UsbExclusiveStatus {
       lastError: i(map['lastError']),
       lastStreamErrorCode: i(map['resultCode']),
       channelMismatchFrames: i(map['channelMismatchFrames']) ?? 0,
-      rateVerified: map['streamingActive'] == true && map['rateVerified'] == true,
+      rateVerified:
+          map['streamingActive'] == true && map['rateVerified'] == true,
       advertisedFormats: (map['advertisedFormats'] is List)
           ? (map['advertisedFormats'] as List)
               .whereType<Map>()
@@ -460,9 +463,7 @@ class UsbExclusiveStatus {
       drainPending: map['drainPending'] == true,
       sessionState: (map['sessionState'] as String?) ?? 'unknown',
       quirkApplied: (map['quirkApplied'] is List)
-          ? (map['quirkApplied'] as List)
-              .map((e) => '$e')
-              .toList()
+          ? (map['quirkApplied'] as List).map((e) => '$e').toList()
           : const [],
       quirkRejected: (map['quirkRejected'] is Map)
           ? (map['quirkRejected'] as Map).map(
@@ -652,9 +653,9 @@ class UsbExclusiveService {
   Future<bool> setUsbHardwareVolumeEnabled(bool enabled) async {
     if (!_isAndroid) return false;
     try {
-      final dynamic res = await _methodChannel
-          .invokeMethod<dynamic>('setUsbHardwareVolumeEnabled', {'enabled': enabled})
-          .timeout(const Duration(seconds: 2));
+      final dynamic res = await _methodChannel.invokeMethod<dynamic>(
+          'setUsbHardwareVolumeEnabled',
+          {'enabled': enabled}).timeout(const Duration(seconds: 2));
       return res == true;
     } catch (e, st) {
       ErrorLogger.log('Failed to setUsbHardwareVolumeEnabled($enabled)',
@@ -713,7 +714,9 @@ class UsbExclusiveService {
           final depthSatisfied = strict
               ? openedDepth == bitDepth
               : (openedDepth >= bitDepth &&
-                  (openedDepth == 16 || openedDepth == 24 || openedDepth == 32));
+                  (openedDepth == 16 ||
+                      openedDepth == 24 ||
+                      openedDepth == 32));
           final satisfied = status != null &&
               status.attached &&
               status.permitted &&
@@ -790,8 +793,10 @@ class UsbExclusiveService {
           .invokeMethod<dynamic>('stopStreaming')
           .timeout(const Duration(seconds: 5));
       final status = await _readStatus();
-      return res is Map && res['success'] == true &&
-          status != null && !status.streamingActive;
+      return res is Map &&
+          res['success'] == true &&
+          status != null &&
+          !status.streamingActive;
     } catch (e, st) {
       ErrorLogger.log('Failed to stop USB streaming',
           error: e, stackTrace: st, category: 'UsbExclusive');
@@ -836,7 +841,8 @@ class UsbExclusiveService {
       final value = (res as num?)?.toInt() ?? 0;
       return (value >= 1 && value <= 8) ? value : 0;
     } catch (e, st) {
-      ErrorLogger.log('Failed to get producer channels', error: e, stackTrace: st, category: 'UsbExclusive');
+      ErrorLogger.log('Failed to get producer channels',
+          error: e, stackTrace: st, category: 'UsbExclusive');
       return 0;
     }
   }
@@ -852,7 +858,8 @@ class UsbExclusiveService {
       }
       return const {};
     } catch (e, st) {
-      ErrorLogger.log('Failed to get diagnostics', error: e, stackTrace: st, category: 'UsbExclusive');
+      ErrorLogger.log('Failed to get diagnostics',
+          error: e, stackTrace: st, category: 'UsbExclusive');
       return const {};
     }
   }
@@ -887,9 +894,8 @@ class UsbExclusiveService {
   Future<bool> startPcmFile(String path) async {
     if (!_isAndroid || path.isEmpty) return false;
     try {
-      final bool? res = await _methodChannel
-          .invokeMethod<bool>('startPcmFile', <String, Object?>{'path': path})
-          .timeout(const Duration(seconds: 5));
+      final bool? res = await _methodChannel.invokeMethod<bool>('startPcmFile',
+          <String, Object?>{'path': path}).timeout(const Duration(seconds: 5));
       return res ?? false;
     } catch (e, st) {
       ErrorLogger.log('Failed to start the USB PCM source',
@@ -929,7 +935,8 @@ class UsbExclusiveService {
   }
 
   /// Starts native DSD streaming with the probed alternate setting tuple.
-  Future<bool> startDsdStreaming(DsdAltSettingTuple tuple, {bool strict = true}) async {
+  Future<bool> startDsdStreaming(DsdAltSettingTuple tuple,
+      {bool strict = true}) async {
     if (!_isAndroid) return false;
     if (tuple.interfaceNumber < 0 ||
         tuple.altSetting < 0 ||
@@ -968,7 +975,8 @@ class UsbExclusiveService {
 
   /// Writes one stereo 1-bit DSD block to the native DSD sink.
   /// Returns false on backpressure (ring full) or if streaming is inactive.
-  Future<bool> writeDsd(Uint8List left, Uint8List right, {int producerId = 0}) async {
+  Future<bool> writeDsd(Uint8List left, Uint8List right,
+      {int producerId = 0}) async {
     if (!_isAndroid) return false;
     try {
       final res = await _methodChannel.invokeMethod<bool>('writeDsd', {

@@ -234,8 +234,8 @@ mixin PulsrAudioPlaybackExtras on BaseAudioHandler {
   // the native boolean stage.
   Future<void> setSilenceSkipSensitivity(int v) async {
     silenceSkipController.setSensitivity(v);
-    final enabled = silenceSkipController.enabled &&
-        !await playbackRateMustRemainUnity();
+    final enabled =
+        silenceSkipController.enabled && !await playbackRateMustRemainUnity();
     try {
       await _playerA.setSkipSilenceEnabled(enabled);
       await _playerB.setSkipSilenceEnabled(enabled);
@@ -283,8 +283,12 @@ mixin PulsrAudioPlaybackExtras on BaseAudioHandler {
   YtmResolvingSource _buildResolvingYoutubeSource({
     required SongsTableData song,
     required MediaItem tag,
-    ({String url, String? userAgent, String? cookies, String quality})?
-        initialResolved,
+    ({
+      String url,
+      String? userAgent,
+      String? cookies,
+      String quality
+    })? initialResolved,
   });
 
   StreamResolutionPipeline get _streamResolutionPipeline;

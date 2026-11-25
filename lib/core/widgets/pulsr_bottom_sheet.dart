@@ -422,100 +422,101 @@ class PulsrBottomSheetContainer extends StatelessWidget {
                 ),
               ),
               child: PulsrSheetScope(
-            isDialog: isDialog,
-            child: Stack(
-              children: [
-                // Top specular refraction hairline
-                if (!isHighContrast && p.specularScale > 0)
-                  PositionedDirectional(
-                    top: 0,
-                    start: 24,
-                    end: 24,
-                    height: 1.2,
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            AppColors.specularAt(0.0),
-                            AppColors.specularAt(
-                              (p.isDark ? 0.34 : 0.60) * p.specularScale,
+                isDialog: isDialog,
+                child: Stack(
+                  children: [
+                    // Top specular refraction hairline
+                    if (!isHighContrast && p.specularScale > 0)
+                      PositionedDirectional(
+                        top: 0,
+                        start: 24,
+                        end: 24,
+                        height: 1.2,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                AppColors.specularAt(0.0),
+                                AppColors.specularAt(
+                                  (p.isDark ? 0.34 : 0.60) * p.specularScale,
+                                ),
+                                AppColors.specularAt(0.0),
+                              ],
+                              stops: const [0.0, 0.5, 1.0],
                             ),
-                            AppColors.specularAt(0.0),
-                          ],
-                          stops: const [0.0, 0.5, 1.0],
+                          ),
                         ),
                       ),
-                    ),
-                  ),
-                SafeArea(
-                  top: false,
-                  left: false,
-                  right: false,
-                  bottom: !isDialog,
-                  child: Material(
-                    type: MaterialType.transparency,
-                    child: FocusTraversalGroup(
-                      policy: OrderedTraversalPolicy(),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          if (showDragHandle && !isDialog) ...[
-                            const SizedBox(height: AppSpacing.s10),
-                            Center(
-                              child: Semantics(
-                                label: context.l10n.sheetDragHandle,
-                                hint: context.l10n.sheetDragDownToDismiss,
-                                child: Container(
-                                  width: AppSpacing.s40,
-                                  height: 4.5,
-                                  decoration: BoxDecoration(
-                                    color:
-                                        (p.isDark ? Colors.white : Colors.black)
+                    SafeArea(
+                      top: false,
+                      left: false,
+                      right: false,
+                      bottom: !isDialog,
+                      child: Material(
+                        type: MaterialType.transparency,
+                        child: FocusTraversalGroup(
+                          policy: OrderedTraversalPolicy(),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              if (showDragHandle && !isDialog) ...[
+                                const SizedBox(height: AppSpacing.s10),
+                                Center(
+                                  child: Semantics(
+                                    label: context.l10n.sheetDragHandle,
+                                    hint: context.l10n.sheetDragDownToDismiss,
+                                    child: Container(
+                                      width: AppSpacing.s40,
+                                      height: 4.5,
+                                      decoration: BoxDecoration(
+                                        color: (p.isDark
+                                                ? Colors.white
+                                                : Colors.black)
                                             .withValues(
-                                      alpha: isHighContrast ? 0.58 : 0.26,
+                                          alpha: isHighContrast ? 0.58 : 0.26,
+                                        ),
+                                        borderRadius: AppRadii.full,
+                                      ),
                                     ),
-                                    borderRadius: AppRadii.full,
+                                  ),
+                                ),
+                                const SizedBox(height: AppSpacing.s8),
+                              ],
+                              if (headerTitle != null ||
+                                  (isDialog &&
+                                      showDialogCloseButton &&
+                                      trailing == null))
+                                FocusTraversalOrder(
+                                  order: const NumericFocusOrder(1.0),
+                                  child: _buildHeader(
+                                    context,
+                                    p,
+                                    headerTitle,
+                                    effectiveIsDialog: isDialog,
+                                  ),
+                                ),
+                              Flexible(
+                                child: FocusTraversalOrder(
+                                  order: const NumericFocusOrder(2.0),
+                                  child: Material(
+                                    color: Colors.transparent,
+                                    child: child,
                                   ),
                                 ),
                               ),
-                            ),
-                            const SizedBox(height: AppSpacing.s8),
-                          ],
-                          if (headerTitle != null ||
-                              (isDialog &&
-                                  showDialogCloseButton &&
-                                  trailing == null))
-                            FocusTraversalOrder(
-                              order: const NumericFocusOrder(1.0),
-                              child: _buildHeader(
-                                context,
-                                p,
-                                headerTitle,
-                                effectiveIsDialog: isDialog,
-                              ),
-                            ),
-                          Flexible(
-                            child: FocusTraversalOrder(
-                              order: const NumericFocusOrder(2.0),
-                              child: Material(
-                                color: Colors.transparent,
-                                child: child,
-                              ),
-                            ),
+                            ],
                           ),
-                        ],
+                        ),
                       ),
                     ),
-                  ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
         ),
       ),
-    ),
-    ),
     );
 
     if (isDialog) {

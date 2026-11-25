@@ -178,7 +178,8 @@ class _UsbDacSectionState extends State<UsbDacSection> {
       final maxDb = range.maxQ8 / 256.0;
       if (maxDb > minDb) {
         final position = ((db - minDb) / (maxDb - minDb)).clamp(0.0, 1.0);
-        if (_uac2Position == null || (_uac2Position! - position).abs() > 0.005) {
+        if (_uac2Position == null ||
+            (_uac2Position! - position).abs() > 0.005) {
           setState(() => _uac2Position = position);
         }
       }
@@ -404,8 +405,7 @@ class _UsbDacSectionState extends State<UsbDacSection> {
     final hasHwVolume =
         uac2Range != null || (_status.hasVolumeControl && hasDbRange);
     final currentDb = (minDb != null && maxDb != null)
-        ? (_pendingDb ?? _status.hardwareVolumeDb ?? maxDb)
-            .clamp(minDb, maxDb)
+        ? (_pendingDb ?? _status.hardwareVolumeDb ?? maxDb).clamp(minDb, maxDb)
         : 0.0;
 
     return Column(
@@ -595,7 +595,8 @@ class _UsbDacSectionState extends State<UsbDacSection> {
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text('${(position * 100).round()} %', style: textTheme.bodySmall),
+                Text('${(position * 100).round()} %',
+                    style: textTheme.bodySmall),
                 if (_status.hasMuteControl) ...[
                   const SizedBox(width: AppSpacing.xs),
                   IconButton(

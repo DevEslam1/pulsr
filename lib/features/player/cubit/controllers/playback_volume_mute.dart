@@ -140,15 +140,18 @@ class PlaybackVolumeMute {
     if (active != null) return active.snapshot;
     if (!getIt.isRegistered<SharedPreferences>()) return null;
     final prefs = getIt<SharedPreferences>();
-    final hasCurve = prefs.containsKey(SystemBehaviorPrefsKeys.softwareVolumeCurve);
-    final hasStep = prefs.containsKey(SystemBehaviorPrefsKeys.volumeStepPercent);
+    final hasCurve =
+        prefs.containsKey(SystemBehaviorPrefsKeys.softwareVolumeCurve);
+    final hasStep =
+        prefs.containsKey(SystemBehaviorPrefsKeys.volumeStepPercent);
     if (!hasCurve && !hasStep) return null;
     return SystemBehaviorSettingsSnapshot.normalized(
       softwareVolumeCurve: SoftwareVolumeCurve.parse(
         prefs.getString(SystemBehaviorPrefsKeys.softwareVolumeCurve),
       ),
-      volumeStepPercent: prefs.getInt(SystemBehaviorPrefsKeys.volumeStepPercent) ??
-          SystemBehaviorSettingsSnapshot.defaults.volumeStepPercent,
+      volumeStepPercent:
+          prefs.getInt(SystemBehaviorPrefsKeys.volumeStepPercent) ??
+              SystemBehaviorSettingsSnapshot.defaults.volumeStepPercent,
     );
   }
 
@@ -165,8 +168,7 @@ class PlaybackVolumeMute {
             if (await _audioHandler.setUsbHardwareMute(target)) {
               _muted = target;
               final s = _getState();
-              _emit(s.copyWith(
-                  playback: s.playback.copyWith(isMuted: _muted)));
+              _emit(s.copyWith(playback: s.playback.copyWith(isMuted: _muted)));
               return;
             }
           }

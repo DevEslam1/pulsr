@@ -280,7 +280,8 @@ void main() {
       await tester.pumpWidget(sheetHost(
         playerCubit: player,
         settingsCubit: settings,
-        child: const AudioQualitySheet(song: testSong, activeColor: Colors.teal),
+        child:
+            const AudioQualitySheet(song: testSong, activeColor: Colors.teal),
       ));
       await tester.pump();
 
@@ -310,7 +311,8 @@ void main() {
       await tester.tap(find.text('Output'));
       await tester.pumpAndSettle();
 
-      final usbDrawer = find.byKey(const ValueKey('audio_route_drawer_usb_dac'));
+      final usbDrawer =
+          find.byKey(const ValueKey('audio_route_drawer_usb_dac'));
       expect(usbDrawer, findsOneWidget);
       expect(find.byKey(const ValueKey('audio_route_drawer_bluetooth')),
           findsNothing);
@@ -340,7 +342,8 @@ void main() {
             currentOutputDevice: _btOutput,
           ),
         ),
-        child: const AudioQualitySheet(song: testSong, activeColor: Colors.teal),
+        child:
+            const AudioQualitySheet(song: testSong, activeColor: Colors.teal),
       ));
       await tester.pump();
 

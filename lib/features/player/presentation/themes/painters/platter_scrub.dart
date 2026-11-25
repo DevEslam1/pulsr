@@ -109,7 +109,9 @@ class PlatterScrubController extends ChangeNotifier {
     if (_isScrubbing && duration > Duration.zero) {
       final target = position + scrubDelta;
       onSeek(
-        Duration(milliseconds: target.inMilliseconds.clamp(0, duration.inMilliseconds)),
+        Duration(
+            milliseconds:
+                target.inMilliseconds.clamp(0, duration.inMilliseconds)),
       );
     }
     cancel();
@@ -172,8 +174,10 @@ class PlatterScrubSemantics extends StatelessWidget {
           slider: true,
           label: context.l10n.seekLabel,
           value: readout(span.elapsed.clamp(0, total)),
-          increasedValue: readout((span.elapsed + _seekStep.inSeconds).clamp(0, total)),
-          decreasedValue: readout((span.elapsed - _seekStep.inSeconds).clamp(0, total)),
+          increasedValue:
+              readout((span.elapsed + _seekStep.inSeconds).clamp(0, total)),
+          decreasedValue:
+              readout((span.elapsed - _seekStep.inSeconds).clamp(0, total)),
           onIncrease: () => _seekBy(cubit, _seekStep),
           onDecrease: () => _seekBy(cubit, -_seekStep),
           // The disc's own artwork node is described by the deck's image node,

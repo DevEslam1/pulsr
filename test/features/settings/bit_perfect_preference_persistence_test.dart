@@ -148,7 +148,8 @@ void main() {
     expect(prefs.getBool(PrefsKeys.bitPerfectOutput), isTrue);
   });
 
-  test('plugging a USB DAC restores a saved Strict choice, not just Bit-Perfect',
+  test(
+      'plugging a USB DAC restores a saved Strict choice, not just Bit-Perfect',
       () async {
     SharedPreferences.setMockInitialValues({
       PrefsKeys.bitPerfectOutput: true,
@@ -198,7 +199,8 @@ void main() {
     expect(prefs.getBool(PrefsKeys.bitPerfectOutput), isTrue);
   });
 
-  test('H-48 startup does not flicker bitPerfectOutput true when no USB DAC is attached',
+  test(
+      'H-48 startup does not flicker bitPerfectOutput true when no USB DAC is attached',
       () async {
     SharedPreferences.setMockInitialValues({
       PrefsKeys.bitPerfectOutput: true,

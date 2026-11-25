@@ -120,14 +120,14 @@ mixin _MusicRepositoryTagsAndFacets {
                 oldAlbumRow.title.toLowerCase() == trimmedAlbum.toLowerCase() &&
                 (otherWithAlbum != null ||
                     oldAlbumRow.artist.toLowerCase() == 'various artists');
-            final effectiveAlbumArtist = (explicitAlbumArtist != null &&
-                    explicitAlbumArtist.isNotEmpty)
-                ? explicitAlbumArtist
-                : (isCompilation == true
-                    ? 'Various Artists'
-                    : (preservesCompilationOwner
-                        ? oldAlbumRow.artist
-                        : trimmedArtist));
+            final effectiveAlbumArtist =
+                (explicitAlbumArtist != null && explicitAlbumArtist.isNotEmpty)
+                    ? explicitAlbumArtist
+                    : (isCompilation == true
+                        ? 'Various Artists'
+                        : (preservesCompilationOwner
+                            ? oldAlbumRow.artist
+                            : trimmedArtist));
             final albumArtistId = effectiveAlbumArtist.toLowerCase() ==
                     trimmedArtist.toLowerCase()
                 ? newArtistId

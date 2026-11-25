@@ -63,7 +63,8 @@ class _TestAudioHandler extends BaseAudioHandler
   final List<bool> setUsbHardwareMuteCalls = <bool>[];
   EqualizerManager? overrideEqualizerManager;
   bool crossfeedEnabledOverride = false;
-  late final EqualizerManager _fallbackEqualizerManager = MockEqualizerManager();
+  late final EqualizerManager _fallbackEqualizerManager =
+      MockEqualizerManager();
 
   @override
   bool get usbHardwareVolumeOwned => usbHardwareVolumeOwnedOverride;
@@ -233,7 +234,8 @@ void main() {
       expect(state.isMuted, isTrue);
     });
 
-    test('PlayerCubit re-syncs state.dsp when equalizerManager.reloadNotifier fires',
+    test(
+        'PlayerCubit re-syncs state.dsp when equalizerManager.reloadNotifier fires',
         () async {
       final reloadNotifier = ValueNotifier<int>(0);
       addTearDown(reloadNotifier.dispose);

@@ -205,7 +205,8 @@ class SacdDsfExtractor {
       );
     }
     if (maxOutputBytes <= 0) {
-      throw ArgumentError.value(maxOutputBytes, 'maxOutputBytes', 'must be > 0');
+      throw ArgumentError.value(
+          maxOutputBytes, 'maxOutputBytes', 'must be > 0');
     }
   }
 

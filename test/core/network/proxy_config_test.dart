@@ -206,10 +206,12 @@ void main() {
       expect(restored.isWorking, true);
     });
 
-    test('rejects CRLF, whitespace, and semicolons in proxy host and normalizes IPv6 bypass',
+    test(
+        'rejects CRLF, whitespace, and semicolons in proxy host and normalizes IPv6 bypass',
         () {
       expect(
-        const ProxyConfig(enabled: true, host: 'proxy.local\r\nEvil: 1', port: 8080)
+        const ProxyConfig(
+                enabled: true, host: 'proxy.local\r\nEvil: 1', port: 8080)
             .isValid,
         isFalse,
       );

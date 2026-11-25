@@ -245,16 +245,18 @@ class _CleanArtworkStage extends StatelessWidget {
               borderRadius: artRadius,
             );
 
-            final Widget mediaChild =
-                (!isPreview && canvasEnabled && !canvasAsBackdrop && song != null)
-                    ? CanvasBackdrop(
-                        song: song,
-                        isPlaying: isPlaying,
-                        isBackdropMode: false,
-                        borderRadius: artCorners,
-                        fallbackArtwork: fallbackArt,
-                      )
-                    : fallbackArt;
+            final Widget mediaChild = (!isPreview &&
+                    canvasEnabled &&
+                    !canvasAsBackdrop &&
+                    song != null)
+                ? CanvasBackdrop(
+                    song: song,
+                    isPlaying: isPlaying,
+                    isBackdropMode: false,
+                    borderRadius: artCorners,
+                    fallbackArtwork: fallbackArt,
+                  )
+                : fallbackArt;
 
             final List<BoxShadow> shadows = p.isCalmDensity
                 ? const []

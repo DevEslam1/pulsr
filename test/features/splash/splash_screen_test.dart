@@ -119,7 +119,8 @@ void main() {
     expect(find.text('HOME_SCREEN'), findsOneWidget);
   });
 
-  testWidgets('M-08/L-02: Retry invokes DI reconfiguration when needed and respects Reduce Motion',
+  testWidgets(
+      'M-08/L-02: Retry invokes DI reconfiguration when needed and respects Reduce Motion',
       (tester) async {
     SharedPreferences.setMockInitialValues({'onboarding_completed': true});
     var reconfigureAttempts = 0;

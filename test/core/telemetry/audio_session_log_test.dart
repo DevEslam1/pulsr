@@ -210,7 +210,9 @@ void main() {
           isFalse);
     });
 
-    test('endSession() immediately followed by readAll() captures final session without race', () async {
+    test(
+        'endSession() immediately followed by readAll() captures final session without race',
+        () async {
       log = buildLog();
       await log.startSession(trackId: 'race_1', trackTitle: 'Race Track 1');
       // Fire endSession and readAll back-to-back
@@ -223,7 +225,9 @@ void main() {
       expect(records.single.endedAt, isNotNull);
     });
 
-    test('endSession() immediately followed by clear() flushes and deletes cleanly', () async {
+    test(
+        'endSession() immediately followed by clear() flushes and deletes cleanly',
+        () async {
       log = buildLog();
       await log.startSession(trackId: 'race_2', trackTitle: 'Race Track 2');
       final endFuture = log.endSession();
@@ -233,7 +237,8 @@ void main() {
       final records = await log.readAll();
       expect(records, isEmpty);
       expect(
-        await File('${tempDir.path}/${AudioSessionLog.defaultFileName}').exists(),
+        await File('${tempDir.path}/${AudioSessionLog.defaultFileName}')
+            .exists(),
         isFalse,
       );
     });

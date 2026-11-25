@@ -16,6 +16,7 @@ import '../../../helpers/screen_harness.dart';
 import '../../../helpers/test_song_factory.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 class _MockSettingsCubit extends Mock implements SettingsCubit {}
 
 class _MockDynamicThemeCubit extends Mock implements DynamicThemeCubit {}
@@ -114,8 +115,7 @@ void main() {
                   BlocProvider<DynamicThemeCubit>.value(value: dynamicTheme),
                 ],
                 child: MaterialApp(
-                  localizationsDelegates:
-                      appLocalizationsDelegates,
+                  localizationsDelegates: appLocalizationsDelegates,
                   supportedLocales: AppLocalizations.supportedLocales,
                   navigatorKey: navKey,
                   navigatorObservers: [observer],

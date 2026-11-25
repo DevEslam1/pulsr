@@ -389,7 +389,8 @@ void main() {
     });
   }
 
-  testWidgets('Online HomeScreen tab renders overflow-free at 360x800 @ 2.0x RTL',
+  testWidgets(
+      'Online HomeScreen tab renders overflow-free at 360x800 @ 2.0x RTL',
       (tester) async {
     final errors = <FlutterErrorDetails>[];
     final prevOnError = FlutterError.onError;

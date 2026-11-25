@@ -109,8 +109,11 @@ void main() {
       expect(AudioOutputInfo.fromMap(info.toMap()).systemEffectsCompromised,
           isTrue);
       expect(info.copyWith(bitDepth: 16).systemEffectsCompromised, isTrue);
-      expect(info.copyWith(systemEffectsCompromised: false)
-          .systemEffectsCompromised, isFalse);
+      expect(
+          info
+              .copyWith(systemEffectsCompromised: false)
+              .systemEffectsCompromised,
+          isFalse);
 
       // Two routes that differ only in whether the OEM chain is compromised
       // are not the same route.

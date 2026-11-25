@@ -26,7 +26,8 @@ class _FakeHiResAudioService extends HiResAudioService {
   AudioOutputInfo? get currentOutputInfo => _info;
 
   @override
-  Future<AudioOutputInfo> getAudioOutputInfo({bool allowCached = false}) async =>
+  Future<AudioOutputInfo> getAudioOutputInfo(
+          {bool allowCached = false}) async =>
       _info;
 }
 
@@ -108,7 +109,10 @@ class _QuranAudioHandler extends TestPulsrAudioHandler {
 
   @override
   Future<void> setReverb(bool enabled,
-      {int? preset, double? wetDry, double? predelayMs, double? damping}) async {
+      {int? preset,
+      double? wetDry,
+      double? predelayMs,
+      double? damping}) async {
     if (rejectReverb) throw StateError('Native reverb rejected');
     lastReverbEnabled = enabled;
     lastReverbWetDry = wetDry;
@@ -1069,8 +1073,7 @@ void main() {
       expect(tuning.ambience, closeTo(0.2, 1e-9));
     });
 
-    test('a failed profile apply rolls the mode back and reports it',
-        () async {
+    test('a failed profile apply rolls the mode back and reports it', () async {
       final service = QuranModeService();
       final handler = _QuranAudioHandler()..rejectReverb = true;
       var state = const PlayerState();

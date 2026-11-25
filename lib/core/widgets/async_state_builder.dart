@@ -72,7 +72,8 @@ Object? _leftFailureOf(Object? data) {
   return null;
 }
 
-class _AsyncErrorCard extends StatelessWidget {  const _AsyncErrorCard({required this.error, this.onRetry});
+class _AsyncErrorCard extends StatelessWidget {
+  const _AsyncErrorCard({required this.error, this.onRetry});
 
   final Object error;
   final VoidCallback? onRetry;

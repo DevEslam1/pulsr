@@ -93,7 +93,9 @@ void main() {
       expect(decoded.bassBoost, 0.0);
     });
 
-    test('safely parses numeric lists with null, non-num, and non-finite elements', () {
+    test(
+        'safely parses numeric lists with null, non-num, and non-finite elements',
+        () {
       final decoded = EqPreset.fromJson({
         'name': 'CorruptData',
         'gains': [1.5, 'bad', null, double.nan, double.infinity, 3],
@@ -111,7 +113,9 @@ void main() {
   });
 
   group('EqPreset edge-case frequency interpolation guards', () {
-    test('interpolateGains guards non-positive frequencies and identical bounds', () {
+    test(
+        'interpolateGains guards non-positive frequencies and identical bounds',
+        () {
       final out = EqPreset.interpolateGains(
         [1.0, 5.0],
         sourceFrequencies: [0.0, 1000.0],

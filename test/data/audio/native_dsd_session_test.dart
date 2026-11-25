@@ -29,7 +29,8 @@ class MockUsbExclusiveService extends UsbExclusiveService {
       );
 
   @override
-  Future<bool> startDsdStreaming(DsdAltSettingTuple tuple, {bool strict = true}) async {
+  Future<bool> startDsdStreaming(DsdAltSettingTuple tuple,
+      {bool strict = true}) async {
     isStreamingStarted = true;
     return true;
   }
@@ -42,7 +43,8 @@ class MockUsbExclusiveService extends UsbExclusiveService {
   }
 
   @override
-  Future<bool> writeDsd(Uint8List left, Uint8List right, {int producerId = 0}) async {
+  Future<bool> writeDsd(Uint8List left, Uint8List right,
+      {int producerId = 0}) async {
     if (failWrites) return false;
     writtenLeft.add(left);
     writtenRight.add(right);
@@ -133,7 +135,9 @@ void main() {
       );
     });
 
-    test('exact tuple selection rejects non-matching rates without first-tuple fallback', () {
+    test(
+        'exact tuple selection rejects non-matching rates without first-tuple fallback',
+        () {
       const caps = DsdDacCapabilities(
         dsd64: true,
         dsd128: false,
@@ -161,28 +165,33 @@ void main() {
 
       // DSD128 has NO exact tuple: must return null instead of falling back to DSD64
       final tuple128 = NativeDsdProducer.selectProbedTuple(caps, 128);
-      expect(tuple128, isNull, reason: 'Must not use first-tuple fallback for mismatched DSD rate');
+      expect(tuple128, isNull,
+          reason: 'Must not use first-tuple fallback for mismatched DSD rate');
 
       // Zero or invalid rate returns null
       expect(NativeDsdProducer.selectProbedTuple(caps, 0), isNull);
       expect(NativeDsdProducer.selectProbedTuple(caps, -1), isNull);
     });
 
-    test('seek alignment enforces 4-byte boundaries for 32-bit DSD_U32 words', () {
+    test('seek alignment enforces 4-byte boundaries for 32-bit DSD_U32 words',
+        () {
       final left = Uint8List(1000);
       final right = Uint8List(1000);
       producer.prepare(left: left, right: right, dsdRate: 64);
 
       // Seek to 10 ms (at DSD64 = 2,822,400 bits/sec = 352,800 bytes/sec -> 3,528 bytes)
       producer.seek(const Duration(milliseconds: 10));
-      expect(producer.currentByteOffset % 4, 0, reason: 'Must align to 4-byte boundary');
+      expect(producer.currentByteOffset % 4, 0,
+          reason: 'Must align to 4-byte boundary');
 
       // Seek to 33 ms -> 11,642.4 bytes -> must be floored to multiple of 4
       producer.seek(const Duration(milliseconds: 33));
-      expect(producer.currentByteOffset % 4, 0, reason: 'Must align to 4-byte boundary');
+      expect(producer.currentByteOffset % 4, 0,
+          reason: 'Must align to 4-byte boundary');
     });
 
-    test('pause feeds DC-neutral DSD silence pattern (alternating 0x69/0x96)', () async {
+    test('pause feeds DC-neutral DSD silence pattern (alternating 0x69/0x96)',
+        () async {
       final left = Uint8List(100000);
       final right = Uint8List(100000);
       producer.prepare(left: left, right: right, dsdRate: 64);
@@ -206,7 +215,8 @@ void main() {
       await pumping;
     });
 
-    test('xrun counter increments and triggers fallback halt after max retries', () async {
+    test('xrun counter increments and triggers fallback halt after max retries',
+        () async {
       mockUsb.failWrites = true; // force backpressure / write failure
       mockUsb.dsdActiveState = true;
       final left = Uint8List(4096);
@@ -217,10 +227,12 @@ void main() {
       await producer.startPumping(chunkSize: 512);
 
       expect(producer.state, NativeDsdProducerState.stopped);
-      expect(producer.xrunCount, greaterThanOrEqualTo(NativeDsdProducer.kMaxXrunsBeforeFallback));
+      expect(producer.xrunCount,
+          greaterThanOrEqualTo(NativeDsdProducer.kMaxXrunsBeforeFallback));
     });
 
-    test('volume policy delegates to hardware volume only when enabled', () async {
+    test('volume policy delegates to hardware volume only when enabled',
+        () async {
       final session = NativeDsdSession(usb: mockUsb, producer: producer);
       expect(session.capabilities.canSoftwareVolume, isFalse);
 
@@ -239,7 +251,9 @@ void main() {
       expect(mockUsb.isStreamingStopped, isTrue);
     });
 
-    test('bit reversal accurately swaps MSB-first DFF bits to LSB-first DSF order', () {
+    test(
+        'bit reversal accurately swaps MSB-first DFF bits to LSB-first DSF order',
+        () {
       // 0b10000000 (0x80) -> 0b00000001 (0x01)
       // 0b11000000 (0xC0) -> 0b00000011 (0x03)
       // 0b10101010 (0xAA) -> 0b01010101 (0x55)
@@ -298,7 +312,8 @@ void main() {
       expect(DsdDecoderHelper.dsdNativeActive, isFalse);
     });
 
-    test('status flips only after the first real block and completes once', () async {
+    test('status flips only after the first real block and completes once',
+        () async {
       final active = Completer<void>();
       final completed = Completer<void>();
       session.onNativeActive = () {
@@ -317,7 +332,8 @@ void main() {
       expect(session.nativeStatusActive, isTrue);
     });
 
-    test('stream death raises the fallback signal and clears the native claim', () async {
+    test('stream death raises the fallback signal and clears the native claim',
+        () async {
       mockUsb.failWrites = true;
       mockUsb.dsdActiveState = false;
       final fallback = Completer<Duration>();
@@ -332,7 +348,8 @@ void main() {
       expect(session.nativeStatusActive, isFalse);
     });
 
-    test('a mismatched tuple is refused instead of played at the wrong rate', () async {
+    test('a mismatched tuple is refused instead of played at the wrong rate',
+        () async {
       final mismatched = NativeDsdSession(
         usb: mockUsb,
         producer: producer,
@@ -371,7 +388,9 @@ void main() {
       expect(session.isPrepared, isFalse);
     });
 
-    test('BUG-P1-3: dispose mid-prepare closes file/USB without StateError on closed controllers', () async {
+    test(
+        'BUG-P1-3: dispose mid-prepare closes file/USB without StateError on closed controllers',
+        () async {
       final probeGate = Completer<DsdDacCapabilities>();
       final midSession = NativeDsdSession(
         usb: mockUsb,

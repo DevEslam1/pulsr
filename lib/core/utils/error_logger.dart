@@ -23,8 +23,8 @@ class ErrorLogger {
   static final _authHeaderRegex = RegExp(
       r'\b(Authorization|token|key):\s*(?:Bearer\s+)?([^\s,;]+)|\b(Bearer)\s+([A-Za-z0-9._~+/-]+=*)',
       caseSensitive: false);
-  static final _jwtRegex = RegExp(
-      r'\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}(?:\.[A-Za-z0-9_-]*)?');
+  static final _jwtRegex =
+      RegExp(r'\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}(?:\.[A-Za-z0-9_-]*)?');
   static final _userPathRegex = RegExp(
       r'(?:/Users/|/home/|[A-Za-z]:[/\\]Users[/\\])[^\s\n\r"\)\],;]+',
       caseSensitive: false);
@@ -313,8 +313,7 @@ class _RedactedException implements Exception {
   const _RedactedException(this.originalType, this.redactedMessage);
 
   @override
-  String toString() =>
-      redactedMessage.startsWith(originalType)
-          ? redactedMessage
-          : '$originalType: $redactedMessage';
+  String toString() => redactedMessage.startsWith(originalType)
+      ? redactedMessage
+      : '$originalType: $redactedMessage';
 }

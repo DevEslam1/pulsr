@@ -8,6 +8,7 @@ import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 
 import '../../../../core/utils/pulsr_haptics.dart';
+
 /// Interactive vertical alphabet quick-scroll rail for Library lists.
 ///
 /// Features:

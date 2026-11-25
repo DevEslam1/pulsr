@@ -168,8 +168,8 @@ LiveOutputVerdict resolveLiveOutputVerdict(LiveOutputObservation observation) {
       observation.dvcActive;
 
   final facts = BitPerfectOutputFacts(
-    requested: observation.bitPerfectOutput ||
-        (output?.bitPerfectRequested ?? false),
+    requested:
+        observation.bitPerfectOutput || (output?.bitPerfectRequested ?? false),
     sinkActive: direct || output?.isBitPerfectActive == true,
     directUsbActive: direct,
     bluetooth: output?.isBluetooth == true,
@@ -195,8 +195,8 @@ LiveOutputVerdict resolveLiveOutputVerdict(LiveOutputObservation observation) {
     rateVerified: !direct || observation.rateVerified,
     isDsdDop: observation.isDsdDop,
     isDsdNative: observation.isDsdNative,
-    sourceLossy: observation.isRadioSource ||
-        codecState == AudioSourceCodecState.lossy,
+    sourceLossy:
+        observation.isRadioSource || codecState == AudioSourceCodecState.lossy,
     sourceCodecUnconfirmed: codecState == AudioSourceCodecState.unknown,
     failureReason: output?.bitPerfectFailureReason,
   );

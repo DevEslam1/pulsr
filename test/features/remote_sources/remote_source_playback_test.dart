@@ -91,8 +91,8 @@ void main() {
 
       expect(cubit.state.currentSong?.source, SongSource.remote);
       expect(cubit.queueController.isLiveRadio, isFalse);
-      expect(RadioNowPlayingRecommendations.shouldShowFor(remoteSong()),
-          isFalse);
+      expect(
+          RadioNowPlayingRecommendations.shouldShowFor(remoteSong()), isFalse);
       // A genuine radio row must still show it.
       expect(
           RadioNowPlayingRecommendations.shouldShowFor(
@@ -114,7 +114,8 @@ void main() {
       // The engine is the source of truth for the position: seek into the file
       // and let the fake handler publish it, as ExoPlayer would.
       await cubit.seek(const Duration(seconds: 97));
-      handler.positionStream.isEmpty; // touch the stream so the lint stays happy
+      handler
+          .positionStream.isEmpty; // touch the stream so the lint stays happy
 
       await cubit.pause();
       expect(handler.pauseCalls, 1);
@@ -125,8 +126,8 @@ void main() {
       handler.playCalls = 0;
       await cubit.play();
       expect(handler.playCalls, 1);
-      expect(handler.transportOrder.where((c) => c.startsWith('seek:')),
-          isEmpty,
+      expect(
+          handler.transportOrder.where((c) => c.startsWith('seek:')), isEmpty,
           reason: 'resume must continue in place, never seek back to zero');
       expect(handler.seekTargets, isNot(contains(Duration.zero)));
     });

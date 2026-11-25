@@ -107,8 +107,8 @@ void main() {
           'cloud_sync_hashes_cache', '{"users/u1/favorites/1": "hash1"}');
       await prefs.setStringList(
           'cloud_sync_uploaded_favorite_ids', ['fav_1', 'fav_2']);
-      await prefs.setStringList(
-          'cloud_sync_uploaded_playlist_ids', ['pl_1', 'pl_2']);
+      await prefs
+          .setStringList('cloud_sync_uploaded_playlist_ids', ['pl_1', 'pl_2']);
       await prefs.setString(
           'cloud_sync_uploaded_playlist_songs', '{"pl_1": ["s1", "s2"]}');
 
@@ -282,7 +282,8 @@ void main() {
       expect(entries.single.playlistId, playlistId);
     });
 
-    test('UID change on syncAll resets stale session state and persists new UID',
+    test(
+        'UID change on syncAll resets stale session state and persists new UID',
         () async {
       SharedPreferences.setMockInitialValues({
         'cloud_sync_last_uid': 'uid-previous',
@@ -305,7 +306,8 @@ void main() {
       expect(prefs.getStringList('cloud_sync_uploaded_favorite_ids'), isNull);
     });
 
-    test('AuthService signOut invokes registered CloudSyncService resetSessionState',
+    test(
+        'AuthService signOut invokes registered CloudSyncService resetSessionState',
         () async {
       SharedPreferences.setMockInitialValues({
         'cloud_sync_last_uid': 'uid-active',

@@ -519,8 +519,8 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
                                     child: PulsrDockAware(
                                       heightIncludesSafeArea: true,
                                       child: TabletSideInspector(
-                                        onClose: () => setState(() =>
-                                            _isSideInspectorOpen = false),
+                                        onClose: () => setState(
+                                            () => _isSideInspectorOpen = false),
                                       ),
                                     ),
                                   )

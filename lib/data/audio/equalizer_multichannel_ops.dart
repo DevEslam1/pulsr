@@ -7,13 +7,15 @@ extension EqualizerMultichannelOps on EqualizerManager {
   AudioChannelLayout? get channelLayout =>
       AudioChannelLayout.fromChannelCount(channelManagerChannelCount);
 
-  Future<void> setChannelManagerEnabled(bool enabled, {int? channelCount}) async {
+  Future<void> setChannelManagerEnabled(bool enabled,
+      {int? channelCount}) async {
     final prevEnabled = isChannelManagerEnabled;
     final prevCount = channelManagerChannelCount;
     final targetCount = (channelCount ?? prevCount).clamp(2, 8);
     try {
       if (PlatformCapabilities.isAndroid) {
-        await _effectsChannel.setChannelManagerEnabled(enabled, channelCount: targetCount);
+        await _effectsChannel.setChannelManagerEnabled(enabled,
+            channelCount: targetCount);
         if (enabled) {
           // Re-enabling must not lose the trims/delays the UI (and prefs)
           // still hold: the native stage was disabled during restore, so push
@@ -105,11 +107,16 @@ extension EqualizerMultichannelOps on EqualizerManager {
     if (channel < 0 || channel >= 8) return;
     final prevTrim = channelManagerTrimDb[channel];
     final prevDelay = channelManagerDelayMs[channel];
-    final targetTrim = trimDb != null ? DspParamRanges.channelManagerTrimDb.clamp(trimDb) : prevTrim;
-    final targetDelay = delayMs != null ? DspParamRanges.channelManagerDelayMs.clamp(delayMs) : prevDelay;
+    final targetTrim = trimDb != null
+        ? DspParamRanges.channelManagerTrimDb.clamp(trimDb)
+        : prevTrim;
+    final targetDelay = delayMs != null
+        ? DspParamRanges.channelManagerDelayMs.clamp(delayMs)
+        : prevDelay;
     try {
       if (PlatformCapabilities.isAndroid) {
-        await _effectsChannel.setChannelManagerChannel(channel, trimDb: targetTrim, delayMs: targetDelay);
+        await _effectsChannel.setChannelManagerChannel(channel,
+            trimDb: targetTrim, delayMs: targetDelay);
       }
       channelManagerTrimDb[channel] = targetTrim;
       channelManagerDelayMs[channel] = targetDelay;
@@ -194,5 +201,4 @@ extension EqualizerMultichannelOps on EqualizerManager {
       rethrow;
     }
   }
-
 }

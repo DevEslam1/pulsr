@@ -273,7 +273,8 @@ void main() {
 
       final guestFallback = await service.resolvePlayerStream('dQw4w9WgXcQ');
       expect(guestFallback?.url, contains('https://x/guest'));
-      expect(requests.map(_clientName), containsAll(['WEB_REMIX', 'ANDROID_VR']));
+      expect(
+          requests.map(_clientName), containsAll(['WEB_REMIX', 'ANDROID_VR']));
 
       requests.clear();
       final handoffOnly = await service.resolvePlayerStream(

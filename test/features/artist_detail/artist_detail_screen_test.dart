@@ -27,6 +27,7 @@ import '../../helpers/detail_screen_harness.dart';
 import '../../helpers/test_song_factory.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 class _Artists extends Mock implements GetArtistsUseCase {}
 
 /// Never performs a network call, so the widget tests stay deterministic and

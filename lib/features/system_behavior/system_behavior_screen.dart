@@ -138,7 +138,8 @@ class _SwitchRow extends StatelessWidget {
       title: Text(title),
       subtitle: Text(
         disabled ? disabledReason! : subtitle,
-        style: TextStyle(fontSize: AppFontSize.bodySmall, color: p.textSecondary),
+        style:
+            TextStyle(fontSize: AppFontSize.bodySmall, color: p.textSecondary),
       ),
       value: value,
       onChanged: disabled ? null : onChanged,

@@ -231,10 +231,9 @@ class ChainOfCustodyReport {
           return 'Not Verified — samples measured identical, but the chain was '
               'not reported bit-perfect while it ran';
         }
-        final bypassLimitation = limitations
-            .cast<String?>()
-            .firstWhere((l) => l!.startsWith('directBypassPath:'),
-                orElse: () => null);
+        final bypassLimitation = limitations.cast<String?>().firstWhere(
+            (l) => l!.startsWith('directBypassPath:'),
+            orElse: () => null);
         if (bypassLimitation != null) {
           final bypassPath =
               bypassLimitation.substring('directBypassPath:'.length);
@@ -607,9 +606,8 @@ class ChainOfCustodyService {
           sha256.convert(utf8.encode(trackUri ?? trackId)).toString();
     }
 
-    final outputSampleRate =
-        (nativeReport['sampleRate'] as num?)?.toDouble() ??
-            sourceSampleRate.toDouble();
+    final outputSampleRate = (nativeReport['sampleRate'] as num?)?.toDouble() ??
+        sourceSampleRate.toDouble();
     final activeStagesRaw = nativeReport['activeStages'] as List<dynamic>?;
 
     return ChainOfCustodyReport(

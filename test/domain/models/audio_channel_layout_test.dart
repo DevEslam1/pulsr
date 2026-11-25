@@ -64,11 +64,15 @@ void main() {
 
     test('the sink channel count is the truth', () {
       expect(info(outputChannels: 6).hasMultichannelOutput, isTrue);
-      expect(info(outputChannels: 2, decodedChannels: 6, supported: [6])
-          .hasMultichannelOutput, isFalse);
+      expect(
+          info(outputChannels: 2, decodedChannels: 6, supported: [6])
+              .hasMultichannelOutput,
+          isFalse);
     });
 
-    test('falls back to a proven device + decoded count when the sink is unprobed', () {
+    test(
+        'falls back to a proven device + decoded count when the sink is unprobed',
+        () {
       expect(info(decodedChannels: 6, supported: [2, 6]).hasMultichannelOutput,
           isTrue);
       expect(info(decodedChannels: 6, supported: [2]).hasMultichannelOutput,

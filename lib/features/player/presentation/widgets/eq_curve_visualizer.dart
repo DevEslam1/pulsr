@@ -124,13 +124,16 @@ class _EqCurveVisualizerState extends State<EqCurveVisualizer> {
       }
     }
     final activeIdx = _activeDraggingBand ?? widget.selectedBandIndex;
-    if (activeIdx != null && activeIdx >= 0 && activeIdx < widget.gains.length) {
+    if (activeIdx != null &&
+        activeIdx >= 0 &&
+        activeIdx < widget.gains.length) {
       final db = widget.gains[activeIdx];
       final dbStr = '${db > 0 ? '+' : ''}${db.toStringAsFixed(1)} dB';
       parts.add('${context.l10n.eqBandLabel(activeIdx + 1)}: $dbStr');
     }
     if (_selectedTargetCurve != null) {
-      parts.add('${context.l10n.autoeqTargetCurve}: ${_selectedTargetCurve!.name}');
+      parts.add(
+          '${context.l10n.autoeqTargetCurve}: ${_selectedTargetCurve!.name}');
     }
     return parts.join(', ');
   }
@@ -147,11 +150,9 @@ class _EqCurveVisualizerState extends State<EqCurveVisualizer> {
     final shouldAnimate =
         _activeDraggingBand == null && PulsrMotion.shouldAnimate(context);
     final surfacePalette = context.playerSurfacePalette;
-    final safeHeight = widget.height.isFinite
-        ? math.max(24.0, widget.height)
-        : 24.0;
-    final curveDuration =
-        shouldAnimate ? context.motionMs(260) : Duration.zero;
+    final safeHeight =
+        widget.height.isFinite ? math.max(24.0, widget.height) : 24.0;
+    final curveDuration = shouldAnimate ? context.motionMs(260) : Duration.zero;
 
     Widget visualizer = RepaintBoundary(
       child: ExcludeSemantics(

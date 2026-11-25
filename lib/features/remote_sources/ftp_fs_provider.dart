@@ -67,40 +67,40 @@ class FtpFsProvider implements RemoteFsProvider {
   @override
   Future<List<RemoteEntry>> list(String path) =>
       _transferLock.protect(() => _errors.guard('list', () async {
-        await _session.ensureConnected();
-        final absolute = _resolve(path);
-        List<RemoteEntry> entries = const [];
-        var listSucceeded = false;
-        var listing = '';
-        try {
-          listing = await _session.readListing('LIST $absolute');
-          listSucceeded = true;
-          entries = FtpListingParser.parseListing(
-            listing,
-            parentPath: path,
-          );
-        } on RemoteProtocolError catch (e, st) {
-          if (!_session.isConnected) rethrow;
-          // Plenty of embedded servers reject `LIST <path>` but answer NLST.
-          ErrorLogger.log(
-            'FTP LIST with a path was rejected; retrying with NLST',
-            error: e,
-            stackTrace: st,
-            category: 'RemoteSources',
-            meta: {'authority': source.authority},
-          );
-          entries = const [];
-        }
-        if (entries.isNotEmpty) return entries;
-        // A clean empty LIST response already proves the folder has no entries;
-        // calling NLST next turns valid empty folders into 550 errors on many
-        // FTP daemons.
-        if (listSucceeded && listing.trim().isEmpty) return const [];
-        final names = await _session.readListing('NLST $absolute');
-        return _enrichTypes(
-          FtpListingParser.parseNameList(names, parentPath: path),
-        );
-      }));
+            await _session.ensureConnected();
+            final absolute = _resolve(path);
+            List<RemoteEntry> entries = const [];
+            var listSucceeded = false;
+            var listing = '';
+            try {
+              listing = await _session.readListing('LIST $absolute');
+              listSucceeded = true;
+              entries = FtpListingParser.parseListing(
+                listing,
+                parentPath: path,
+              );
+            } on RemoteProtocolError catch (e, st) {
+              if (!_session.isConnected) rethrow;
+              // Plenty of embedded servers reject `LIST <path>` but answer NLST.
+              ErrorLogger.log(
+                'FTP LIST with a path was rejected; retrying with NLST',
+                error: e,
+                stackTrace: st,
+                category: 'RemoteSources',
+                meta: {'authority': source.authority},
+              );
+              entries = const [];
+            }
+            if (entries.isNotEmpty) return entries;
+            // A clean empty LIST response already proves the folder has no entries;
+            // calling NLST next turns valid empty folders into 550 errors on many
+            // FTP daemons.
+            if (listSucceeded && listing.trim().isEmpty) return const [];
+            final names = await _session.readListing('NLST $absolute');
+            return _enrichTypes(
+              FtpListingParser.parseNameList(names, parentPath: path),
+            );
+          }));
 
   /// Returns metadata for [path] using `SIZE` / `MDTM`, falling back to `CWD`.
   @override

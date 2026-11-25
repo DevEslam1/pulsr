@@ -6,6 +6,7 @@ import '../utils/l10n_extensions.dart';
 import 'pulsr_scroll_edge_fade.dart';
 
 import '../utils/pulsr_haptics.dart';
+
 /// {@category DesignSystem}
 /// A widget that displays text normally when it fits within the parent bounds,
 /// and smoothly scrolls it horizontally (marquee) when it overflows.

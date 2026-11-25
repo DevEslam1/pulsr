@@ -34,6 +34,7 @@ import (
 )
 
 var (
+	wsWG            sync.WaitGroup
 	store           = party.NewPartyStore()
 	hubInst         = hub.NewHub()
 	createLimiter   = newIPRateLimiter(time.Minute, config.CreateRatePerMinute, config.RateLimitMaxEntries)
@@ -1000,6 +1001,9 @@ func handleInviteLanding(w http.ResponseWriter, r *http.Request) {
 // WebSocket Handler
 
 func handleWebSocket(w http.ResponseWriter, r *http.Request) {
+	wsWG.Add(1)
+	defer wsWG.Done()
+
 	code := r.PathValue("code")
 	token := parseBearerToken(r)
 	if token == "" {

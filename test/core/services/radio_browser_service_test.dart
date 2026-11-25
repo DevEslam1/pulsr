@@ -153,7 +153,8 @@ void main() {
         );
       });
 
-      test('falls back to non-range probe if 416 Range Not Satisfiable', () async {
+      test('falls back to non-range probe if 416 Range Not Satisfiable',
+          () async {
         var attempts = 0;
         final client = MockClient((request) async {
           attempts++;
@@ -198,7 +199,8 @@ void main() {
         });
 
         final service = RadioBrowserService(client: client);
-        expect(await service.isReachable('https://stream.example/redirect'), isFalse);
+        expect(await service.isReachable('https://stream.example/redirect'),
+            isFalse);
       });
 
       test('follows 302 redirect pointing to safe public stream', () async {
@@ -215,7 +217,8 @@ void main() {
         });
 
         final service = RadioBrowserService(client: client);
-        expect(await service.isReachable('https://stream.example/redirect'), isTrue);
+        expect(await service.isReachable('https://stream.example/redirect'),
+            isTrue);
       });
 
       test('rejects 302 without location header', () async {
@@ -224,7 +227,8 @@ void main() {
         });
 
         final service = RadioBrowserService(client: client);
-        expect(await service.isReachable('https://stream.example/live'), isFalse);
+        expect(
+            await service.isReachable('https://stream.example/live'), isFalse);
       });
 
       test('uses AppConfig.appVersion in User-Agent header', () async {
@@ -265,11 +269,13 @@ void main() {
         expect(requested[1].host, 'nl1.api.radio-browser.info');
       });
 
-      test('voteForStation issues vote request and parses confirmation', () async {
+      test('voteForStation issues vote request and parses confirmation',
+          () async {
         Uri? requested;
         final client = MockClient((request) async {
           requested = request.url;
-          return http.Response(jsonEncode({'ok': true, 'message': 'voted'}), 200);
+          return http.Response(
+              jsonEncode({'ok': true, 'message': 'voted'}), 200);
         });
 
         const validUuid = '960e57c0-0601-11e8-ae97-52543be04c81';

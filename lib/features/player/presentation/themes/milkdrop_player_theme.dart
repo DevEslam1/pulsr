@@ -425,9 +425,8 @@ class _MilkdropLiveCanvasState extends State<_MilkdropLiveCanvas>
     final seedOffset = (seed.abs() % 100) / 100.0;
     for (int i = 0; i < _numBands; i++) {
       final phase = i * 0.24 + seedOffset * 3.14;
-      final v =
-          ((math.sin(phase + 1.1) + math.cos(phase * 1.6)) * 0.24 + 0.44)
-              .clamp(0.12, 0.88);
+      final v = ((math.sin(phase + 1.1) + math.cos(phase * 1.6)) * 0.24 + 0.44)
+          .clamp(0.12, 0.88);
       _currentBands[i] = v;
       _targetBands[i] = v;
     }
@@ -530,9 +529,8 @@ class _MilkdropLiveCanvasState extends State<_MilkdropLiveCanvas>
     final sessionId = widget.audioSessionId ?? 0;
     if (sessionId <= 0) return;
 
-    _methodChannel
-        .invokeMethod('setAudioSessionId', {'audioSessionId': sessionId})
-        .catchError((_) {});
+    _methodChannel.invokeMethod(
+        'setAudioSessionId', {'audioSessionId': sessionId}).catchError((_) {});
 
     if (!_claimedNativeSession) {
       _claimedNativeSession = true;
@@ -700,8 +698,8 @@ class _MilkdropTopBar extends StatelessWidget {
     final Color glassFill = AppColors.scrimAt(
       allowBlur ? 0.36 : AppBlur.solidFallbackMinAlpha,
     );
-    final isHighContrast = context.palette.isHighContrast ||
-        MediaQuery.highContrastOf(context);
+    final isHighContrast =
+        context.palette.isHighContrast || MediaQuery.highContrastOf(context);
     final Color glassBorder = isHighContrast
         ? AppColors.specularAt(0.55)
         : AppColors.specularAt(0.22);
@@ -1356,7 +1354,8 @@ class _MilkdropProgressBarState extends State<_MilkdropProgressBar> {
                       onChangeEnd: widget.isBuffering
                           ? null
                           : (val) {
-                              widget.onSeek(Duration(milliseconds: val.round()));
+                              widget
+                                  .onSeek(Duration(milliseconds: val.round()));
                               setState(() => _dragMs = null);
                             },
                       onChangeCancel: () => setState(() => _dragMs = null),

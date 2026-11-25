@@ -16,6 +16,7 @@ import 'package:pulsr/features/player/presentation/widgets/waveform_seek_bar.dar
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 class MockPlayerCubit extends Mock implements PlayerCubit {}
 
 /// Calculates the WCAG 2.1 contrast ratio between two colors using relative luminance.

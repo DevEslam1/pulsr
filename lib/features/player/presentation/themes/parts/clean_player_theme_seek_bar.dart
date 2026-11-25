@@ -253,7 +253,9 @@ class _CleanSeekBarState extends State<_CleanSeekBar> {
                               color: deck.secondary,
                               fontSize: AppFontSize.label,
                               fontWeight: FontWeight.w600,
-                              fontFeatures: const [FontFeature.tabularFigures()],
+                              fontFeatures: const [
+                                FontFeature.tabularFigures()
+                              ],
                             ),
                           ),
                         ),

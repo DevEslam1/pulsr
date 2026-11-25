@@ -71,8 +71,9 @@ extension YtDownloadServiceSequential on YtDownloadService {
       resumeOffset = 0;
     }
 
-    final request =
-        await _http.openUrl('GET', uri).timeout(YtDownloadService._stallTimeout);
+    final request = await _http
+        .openUrl('GET', uri)
+        .timeout(YtDownloadService._stallTimeout);
     _trackRequest(task.runId, request);
     try {
       if (resumeOffset > 0) {
@@ -165,7 +166,8 @@ extension YtDownloadServiceSequential on YtDownloadService {
         if (response.statusCode != HttpStatus.ok &&
             response.statusCode != HttpStatus.partialContent) {
           await YtDownloadHttpSupport.drainSmall(response);
-          throw DownloadFailure('HTTP ${response.statusCode} on stream request');
+          throw DownloadFailure(
+              'HTTP ${response.statusCode} on stream request');
         }
       }
 

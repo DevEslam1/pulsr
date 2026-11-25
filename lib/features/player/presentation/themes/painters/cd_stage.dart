@@ -292,8 +292,7 @@ class _CdJewelStageState extends State<_CdJewelStage> {
                                 return AnimatedBuilder(
                                   animation: widget.pickupAnimation,
                                   builder: (context, child) {
-                                    final engage =
-                                        widget.pickupAnimation.value;
+                                    final engage = widget.pickupAnimation.value;
                                     return CustomPaint(
                                       painter: _CdPickupSledPainter(
                                         railLeft: railLeft,

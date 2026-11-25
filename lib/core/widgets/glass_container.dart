@@ -166,8 +166,7 @@ class GlassContainer extends StatelessWidget {
     // glass intensity modulates, so every glass surface actually diffuses
     // what is behind it. [GlassTier.solid] is the one exception: it exists to
     // be genuinely opaque.
-    final desiredAlpha =
-        base.a * (tier == GlassTier.solid ? 1.0 : tintAlpha);
+    final desiredAlpha = base.a * (tier == GlassTier.solid ? 1.0 : tintAlpha);
     final baseColor = base.withValues(alpha: desiredAlpha.clamp(0.0, 1.0));
 
     final showLiquidSheen = !isHighContrast && (isLiquid || specularHighlight);

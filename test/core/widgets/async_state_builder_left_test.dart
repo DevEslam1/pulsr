@@ -6,6 +6,7 @@ import 'package:pulsr/core/widgets/async_state_builder.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 /// DESIGN.md §10: a repository failure arrives as a `Left` *value*, not as a
 /// stream error. Without this guard, a failed query rendered as "no results".
 void main() {

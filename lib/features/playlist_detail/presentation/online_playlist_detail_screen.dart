@@ -266,8 +266,7 @@ class _OnlinePlaylistDetailScreenState
           if (row.title.isNotEmpty) {
             _title = row.title;
             if (isRenamed ||
-                (widget.args.title != null &&
-                    widget.args.title != row.title)) {
+                (widget.args.title != null && widget.args.title != row.title)) {
               _hasCustomLocalTitle = true;
             }
           }
@@ -969,8 +968,8 @@ class _OnlinePlaylistDetailScreenState
               Row(
                 children: [
                   ExcludeSemantics(
-                    child:
-                        Icon(Icons.swap_vert_rounded, size: 16, color: p.accent),
+                    child: Icon(Icons.swap_vert_rounded,
+                        size: 16, color: p.accent),
                   ),
                   const SizedBox(width: AppSpacing.s6),
                   Expanded(
@@ -1385,9 +1384,8 @@ class _OnlinePlaylistDetailScreenState
                                 ),
                                 tooltip: MaterialLocalizations.of(context)
                                     .moreButtonTooltip,
-                                onPressed: () => SongOptionsSheet.show(
-                                    context,
-                                    song: song),
+                                onPressed: () =>
+                                    SongOptionsSheet.show(context, song: song),
                               ),
                             ],
                           ),

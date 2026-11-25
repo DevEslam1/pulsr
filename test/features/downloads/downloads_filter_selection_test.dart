@@ -19,6 +19,7 @@ import 'package:pulsr/features/player/cubit/player_state.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 class MockDownloadsCubit extends Mock implements DownloadsCubit {}
 
 class MockPlayerCubit extends Mock implements PlayerCubit {}

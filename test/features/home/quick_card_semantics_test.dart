@@ -5,6 +5,7 @@ import 'package:pulsr/features/home/presentation/widgets/quick_card.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 /// Row/tile controls used to be bare `InkWell`s with no role, so a screen
 /// reader announced the text but not that it was actionable.
 void main() {

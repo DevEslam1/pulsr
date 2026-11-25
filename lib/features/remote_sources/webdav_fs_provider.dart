@@ -93,9 +93,8 @@ class WebDavFsProvider implements RemoteFsProvider {
     final response = await _send(
       'GET',
       path,
-      headers: fullRead
-          ? null
-          : {HttpHeaders.rangeHeader: _rangeHeader(start, end)},
+      headers:
+          fullRead ? null : {HttpHeaders.rangeHeader: _rangeHeader(start, end)},
     );
     await _throwForStatus(response, path);
     final isPartial = response.statusCode == HttpStatus.partialContent;

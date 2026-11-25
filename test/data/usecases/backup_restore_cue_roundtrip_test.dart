@@ -27,7 +27,9 @@ void main() {
     await db.close();
   });
 
-  test('BackupRestoreUseCase round-trips CUE Track 1 (cueStartMs == 0) and moved CUE albums', () async {
+  test(
+      'BackupRestoreUseCase round-trips CUE Track 1 (cueStartMs == 0) and moved CUE albums',
+      () async {
     const oldAlbumPath = '/storage/emulated/0/Music/OldAlbum/album.flac';
     const newAlbumPath = '/storage/emulated/0/Music/MovedAlbum/album.flac';
 
@@ -39,7 +41,8 @@ void main() {
             path: oldAlbumPath,
             cueStartMs: const Value(0),
             cueEndMs: const Value(180000),
-            cueFile: const Value('/storage/emulated/0/Music/OldAlbum/album.cue'),
+            cueFile:
+                const Value('/storage/emulated/0/Music/OldAlbum/album.cue'),
             isFavorite: const Value(true), // Track 1 is favorite!
           ),
         );
@@ -50,7 +53,8 @@ void main() {
             path: oldAlbumPath,
             cueStartMs: const Value(180000),
             cueEndMs: const Value(360000),
-            cueFile: const Value('/storage/emulated/0/Music/OldAlbum/album.cue'),
+            cueFile:
+                const Value('/storage/emulated/0/Music/OldAlbum/album.cue'),
             isFavorite: const Value(false),
           ),
         );
@@ -72,7 +76,8 @@ void main() {
     // Verify Track 1 carries #pulsr_cue=0 in favorites and queue
     final favorites = (exportedData['favorites'] as List).cast<String>();
     expect(favorites, contains('$oldAlbumPath#pulsr_cue=0'),
-        reason: 'Track 1 (cueStartMs == 0) must serialize with #pulsr_cue=0 rather than bare path');
+        reason:
+            'Track 1 (cueStartMs == 0) must serialize with #pulsr_cue=0 rather than bare path');
 
     final queue = exportedData['queue'] as Map<String, dynamic>;
     final queuePaths = (queue['paths'] as List).cast<String>();
@@ -90,7 +95,8 @@ void main() {
             path: newAlbumPath,
             cueStartMs: const Value(0),
             cueEndMs: const Value(180000),
-            cueFile: const Value('/storage/emulated/0/Music/MovedAlbum/album.cue'),
+            cueFile:
+                const Value('/storage/emulated/0/Music/MovedAlbum/album.cue'),
             isFavorite: const Value(false),
           ),
         );
@@ -101,7 +107,8 @@ void main() {
             path: newAlbumPath,
             cueStartMs: const Value(180000),
             cueEndMs: const Value(360000),
-            cueFile: const Value('/storage/emulated/0/Music/MovedAlbum/album.cue'),
+            cueFile:
+                const Value('/storage/emulated/0/Music/MovedAlbum/album.cue'),
             isFavorite: const Value(false),
           ),
         );
@@ -117,7 +124,8 @@ void main() {
     final track1 = songs.firstWhere((s) => s.id == 101);
     final track2 = songs.firstWhere((s) => s.id == 102);
 
-    expect(track1.isFavorite, isTrue, reason: 'Track 1 at new path should be marked favorite');
+    expect(track1.isFavorite, isTrue,
+        reason: 'Track 1 at new path should be marked favorite');
     expect(track2.isFavorite, isFalse);
 
     final restoredQueue = await db.select(db.queueItemsTable).get();

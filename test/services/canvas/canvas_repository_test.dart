@@ -145,7 +145,8 @@ void main() {
       expect(result2, isNull);
     });
 
-    test('BUG-P2-25: cached(song) normalizes noisy title and trimmed artist identically to canvasForTrack',
+    test(
+        'BUG-P2-25: cached(song) normalizes noisy title and trimmed artist identically to canvasForTrack',
         () async {
       final repo = CanvasRepository(
         cache: _FakeCache(),

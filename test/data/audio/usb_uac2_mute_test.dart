@@ -48,7 +48,8 @@ void main() {
       expect(result, isFalse);
     });
 
-    test('getUac2HardwareMute returns null when platform returns null or errors',
+    test(
+        'getUac2HardwareMute returns null when platform returns null or errors',
         () async {
       messenger.setMockMethodCallHandler(channel, (call) async {
         if (call.method == 'getUac2HardwareMute') {
@@ -80,7 +81,8 @@ void main() {
       expect(passedMuted, isFalse);
     });
 
-    test('non-Android platform fails closed without invoking channel', () async {
+    test('non-Android platform fails closed without invoking channel',
+        () async {
       debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
 
       final getResult = await bridge.getUac2HardwareMute();

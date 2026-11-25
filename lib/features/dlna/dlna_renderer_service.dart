@@ -114,6 +114,7 @@ class DlnaRendererService extends ChangeNotifier {
   final MediaHttpServer _mediaServer;
   final http.Client _httpClient;
   final bool _ownsHttpClient;
+
   /// Consecutive poll failures after which the loop stops and the UI shows the
   /// stale banner instead of pretending playback is still live.
   static const int maxConsecutivePollFailures = 3;
@@ -182,8 +183,7 @@ class DlnaRendererService extends ChangeNotifier {
         _descriptionTimeout = descriptionTimeout,
         _localAddressResolver =
             localAddressResolver ?? MediaHttpServer.localAddressFacing,
-        _descriptionCache =
-            descriptionCache ?? UpnpDeviceDescriptionCache(),
+        _descriptionCache = descriptionCache ?? UpnpDeviceDescriptionCache(),
         _allowedMediaHosts =
             allowedMediaHosts.map((h) => h.trim().toLowerCase()).toSet(),
         _dnsLookup = dnsLookup;
@@ -1026,7 +1026,8 @@ class DlnaRendererService extends ChangeNotifier {
   Uri? _resolveLocation(SsdpResponse response) {
     final parsed = Uri.tryParse(response.location);
     if (parsed == null ||
-        !SsdpClient.isAllowedDescriptionLocation(parsed, response.sourceAddress)) {
+        !SsdpClient.isAllowedDescriptionLocation(
+            parsed, response.sourceAddress)) {
       ErrorLogger.log(
         'DLNA response has an invalid or untrusted LOCATION: '
         '${response.location} (from ${response.sourceAddress})',

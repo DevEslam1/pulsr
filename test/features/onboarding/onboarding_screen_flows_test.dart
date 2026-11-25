@@ -68,8 +68,7 @@ void main() {
         .thenAnswer((_) => settingsController.stream);
     when(() => settingsCubit.setCustomAccentColor(any()))
         .thenAnswer((_) async {});
-    when(() => settingsCubit.setExperienceMode(any()))
-        .thenAnswer((_) async {});
+    when(() => settingsCubit.setExperienceMode(any())).thenAnswer((_) async {});
     when(() => settingsCubit.setPlayerThemeMode(any()))
         .thenAnswer((_) async {});
   });

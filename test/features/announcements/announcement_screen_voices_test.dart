@@ -76,7 +76,8 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('voices appear when the engine becomes available', (tester) async {
+  testWidgets('voices appear when the engine becomes available',
+      (tester) async {
     final engine = _FlipEngine();
     await tester.pumpWidget(host(engine));
     await tester.pumpAndSettle();

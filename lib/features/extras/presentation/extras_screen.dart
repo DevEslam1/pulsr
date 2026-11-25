@@ -91,6 +91,7 @@ class _ExtrasScreenState extends State<ExtrasScreen> {
     }
     return id;
   }
+
   bool _ownsSystemBehavior = false;
   bool _ownsUsbErgonomics = false;
   bool _ownsSafeMode = false;
@@ -102,8 +103,8 @@ class _ExtrasScreenState extends State<ExtrasScreen> {
   /// Tools whose initialization failed, with the inline message their row
   /// shows. A tool listed here has its row disabled; every other row stays
   /// usable (one broken service cannot blank the whole hub).
-  late final Map<ExtrasTool, String> _toolErrors =
-      Map<ExtrasTool, String>.from(widget.debugToolErrors ?? const <ExtrasTool, String>{});
+  late final Map<ExtrasTool, String> _toolErrors = Map<ExtrasTool, String>.from(
+      widget.debugToolErrors ?? const <ExtrasTool, String>{});
 
   /// Subtitle for [tool]: its inline error when it failed, else [fallback].
   String _subtitleFor(ExtrasTool tool, String fallback) =>
@@ -757,16 +758,16 @@ class _ExtrasScreenState extends State<ExtrasScreen> {
                         SettingsNavTile(
                           Icons.usb_rounded,
                           l10n.extrasUsbTitle,
-                          _subtitleFor(
-                              ExtrasTool.usb, l10n.extrasUsbSubtitle),
+                          _subtitleFor(ExtrasTool.usb, l10n.extrasUsbSubtitle),
                           trailing: _buildTrailing(ExtrasTool.usb),
-                          onTap: _usbErgonomics == null || !_ready(ExtrasTool.usb)
-                              ? null
-                              : () => _push(
-                                    UsbErgonomicsScreen(
-                                      service: _usbErgonomics!,
-                                    ),
-                                  ),
+                          onTap:
+                              _usbErgonomics == null || !_ready(ExtrasTool.usb)
+                                  ? null
+                                  : () => _push(
+                                        UsbErgonomicsScreen(
+                                          service: _usbErgonomics!,
+                                        ),
+                                      ),
                         ),
                       ],
                     ),
@@ -807,14 +808,15 @@ class _ExtrasScreenState extends State<ExtrasScreen> {
                           _subtitleFor(
                               ExtrasTool.profiles, l10n.extrasProfilesSubtitle),
                           trailing: _buildTrailing(ExtrasTool.profiles),
-                          onTap: _profiles == null || !_ready(ExtrasTool.profiles)
-                              ? null
-                              : () => _push(
-                                    AudioProfilesScreen(
-                                      service: _profiles!,
-                                      deviceLabel: _deviceLabel,
-                                    ),
-                                  ),
+                          onTap:
+                              _profiles == null || !_ready(ExtrasTool.profiles)
+                                  ? null
+                                  : () => _push(
+                                        AudioProfilesScreen(
+                                          service: _profiles!,
+                                          deviceLabel: _deviceLabel,
+                                        ),
+                                      ),
                         ),
                         settingsCardDivider(p),
                         SettingsNavTile(
@@ -876,7 +878,8 @@ class _InlineNotice extends StatelessWidget {
             Expanded(
               child: Text(
                 message,
-                style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.label),
+                style: TextStyle(
+                    color: p.textSecondary, fontSize: AppFontSize.label),
               ),
             ),
             if (onRetry != null) ...[
@@ -885,7 +888,8 @@ class _InlineNotice extends StatelessWidget {
                 onPressed: onRetry,
                 style: TextButton.styleFrom(
                   visualDensity: VisualDensity.compact,
-                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
                 ),
                 child: Text(context.l10n.retry),
               ),

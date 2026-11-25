@@ -61,8 +61,8 @@ class PulsrDialogHelper {
     final trackManually = !useRootNavigator;
     if (trackManually) PulsrModalTracker.push();
     final navigator = Navigator.of(context, rootNavigator: useRootNavigator);
-    final effectiveBarrier = barrierColor ??
-        ScrimTokens.barrierScrim(context.palette.isDark);
+    final effectiveBarrier =
+        barrierColor ?? ScrimTokens.barrierScrim(context.palette.isDark);
     final future = navigator.push<T>(
       DialogRoute<T>(
         context: context,

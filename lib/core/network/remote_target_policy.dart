@@ -179,9 +179,8 @@ abstract final class RemoteTargetPolicy {
 
     // IPv4-mapped (::ffff:a.b.c.d), IPv4-compatible (::a.b.c.d),
     // and IPv4-translated (::ffff:0:a.b.c.d).
-    final isMapped = b.sublist(0, 10).every((v) => v == 0) &&
-        b[10] == 0xff &&
-        b[11] == 0xff;
+    final isMapped =
+        b.sublist(0, 10).every((v) => v == 0) && b[10] == 0xff && b[11] == 0xff;
     final isCompatible = b.sublist(0, 12).every((v) => v == 0);
     final isTranslated = b.sublist(0, 8).every((v) => v == 0) &&
         b[8] == 0xff &&
@@ -311,7 +310,8 @@ abstract final class RemoteTargetPolicy {
     if (a == 192 && b == 168) return true; // 192.168.0.0/16
     if (a == 169 && b == 254) return true; // 169.254.0.0/16
     if (a == 100 && b >= 64 && b <= 127) return true; // 100.64.0.0/10
-    if (a >= 224) return true; // 224.0.0.0/4 multicast, 240.0.0.0/4 reserved, 255.255.255.255
+    if (a >= 224)
+      return true; // 224.0.0.0/4 multicast, 240.0.0.0/4 reserved, 255.255.255.255
     return false;
   }
 }

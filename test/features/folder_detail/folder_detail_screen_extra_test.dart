@@ -26,6 +26,7 @@ import '../../helpers/detail_screen_harness.dart';
 import '../../helpers/test_song_factory.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 class _FolderUseCases extends Mock implements FolderUseCases {}
 
 class _Library extends Mock implements LibraryCubit {}

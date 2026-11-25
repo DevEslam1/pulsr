@@ -132,7 +132,8 @@ extension _EqAbCompareBar on _EqualizerSheetState {
                     child: Center(
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: AppSpacing.s10, vertical: AppSpacing.xxs),
+                            horizontal: AppSpacing.s10,
+                            vertical: AppSpacing.xxs),
                         decoration: BoxDecoration(
                           color: isSelected ? p.accent : Colors.transparent,
                           borderRadius: AppRadii.r8All,

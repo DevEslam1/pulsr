@@ -39,10 +39,10 @@ class YtmMediaHelpers {
       if (text == null || text.isEmpty) continue;
       final nav = run['navigationEndpoint'];
       if (nav is Map) {
-        final pageType =
-            (((nav['browseEndpoint'] as Map?)?['browseEndpointContextSupportedConfigs']
-                    as Map?)?['browseEndpointContextMusicConfig']
-                as Map?)?['pageType'] as String?;
+        final pageType = (((nav['browseEndpoint']
+                    as Map?)?['browseEndpointContextSupportedConfigs']
+                as Map?)?['browseEndpointContextMusicConfig']
+            as Map?)?['pageType'] as String?;
         if (pageType == 'MUSIC_PAGE_TYPE_ARTIST' ||
             pageType == 'MUSIC_PAGE_TYPE_USER_CHANNEL') {
           return text;
@@ -55,10 +55,10 @@ class YtmMediaHelpers {
       if (text == null || text.isEmpty) continue;
       final nav = run['navigationEndpoint'];
       if (nav is Map) {
-        final pageType =
-            (((nav['browseEndpoint'] as Map?)?['browseEndpointContextSupportedConfigs']
-                    as Map?)?['browseEndpointContextMusicConfig']
-                as Map?)?['pageType'] as String?;
+        final pageType = (((nav['browseEndpoint']
+                    as Map?)?['browseEndpointContextSupportedConfigs']
+                as Map?)?['browseEndpointContextMusicConfig']
+            as Map?)?['pageType'] as String?;
         if (pageType == 'MUSIC_PAGE_TYPE_ALBUM' ||
             pageType == 'MUSIC_PAGE_TYPE_PLAYLIST') {
           continue;

@@ -80,9 +80,9 @@ extension _BluetoothStatusBanners on AudioQualitySheet {
                                 await cubit?.setBluetoothLdacQuality(i) ??
                                     false;
                             if (!ok && context.mounted) {
-                                _showBtRefused(context, cubit);
-                              }
-                            },
+                              _showBtRefused(context, cubit);
+                            }
+                          },
                     child: Container(
                       width: AppSpacing.minTouchTarget,
                       height: AppSpacing.minTouchTarget,

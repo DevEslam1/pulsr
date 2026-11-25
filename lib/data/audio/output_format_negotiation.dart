@@ -242,9 +242,7 @@ int resolveFollowBitDepth({
 }) {
   if (trackBitDepth > 0) return trackBitDepth;
   if (streamingBitDepth > 0) return streamingBitDepth;
-  if (deviceBitDepth == 16 ||
-      deviceBitDepth == 24 ||
-      deviceBitDepth == 32) {
+  if (deviceBitDepth == 16 || deviceBitDepth == 24 || deviceBitDepth == 32) {
     return deviceBitDepth;
   }
   return 24;

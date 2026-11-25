@@ -109,7 +109,8 @@ class UpnpDeviceDescription {
         )) {
       throw const UpnpParseError(
         code: 'DLNA_CONTROL_URL_DISALLOWED',
-        userMessage: 'The AVTransport control URL points to a disallowed location.',
+        userMessage:
+            'The AVTransport control URL points to a disallowed location.',
       );
     }
 
@@ -128,7 +129,8 @@ class UpnpDeviceDescription {
 /// Removes namespace prefixes such as `s:` from element tags so lookups can
 /// use local names. Attribute values are untouched.
 String _stripNamespacePrefixes(String xml) {
-  final withoutComments = xml.replaceAll(RegExp(r'<!--.*?-->', dotAll: true), '');
+  final withoutComments =
+      xml.replaceAll(RegExp(r'<!--.*?-->', dotAll: true), '');
   final closing =
       withoutComments.replaceAll(RegExp(r'<\s*/\s*[A-Za-z_][\w.-]*:'), '</');
   return closing.replaceAll(RegExp(r'<\s*[A-Za-z_][\w.-]*:'), '<');
@@ -332,7 +334,8 @@ class UpnpServerDescription {
     }
 
     final resolvedControl = Uri.parse(controlUrl);
-    if (!SsdpClient.isAllowedDescriptionLocation(resolvedControl, location.host)) {
+    if (!SsdpClient.isAllowedDescriptionLocation(
+        resolvedControl, location.host)) {
       throw const UpnpParseError(
         code: 'DLNA_CONTENT_DIRECTORY_DISALLOWED',
         userMessage:

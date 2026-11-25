@@ -19,6 +19,7 @@ import 'package:pulsr/features/downloads/presentation/widgets/download_tile.dart
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 class MockDownloadsCubit extends Mock implements DownloadsCubit {}
 
 DownloadTask _task({
@@ -304,10 +305,12 @@ void main() {
     verifyNever(() => cubit.deleteDownload(any()));
   });
 
-  testWidgets('cancel awaits completion before showing retry toast and skips toast on failure',
+  testWidgets(
+      'cancel awaits completion before showing retry toast and skips toast on failure',
       (tester) async {
     final completer = Completer<void>();
-    when(() => cubit.cancelDownload('vid1')).thenAnswer((_) => completer.future);
+    when(() => cubit.cancelDownload('vid1'))
+        .thenAnswer((_) => completer.future);
 
     await pumpTile(tester, _task(status: DownloadStatus.downloading));
 
@@ -332,7 +335,8 @@ void main() {
     expect(find.text(l10n.retry), findsOneWidget);
   });
 
-  testWidgets('delete skips songDeleted toast when delete fails', (tester) async {
+  testWidgets('delete skips songDeleted toast when delete fails',
+      (tester) async {
     when(() => cubit.deleteDownload('vid1')).thenAnswer((_) async {
       when(() => cubit.state).thenReturn(
         DownloadsState(

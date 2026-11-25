@@ -34,7 +34,9 @@ void main() {
   });
 
   group('target render position', () {
-    test('latency math: wired host + 200ms BT follower yields targetRender = roomPos + 200ms', () {
+    test(
+        'latency math: wired host + 200ms BT follower yields targetRender = roomPos + 200ms',
+        () {
       const hostRenderPosition = 10000;
       const hostWiredLatency = 0;
       const followerBtLatency = 200;
@@ -60,7 +62,8 @@ void main() {
       expect(error, equals(0));
     });
 
-    test('a delayed device renders in the future so sound lands on the room', () {
+    test('a delayed device renders in the future so sound lands on the room',
+        () {
       expect(
           PartySyncController.targetRenderPositionMs(
               roomPositionMs: 10000, outputLatencyMs: 180),
@@ -74,7 +77,8 @@ void main() {
           0);
     });
 
-    test('signed error measures audible disagreement, not position equality', () {
+    test('signed error measures audible disagreement, not position equality',
+        () {
       // The device renders exactly the room position, so a naive comparison
       // calls this in sync. That audio reaches the listener 180 ms after the
       // room time it stands for, so it is 180 ms BEHIND.
@@ -85,13 +89,17 @@ void main() {
       // Correctly compensated: rendering 180 ms in the future is spot on.
       expect(
           PartySyncController.signedErrorMs(
-              localRenderMs: 10180, roomPositionMs: 10000, outputLatencyMs: 180),
+              localRenderMs: 10180,
+              roomPositionMs: 10000,
+              outputLatencyMs: 180),
           0);
 
       // Rendering ahead of the compensated target is heard ahead.
       expect(
           PartySyncController.signedErrorMs(
-              localRenderMs: 10300, roomPositionMs: 10000, outputLatencyMs: 180),
+              localRenderMs: 10300,
+              roomPositionMs: 10000,
+              outputLatencyMs: 180),
           120);
     });
   });
@@ -127,7 +135,8 @@ void main() {
       final decision = controller.evaluatePosition(
           localRenderMs: 5131, roomPositionMs: 5000, outputLatencyMs: 0);
       expect(decision.action, SyncAction.seek);
-      expect(decision.errorMs, greaterThan(PartySyncController.seekThresholdMs));
+      expect(
+          decision.errorMs, greaterThan(PartySyncController.seekThresholdMs));
       expect(decision.strikes, 0);
     });
 

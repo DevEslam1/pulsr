@@ -177,7 +177,8 @@ void main() {
       expect(cubit.state.proxyList.map((e) => e.id), ['p1']);
     });
 
-    test('previewCrossfade, previewMinDuration, and previewLiquidGlassTint update state without persisting until committed',
+    test(
+        'previewCrossfade, previewMinDuration, and previewLiquidGlassTint update state without persisting until committed',
         () async {
       SharedPreferences.setMockInitialValues({
         'setting_crossfade': 2.0,

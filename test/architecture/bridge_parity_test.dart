@@ -3,9 +3,11 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('Bridge Parity: Dart AudioEffectsChannel vs Kotlin AudioEffectsPlugin', () {
+  test('Bridge Parity: Dart AudioEffectsChannel vs Kotlin AudioEffectsPlugin',
+      () {
     final dartFile = File('lib/data/audio/audio_effects_channel.dart');
-    final kotlinFile = File('android/app/src/main/kotlin/com/pulsr/music/AudioEffectsPlugin.kt');
+    final kotlinFile = File(
+        'android/app/src/main/kotlin/com/pulsr/music/AudioEffectsPlugin.kt');
 
     expect(dartFile.existsSync(), isTrue, reason: 'Dart channel must exist');
     expect(kotlinFile.existsSync(), isTrue, reason: 'Kotlin plugin must exist');
@@ -74,7 +76,8 @@ void main() {
     final lines = kotlinContent.split('\n');
     for (final line in lines) {
       final trimmed = line.trim();
-      if (trimmed.contains('when (call.method)') || trimmed.contains('when(call.method)')) {
+      if (trimmed.contains('when (call.method)') ||
+          trimmed.contains('when(call.method)')) {
         inMethodSwitch = true;
         switchDepth = braceDepth;
       }
@@ -85,7 +88,8 @@ void main() {
 
       if (inMethodSwitch) {
         final isTop = (braceDepth == switchDepth + 1) ||
-            (openCount > 0 && (braceDepth + openCount - closeCount) == switchDepth + 1);
+            (openCount > 0 &&
+                (braceDepth + openCount - closeCount) == switchDepth + 1);
         if (isTop) {
           if (codePart.contains('->')) {
             final prefix = codePart.split('->').first;
@@ -137,10 +141,12 @@ void main() {
     final missingCallbacksInDart = kotlinCallbacks.difference(dartCallbacks);
 
     expect(missingInKotlin, isEmpty,
-        reason: 'Dart invokes methods that have no Kotlin handler: $missingInKotlin');
+        reason:
+            'Dart invokes methods that have no Kotlin handler: $missingInKotlin');
     expect(uncalledInKotlin, isEmpty,
         reason: 'Kotlin handlers have no Dart caller: $uncalledInKotlin');
     expect(missingCallbacksInDart, isEmpty,
-        reason: 'Kotlin invokes callbacks that have no Dart handler: $missingCallbacksInDart');
+        reason:
+            'Kotlin invokes callbacks that have no Dart handler: $missingCallbacksInDart');
   });
 }

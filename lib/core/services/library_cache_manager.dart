@@ -38,8 +38,7 @@ class LibrarySnapshot {
         .toList();
     return LibrarySnapshot(
       songs: songs,
-      totalSongCount:
-          (json['totalSongCount'] as num?)?.toInt() ?? songs.length,
+      totalSongCount: (json['totalSongCount'] as num?)?.toInt() ?? songs.length,
       albumCount: (json['albumCount'] as num?)?.toInt() ?? 0,
       artistCount: (json['artistCount'] as num?)?.toInt() ?? 0,
       timestamp: DateTime.tryParse(json['timestamp'] as String? ?? '') ??

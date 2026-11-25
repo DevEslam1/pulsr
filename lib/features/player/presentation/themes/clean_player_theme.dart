@@ -130,16 +130,21 @@ class CleanPlayerTheme extends StatelessWidget {
 
         final double horizontalPadding =
             (constraints.maxWidth * 0.06).clamp(16.0, 28.0);
-        final double spacingStageToHeader =
-            isVeryShort ? AppSpacing.s8 : (isShort ? AppSpacing.s12 : AppSpacing.s20);
-        final double spacingHeaderToSeek =
-            isVeryShort ? AppSpacing.s6 : (isShort ? AppSpacing.s10 : AppSpacing.s16);
-        final double spacingSeekToTransport =
-            isVeryShort ? AppSpacing.s6 : (isShort ? AppSpacing.s10 : AppSpacing.s20);
-        final double spacingTransportToDock =
-            isVeryShort ? AppSpacing.s4 : (isShort ? AppSpacing.s10 : AppSpacing.lg);
-        final double paddingBottom =
-            isVeryShort || isPreview ? AppSpacing.s6 : (isShort ? AppSpacing.s8 : AppSpacing.s14);
+        final double spacingStageToHeader = isVeryShort
+            ? AppSpacing.s8
+            : (isShort ? AppSpacing.s12 : AppSpacing.s20);
+        final double spacingHeaderToSeek = isVeryShort
+            ? AppSpacing.s6
+            : (isShort ? AppSpacing.s10 : AppSpacing.s16);
+        final double spacingSeekToTransport = isVeryShort
+            ? AppSpacing.s6
+            : (isShort ? AppSpacing.s10 : AppSpacing.s20);
+        final double spacingTransportToDock = isVeryShort
+            ? AppSpacing.s4
+            : (isShort ? AppSpacing.s10 : AppSpacing.lg);
+        final double paddingBottom = isVeryShort || isPreview
+            ? AppSpacing.s6
+            : (isShort ? AppSpacing.s8 : AppSpacing.s14);
 
         final artworkStage = _CleanArtworkStage(
           props: props,
@@ -191,17 +196,16 @@ class CleanPlayerTheme extends StatelessWidget {
           isPreview: isPreview,
         );
 
-        final Widget? bookmarkBanner =
-            (!isPreview && state.bookmarkPosition != null)
-                ? Padding(
-                    padding:
-                        EdgeInsets.symmetric(horizontal: horizontalPadding),
-                    child: PlayerBookmarkPromptBanner(
-                      cubit: cubit,
-                      position: state.bookmarkPosition!,
-                    ),
-                  )
-                : null;
+        final Widget? bookmarkBanner = (!isPreview &&
+                state.bookmarkPosition != null)
+            ? Padding(
+                padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+                child: PlayerBookmarkPromptBanner(
+                  cubit: cubit,
+                  position: state.bookmarkPosition!,
+                ),
+              )
+            : null;
 
         final transportControls = _CleanTransportControls(
           props: props,

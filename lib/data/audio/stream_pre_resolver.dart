@@ -471,8 +471,7 @@ class StreamPreResolver {
       _startResolution(song, quality);
       return;
     }
-    _enqueue(
-        _PendingResolution(song: song, quality: quality, priority: false));
+    _enqueue(_PendingResolution(song: song, quality: quality, priority: false));
   }
 
   /// Queues [request] in priority-then-FIFO order, dropping it when the queue

@@ -25,6 +25,7 @@ import 'package:pulsr/features/settings/presentation/widgets/backup_section.dart
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 class MockExport extends Mock implements ExportBackupUseCase {}
 
 class MockImport extends Mock implements ImportBackupUseCase {}

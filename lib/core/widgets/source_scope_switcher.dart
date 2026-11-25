@@ -67,7 +67,8 @@ class _SourceScopeSwitcherState extends State<SourceScopeSwitcher> {
     try {
       final prefs = await SharedPreferences.getInstance();
       if (!mounted) return;
-      final raw = prefs.getString(SourceScopeSwitcher.storageKey(widget.persistKey));
+      final raw =
+          prefs.getString(SourceScopeSwitcher.storageKey(widget.persistKey));
       if (raw == null) return;
       final parsed = SourceScope.values.where((s) => s.name == raw).firstOrNull;
       if (parsed == null) return;

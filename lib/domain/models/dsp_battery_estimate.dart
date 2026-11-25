@@ -25,7 +25,8 @@ class DspBatteryEstimate {
     } else if (breakdownRaw is List) {
       for (final item in breakdownRaw) {
         if (item is Map) {
-          final key = (item['stageId'] ?? item['stage'] ?? item['name'])?.toString();
+          final key =
+              (item['stageId'] ?? item['stage'] ?? item['name'])?.toString();
           final val = item['mahPerHour'] ?? item['cost'];
           if (key != null && val is num) {
             breakdown[key] = val.toDouble();
@@ -38,7 +39,8 @@ class DspBatteryEstimate {
     if (breakdown.isEmpty && breakdownListRaw is List) {
       for (final item in breakdownListRaw) {
         if (item is Map) {
-          final key = (item['stageId'] ?? item['stage'] ?? item['name'])?.toString();
+          final key =
+              (item['stageId'] ?? item['stage'] ?? item['name'])?.toString();
           final val = item['mahPerHour'] ?? item['cost'];
           if (key != null && val is num) {
             breakdown[key] = val.toDouble();
@@ -61,8 +63,7 @@ class DspBatteryEstimate {
       estimatedMahPerHour:
           (map['estimatedMahPerHour'] as num?)?.toDouble() ?? 0.0,
       lowPowerBypassActive: map['lowPowerBypassActive'] as bool? ?? false,
-      activeStageCount:
-          (rawCount as num?)?.toInt() ?? breakdown.length,
+      activeStageCount: (rawCount as num?)?.toInt() ?? breakdown.length,
       stageBreakdown: breakdown,
       stagePowerSpecs: specs,
     );

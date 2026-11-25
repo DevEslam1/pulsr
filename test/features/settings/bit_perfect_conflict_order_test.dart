@@ -13,6 +13,7 @@ import 'package:pulsr/l10n/app_localizations_delegates.dart';
 import 'package:pulsr/core/services/ambient_sound_service.dart';
 
 class _MockAmbientSoundService extends Mock implements AmbientSoundService {}
+
 class _MockSettingsCubit extends Mock implements SettingsCubit {}
 
 class _MockPlayerCubit extends Mock implements PlayerCubit {}
@@ -229,7 +230,8 @@ void main() {
 
     var bitPerfectState = false;
     final cubit = _MockSettingsCubit();
-    when(() => cubit.state).thenAnswer((_) => SettingsState(bitPerfectOutput: bitPerfectState));
+    when(() => cubit.state)
+        .thenAnswer((_) => SettingsState(bitPerfectOutput: bitPerfectState));
     when(() => cubit.stream).thenAnswer((_) => const Stream.empty());
     when(() => cubit.setBitPerfectOutput(any())).thenAnswer((invocation) async {
       bitPerfectState = invocation.positionalArguments.first as bool;

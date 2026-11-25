@@ -86,8 +86,7 @@ void main() {
       when(() => account.isLoggedIn).thenReturn(false);
       when(() => account.validateSessionDetailed())
           .thenAnswer((_) async => SessionValidationResult.valid);
-      when(() => account.clearSessionWebViewCookies())
-          .thenAnswer((_) async {});
+      when(() => account.clearSessionWebViewCookies()).thenAnswer((_) async {});
       when(() => account.logout()).thenAnswer((_) async {});
       when(() => account.getNativeCookiesFromDomains())
           .thenAnswer((_) async => null);
@@ -210,7 +209,8 @@ void main() {
     testWidgets(
       'PlaylistsScreen online action overlays & sign-in controls are >= 48dp',
       (tester) async {
-        SharedPreferences.setMockInitialValues({'smart_playlists_seeded': true});
+        SharedPreferences.setMockInitialValues(
+            {'smart_playlists_seeded': true});
         final cubit = _MockPlaylistCubit();
         final account = _MockYtmAccountService();
         final loginNotifier = ValueNotifier<bool>(true);
@@ -249,7 +249,8 @@ void main() {
         });
 
         when(() => account.loginState).thenReturn(loginNotifier);
-        when(() => cubit.state).thenReturn(const PlaylistState(isLoading: false));
+        when(() => cubit.state)
+            .thenReturn(const PlaylistState(isLoading: false));
         when(() => cubit.stream).thenAnswer((_) => const Stream.empty());
         when(() => cubit.ytmOnline).thenReturn(onlineNotifier);
         when(() => cubit.autoFetchOnlineLibrary()).thenAnswer((_) async {});
@@ -310,7 +311,8 @@ void main() {
       },
     );
 
-    test('playlists_screen.dart contains zero raw Color(0x...) or Colors.* literals',
+    test(
+        'playlists_screen.dart contains zero raw Color(0x...) or Colors.* literals',
         () {
       final file =
           File('lib/features/playlists/presentation/playlists_screen.dart');
@@ -379,9 +381,8 @@ void main() {
               .getSemanticsData();
           expect(titleData.flagsCollection.isHeader, isTrue);
 
-          final membersHeader = tester
-              .getSemantics(find.textContaining('/8'))
-              .getSemanticsData();
+          final membersHeader =
+              tester.getSemantics(find.textContaining('/8')).getSemanticsData();
           expect(membersHeader.flagsCollection.isHeader, isTrue);
 
           // Room code is spelled out cleanly for screen readers.
@@ -536,7 +537,8 @@ void main() {
           );
 
           // Favorite toggle reports toggled=true for favorited song.
-          final favBtn = find.widgetWithIcon(IconButton, Icons.favorite_rounded);
+          final favBtn =
+              find.widgetWithIcon(IconButton, Icons.favorite_rounded);
           expect(favBtn, findsOneWidget);
           expect(
             tester

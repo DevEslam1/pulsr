@@ -164,7 +164,8 @@ abstract final class Mp4BoxParser {
     }
   }
 
-  static Future<Mp4AudioProbeResult> _parseFromReader(_AsyncByteReader reader) async {
+  static Future<Mp4AudioProbeResult> _parseFromReader(
+      _AsyncByteReader reader) async {
     final fileLength = await reader.length();
     if (fileLength < 8) return Mp4AudioProbeResult.unrecognised;
 
@@ -181,7 +182,8 @@ abstract final class Mp4BoxParser {
 
       if (boxType == 'ftyp') {
         if (boxSize >= headerSize + 8) {
-          final ftypPayload = await reader.readBytes(offset + headerSize, boxSize - headerSize);
+          final ftypPayload =
+              await reader.readBytes(offset + headerSize, boxSize - headerSize);
           if (ftypPayload.length >= 8) {
             majorBrand = _asciiString(ftypPayload, 0, 4);
             final compCount = (ftypPayload.length - 8) ~/ 4;
@@ -225,7 +227,8 @@ abstract final class Mp4BoxParser {
 
       if (boxType == 'ftyp') {
         if (boxSize >= headerSize + 8) {
-          final ftypPayload = reader.readBytes(offset + headerSize, boxSize - headerSize);
+          final ftypPayload =
+              reader.readBytes(offset + headerSize, boxSize - headerSize);
           if (ftypPayload.length >= 8) {
             majorBrand = _asciiString(ftypPayload, 0, 4);
             final compCount = (ftypPayload.length - 8) ~/ 4;
@@ -583,7 +586,8 @@ abstract final class Mp4BoxParser {
     int offset = stsdPayloadStart + 8;
     for (var i = 0; i < entryCount; i++) {
       if (offset + 8 > stsdEnd) break;
-      final (entrySize, formatFourcc, entryHeaderSize) = await reader.readBoxHeader(offset);
+      final (entrySize, formatFourcc, entryHeaderSize) =
+          await reader.readBoxHeader(offset);
       if (entrySize < entryHeaderSize || offset + entrySize > stsdEnd) break;
 
       // Sample entry contains an AudioSampleEntry header (at least 28 bytes beyond box header)
@@ -616,7 +620,8 @@ abstract final class Mp4BoxParser {
     int offset = stsdPayloadStart + 8;
     for (var i = 0; i < entryCount; i++) {
       if (offset + 8 > stsdEnd) break;
-      final (entrySize, formatFourcc, entryHeaderSize) = reader.readBoxHeader(offset);
+      final (entrySize, formatFourcc, entryHeaderSize) =
+          reader.readBoxHeader(offset);
       if (entrySize < entryHeaderSize || offset + entrySize > stsdEnd) break;
 
       final sampleEntryBytes = reader.readBytes(offset, entrySize);
@@ -664,9 +669,27 @@ abstract final class Mp4BoxParser {
 
     // Reject non-audio sample entries (video, subtitle, hint tracks)
     const nonAudioFourccs = {
-      'avc1', 'avc2', 'avc3', 'avc4', 'hvc1', 'hev1', 'mp4v', 's263',
-      'vp08', 'vp09', 'av01', 'jpeg', 'png ', 'raw ', 'text', 'tx3g',
-      'sbtl', 'subp', 'rtp ', 'hint', 'tmcd',
+      'avc1',
+      'avc2',
+      'avc3',
+      'avc4',
+      'hvc1',
+      'hev1',
+      'mp4v',
+      's263',
+      'vp08',
+      'vp09',
+      'av01',
+      'jpeg',
+      'png ',
+      'raw ',
+      'text',
+      'tx3g',
+      'sbtl',
+      'subp',
+      'rtp ',
+      'hint',
+      'tmcd',
     };
     if (nonAudioFourccs.contains(lowerFourcc)) {
       return null;
@@ -675,7 +698,12 @@ abstract final class Mp4BoxParser {
     // Inspect child atoms (alac, esds, fLaC/dfLa, wave/enda, dOps)
     // Per §8.3: Inspect mp4a children, handle wave/enda, 64-bit child sizes,
     // and validate ALACSpecificConfig fields (bit depth 16/20/24/32, sane rate/channels).
-    ({int bitDepth, int sampleRate, int channels, int? bitrateKbps})? alacConfig;
+    ({
+      int bitDepth,
+      int sampleRate,
+      int channels,
+      int? bitrateKbps
+    })? alacConfig;
     String? embeddedCodec;
     bool malformedAlacSeen = false;
 
@@ -688,11 +716,13 @@ abstract final class Mp4BoxParser {
         subBoxSize = _readUint64(entryBytes, subOffset + 8);
         subHeaderSize = 16;
       }
-      if (subBoxSize < subHeaderSize || subOffset + subBoxSize > entryBytes.length) break;
+      if (subBoxSize < subHeaderSize ||
+          subOffset + subBoxSize > entryBytes.length) break;
       final subBoxType = _asciiString(entryBytes, subOffset + 4, 4);
 
       if (subBoxType == 'alac') {
-        alacConfig = _parseAlacBox(entryBytes, subOffset + subHeaderSize, subOffset + subBoxSize);
+        alacConfig = _parseAlacBox(
+            entryBytes, subOffset + subHeaderSize, subOffset + subBoxSize);
         if (alacConfig != null) {
           break;
         } else {
@@ -711,10 +741,12 @@ abstract final class Mp4BoxParser {
             waveBoxSize = _readUint64(entryBytes, waveOffset + 8);
             waveHeaderSize = 16;
           }
-          if (waveBoxSize < waveHeaderSize || waveOffset + waveBoxSize > waveEnd) break;
+          if (waveBoxSize < waveHeaderSize ||
+              waveOffset + waveBoxSize > waveEnd) break;
           final waveBoxType = _asciiString(entryBytes, waveOffset + 4, 4);
           if (waveBoxType == 'alac') {
-            alacConfig = _parseAlacBox(entryBytes, waveOffset + waveHeaderSize, waveOffset + waveBoxSize);
+            alacConfig = _parseAlacBox(entryBytes, waveOffset + waveHeaderSize,
+                waveOffset + waveBoxSize);
             if (alacConfig != null) {
               break;
             } else {
@@ -787,7 +819,10 @@ abstract final class Mp4BoxParser {
 
     if (lowerFourcc == 'alac') {
       // Direct alac fourcc without a valid parsed child config: validate sampleSize
-      if (sampleSize == 16 || sampleSize == 20 || sampleSize == 24 || sampleSize == 32) {
+      if (sampleSize == 16 ||
+          sampleSize == 20 ||
+          sampleSize == 24 ||
+          sampleSize == 32) {
         return Mp4AudioProbeResult(
           hasAudioTrack: true,
           codec: 'ALAC',
@@ -910,7 +945,8 @@ abstract final class Mp4BoxParser {
     return b.getUint64(0);
   }
 
-  static ({int bitDepth, int sampleRate, int channels, int? bitrateKbps})? _parseAlacBox(
+  static ({int bitDepth, int sampleRate, int channels, int? bitrateKbps})?
+      _parseAlacBox(
     Uint8List entryBytes,
     int boxPayloadStart,
     int boxEnd,
@@ -955,7 +991,8 @@ abstract final class Mp4BoxParser {
       return null;
     }
 
-    final bitrateKbps = avgBitrateBps > 0 ? (avgBitrateBps / 1000).round() : null;
+    final bitrateKbps =
+        avgBitrateBps > 0 ? (avgBitrateBps / 1000).round() : null;
     return (
       bitDepth: bitDepth,
       sampleRate: rate,
@@ -966,7 +1003,8 @@ abstract final class Mp4BoxParser {
 
   static String _asciiString(Uint8List bytes, int offset, int length) {
     if (offset + length > bytes.length) return '';
-    return ascii.decode(bytes.sublist(offset, offset + length), allowInvalid: true);
+    return ascii.decode(bytes.sublist(offset, offset + length),
+        allowInvalid: true);
   }
 }
 
@@ -994,12 +1032,14 @@ final class _RafByteReader implements _AsyncByteReader {
   Future<int> length() => _raf.length();
 
   @override
-  Future<(int size, String type, int headerSize)> readBoxHeader(int offset) async {
+  Future<(int size, String type, int headerSize)> readBoxHeader(
+      int offset) async {
     await _raf.setPosition(offset);
     final header = await _raf.read(8);
     if (header.length < 8) return (0, '', 8);
 
-    int size = (header[0] << 24) | (header[1] << 16) | (header[2] << 8) | header[3];
+    int size =
+        (header[0] << 24) | (header[1] << 16) | (header[2] << 8) | header[3];
     final type = ascii.decode(header.sublist(4, 8), allowInvalid: true);
     int headerSize = 8;
 
@@ -1041,7 +1081,8 @@ final class _MemoryByteReader implements _SyncByteReader {
         (_bytes[offset + 1] << 16) |
         (_bytes[offset + 2] << 8) |
         _bytes[offset + 3];
-    final type = ascii.decode(_bytes.sublist(offset + 4, offset + 8), allowInvalid: true);
+    final type = ascii.decode(_bytes.sublist(offset + 4, offset + 8),
+        allowInvalid: true);
     int headerSize = 8;
 
     if (size == 1) {
@@ -1059,7 +1100,8 @@ final class _MemoryByteReader implements _SyncByteReader {
 
   @override
   Uint8List readBytes(int offset, int count) {
-    final end = (offset + count <= _bytes.length) ? offset + count : _bytes.length;
+    final end =
+        (offset + count <= _bytes.length) ? offset + count : _bytes.length;
     if (offset >= _bytes.length) return Uint8List(0);
     return _bytes.sublist(offset, end);
   }

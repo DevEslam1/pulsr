@@ -714,18 +714,18 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                         height: 48,
                         alignment: AlignmentDirectional.centerEnd,
                         child: Text(
-                        _showRemaining
-                            ? (widget.duration > currentDuration
-                                ? '-${Formatters.formatDuration(widget.duration - currentDuration)}'
-                                : '0:00')
-                            : Formatters.formatDuration(widget.duration),
-                        style: TextStyle(
-                          color: p.textSecondary,
-                          fontSize: AppFontSize.label,
-                          fontWeight: FontWeight.w600,
-                          fontFeatures: const [FontFeature.tabularFigures()],
-                          letterSpacing: AppTracking.label,
-                        ),
+                          _showRemaining
+                              ? (widget.duration > currentDuration
+                                  ? '-${Formatters.formatDuration(widget.duration - currentDuration)}'
+                                  : '0:00')
+                              : Formatters.formatDuration(widget.duration),
+                          style: TextStyle(
+                            color: p.textSecondary,
+                            fontSize: AppFontSize.label,
+                            fontWeight: FontWeight.w600,
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                            letterSpacing: AppTracking.label,
+                          ),
                         ),
                       ),
                     ),

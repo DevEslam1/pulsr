@@ -299,7 +299,8 @@ void main() {
   });
 
   group('transition and coordinator hardening', () {
-    test('setAutomixEnabled updates gapless vs dual-player mode when crossfade is 0',
+    test(
+        'setAutomixEnabled updates gapless vs dual-player mode when crossfade is 0',
         () async {
       handler = await buildTestHandler(repository: repo, ytmService: ytm);
       handler!.setCrossfadeDuration(Duration.zero);

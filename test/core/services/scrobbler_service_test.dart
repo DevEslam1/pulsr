@@ -95,8 +95,8 @@ void main() {
     test('Custom webhook rejects private/loopback targets', () async {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(ScrobblerService.keyCustomWebhookEnabled, true);
-      await prefs.setString(
-          ScrobblerService.keyCustomWebhookUrl, 'http://127.0.0.1:8080/scrobble');
+      await prefs.setString(ScrobblerService.keyCustomWebhookUrl,
+          'http://127.0.0.1:8080/scrobble');
 
       await service.notifyPlaybackState(
         id: 789,
@@ -130,11 +130,13 @@ void main() {
         isPlaying: true,
       );
 
-      expect(httpRequests.where((r) => r.url.host == 'example.com'), hasLength(1));
+      expect(
+          httpRequests.where((r) => r.url.host == 'example.com'), hasLength(1));
       expect(prefs.getInt(ScrobblerService.keyTotalScrobbleCount), equals(1));
     });
 
-    test('Custom webhook rejects redirect pointing to private network', () async {
+    test('Custom webhook rejects redirect pointing to private network',
+        () async {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(ScrobblerService.keyCustomWebhookEnabled, true);
       await prefs.setString(
@@ -162,7 +164,8 @@ void main() {
         isPlaying: true,
       );
 
-      expect(redirectRequests.where((r) => r.url.host == '192.168.1.1'), isEmpty);
+      expect(
+          redirectRequests.where((r) => r.url.host == '192.168.1.1'), isEmpty);
       expect(prefs.getInt(ScrobblerService.keyTotalScrobbleCount), isNull);
     });
 
@@ -198,7 +201,8 @@ void main() {
       );
 
       expect(redirectRequests.length, equals(2));
-      expect(redirectRequests.last.url.toString(), 'https://example.com/final_hook');
+      expect(redirectRequests.last.url.toString(),
+          'https://example.com/final_hook');
       expect(prefs.getInt(ScrobblerService.keyTotalScrobbleCount), equals(1));
     });
 

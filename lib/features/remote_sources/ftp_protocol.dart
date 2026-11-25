@@ -212,7 +212,10 @@ abstract final class FtpListingParser {
     }
     final port = parts[4] * 256 + parts[5];
     if (port < 1 || port > 65535) return null;
-    return (host: '${parts[0]}.${parts[1]}.${parts[2]}.${parts[3]}', port: port);
+    return (
+      host: '${parts[0]}.${parts[1]}.${parts[2]}.${parts[3]}',
+      port: port
+    );
   }
 
   /// Parses a `229 Entering Extended Passive Mode (|||6446|)` answer.
@@ -284,8 +287,8 @@ abstract final class FtpListingParser {
   }
 
   static RemoteEntry? _parseUnix(String line, String parentPath, DateTime now) {
-    final match = _unixWithGroup.firstMatch(line) ??
-        _unixWithoutGroup.firstMatch(line);
+    final match =
+        _unixWithGroup.firstMatch(line) ?? _unixWithoutGroup.firstMatch(line);
     if (match == null) return null;
     final typeChar = match.group(1)!.toLowerCase();
     final size = int.tryParse(match.group(2)!);

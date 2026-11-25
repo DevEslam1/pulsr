@@ -59,10 +59,9 @@ class RadioStation {
       lastPlayed: lastPlayed,
       bitrate: (bitrate != null && bitrate > 0) ? bitrate : null,
       codec: normalizedCodec,
-      stationUuid:
-          (stationUuid != null && stationUuid.trim().isNotEmpty)
-              ? stationUuid.trim()
-              : null,
+      stationUuid: (stationUuid != null && stationUuid.trim().isNotEmpty)
+          ? stationUuid.trim()
+          : null,
     );
   }
 

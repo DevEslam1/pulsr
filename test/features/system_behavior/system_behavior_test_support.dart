@@ -88,10 +88,8 @@ Future<SystemBehaviorSettings> loadSettings({
   bool resumeAfterCall = true,
 }) async {
   SharedPreferences.setMockInitialValues(<String, Object>{
-    SystemBehaviorPrefsKeys.usbReleaseOnFocusLoss:
-        usbReleaseOnFocusLoss.name,
-    SystemBehaviorPrefsKeys.closeUsbWhenBackgrounded:
-        closeUsbWhenBackgrounded,
+    SystemBehaviorPrefsKeys.usbReleaseOnFocusLoss: usbReleaseOnFocusLoss.name,
+    SystemBehaviorPrefsKeys.closeUsbWhenBackgrounded: closeUsbWhenBackgrounded,
     PrefsKeys.duckingMode: pauseOnNotificationSound ? 'pause' : 'duck',
     SystemBehaviorPrefsKeys.stopWhenTaskRemoved: stopWhenTaskRemoved,
     SystemBehaviorPrefsKeys.volumeRockerTrackSwitch: volumeRockerTrackSwitch,

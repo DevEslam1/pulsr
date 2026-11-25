@@ -385,7 +385,8 @@ void main() {
       expect(cubit.activeSubscriptionCount, 0);
     });
 
-    test('upstream re-queue clears canceled mask and deleted repo failure disappears',
+    test(
+        'upstream re-queue clears canceled mask and deleted repo failure disappears',
         () async {
       final cubit = build();
       await cubit.cancelDownload('requeue0001');
@@ -400,8 +401,10 @@ void main() {
             taskWith('deadfail001', DownloadStatus.failed, error: 'network'),
       }));
       await Future.delayed(Duration.zero);
-      expect(cubit.state.itemFor('requeue0001').status, YtDownloadStatus.queued);
-      expect(cubit.state.itemFor('deadfail001').status, YtDownloadStatus.failed);
+      expect(
+          cubit.state.itemFor('requeue0001').status, YtDownloadStatus.queued);
+      expect(
+          cubit.state.itemFor('deadfail001').status, YtDownloadStatus.failed);
 
       // Deleting the failed repo task clears the failed item instead of
       // keeping it pinned in state.items forever.
@@ -411,7 +414,8 @@ void main() {
       await cubit.close();
     });
 
-    test('changing quality on a paused track cancels and re-queues with new quality',
+    test(
+        'changing quality on a paused track cancels and re-queues with new quality',
         () async {
       final cubit = build();
       final song = remoteSong('qual0000001');
@@ -421,7 +425,8 @@ void main() {
         'qual0000001': taskWith('qual0000001', DownloadStatus.paused),
       }));
       await Future.delayed(Duration.zero);
-      expect(cubit.state.itemFor('qual0000001').status, YtDownloadStatus.paused);
+      expect(
+          cubit.state.itemFor('qual0000001').status, YtDownloadStatus.paused);
 
       await cubit.download(song, quality: YtmAudioQuality.high);
 

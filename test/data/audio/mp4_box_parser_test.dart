@@ -148,11 +148,20 @@ Uint8List _makeMp4AudioFile({
   Uint8List? preMdat,
 }) {
   final stbl = _box('stbl', stsdBox);
-  final minf = _box('minf', [..._box('smhd', [0, 0, 0, 0]), ...stbl]);
+  final minf = _box('minf', [
+    ..._box('smhd', [0, 0, 0, 0]),
+    ...stbl
+  ]);
   final hdlr = _makeHdlr(handlerType);
   final mdia = _box('mdia', [...hdlr, ...minf]);
-  final trak = _box('trak', [..._box('tkhd', [0, 0, 0, 0]), ...mdia]);
-  final moov = _box('moov', [..._box('mvhd', [0, 0, 0, 0]), ...trak]);
+  final trak = _box('trak', [
+    ..._box('tkhd', [0, 0, 0, 0]),
+    ...mdia
+  ]);
+  final moov = _box('moov', [
+    ..._box('mvhd', [0, 0, 0, 0]),
+    ...trak
+  ]);
   final ftyp = _makeFtyp(majorBrand: majorBrand);
 
   final fileBytes = <int>[...ftyp];
@@ -176,7 +185,8 @@ void main() {
       final sampleEntry = _makeAudioSampleEntry(
         format: 'alac',
         channels: 2,
-        sampleSize: 16, // container may declare 16, ALAC cookie overrides with 24
+        sampleSize:
+            16, // container may declare 16, ALAC cookie overrides with 24
         sampleRate: 96000,
         childBoxes: alacAtom,
       );
@@ -229,7 +239,9 @@ void main() {
       expect(probe.bitrateKbps, 850);
     });
 
-    test('extracts 24-bit ALAC without FullBox version/flags header in alac box', () {
+    test(
+        'extracts 24-bit ALAC without FullBox version/flags header in alac box',
+        () {
       final config = _makeAlacConfig(
         bitDepth: 24,
         sampleRate: 192000,
@@ -352,7 +364,9 @@ void main() {
   });
 
   group('AAC (mp4a) Probe', () {
-    test('identifies AAC accurately with lossy classification and null bitDepth', () {
+    test(
+        'identifies AAC accurately with lossy classification and null bitDepth',
+        () {
       final sampleEntry = _makeAudioSampleEntry(
         format: 'mp4a',
         channels: 2,
@@ -424,7 +438,8 @@ void main() {
       );
       final stsd = _makeStsd([sampleEntry]);
       final dummyMediaBytes = Uint8List(512); // Simulate mdat payload
-      final mp4Bytes = _makeMp4AudioFile(stsdBox: stsd, preMdat: dummyMediaBytes);
+      final mp4Bytes =
+          _makeMp4AudioFile(stsdBox: stsd, preMdat: dummyMediaBytes);
 
       final probe = Mp4BoxParser.probeBytes(mp4Bytes);
 
@@ -454,7 +469,8 @@ void main() {
     });
 
     test('random short noise returns unrecognised', () {
-      final probe = Mp4BoxParser.probeBytes(Uint8List.fromList([1, 2, 3, 4, 5]));
+      final probe =
+          Mp4BoxParser.probeBytes(Uint8List.fromList([1, 2, 3, 4, 5]));
       expect(probe.hasAudioTrack, isFalse);
       expect(probe.codec, 'UNKNOWN');
     });
@@ -547,7 +563,9 @@ void main() {
       expect(state, AudioSourceCodecState.unknown);
     });
 
-    test('GaplessTrimHandler does NOT apply AAC encoder delay when codec is ALAC', () {
+    test(
+        'GaplessTrimHandler does NOT apply AAC encoder delay when codec is ALAC',
+        () {
       final alacTrim = GaplessTrimHandler.trimFor(
         path: '/storage/music/track.m4a',
         codec: 'ALAC',

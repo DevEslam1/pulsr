@@ -69,8 +69,7 @@ void main() {
       expect(breaker.shouldAllow(signal), isTrue);
     });
 
-    test('a bot challenge opens only after hitting maxConsecutiveFailures',
-        () {
+    test('a bot challenge opens only after hitting maxConsecutiveFailures', () {
       const signal = YtmBlockSignal.botChallenge;
       breaker.recordFailure(signal);
       breaker.recordFailure(signal);

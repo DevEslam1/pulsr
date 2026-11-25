@@ -151,7 +151,8 @@ void main() {
       expect(tracker.counters.bridgeTimeoutFailure, 0);
     });
 
-    test('dispose during initial load does not reopen controller or emit stale events',
+    test(
+        'dispose during initial load does not reopen controller or emit stale events',
         () async {
       final tracker = DspReliabilityTracker.instance;
       final events = <DspReliabilityCounters>[];

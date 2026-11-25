@@ -11,6 +11,7 @@ import '../theme/aura_theme.dart';
 import 'pulsr_pressable.dart';
 
 import '../utils/pulsr_haptics.dart';
+
 /// {@category DesignSystem}
 /// One option in a [PulsrSegmentedControl].
 class PulsrSegment {

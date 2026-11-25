@@ -152,8 +152,7 @@ void main() {
       expect(reader.readAt(0, -4), throwsA(isA<IsoFormatException>()));
     });
 
-    test('a 4-byte Rock Ridge NM at the extent end is not read past',
-        () async {
+    test('a 4-byte Rock Ridge NM at the extent end is not read past', () async {
       // The NM record is the last thing in the directory extent: signature NM,
       // entry length 4, version 1 — and therefore no flags byte. Reading the
       // flags at position + 4 used to index one byte past the buffer.
@@ -274,8 +273,7 @@ int _writeRecord(
   List<int> systemUse = const <int>[],
 }) {
   final padAfterIdentifier = identifier.length.isEven ? 1 : 0;
-  final length =
-      33 + identifier.length + padAfterIdentifier + systemUse.length;
+  final length = 33 + identifier.length + padAfterIdentifier + systemUse.length;
   final view = ByteData.sublistView(image, offset, offset + length);
   image[offset] = length;
   image[offset + 1] = 0;

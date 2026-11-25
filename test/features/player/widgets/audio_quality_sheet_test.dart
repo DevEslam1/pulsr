@@ -16,6 +16,7 @@ import 'package:pulsr/l10n/generated/app_localizations.dart';
 import 'player_sheet_test_support.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 const _usbDevice = AudioDeviceEntry(
   id: 1,
   name: 'USB DAC',

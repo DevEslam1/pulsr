@@ -133,9 +133,8 @@ class YtmDownloadButton extends StatelessWidget {
             case YtDownloadStatus.queued:
             case YtDownloadStatus.running:
               final isRunning = item.status == YtDownloadStatus.running;
-              final progressValue = isRunning
-                  ? item.progress?.clamp(0.0, 1.0)
-                  : null;
+              final progressValue =
+                  isRunning ? item.progress?.clamp(0.0, 1.0) : null;
               final pctLabel = progressValue == null
                   ? null
                   : '${(progressValue * 100).toStringAsFixed(0)}%';

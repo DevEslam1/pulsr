@@ -83,21 +83,22 @@ void applySongSort(
 ) {
   final mode = ascending ? OrderingMode.asc : OrderingMode.desc;
   final OrderingTerm Function($SongsTableTable) primary = switch (sortBy) {
-    'artist' =>
-      (t) => OrderingTerm(expression: articleInsensitive(t.artist), mode: mode),
+    'artist' => (t) =>
+        OrderingTerm(expression: articleInsensitive(t.artist), mode: mode),
     'dateAdded' => (t) => OrderingTerm(expression: t.dateAdded, mode: mode),
     'duration' => (t) => OrderingTerm(expression: t.durationMs, mode: mode),
-    'album' =>
-      (t) => OrderingTerm(expression: articleInsensitive(t.album), mode: mode),
+    'album' => (t) =>
+        OrderingTerm(expression: articleInsensitive(t.album), mode: mode),
     'playCount' => (t) => OrderingTerm(expression: t.playCount, mode: mode),
     'lastPlayed' => (t) => OrderingTerm(expression: t.lastPlayed, mode: mode),
     'fileSize' => (t) => OrderingTerm(expression: t.fileSize, mode: mode),
     'year' => (t) => OrderingTerm(expression: t.year, mode: mode),
     'sampleRate' => (t) => OrderingTerm(expression: t.sampleRate, mode: mode),
-    'title' =>
-      (t) => OrderingTerm(expression: articleInsensitive(t.title), mode: mode),
+    'title' => (t) =>
+        OrderingTerm(expression: articleInsensitive(t.title), mode: mode),
     // Unknown keys keep a case-insensitive title fallback.
-    _ => (t) => OrderingTerm(expression: t.title.collate(Collate.noCase), mode: mode),
+    _ => (t) =>
+        OrderingTerm(expression: t.title.collate(Collate.noCase), mode: mode),
   };
   final bool articleOrdered =
       sortBy == 'title' || sortBy == 'artist' || sortBy == 'album';

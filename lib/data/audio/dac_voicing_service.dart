@@ -56,8 +56,7 @@ class DacVoicingService {
       character = DacVoicingCharacter
           .values[index.clamp(0, DacVoicingCharacter.values.length - 1)];
       final rawAmount = prefs.getDouble(PrefsKeys.dacVoicingAmount) ?? 0.0;
-      amount =
-          rawAmount.isFinite ? rawAmount.clamp(0.0, 1.0).toDouble() : 0.0;
+      amount = rawAmount.isFinite ? rawAmount.clamp(0.0, 1.0).toDouble() : 0.0;
       loaded = true;
       await _push();
     } catch (_) {

@@ -138,12 +138,24 @@ SongsTableData _transitionSong({
   int depth = 24,
   int rate = 48000,
   String source = SongSource.local,
-}) => SongsTableData(
-  id: 1, title: 'Source transition', artist: 'A', album: 'B',
-  durationMs: 1000, path: path, codec: codec, bitDepth: depth,
-  sampleRate: rate, source: source, playCount: 0, lastPositionMs: 0,
-  isFavorite: false, isMissing: false, isDownloaded: false,
-);
+}) =>
+    SongsTableData(
+      id: 1,
+      title: 'Source transition',
+      artist: 'A',
+      album: 'B',
+      durationMs: 1000,
+      path: path,
+      codec: codec,
+      bitDepth: depth,
+      sampleRate: rate,
+      source: source,
+      playCount: 0,
+      lastPositionMs: 0,
+      isFavorite: false,
+      isMissing: false,
+      isDownloaded: false,
+    );
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -209,13 +221,13 @@ void main() {
       when(() => handler.currentSong).thenAnswer((_) => rig.song);
       when(() => handler.setBitPerfectTransportPolicy(any()))
           .thenAnswer((_) async {});
-      when(() => handler.setFloatOutputEnabled(any()))
-          .thenAnswer((_) async {});
+      when(() => handler.setFloatOutputEnabled(any())).thenAnswer((_) async {});
       when(() => handler.setTapSrcRate(any())).thenAnswer((_) async {});
       when(() => handler.cancelActiveCrossfade()).thenAnswer((_) async {});
     });
 
-    Future<SettingsCubit> start({bool saved = true, bool strict = false}) async {
+    Future<SettingsCubit> start(
+        {bool saved = true, bool strict = false}) async {
       SharedPreferences.setMockInitialValues({
         PrefsKeys.bitPerfectOutput: saved,
         PrefsKeys.strictBitPerfect: strict,
@@ -226,7 +238,8 @@ void main() {
       final hires = HiResAudioService();
       addTearDown(hires.dispose);
       final cubit = SettingsCubit(
-        scannerService: MockMediaScannerService(), hiResAudioService: hires,
+        scannerService: MockMediaScannerService(),
+        hiResAudioService: hires,
       );
       addTearDown(cubit.close);
       await cubit.preferencesReady;
@@ -234,7 +247,9 @@ void main() {
     }
 
     for (final strict in [false, true]) {
-      test('direct fallback requests USB permission before probing formats, strict=$strict', () async {
+      test(
+          'direct fallback requests USB permission before probing formats, strict=$strict',
+          () async {
         rig.song = _transitionSong();
         rig.mixerEnableWorks = false;
         rig.permitted = false;
@@ -255,7 +270,9 @@ void main() {
       });
 
       for (final denied in [false, true]) {
-        test('direct fallback refuses ${denied ? 'denied permission' : 'unsupported formats'} after permission request, strict=$strict', () async {
+        test(
+            'direct fallback refuses ${denied ? 'denied permission' : 'unsupported formats'} after permission request, strict=$strict',
+            () async {
           rig.song = _transitionSong();
           rig.mixerEnableWorks = false;
           rig.permitted = false;
@@ -274,17 +291,23 @@ void main() {
           expect(cubit.bitPerfectViaDirectStream, isFalse);
           expect(cubit.state.bitPerfectOutput, isFalse);
           expect(cubit.state.strictBitPerfect, isFalse);
-          expect(cubit.state.errorMessage,
-              contains(denied ? 'permission was not granted' : 'streamable USB Audio interface'));
+          expect(
+              cubit.state.errorMessage,
+              contains(denied
+                  ? 'permission was not granted'
+                  : 'streamable USB Audio interface'));
         });
       }
     }
 
     final rejectedSources = {
-      'lossy': _transitionSong(path: '/music/track.aac', codec: 'aac', depth: 16),
+      'lossy':
+          _transitionSong(path: '/music/track.aac', codec: 'aac', depth: 16),
       'radio': _transitionSong(source: SongSource.radio),
-      'float32': _transitionSong(path: '/music/track.wav', codec: 'pcm_f32le', depth: 32),
-      'unsupported integer32': _transitionSong(path: '/music/track.wav', codec: 'pcm_s32le', depth: 32),
+      'float32': _transitionSong(
+          path: '/music/track.wav', codec: 'pcm_f32le', depth: 32),
+      'unsupported integer32': _transitionSong(
+          path: '/music/track.wav', codec: 'pcm_s32le', depth: 32),
     };
     for (final strict in [false, true]) {
       for (final source in rejectedSources.entries) {
@@ -305,7 +328,8 @@ void main() {
       }
 
       test('boot PCM32 uses only raw USB, strict=$strict', () async {
-        rig.song = _transitionSong(path: '/music/track.wav', codec: 'pcm_s32le', depth: 32);
+        rig.song = _transitionSong(
+            path: '/music/track.wav', codec: 'pcm_s32le', depth: 32);
         final cubit = await start(strict: strict);
         expect(rig.calls, isNot(contains('mixer:true')));
         expect(rig.calls, isNot(contains('mixer:format')));
@@ -315,16 +339,20 @@ void main() {
         expect(cubit.state.bitPerfectOutput, isTrue);
       });
 
-      test('PCM32 migration waits for confirmed mixer clear, strict=$strict', () async {
+      test('PCM32 migration waits for confirmed mixer clear, strict=$strict',
+          () async {
         rig.song = _transitionSong();
         final cubit = await start(strict: strict);
         expect(rig.mixerActive, isTrue);
         rig.calls.clear();
-        rig.song = _transitionSong(path: '/music/track.wav', codec: 'pcm_s32le', depth: 32);
+        rig.song = _transitionSong(
+            path: '/music/track.wav', codec: 'pcm_s32le', depth: 32);
         final gate = Completer<bool>();
         rig.clearGate = gate.future;
         final change = cubit.setBitPerfectTrackFormat(
-          sampleRate: 96000, bitDepth: 32, channels: 1,
+          sampleRate: 96000,
+          bitDepth: 32,
+          channels: 1,
         );
         await pumpEventQueue();
         expect(rig.calls, ['mixer:false']);
@@ -347,13 +375,18 @@ void main() {
         expect(cubit.state.bitPerfectOutput, isTrue);
       });
 
-      test('failed mixer clear retains owner and switches, strict=$strict', () async {
+      test('failed mixer clear retains owner and switches, strict=$strict',
+          () async {
         rig.song = _transitionSong();
         final cubit = await start(strict: strict);
         rig.calls.clear();
-        rig.song = _transitionSong(path: '/music/track.wav', codec: 'pcm_s32le', depth: 32);
+        rig.song = _transitionSong(
+            path: '/music/track.wav', codec: 'pcm_s32le', depth: 32);
         rig.mixerClearWorks = false;
-        expect(await cubit.setBitPerfectTrackFormat(sampleRate: 48000, bitDepth: 32), isFalse);
+        expect(
+            await cubit.setBitPerfectTrackFormat(
+                sampleRate: 48000, bitDepth: 32),
+            isFalse);
         expect(rig.calls, ['mixer:false']);
         expect(rig.mixerActive, isTrue);
         expect(rig.starts, isEmpty);
@@ -375,7 +408,8 @@ void main() {
       // The current source can change during an awaited mixer request. The
       // direct-start boundary must revalidate, not trust the caller's gate.
       for (final source in rejectedSources.entries) {
-        test('direct boundary rejects changed ${source.key}, strict=$strict', () async {
+        test('direct boundary rejects changed ${source.key}, strict=$strict',
+            () async {
           rig.song = _transitionSong();
           rig.mixerEnableWorks = false;
           rig.onMixerEnable = () {
@@ -396,7 +430,9 @@ void main() {
       _transitionSong(rate: 0),
       _transitionSong(rate: 12345),
     ]) {
-      test('strict boot rejects unconfirmed codec/rate ${song.path}/${song.sampleRate}', () async {
+      test(
+          'strict boot rejects unconfirmed codec/rate ${song.path}/${song.sampleRate}',
+          () async {
         rig.song = song;
         final cubit = await start(strict: true);
         expect(rig.calls, isNot(contains('mixer:true')));
@@ -407,7 +443,8 @@ void main() {
     }
 
     test('boot uses decoded PCM32 precision over a narrower tag', () async {
-      rig.song = _transitionSong(path: '/music/track.wav', codec: 'pcm_s32le', depth: 24);
+      rig.song = _transitionSong(
+          path: '/music/track.wav', codec: 'pcm_s32le', depth: 24);
       rig.decodedDepth = 32;
       final cubit = await start();
       expect(rig.calls, isNot(contains('mixer:true')));
@@ -415,15 +452,22 @@ void main() {
       expect(cubit.bitPerfectViaDirectStream, isTrue);
     });
 
-    test('decoded PCM32 migrates and stays raw despite narrower format metadata', () async {
+    test(
+        'decoded PCM32 migrates and stays raw despite narrower format metadata',
+        () async {
       rig.song = _transitionSong();
       final cubit = await start();
-      rig.song = _transitionSong(path: '/music/track.wav', codec: 'pcm_s32le', depth: 24);
+      rig.song = _transitionSong(
+          path: '/music/track.wav', codec: 'pcm_s32le', depth: 24);
       rig.decodedDepth = 32;
       await cubit.refreshOutputDevice();
       rig.calls.clear();
-      expect(await cubit.setBitPerfectTrackFormat(sampleRate: 48000, bitDepth: 24), isTrue);
-      expect(await cubit.setBitPerfectTrackFormat(sampleRate: 96000, bitDepth: 24), isTrue);
+      expect(
+          await cubit.setBitPerfectTrackFormat(sampleRate: 48000, bitDepth: 24),
+          isTrue);
+      expect(
+          await cubit.setBitPerfectTrackFormat(sampleRate: 96000, bitDepth: 24),
+          isTrue);
       expect(rig.calls, ['mixer:false', 'usb:start', 'usb:start']);
       expect(rig.starts.map((format) => format['bitDepth']), [32, 32]);
       expect(cubit.bitPerfectViaDirectStream, isTrue);
@@ -588,8 +632,7 @@ void main() {
       () async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     final handler = registeredHandler();
-    when(() => handler.setSkipSilenceEnabled(any()))
-        .thenAnswer((_) async {});
+    when(() => handler.setSkipSilenceEnabled(any())).thenAnswer((_) async {});
     when(() => handler.setSilenceSkipSensitivity(any()))
         .thenAnswer((_) async {});
 
@@ -939,8 +982,8 @@ void main() {
       expect(cubit.state.bitPerfectOutput, isTrue);
 
       acceptedFormats = <String>['192000/24'];
-      final applied =
-          await cubit.setBitPerfectTrackFormat(sampleRate: 352800, bitDepth: 16);
+      final applied = await cubit.setBitPerfectTrackFormat(
+          sampleRate: 352800, bitDepth: 16);
 
       expect(applied, isFalse);
       // One unreadable format must not permanently discard the preference.
@@ -950,7 +993,9 @@ void main() {
       expect(cubit.state.errorMessage, contains('352800'));
     });
 
-    test('an unknown track format suspends direct playback without a guessed clock', () async {
+    test(
+        'an unknown track format suspends direct playback without a guessed clock',
+        () async {
       debugDefaultTargetPlatformOverride = TargetPlatform.android;
       Map<String, dynamic>? startArgs;
       stubPlatform(usb: (method, args) {
@@ -1020,7 +1065,10 @@ void main() {
         TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
     messenger.setMockMethodCallHandler(hiresChannel, (call) async {
       if (call.method == 'setBitPerfectModeDetailed') {
-        return <String, dynamic>{'success': false, 'reason': 'requires_android_14'};
+        return <String, dynamic>{
+          'success': false,
+          'reason': 'requires_android_14'
+        };
       }
       if (call.method == 'getAudioOutputInfo') {
         return <String, dynamic>{'deviceName': 'USB DAC', 'isUsbDac': true};
@@ -1063,15 +1111,16 @@ void main() {
     final handler = registeredHandler();
     var accepted = false;
     when(() => handler.setAaudioOutputEnabled(
-      any(),
-      preferExclusive: any(named: 'preferExclusive'),
-      targetBufferMs: any(named: 'targetBufferMs'),
-    )).thenAnswer((_) async => accepted);
+          any(),
+          preferExclusive: any(named: 'preferExclusive'),
+          targetBufferMs: any(named: 'targetBufferMs'),
+        )).thenAnswer((_) async => accepted);
 
     final cubit = make();
     addTearDown(cubit.close);
     await cubit.preferencesReady;
-    cubit.safeEmit(cubit.state.copyWith(crossfadeSeconds: 4.0, dvcEnabled: true));
+    cubit.safeEmit(
+        cubit.state.copyWith(crossfadeSeconds: 4.0, dvcEnabled: true));
 
     await cubit.setAaudioOutputEnabled(true);
 
@@ -1142,7 +1191,8 @@ void main() {
     expect(cubit.state.currentOutputDevice?.deviceName, 'Newer DAC');
   });
 
-  test('an uncalibrated Bluetooth device gets the global offset, not the last one',
+  test(
+      'an uncalibrated Bluetooth device gets the global offset, not the last one',
       () async {
     const globalMs = 40;
     const headsetA = AudioOutputInfo(
@@ -1173,8 +1223,7 @@ void main() {
     final service = MockHiResAudioService();
     final devices = StreamController<AudioOutputInfo>.broadcast();
     when(() => service.outputDeviceStream).thenAnswer((_) => devices.stream);
-    when(() => service.getAudioOutputInfo())
-        .thenAnswer((_) async => headsetA);
+    when(() => service.getAudioOutputInfo()).thenAnswer((_) async => headsetA);
     getIt.registerSingleton<HiResAudioService>(service);
     addTearDown(() async {
       await devices.close();
@@ -1204,7 +1253,8 @@ void main() {
   });
 
   group('bit-perfect transition ordering and tap-SRC safety', () {
-    test('disabling bit-perfect while playing pauses, reconfigures, plays before final refresh, and never passes USB sampleRate to tap-SRC',
+    test(
+        'disabling bit-perfect while playing pauses, reconfigures, plays before final refresh, and never passes USB sampleRate to tap-SRC',
         () async {
       debugDefaultTargetPlatformOverride = TargetPlatform.android;
       final rig = _SourceTransitionRig()
@@ -1241,8 +1291,7 @@ void main() {
         tapSrcRates.add(r);
         events.add('tapSrc:$r');
       });
-      when(() => handler.setFloatOutputEnabled(any()))
-          .thenAnswer((_) async {});
+      when(() => handler.setFloatOutputEnabled(any())).thenAnswer((_) async {});
 
       SharedPreferences.setMockInitialValues({
         PrefsKeys.bitPerfectOutput: true,
@@ -1267,7 +1316,8 @@ void main() {
       expect(tapSrcRates.where((r) => r > 0), isEmpty);
     });
 
-    test('toggling bypassDspOnBitPerfect while playing wraps in muted sink rebuild',
+    test(
+        'toggling bypassDspOnBitPerfect while playing wraps in muted sink rebuild',
         () async {
       debugDefaultTargetPlatformOverride = TargetPlatform.android;
       final rig = _SourceTransitionRig()
@@ -1298,8 +1348,7 @@ void main() {
       when(() => handler.reconfigurePlaybackSink()).thenAnswer((_) async {
         events.add('reconfigure');
       });
-      when(() => handler.setFloatOutputEnabled(any()))
-          .thenAnswer((_) async {});
+      when(() => handler.setFloatOutputEnabled(any())).thenAnswer((_) async {});
 
       SharedPreferences.setMockInitialValues({
         PrefsKeys.bitPerfectOutput: true,

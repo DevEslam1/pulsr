@@ -18,6 +18,7 @@ import 'package:pulsr/l10n/generated/app_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 class MockPlayerCubit extends Mock implements PlayerCubit {}
 
 class MockRoomCorrectionService extends Mock implements RoomCorrectionService {}

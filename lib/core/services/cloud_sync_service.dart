@@ -153,7 +153,8 @@ class CloudSyncService {
     return 0;
   }
 
-  static bool shouldCloudWin({required int cloudTimestamp, int? localTimestamp}) {
+  static bool shouldCloudWin(
+      {required int cloudTimestamp, int? localTimestamp}) {
     if (localTimestamp == null || localTimestamp == 0) return true;
     return cloudTimestamp >= localTimestamp;
   }
@@ -216,9 +217,8 @@ class CloudSyncService {
       await prefs.remove(_keyLastSyncedUid);
       final keysToRemove = prefs
           .getKeys()
-          .where((k) =>
-              k.startsWith('sync_pl_') ||
-              k.startsWith('sync_cloud_pl_'))
+          .where(
+              (k) => k.startsWith('sync_pl_') || k.startsWith('sync_cloud_pl_'))
           .toList(growable: false);
       for (final key in keysToRemove) {
         await prefs.remove(key);
@@ -869,8 +869,7 @@ class CloudSyncService {
         (existing.remoteArtworkUrl == null ||
             existing.remoteArtworkUrl!.isEmpty);
     if (needsFavorite || needsArtwork) {
-      await (_db.update(_db.songsTable)
-            ..where((t) => t.id.equals(existing.id)))
+      await (_db.update(_db.songsTable)..where((t) => t.id.equals(existing.id)))
           .write(SongsTableCompanion(
         isFavorite: needsFavorite ? const Value(true) : const Value.absent(),
         remoteArtworkUrl:
@@ -1021,9 +1020,9 @@ class CloudSyncService {
     if (syncPlaylists) {
       final plSnapshot = await userDoc.collection('playlists').get();
       final existingPlaylistsRes = await _repository.getPlaylists();
-      final existingPlaylists =
-          existingPlaylistsRes.fold((l) => <PlaylistsTableData>[], (r) => r)
-              .toList();
+      final existingPlaylists = existingPlaylistsRes
+          .fold((l) => <PlaylistsTableData>[], (r) => r)
+          .toList();
       final prefs = await _getPrefs();
       final deviceId = await getDeviceId();
       final playlistSongsAll = await _db.select(_db.songsTable).get();
@@ -1071,7 +1070,8 @@ class CloudSyncService {
               final mapped = prefs.getString('sync_pl_stable_id_${cand.id}');
               if (mapped == null || mapped == cloudSyncId) {
                 pl = cand;
-                await prefs.setString('sync_pl_stable_id_${cand.id}', cloudSyncId);
+                await prefs.setString(
+                    'sync_pl_stable_id_${cand.id}', cloudSyncId);
                 await prefs.setInt('sync_cloud_pl_$cloudSyncId', cand.id);
                 break;
               }
@@ -1087,7 +1087,8 @@ class CloudSyncService {
                   .getSingleOrNull();
               if (pl != null) {
                 existingPlaylists.add(pl);
-                await prefs.setString('sync_pl_stable_id_${pl.id}', cloudSyncId);
+                await prefs.setString(
+                    'sync_pl_stable_id_${pl.id}', cloudSyncId);
                 await prefs.setInt('sync_cloud_pl_$cloudSyncId', pl.id);
               }
             }

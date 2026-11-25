@@ -151,9 +151,7 @@ extension EqualizerFirOps on EqualizerManager {
         // preamp (clamped by its own range).
         final preamp = firMode && isArbitraryEqEnabled
             ? 0.0
-            : (isParametric
-                ? profile.computeSafePreamp()
-                : profile.preampGain);
+            : (isParametric ? profile.computeSafePreamp() : profile.preampGain);
         await setPreamp(preamp);
       } else {
         if (prevProfile == null) return;

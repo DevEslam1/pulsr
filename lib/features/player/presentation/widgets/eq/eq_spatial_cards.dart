@@ -1,4 +1,4 @@
-﻿part of '../equalizer_sheet.dart';
+part of '../equalizer_sheet.dart';
 
 /// Spatial processing cards used by Pro Rack Tab 2: Crossfeed, Stereo Width,
 /// Stereo Balance & Mono Mix, and Convolution Reverb.
@@ -290,7 +290,8 @@ extension _EqSpatialCards on _EqualizerSheetState {
                 value: available && state.isStereoWidthEnabled,
                 activeTrackColor: p.accent,
                 activeThumbColor: p.onAccent,
-                onChanged: !available ? null : (val) => cubit.setStereoWidth(val),
+                onChanged:
+                    !available ? null : (val) => cubit.setStereoWidth(val),
               ),
             ],
           ),
@@ -376,5 +377,4 @@ extension _EqSpatialCards on _EqualizerSheetState {
       ),
     );
   }
-
 }

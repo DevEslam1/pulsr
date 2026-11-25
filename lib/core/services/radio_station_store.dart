@@ -36,12 +36,9 @@ class RadioStationStore {
       'setting_radio_hero_cards_visible_v1';
   static const String prefsKeyHeroPinnedUrls =
       'setting_radio_hero_pinned_urls_v1';
-  static const String prefsKeyHeroSortMode =
-      'setting_radio_hero_sort_mode_v1';
-  static const String prefsKeyRadioSortBy =
-      'setting_radio_screen_sort_by_v1';
-  static const String prefsKeyRadioSortAsc =
-      'setting_radio_screen_sort_asc_v1';
+  static const String prefsKeyHeroSortMode = 'setting_radio_hero_sort_mode_v1';
+  static const String prefsKeyRadioSortBy = 'setting_radio_screen_sort_by_v1';
+  static const String prefsKeyRadioSortAsc = 'setting_radio_screen_sort_asc_v1';
   static const int maxEntries = 500;
 
   /// Global reactive visibility notifier for homescreen radio hero cards.
@@ -148,9 +145,11 @@ class RadioStationStore {
   static const String newsArtwork = 'assets/Pictures/radio_news.jpg';
 
   // Panoramic Home Cards (2172 x 724)
-  static const String minshawiHomeCard = 'assets/Pictures/home card/minshawi.jpg';
+  static const String minshawiHomeCard =
+      'assets/Pictures/home card/minshawi.jpg';
   static const String hussaryHomeCard = 'assets/Pictures/home card/hussary.jpg';
-  static const String abdulBasitHomeCard = 'assets/Pictures/home card/abdulbasit.jpg';
+  static const String abdulBasitHomeCard =
+      'assets/Pictures/home card/abdulbasit.jpg';
   static const String mustafaIsmailHomeCard =
       'assets/Pictures/home card/mustafa_ismail.jpg';
   static const String quranCairoHomeCard =
@@ -372,7 +371,8 @@ class RadioStationStore {
   /// Resolves the localized display name for a curated station according to the
   /// given language code ('ar', 'en', etc.). For custom stations or unmapped IDs,
   /// returns [station.name].
-  static String localizedStationName(RadioStation station, String languageCode) {
+  static String localizedStationName(
+      RadioStation station, String languageCode) {
     final entry = _localizedStationNames[station.id];
     if (entry != null) {
       return languageCode == 'ar' ? entry.ar : entry.en;
@@ -654,7 +654,8 @@ class RadioStationStore {
     }
 
     // Generic fallback for any other Quran stream
-    if (isQuranStation(RadioStation(id: lowerId, name: lowerName, url: lowerUrl))) {
+    if (isQuranStation(
+        RadioStation(id: lowerId, name: lowerName, url: lowerUrl))) {
       return tarteelHomeCard;
     }
 
@@ -1127,15 +1128,13 @@ class RadioStationStore {
         RadioStation(
             id: 'cur-quran-minshawi-murattal',
             name: 'إذاعة الشيخ محمد صديق المنشاوي (مرتل)',
-            url:
-                'https://backup.qurango.net/radio/mohammed_siddiq_alminshawi',
+            url: 'https://backup.qurango.net/radio/mohammed_siddiq_alminshawi',
             genre: 'Quran',
             artworkUrl: minshawiArtwork),
         RadioStation(
             id: 'cur-quran-abdulbasit-murattal',
             name: 'إذاعة الشيخ عبد الباسط عبد الصمد (مرتل)',
-            url:
-                'https://backup.qurango.net/radio/abdulbasit_abdulsamad',
+            url: 'https://backup.qurango.net/radio/abdulbasit_abdulsamad',
             genre: 'Quran',
             artworkUrl: abdulBasitArtwork),
         RadioStation(
@@ -1155,8 +1154,7 @@ class RadioStationStore {
         RadioStation(
             id: 'cur-quran-banna-murattal',
             name: 'إذاعة الشيخ محمود علي البنا (مرتل)',
-            url:
-                'https://backup.qurango.net/radio/mahmoud_ali__albanna',
+            url: 'https://backup.qurango.net/radio/mahmoud_ali__albanna',
             genre: 'Quran',
             artworkUrl: quranCairoArtwork),
         RadioStation(

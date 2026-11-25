@@ -1673,14 +1673,15 @@ class PulsrConfigurationErrorApp extends StatelessWidget {
                     innerContext.l10n.bootConfigurationError,
                     textAlign: TextAlign.center,
                     style: const TextStyle(
-                        fontSize: AppFontSize.title, fontWeight: FontWeight.w800),
+                        fontSize: AppFontSize.title,
+                        fontWeight: FontWeight.w800),
                   ),
                   const SizedBox(height: 12),
                   Text(
                     message,
                     textAlign: TextAlign.center,
-                    style:
-                        const TextStyle(fontSize: AppFontSize.body, height: 1.4),
+                    style: const TextStyle(
+                        fontSize: AppFontSize.body, height: 1.4),
                   ),
                 ],
               ),

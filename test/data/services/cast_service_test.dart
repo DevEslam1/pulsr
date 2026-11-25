@@ -299,7 +299,8 @@ void main() {
       expect(status.duration, const Duration(milliseconds: 180000));
     });
 
-    test('play, pause, stop, seek, next, previous forward to setPlaybackState', () async {
+    test('play, pause, stop, seek, next, previous forward to setPlaybackState',
+        () async {
       calls.clear();
       final playRes = await service.play();
       expect(playRes.success, isTrue);
@@ -331,7 +332,8 @@ void main() {
       expect(result.success, isTrue);
     });
 
-    test('dispose resets singleton instance so a fresh instance is created', () {
+    test('dispose resets singleton instance so a fresh instance is created',
+        () {
       final before = CastService();
       before.dispose();
       final after = CastService();

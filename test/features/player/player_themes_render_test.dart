@@ -90,8 +90,7 @@ void main() {
         (props) => const SizedBox(key: ValueKey('custom_clean')),
       );
 
-      final overridden =
-          ThemeRegistry.build(PlayerThemeMode.clean, dummyProps);
+      final overridden = ThemeRegistry.build(PlayerThemeMode.clean, dummyProps);
       expect(overridden, isA<SizedBox>());
 
       ThemeRegistry.reset();

@@ -269,9 +269,8 @@ class _SectionActionButtonState extends State<_SectionActionButton> {
                             ? PulsrCapsuleStyle.foregroundColor(p)
                             : p.accent,
                         fontWeight: FontWeight.w700,
-                        fontSize: isCapsule
-                            ? AppFontSize.caption
-                            : AppFontSize.label,
+                        fontSize:
+                            isCapsule ? AppFontSize.caption : AppFontSize.label,
                         letterSpacing: AppTracking.label,
                       ),
                     ),

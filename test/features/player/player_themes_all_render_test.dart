@@ -14,6 +14,7 @@ import 'package:pulsr/l10n/generated/app_localizations.dart';
 import '../../helpers/test_song_factory.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 class MockPlayerCubit extends Mock implements PlayerCubit {}
 
 class MockSettingsCubit extends Mock implements SettingsCubit {}
@@ -81,7 +82,8 @@ void main() {
     );
   }
 
-  group('All 8 PlayerSurfaceShell Themes Multi-Form-Factor Rendering Tests', () {
+  group('All 8 PlayerSurfaceShell Themes Multi-Form-Factor Rendering Tests',
+      () {
     for (final themeMode in PlayerThemeMode.values) {
       testWidgets('$themeMode renders without exception in Portrait (390x844)',
           (tester) async {

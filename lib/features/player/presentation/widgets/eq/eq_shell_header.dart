@@ -1,4 +1,4 @@
-﻿part of '../equalizer_sheet.dart';
+part of '../equalizer_sheet.dart';
 
 /// Top bar, mode switcher, master EQ/DSP toggle cards, and hardware device
 /// profile bar shared by portrait and landscape layouts of [EqualizerSheet].
@@ -571,5 +571,4 @@ extension _EqShellHeader on _EqualizerSheetState {
       ),
     );
   }
-
 }

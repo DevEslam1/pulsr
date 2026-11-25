@@ -311,8 +311,7 @@ class TabletSideInspectorState extends State<TabletSideInspector> {
                                                 }
                                               },
                                               child: AnimatedContainer(
-                                                duration:
-                                                    context.motionMs(200),
+                                                duration: context.motionMs(200),
                                                 curve: context.motionCurve(
                                                     Curves.easeOutCubic),
                                                 padding:
@@ -359,13 +358,12 @@ class TabletSideInspectorState extends State<TabletSideInspector> {
                                                                 fontSize:
                                                                     AppFontSize
                                                                         .label,
-                                                                fontWeight:
-                                                                    safeTabIndex ==
-                                                                            i
-                                                                        ? FontWeight
-                                                                            .w700
-                                                                        : FontWeight
-                                                                            .w600,
+                                                                fontWeight: safeTabIndex ==
+                                                                        i
+                                                                    ? FontWeight
+                                                                        .w700
+                                                                    : FontWeight
+                                                                        .w600,
                                                                 color: safeTabIndex ==
                                                                         i
                                                                     ? p.onAccent
@@ -539,8 +537,7 @@ class TabletSideInspectorState extends State<TabletSideInspector> {
                               boxShadow: _isDragging && !isCalm
                                   ? [
                                       BoxShadow(
-                                        color:
-                                            p.accent.withValues(alpha: 0.45),
+                                        color: p.accent.withValues(alpha: 0.45),
                                         blurRadius: 8,
                                       ),
                                     ]

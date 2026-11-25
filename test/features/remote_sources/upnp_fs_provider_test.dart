@@ -356,7 +356,8 @@ void main() {
   });
 
   group('resource URI refresh', () {
-    test('evicts stale cached URI and re-browses once on 401/403/404/410 or TTL expiry',
+    test(
+        'evicts stale cached URI and re-browses once on 401/403/404/410 or TTL expiry',
         () async {
       var browseMetadataCount = 0;
       var now = DateTime.utc(2026, 1, 1, 12);
@@ -397,7 +398,8 @@ void main() {
         clock: () => now,
       );
 
-      expect(await cachedProvider.openRead('i/10').expand((c) => c).toList(), [9]);
+      expect(
+          await cachedProvider.openRead('i/10').expand((c) => c).toList(), [9]);
       expect(browseMetadataCount, 1);
 
       // Cached URI now returns 403 -> evicts cache, re-browses v2, retries once.

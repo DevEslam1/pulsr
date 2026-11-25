@@ -261,10 +261,8 @@ class UsbQuirkProfile {
       preferredSelectorPin: identical(preferredSelectorPin, _unset)
           ? this.preferredSelectorPin
           : preferredSelectorPin as int?,
-      volumeCalibrationDb:
-          volumeCalibrationDb ?? this.volumeCalibrationDb,
-      uac1ReassertAfterAlt:
-          uac1ReassertAfterAlt ?? this.uac1ReassertAfterAlt,
+      volumeCalibrationDb: volumeCalibrationDb ?? this.volumeCalibrationDb,
+      uac1ReassertAfterAlt: uac1ReassertAfterAlt ?? this.uac1ReassertAfterAlt,
       disableUac2ClockSwitch:
           disableUac2ClockSwitch ?? this.disableUac2ClockSwitch,
     );
@@ -329,8 +327,7 @@ class UsbQuirkProfile {
       disableExplicitFeedback:
           _readBool(json, 'disableExplicitFeedback') ?? false,
       preferredSelectorPin: _readInt(json, 'preferredSelectorPin'),
-      volumeCalibrationDb:
-          _readDouble(json, 'volumeCalibrationDb') ?? 0.0,
+      volumeCalibrationDb: _readDouble(json, 'volumeCalibrationDb') ?? 0.0,
       uac1ReassertAfterAlt: _readBool(json, 'uac1ReassertAfterAlt') ?? false,
       disableUac2ClockSwitch:
           _readBool(json, 'disableUac2ClockSwitch') ?? false,

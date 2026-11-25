@@ -74,7 +74,8 @@ void main() {
     await getIt.reset();
   });
 
-  group('H-38: SearchCubit fuzzy fallback, ID-based played songs, direct entities',
+  group(
+      'H-38: SearchCubit fuzzy fallback, ID-based played songs, direct entities',
       () {
     test(
         'bounded full-library fallback finds match when FTS misses due to leading typo',
@@ -182,7 +183,8 @@ void main() {
       await cubit.searchPlayedSongsReady;
 
       // Reconciled with fresh DB metadata, hidden folder filtered out, deleted 999 dropped.
-      expect(cubit.searchPlayedSongs.value.map((s) => s.title), ['Fresh DB Title']);
+      expect(cubit.searchPlayedSongs.value.map((s) => s.title),
+          ['Fresh DB Title']);
 
       final prefs = await SharedPreferences.getInstance();
       final persisted = prefs.getStringList('search_played_songs')!;
@@ -205,8 +207,10 @@ void main() {
         artist: 'Pink Floyd',
         songCount: 10,
       );
-      when(() => repo.getArtists()).thenAnswer((_) async => const Right([artist]));
-      when(() => repo.getAlbums()).thenAnswer((_) async => const Right([album]));
+      when(() => repo.getArtists())
+          .thenAnswer((_) async => const Right([artist]));
+      when(() => repo.getAlbums())
+          .thenAnswer((_) async => const Right([album]));
       when(() => searchUseCase.searchSongs(
             any(),
             excludedFolders: any(named: 'excludedFolders'),

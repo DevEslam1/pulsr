@@ -45,8 +45,7 @@ void main() {
       await service.setEnabled(true);
       // The stage reads its character when it is switched on; pushing the
       // enable first would render one block with the previous filter.
-      expect(pushedMethods(),
-          ['setDacVoicingParams', 'setDacVoicingEnabled']);
+      expect(pushedMethods(), ['setDacVoicingParams', 'setDacVoicingEnabled']);
       expect(calls.last.arguments['enabled'], isTrue);
     });
 
@@ -82,8 +81,7 @@ void main() {
       expect(prefs.getBool(PrefsKeys.dacVoicingEnabled), isTrue);
       expect(prefs.getInt(PrefsKeys.dacVoicingCharacter),
           DacVoicingCharacter.slow.index);
-      expect(
-          prefs.getDouble(PrefsKeys.dacVoicingAmount), closeTo(0.65, 1e-9));
+      expect(prefs.getDouble(PrefsKeys.dacVoicingAmount), closeTo(0.65, 1e-9));
 
       // Fresh startup: fields back to shipped defaults, nothing loaded yet.
       service
@@ -99,12 +97,11 @@ void main() {
       expect(service.character, DacVoicingCharacter.slow);
       expect(service.amount, closeTo(0.65, 1e-9));
       expect(pushedMethods(), ['setDacVoicingParams', 'setDacVoicingEnabled']);
-      expect(calls.first.arguments['character'],
-          DacVoicingCharacter.slow.index);
+      expect(
+          calls.first.arguments['character'], DacVoicingCharacter.slow.index);
     });
 
-    test('a corrupt stored index or amount cannot crash the restore',
-        () async {
+    test('a corrupt stored index or amount cannot crash the restore', () async {
       SharedPreferences.setMockInitialValues({
         PrefsKeys.dacVoicingEnabled: true,
         PrefsKeys.dacVoicingCharacter: 99,

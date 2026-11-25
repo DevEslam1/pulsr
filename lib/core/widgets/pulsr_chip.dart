@@ -10,6 +10,7 @@ import '../theme/pulsr_button_style.dart';
 import 'pulsr_pressable.dart';
 
 import '../utils/pulsr_haptics.dart';
+
 /// {@category DesignSystem}
 enum PulsrChipVariant {
   /// Filter toggle chips (shows check/dot when selected).
@@ -94,9 +95,8 @@ class PulsrChip extends StatelessWidget {
           )
         : const SizedBox.shrink();
 
-    final chipRadius = isCapsule
-        ? context.buttonRadius(rectRadius: 6.0)
-        : AppRadii.full;
+    final chipRadius =
+        isCapsule ? context.buttonRadius(rectRadius: 6.0) : AppRadii.full;
 
     return Semantics(
       button: true,

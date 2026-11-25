@@ -399,8 +399,8 @@ class _RecentlyPlayedSectionState extends State<RecentlyPlayedSection> {
                                         SizedBox(
                                           height: scaledTitleBoxHeight(context),
                                           child: Align(
-                                            alignment:
-                                                AlignmentDirectional.centerStart,
+                                            alignment: AlignmentDirectional
+                                                .centerStart,
                                             child: Text(
                                               displayInfo.title,
                                               maxLines: 1,

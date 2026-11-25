@@ -14,6 +14,7 @@ import 'package:pulsr/core/theme/aura_theme.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 /// A platform web-view widget that renders out to an inert box. The captured
 /// [params] let a test fire `onWebViewCreated` / `onLoadStop` / etc. manually.
 class FakePlatformInAppWebView extends PlatformInAppWebViewWidget {

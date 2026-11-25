@@ -118,8 +118,7 @@ class _StudioOscilloscopeBayState extends State<_StudioOscilloscopeBay> {
         ? Color.lerp(surface.tapeWindow, p.bg, 0.25) ?? surface.tapeWindow
         : Color.lerp(p.surfaceContainerHigh, p.surface, 0.35) ??
             p.surfaceContainerHigh;
-    final Color gridColor =
-        p.isDark ? AppColors.specularAt(0.08) : p.hairline;
+    final Color gridColor = p.isDark ? AppColors.specularAt(0.08) : p.hairline;
     final Color gridAccentColor = p.isDark
         ? AppColors.specularAt(0.16)
         : p.textSecondary.withValues(alpha: 0.25);
@@ -283,9 +282,7 @@ class _StudioOscilloscopeBayState extends State<_StudioOscilloscopeBay> {
                                 }
                               },
                               onTapUp: (d) {
-                                if (isBuffering ||
-                                    _dragStarted ||
-                                    maxMs <= 0) {
+                                if (isBuffering || _dragStarted || maxMs <= 0) {
                                   return;
                                 }
                                 PulsrHaptics.selectionClick();
@@ -369,7 +366,8 @@ class _StudioOscilloscopeBayState extends State<_StudioOscilloscopeBay> {
                                           ? (_dragMs! - _dragStartMs!).round()
                                           : 0;
                                       final sign = deltaMs >= 0 ? '+' : '-';
-                                      final deltaStr = Formatters.formatDuration(
+                                      final deltaStr =
+                                          Formatters.formatDuration(
                                         Duration(milliseconds: deltaMs.abs()),
                                       );
                                       final hudText =
@@ -499,8 +497,7 @@ class _StudioOscilloscopeBayState extends State<_StudioOscilloscopeBay> {
                               fontFamily: 'monospace',
                               fontSize: AppFontSize.caption,
                               fontWeight: FontWeight.w700,
-                              color:
-                                  abEnabled ? activeColor : p.textSecondary,
+                              color: abEnabled ? activeColor : p.textSecondary,
                               fontFeatures: const [
                                 FontFeature.tabularFigures(),
                               ],
@@ -667,8 +664,7 @@ class _OscilloscopeWaveformPainter extends CustomPainter {
     ..strokeJoin = StrokeJoin.round;
   static final Paint _playheadGlowPaint = Paint()
     ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5.0);
-  static final Paint _playheadCorePaint = Paint()
-    ..strokeCap = StrokeCap.round;
+  static final Paint _playheadCorePaint = Paint()..strokeCap = StrokeCap.round;
   static final Paint _markerPaint = Paint();
 
   static final Map<String, TextPainter> _pinTextPainters = {};
@@ -755,13 +751,11 @@ class _OscilloscopeWaveformPainter extends CustomPainter {
     if (durMs > 0 && (loopPointA != null || loopPointB != null)) {
       final double? ax = loopPointA != null
           ? padX +
-              usableW *
-                  (loopPointA!.inMilliseconds / durMs).clamp(0.0, 1.0)
+              usableW * (loopPointA!.inMilliseconds / durMs).clamp(0.0, 1.0)
           : null;
       final double? bx = loopPointB != null
           ? padX +
-              usableW *
-                  (loopPointB!.inMilliseconds / durMs).clamp(0.0, 1.0)
+              usableW * (loopPointB!.inMilliseconds / durMs).clamp(0.0, 1.0)
           : null;
 
       if (ax != null && bx != null) {
@@ -823,7 +817,8 @@ class _OscilloscopeWaveformPainter extends CustomPainter {
         final int lo = pos.floor().clamp(0, samples.length - 1);
         final int hi = (lo + 1).clamp(0, samples.length - 1);
         final double frac = pos - lo;
-        return (samples[lo] * (1.0 - frac) + samples[hi] * frac).clamp(0.05, 1.0);
+        return (samples[lo] * (1.0 - frac) + samples[hi] * frac)
+            .clamp(0.05, 1.0);
       }, growable: false);
       _lastSamples = samples;
       _lastTargetBars = targetBars;
@@ -862,8 +857,7 @@ class _OscilloscopeWaveformPainter extends CustomPainter {
 
     for (int i = 0; i < targetBars; i++) {
       final double cx = padX + slot * (i + 0.5);
-      final double peakH =
-          (bars[i] * usableH * ampScale).clamp(4.0, usableH);
+      final double peakH = (bars[i] * usableH * ampScale).clamp(4.0, usableH);
       final double topY = midY - peakH / 2;
       final double bottomY = midY + peakH / 2;
 

@@ -122,13 +122,11 @@ class _MultichannelBassCardState extends State<MultichannelBassCard> {
             prefs.getBool(PrefsKeys.lfeCrossoverEnabled) ?? false;
         _lfeCrossoverHz = prefs.getDouble(PrefsKeys.lfeCrossoverHz) ?? 80.0;
         _lfeLowPassHz = prefs.getDouble(PrefsKeys.lfeLowPassHz) ?? 120.0;
-        _lfeSlopeDbPerOct =
-            prefs.getDouble(PrefsKeys.lfeSlopeDbPerOct) ?? 24.0;
+        _lfeSlopeDbPerOct = prefs.getDouble(PrefsKeys.lfeSlopeDbPerOct) ?? 24.0;
         _lfeGainDb = prefs.getDouble(PrefsKeys.lfeGainDb) ?? 0.0;
-        _lfeChannelIndex = (prefs.getInt(PrefsKeys.lfeChannelIndex) ?? 3)
-            .clamp(0, 7);
-        _lfeRedirectBass =
-            prefs.getBool(PrefsKeys.lfeRedirectBass) ?? true;
+        _lfeChannelIndex =
+            (prefs.getInt(PrefsKeys.lfeChannelIndex) ?? 3).clamp(0, 7);
+        _lfeRedirectBass = prefs.getBool(PrefsKeys.lfeRedirectBass) ?? true;
       }
     } catch (e, st) {
       ErrorLogger.log('Failed to restore multichannel bass settings',
@@ -242,8 +240,7 @@ class _MultichannelBassCardState extends State<MultichannelBassCard> {
     final nextTrim = trimDb ?? _channelTrims[channel];
     final nextDelay = delayMs ?? _channelDelays[channel];
     final nextTrims = List<double>.from(_channelTrims)..[channel] = nextTrim;
-    final nextDelays = List<double>.from(_channelDelays)
-      ..[channel] = nextDelay;
+    final nextDelays = List<double>.from(_channelDelays)..[channel] = nextDelay;
     try {
       if (getIt.isRegistered<EqualizerManager>()) {
         await getIt<EqualizerManager>().setChannelManagerChannel(
@@ -311,8 +308,7 @@ class _MultichannelBassCardState extends State<MultichannelBassCard> {
           lfeChannelIndex: targetLfeIndex,
           redirectBass: targetRedirect,
         );
-        await AudioEffectsChannel()
-            .setLfeCrossoverEnabled(targetEnabled);
+        await AudioEffectsChannel().setLfeCrossoverEnabled(targetEnabled);
         final prefs = await SharedPreferences.getInstance();
         await prefs.setBool(PrefsKeys.lfeCrossoverEnabled, targetEnabled);
         await prefs.setDouble(PrefsKeys.lfeCrossoverHz, targetCrossover);
@@ -447,9 +443,8 @@ class _MultichannelBassCardState extends State<MultichannelBassCard> {
                 value: !isBlocked && _channelManagerEnabled,
                 activeTrackColor: p.accent,
                 activeThumbColor: p.onAccent,
-                onChanged: isBlocked
-                    ? null
-                    : (val) => _setChannelManagerEnabled(val),
+                onChanged:
+                    isBlocked ? null : (val) => _setChannelManagerEnabled(val),
               ),
             ],
           ),

@@ -46,8 +46,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'player_test_support.dart';
 
 class MockPulsrAudioHandler extends Mock implements PulsrAudioHandler {}
+
 class MockEqualizerManager extends Mock implements EqualizerManager {}
+
 class _MockPlayerCubit extends Mock implements PlayerCubit {}
+
 class _MockSettingsCubit extends Mock implements SettingsCubit {}
 
 void main() {
@@ -91,7 +94,8 @@ void main() {
   });
 
   group('Phase 5 - AudioVisualizer 1-element data and NaN safety', () {
-    testWidgets('AudioVisualizer handles 1-element data without throwing', (tester) async {
+    testWidgets('AudioVisualizer handles 1-element data without throwing',
+        (tester) async {
       await tester.pumpWidget(
         MaterialApp(
           localizationsDelegates: appLocalizationsDelegates,
@@ -107,7 +111,8 @@ void main() {
         ),
       );
       await tester.pump();
-      final state = tester.state<AudioVisualizerState>(find.byType(AudioVisualizer));
+      final state =
+          tester.state<AudioVisualizerState>(find.byType(AudioVisualizer));
       // Set single bar and tick
       state.setBarDataForTesting(0, 0.7);
       expect(() => state.onTickForTesting(), returnsNormally);
@@ -115,7 +120,8 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    test('AudioVisualizer ignores NaN and Infinite values in native FFT stream', () {
+    test('AudioVisualizer ignores NaN and Infinite values in native FFT stream',
+        () {
       final targetData = List<double>.filled(16, 0.0);
       final rawEvents = <dynamic>[double.nan, 0.75, double.infinity, -1.0, 0.5];
 
@@ -174,7 +180,8 @@ void main() {
       mockSettingsCubit = _MockSettingsCubit();
 
       when(() => mockSettingsCubit.state).thenReturn(const SettingsState());
-      when(() => mockSettingsCubit.stream).thenAnswer((_) => const Stream<SettingsState>.empty());
+      when(() => mockSettingsCubit.stream)
+          .thenAnswer((_) => const Stream<SettingsState>.empty());
 
       when(() => mockPlayerCubit.state).thenReturn(
         const PlayerState(
@@ -186,7 +193,8 @@ void main() {
           ),
         ),
       );
-      when(() => mockPlayerCubit.stream).thenAnswer((_) => const Stream<PlayerState>.empty());
+      when(() => mockPlayerCubit.stream)
+          .thenAnswer((_) => const Stream<PlayerState>.empty());
     });
 
     testWidgets('CdPlayerTheme platter cancels drag on song change',
@@ -232,7 +240,8 @@ void main() {
       expect(gestureFinder, findsWidgets);
 
       // Perform a pan down gesture to start scrubbing
-      final gesture = await tester.startGesture(tester.getCenter(gestureFinder.first));
+      final gesture =
+          await tester.startGesture(tester.getCenter(gestureFinder.first));
       await gesture.moveBy(const Offset(20, 20));
       await tester.pump(const Duration(milliseconds: 50));
 
@@ -246,7 +255,9 @@ void main() {
       await tester.pump(const Duration(milliseconds: 50));
     });
 
-    testWidgets('_VinylTurntableDeck renders platter and tonearm with reactive scrub', (tester) async {
+    testWidgets(
+        '_VinylTurntableDeck renders platter and tonearm with reactive scrub',
+        (tester) async {
       await tester.binding.setSurfaceSize(const Size(500, 950));
       addTearDown(() => tester.binding.setSurfaceSize(null));
 
@@ -288,7 +299,9 @@ void main() {
   });
 
   group('Phase 5 - QuranMushafView Rebuild Optimization', () {
-    testWidgets('QuranMushafView only rebuilds when activeAyah changes, not on same-ayah ticks', (tester) async {
+    testWidgets(
+        'QuranMushafView only rebuilds when activeAyah changes, not on same-ayah ticks',
+        (tester) async {
       int buildCount = 0;
 
       final timings = [
@@ -384,29 +397,66 @@ void main() {
 
       when(() => mockSettings.state).thenReturn(const SettingsState());
       when(() => handler.isCrossfeedEnabled).thenReturn(false);
-      when(() => mockEqManager.setMultibandCompressor(any())).thenAnswer((_) async {});
+      when(() => mockEqManager.setMultibandCompressor(any()))
+          .thenAnswer((_) async {});
       when(() => handler.equalizerManager).thenReturn(mockEqManager);
       when(() => handler.setSpatializerEnabled(any())).thenAnswer((_) async {});
       when(() => handler.setVirtualizerEnabled(any())).thenAnswer((_) async {});
-      when(() => handler.setDynamicsPreset(any(), enabled: any(named: 'enabled'))).thenAnswer((_) async {});
-      when(() => handler.setCrossfeed(any(), delayUs: any(named: 'delayUs'), feedDb: any(named: 'feedDb'), mode: any(named: 'mode'), fcut: any(named: 'fcut'))).thenAnswer((_) async {});
-      when(() => handler.setHrtfBinaural(any(), azimuth: any(named: 'azimuth'), elevation: any(named: 'elevation'), sofaPath: any(named: 'sofaPath'))).thenAnswer((_) async {});
-      when(() => handler.setLookaheadLimiter(any(), thresholdDb: any(named: 'thresholdDb'), releaseMs: any(named: 'releaseMs'), lookaheadMs: any(named: 'lookaheadMs'))).thenAnswer((_) async {});
-      when(() => handler.setReverb(any(), preset: any(named: 'preset'), wetDry: any(named: 'wetDry'), damping: any(named: 'damping'))).thenAnswer((_) async {});
-      when(() => handler.setSaturation(any(), drive: any(named: 'drive'), mix: any(named: 'mix'), tilt: any(named: 'tilt'), multiband: any(named: 'multiband'))).thenAnswer((_) async {});
+      when(() =>
+              handler.setDynamicsPreset(any(), enabled: any(named: 'enabled')))
+          .thenAnswer((_) async {});
+      when(() => handler.setCrossfeed(any(),
+          delayUs: any(named: 'delayUs'),
+          feedDb: any(named: 'feedDb'),
+          mode: any(named: 'mode'),
+          fcut: any(named: 'fcut'))).thenAnswer((_) async {});
+      when(() => handler.setHrtfBinaural(any(),
+          azimuth: any(named: 'azimuth'),
+          elevation: any(named: 'elevation'),
+          sofaPath: any(named: 'sofaPath'))).thenAnswer((_) async {});
+      when(() => handler.setLookaheadLimiter(any(),
+          thresholdDb: any(named: 'thresholdDb'),
+          releaseMs: any(named: 'releaseMs'),
+          lookaheadMs: any(named: 'lookaheadMs'))).thenAnswer((_) async {});
+      when(() => handler.setReverb(any(),
+          preset: any(named: 'preset'),
+          wetDry: any(named: 'wetDry'),
+          damping: any(named: 'damping'))).thenAnswer((_) async {});
+      when(() => handler.setSaturation(any(),
+          drive: any(named: 'drive'),
+          mix: any(named: 'mix'),
+          tilt: any(named: 'tilt'),
+          multiband: any(named: 'multiband'))).thenAnswer((_) async {});
       when(() => handler.setStereoWidth(any())).thenAnswer((_) async {});
-      when(() => handler.setLoudnessContour(any(), intensity: any(named: 'intensity'))).thenAnswer((_) async {});
-      when(() => handler.setSubCrossover(any(), cornerHz: any(named: 'cornerHz'), slopeDbPerOct: any(named: 'slopeDbPerOct'), gain: any(named: 'gain'), bassMono: any(named: 'bassMono'), antiPop: any(named: 'antiPop'))).thenAnswer((_) async {});
+      when(() => handler.setLoudnessContour(any(),
+          intensity: any(named: 'intensity'))).thenAnswer((_) async {});
+      when(() => handler.setSubCrossover(any(),
+          cornerHz: any(named: 'cornerHz'),
+          slopeDbPerOct: any(named: 'slopeDbPerOct'),
+          gain: any(named: 'gain'),
+          bassMono: any(named: 'bassMono'),
+          antiPop: any(named: 'antiPop'))).thenAnswer((_) async {});
       when(() => handler.setDynamicEq(any())).thenAnswer((_) async {});
-      when(() => handler.setViperDdc(any(), profileName: any(named: 'profileName'), coeffs: any(named: 'coeffs'), ddcContent: any(named: 'ddcContent'))).thenAnswer((_) async {});
-      when(() => handler.setArbitraryEq(any(), eqString: any(named: 'eqString'), linearPhase: any(named: 'linearPhase'))).thenAnswer((_) async {});
-      when(() => handler.setLiveProg(any(), code: any(named: 'code'))).thenAnswer((_) async {});
-      when(() => handler.setDynamicBass(enabled: any(named: 'enabled'), strength: any(named: 'strength'), preset: any(named: 'preset'))).thenAnswer((_) async {});
+      when(() => handler.setViperDdc(any(),
+          profileName: any(named: 'profileName'),
+          coeffs: any(named: 'coeffs'),
+          ddcContent: any(named: 'ddcContent'))).thenAnswer((_) async {});
+      when(() => handler.setArbitraryEq(any(),
+          eqString: any(named: 'eqString'),
+          linearPhase: any(named: 'linearPhase'))).thenAnswer((_) async {});
+      when(() => handler.setLiveProg(any(), code: any(named: 'code')))
+          .thenAnswer((_) async {});
+      when(() => handler.setDynamicBass(
+          enabled: any(named: 'enabled'),
+          strength: any(named: 'strength'),
+          preset: any(named: 'preset'))).thenAnswer((_) async {});
       when(() => handler.setVolumeBoost(any())).thenAnswer((_) async {});
       when(() => handler.setBassBoost(any())).thenAnswer((_) async {});
     });
 
-    test('setDspEffectsEnabled(false) disables HRTF and restores it on re-enable', () async {
+    test(
+        'setDspEffectsEnabled(false) disables HRTF and restores it on re-enable',
+        () async {
       var state = const PlayerState(
         dsp: DspSlice(
           isHrtfEnabled: true,
@@ -437,10 +487,13 @@ void main() {
       expect(state.dsp.hrtfAzimuth, equals(30.0));
       expect(state.dsp.hrtfElevation, equals(10.0));
       expect(state.dsp.isDspEffectsActive, isTrue);
-      verify(() => handler.setHrtfBinaural(true, azimuth: 30.0, elevation: 10.0)).called(1);
+      verify(() =>
+              handler.setHrtfBinaural(true, azimuth: 30.0, elevation: 10.0))
+          .called(1);
     });
 
-    test('overlapping onOutputDeviceChanged calls serialize under mutex', () async {
+    test('overlapping onOutputDeviceChanged calls serialize under mutex',
+        () async {
       var state = const PlayerState();
 
       final controller = PlayerDspController(
@@ -483,7 +536,8 @@ void main() {
     test('restoreQueueSlots protects operations under _queueMutex', () async {
       final mutex = Mutex();
       var state = const PlayerState();
-      when(() => handler.queue).thenAnswer((_) => BehaviorSubject.seeded(const <MediaItem>[]));
+      when(() => handler.queue)
+          .thenAnswer((_) => BehaviorSubject.seeded(const <MediaItem>[]));
 
       final controller = PlayerQueueController(
         audioHandler: handler,

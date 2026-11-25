@@ -262,7 +262,8 @@ void main() {
     semantics.dispose();
   });
 
-  testWidgets('H-46 prevents stacked palettes and navigates via TextField FocusNode',
+  testWidgets(
+      'H-46 prevents stacked palettes and navigates via TextField FocusNode',
       (tester) async {
     CommandPaletteSheet.debugResetPaletteOpen();
     addTearDown(CommandPaletteSheet.debugResetPaletteOpen);
@@ -306,7 +307,8 @@ void main() {
     expect(find.byType(CommandPaletteSheet), findsNothing);
   });
 
-  testWidgets('M-08 deduplicates empty-query Recent actions and updates live player icons',
+  testWidgets(
+      'M-08 deduplicates empty-query Recent actions and updates live player icons',
       (tester) async {
     final playerStream = StreamController<PlayerState>.broadcast();
     addTearDown(playerStream.close);

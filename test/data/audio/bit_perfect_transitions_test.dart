@@ -85,18 +85,23 @@ void main() {
   });
 
   for (final stopConfirmed in [true, false]) {
-    test('boot strict direct bypass failure retains ON until teardown $stopConfirmed', () async {
+    test(
+        'boot strict direct bypass failure retains ON until teardown $stopConfirmed',
+        () async {
       await cubit.close();
       SharedPreferences.setMockInitialValues({
-        PrefsKeys.strictBitPerfect: true, PrefsKeys.bitPerfectOutput: true,
+        PrefsKeys.strictBitPerfect: true,
+        PrefsKeys.bitPerfectOutput: true,
         PrefsKeys.bypassDspOnBitPerfect: true,
         PrefsKeys.floatOutputEnabled: false,
-        'target_output_sample_rate': 96000, 'target_output_bit_depth': 16,
+        'target_output_sample_rate': 96000,
+        'target_output_bit_depth': 16,
       });
       const usb = MethodChannel(PulsrChannels.usbExclusive);
       var running = false;
       bool? strictRequest;
-      final messenger = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
       messenger.setMockMethodCallHandler(usb, (call) async {
         if (call.method == 'startStreaming') {
           strictRequest = (call.arguments as Map)['strict'] as bool;
@@ -107,10 +112,17 @@ void main() {
           if (stopConfirmed) running = false;
           return {'success': stopConfirmed};
         }
-        return {'attached': true, 'permitted': true, 'deviceId': 7,
-          'streamingSupported': true, 'streamingActive': running,
-          'streamingSampleRate': 48000, 'streamingBitDepth': 24,
-          'streamingChannels': 2, 'rateVerified': true};
+        return {
+          'attached': true,
+          'permitted': true,
+          'deviceId': 7,
+          'streamingSupported': true,
+          'streamingActive': running,
+          'streamingSampleRate': 48000,
+          'streamingBitDepth': 24,
+          'streamingChannels': 2,
+          'rateVerified': true
+        };
       });
       addTearDown(() => messenger.setMockMethodCallHandler(usb, null));
       when(() => hires.setBitPerfectMode(any())).thenAnswer((_) async => false);
@@ -118,7 +130,8 @@ void main() {
         if (call.method == 'setBypassDspForBitPerfect') return false;
         return null;
       });
-      cubit = SettingsCubit(scannerService: _Scanner(), hiResAudioService: hires);
+      cubit =
+          SettingsCubit(scannerService: _Scanner(), hiResAudioService: hires);
       await cubit.preferencesReady;
       expect(strictRequest, true);
       expect(running, !stopConfirmed);
@@ -126,7 +139,8 @@ void main() {
       expect(cubit.state.strictBitPerfect, !stopConfirmed);
       final prefs = await SharedPreferences.getInstance();
       expect(prefs.getBool(PrefsKeys.bitPerfectOutput), !stopConfirmed);
-      verifyNever(() => hires.setTargetOutputFormat(sampleRate: 96000, bitDepth: 16));
+      verifyNever(
+          () => hires.setTargetOutputFormat(sampleRate: 96000, bitDepth: 16));
     });
   }
 
@@ -252,23 +266,43 @@ void main() {
   });
 
   for (final strict in [false, true]) {
-    test('direct ${strict ? "strict" : "normal"} startup rolls back on bypass failure', () async {
+    test(
+        'direct ${strict ? "strict" : "normal"} startup rolls back on bypass failure',
+        () async {
       const usbChannel = MethodChannel(PulsrChannels.usbExclusive);
       var running = false;
       var stopped = false;
-      final messenger = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
       messenger.setMockMethodCallHandler(usbChannel, (call) async {
-        if (call.method == 'startStreaming') { running = true; return {'success': true}; }
-        if (call.method == 'stopStreaming') { running = false; stopped = true; return {'success': true}; }
-        return {'attached': true, 'permitted': true, 'deviceId': 7,
-          'streamingSupported': true, 'streamingActive': running,
-          'streamingSampleRate': 48000, 'streamingBitDepth': 24, 'streamingChannels': 2};
+        if (call.method == 'startStreaming') {
+          running = true;
+          return {'success': true};
+        }
+        if (call.method == 'stopStreaming') {
+          running = false;
+          stopped = true;
+          return {'success': true};
+        }
+        return {
+          'attached': true,
+          'permitted': true,
+          'deviceId': 7,
+          'streamingSupported': true,
+          'streamingActive': running,
+          'streamingSampleRate': 48000,
+          'streamingBitDepth': 24,
+          'streamingChannels': 2
+        };
       });
       addTearDown(() => messenger.setMockMethodCallHandler(usbChannel, null));
       when(() => hires.setBitPerfectMode(any())).thenAnswer((_) async => false);
       messenger.setMockMethodCallHandler(effectsChannel, (call) async => false);
-      if (strict) { await cubit.setStrictBitPerfect(true); }
-      else { await cubit.setBitPerfectOutput(true); }
+      if (strict) {
+        await cubit.setStrictBitPerfect(true);
+      } else {
+        await cubit.setBitPerfectOutput(true);
+      }
       expect(stopped, isTrue);
       expect(running, isFalse);
       expect(cubit.state.bitPerfectOutput, isFalse);

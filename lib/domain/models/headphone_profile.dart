@@ -251,8 +251,10 @@ class HeadphoneProfile {
         final rawG = gains[i];
         final safeG = rawG.isFinite ? rawG : 0.0;
         final clampedGain = (safeG + safePreamp).clamp(-30.0, 30.0);
-        final freq = centers[i].isFinite && centers[i] > 0 ? centers[i] : 1000.0;
-        pairs.add('${freq.toStringAsFixed(1)} ${clampedGain.toStringAsFixed(2)}');
+        final freq =
+            centers[i].isFinite && centers[i] > 0 ? centers[i] : 1000.0;
+        pairs.add(
+            '${freq.toStringAsFixed(1)} ${clampedGain.toStringAsFixed(2)}');
       }
       return 'GraphicEq: ${pairs.join("; ")}';
     }

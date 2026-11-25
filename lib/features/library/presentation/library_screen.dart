@@ -969,7 +969,8 @@ class _LibraryScreenState extends State<LibraryScreen>
                                               'library_search_action',
                                             ),
                                             borderRadius: AppRadii.r20All,
-                                            onTap: () => context.push('/search'),
+                                            onTap: () =>
+                                                context.push('/search'),
                                             child: Container(
                                               height: controlBarHeight,
                                               padding:
@@ -1733,8 +1734,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                   : p.surfaceContainer,
               borderRadius: AppRadii.r12All,
               border: Border.all(
-                color:
-                    selected ? p.accent.withValues(alpha: 0.35) : p.hairline,
+                color: selected ? p.accent.withValues(alpha: 0.35) : p.hairline,
               ),
             ),
             child: Row(
@@ -2134,6 +2134,7 @@ class _LibraryScreenState extends State<LibraryScreen>
   }
 
   @override
+
   /// Persistent, retryable failure state for the library tabs.
   ///
   /// Retry re-subscribes the Drift streams via [LibraryCubit.init] rather than

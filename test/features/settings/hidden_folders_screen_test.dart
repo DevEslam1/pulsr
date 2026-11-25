@@ -12,6 +12,7 @@ import 'package:pulsr/features/settings/presentation/hidden_folders_screen.dart'
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 class MockFolderUseCases extends Mock implements FolderUseCases {}
 
 class MockSettingsCubit extends Mock implements SettingsCubit {}

@@ -246,7 +246,9 @@ void main() {
       expect(SacdLayout.isAreaTocFileName('SACD_2CH.TOC.bak'), isFalse);
     });
 
-    test('BUG-P1-6: parses Scarlet Book TWOCHTOC with SACDTRL1 and rejects DST frame_format == 0', () {
+    test(
+        'BUG-P1-6: parses Scarlet Book TWOCHTOC with SACDTRL1 and rejects DST frame_format == 0',
+        () {
       final buf = Uint8List(4096);
       final view = ByteData.sublistView(buf);
       void writeAscii(int off, String s) {
@@ -269,7 +271,8 @@ void main() {
       view.setUint32(2048 + 8 + 255 * 4 + 0, 10, Endian.big);
       view.setUint32(2048 + 8 + 255 * 4 + 4, 15, Endian.big);
 
-      final toc = SacdToc.parse(buf, fileName: 'TWOCHTOC.TOC', imageLengthSectors: 1000);
+      final toc = SacdToc.parse(buf,
+          fileName: 'TWOCHTOC.TOC', imageLengthSectors: 1000);
       expect(toc.area, SacdAreaKind.twoChannel);
       expect(toc.channels, 2);
       expect(toc.tracks, hasLength(2));

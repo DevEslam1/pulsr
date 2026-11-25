@@ -13,6 +13,7 @@ import 'package:pulsr/l10n/generated/app_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 class MockPlayerCubit extends Mock implements PlayerCubit {}
 
 void main() {
@@ -45,8 +46,7 @@ void main() {
     when(() => cubit.state).thenAnswer((_) => currentState);
     when(() => cubit.stream)
         .thenAnswer((_) => const Stream<PlayerState>.empty());
-    when(() => cubit.setAutoEqCorrectionMode(any()))
-        .thenAnswer((_) async {});
+    when(() => cubit.setAutoEqCorrectionMode(any())).thenAnswer((_) async {});
     when(() => cubit.applyHeadphoneProfile(any()))
         .thenAnswer((invocation) async {
       final profile = invocation.positionalArguments[0] as HeadphoneProfile?;

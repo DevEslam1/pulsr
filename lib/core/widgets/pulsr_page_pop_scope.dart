@@ -24,8 +24,8 @@ class PulsrPagePopScope extends StatelessWidget {
     // under the app router; only the pop *callback* used to touch GoRouter,
     // and moving that lookup into build broke those cases.
     final router = GoRouter.maybeOf(context);
-    final canPop = router?.canPop() ??
-        (Navigator.maybeOf(context)?.canPop() ?? false);
+    final canPop =
+        router?.canPop() ?? (Navigator.maybeOf(context)?.canPop() ?? false);
     return PopScope(
       // Reporting the real value is what lets Android 14 draw the
       // predictive-back preview. The old hard-coded `false` suppressed the

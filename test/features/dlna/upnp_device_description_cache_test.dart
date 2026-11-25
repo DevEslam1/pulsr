@@ -64,7 +64,8 @@ void main() {
         clock: () => fakeNow,
       );
 
-      final first = await cache.getOrFetchDeviceDescription(uri1, client: client);
+      final first =
+          await cache.getOrFetchDeviceDescription(uri1, client: client);
       expect(first, isNotNull);
       expect(first!.friendlyName, 'Living Room Speaker');
       expect(client.requestCount, 1);
@@ -72,7 +73,8 @@ void main() {
       // Advance time by 2 minutes (still within 5 minute TTL)
       fakeNow = fakeNow.add(const Duration(minutes: 2));
 
-      final second = await cache.getOrFetchDeviceDescription(uri1, client: client);
+      final second =
+          await cache.getOrFetchDeviceDescription(uri1, client: client);
       expect(second, isNotNull);
       expect(second!.friendlyName, 'Living Room Speaker');
       expect(client.requestCount, 1); // No new network request
@@ -120,7 +122,8 @@ void main() {
       final client = _CountingClient((_) async => _xmlResponse(_serverXml));
       final cache = UpnpDeviceDescriptionCache();
 
-      final server = await cache.getOrFetchServerDescription(uri2, client: client);
+      final server =
+          await cache.getOrFetchServerDescription(uri2, client: client);
       expect(server, isNotNull);
       expect(server!.friendlyName, 'NAS Music');
       expect(server.contentDirectoryControlUrl,
@@ -162,7 +165,8 @@ void main() {
       expect(cache.contains(u3), isTrue);
     });
 
-    test('accessing entry updates recency and protects it from LRU eviction', () async {
+    test('accessing entry updates recency and protects it from LRU eviction',
+        () async {
       final cache = UpnpDeviceDescriptionCache(maxEntries: 2);
       final u1 = Uri.parse('http://1.1.1.1/d.xml');
       final u2 = Uri.parse('http://1.1.1.2/d.xml');
@@ -183,7 +187,8 @@ void main() {
     });
 
     test('rejects responses exceeding maxDescriptionBytes', () async {
-      final oversized = 'x' * (UpnpDeviceDescriptionCache.maxDescriptionBytes + 1);
+      final oversized =
+          'x' * (UpnpDeviceDescriptionCache.maxDescriptionBytes + 1);
       final client = _CountingClient((_) async => _xmlResponse(oversized));
       final cache = UpnpDeviceDescriptionCache();
 

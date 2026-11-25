@@ -703,7 +703,8 @@ void main() {
       expect(cubit.state.error?.code, 'YTM_BOT_BLOCK');
     });
 
-    test('single-flight poToken refresh recovers subsequent query without deadlock',
+    test(
+        'single-flight poToken refresh recovers subsequent query without deadlock',
         () async {
       final tokenCompleter = Completer<bool>();
       var calls = 0;
@@ -733,7 +734,8 @@ void main() {
       expect(cubit.state.results.single.title, 'Recovered');
     });
 
-    test('YTM_NETWORK classification sets YTM_NETWORK_OFFLINE for statusMessageFor',
+    test(
+        'YTM_NETWORK classification sets YTM_NETWORK_OFFLINE for statusMessageFor',
         () async {
       when(() => service.searchWithFallback(any()))
           .thenThrow(const YtmException('YTM_NETWORK'));

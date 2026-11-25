@@ -6,6 +6,7 @@ import 'package:pulsr/features/settings/presentation/cloud_backup_dashboard_scre
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 class MockCloudSyncService extends Mock implements CloudSyncService {}
 
 void main() {

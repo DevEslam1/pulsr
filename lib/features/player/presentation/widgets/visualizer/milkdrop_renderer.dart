@@ -80,7 +80,9 @@ double _sanitizeScalar(double value, double fallback, double min, double max) {
 }
 
 double _resolveMonotonicSeconds(double? elapsedSeconds) {
-  if (elapsedSeconds != null && elapsedSeconds.isFinite && elapsedSeconds >= 0) {
+  if (elapsedSeconds != null &&
+      elapsedSeconds.isFinite &&
+      elapsedSeconds >= 0) {
     return elapsedSeconds;
   }
   return _fallbackMonotonicClock.elapsedMicroseconds / 1000000.0;
@@ -249,8 +251,7 @@ class MilkdropCanvasPainter extends CustomPainter {
       canvas.translate(center.dx, center.dy);
       canvas.rotate(baseRot + r * 0.18);
       final rawWarpX = 1.0 + (safeWarp - 1.0) * depth * 0.35;
-      final warpX =
-          rawWarpX.isFinite ? rawWarpX.clamp(0.05, 4.0) : 1.0;
+      final warpX = rawWarpX.isFinite ? rawWarpX.clamp(0.05, 4.0) : 1.0;
       canvas.scale(warpX, 1.0 / warpX);
       canvas.drawOval(
         Rect.fromCenter(

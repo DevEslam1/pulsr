@@ -70,7 +70,8 @@ void main() {
   }
 
   group('notifyPlaybackState broadcast gating', () {
-    test('skips both Android broadcast and REST for Quran recitation', () async {
+    test('skips both Android broadcast and REST for Quran recitation',
+        () async {
       await service.notifyPlaybackState(
         id: 1,
         artist: 'Reciter',
@@ -364,12 +365,15 @@ void main() {
     });
   });
 
-  group('HTTP 200 API error handling, Libre.fm signing, and restart detection', () {
-    test('retries HTTP 200 transient JSON error and avoids poisoning dedup key when all fail',
+  group('HTTP 200 API error handling, Libre.fm signing, and restart detection',
+      () {
+    test(
+        'retries HTTP 200 transient JSON error and avoids poisoning dedup key when all fail',
         () async {
       final errClient = MockClient((request) async {
         httpRequests.add(request);
-        return http.Response(jsonEncode({'error': 16, 'message': 'Temporary error'}), 200);
+        return http.Response(
+            jsonEncode({'error': 16, 'message': 'Temporary error'}), 200);
       });
       final errService = ScrobblerService(errClient, secure);
       errService.scrobbleThrottle = Duration.zero;
@@ -391,7 +395,8 @@ void main() {
       expect(prefs.getString('scrobbler_offline_queue'), contains('Track 77'));
     }, timeout: const Timeout(Duration(seconds: 30)));
 
-    test('signs Libre.fm Now Playing and Scrobble requests with api_key and api_sig',
+    test(
+        'signs Libre.fm Now Playing and Scrobble requests with api_key and api_sig',
         () async {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(ScrobblerService.keyLibreFmEnabled, true);

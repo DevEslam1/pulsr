@@ -61,7 +61,8 @@ void main() {
         preferExclusive: true, targetBufferMs: 120)).called(1);
   });
 
-  test('bluetooth route defaults to 150 ms buffer when targetBufferMs is omitted',
+  test(
+      'bluetooth route defaults to 150 ms buffer when targetBufferMs is omitted',
       () async {
     final player = _Player();
     when(() => player.dspSetAaudioOutput(true,

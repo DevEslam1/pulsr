@@ -13,6 +13,7 @@ import 'package:pulsr/features/downloads/presentation/widgets/download_tile.dart
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 class MockDownloadsCubit extends Mock implements DownloadsCubit {}
 
 void main() {

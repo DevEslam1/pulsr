@@ -117,8 +117,7 @@ class MediaScannerService {
 
   Future<void> markScanComplete({int? epochSec}) async {
     _lastScanAt = DateTime.now();
-    final epoch =
-        epochSec ?? DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    final epoch = epochSec ?? DateTime.now().millisecondsSinceEpoch ~/ 1000;
     _lastScanEpochSec = epoch;
     _lastOrphanPruneAt ??= _lastScanAt;
     try {
@@ -376,8 +375,8 @@ class MediaScannerService {
           final prefs = await SharedPreferences.getInstance();
           _lastScanEpochSec = prefs.getInt(PrefsKeys.lastScanEpochSec);
           if (_lastScanEpochSec != null && _lastScanAt == null) {
-            _lastScanAt = DateTime.fromMillisecondsSinceEpoch(
-                _lastScanEpochSec! * 1000);
+            _lastScanAt =
+                DateTime.fromMillisecondsSinceEpoch(_lastScanEpochSec! * 1000);
           }
         } catch (e, st) {
           ErrorLogger.log('Failed to read last scan epoch',
@@ -654,8 +653,7 @@ class MediaScannerService {
         if (repo is MusicRepository) {
           await repo.updateSongTags(
             path: path,
-            title:
-                (title != null && title.isNotEmpty) ? title : 'Unknown Song',
+            title: (title != null && title.isNotEmpty) ? title : 'Unknown Song',
             artist: (artist != null && artist.isNotEmpty)
                 ? artist
                 : 'Unknown Artist',
@@ -669,8 +667,7 @@ class MediaScannerService {
         } else {
           await repo.updateSongTags(
             path: path,
-            title:
-                (title != null && title.isNotEmpty) ? title : 'Unknown Song',
+            title: (title != null && title.isNotEmpty) ? title : 'Unknown Song',
             artist: (artist != null && artist.isNotEmpty)
                 ? artist
                 : 'Unknown Artist',
@@ -786,9 +783,7 @@ class MediaScannerService {
         bitDepth: bitDepth != null && bitDepth > 0 ? bitDepth : null,
         bitrateKbps:
             bitrateKbps != null && bitrateKbps > 0 ? bitrateKbps : null,
-        codec: (codec != null && codec.isNotEmpty)
-            ? codec
-            : 'UNPROBED_FAILED',
+        codec: (codec != null && codec.isNotEmpty) ? codec : 'UNPROBED_FAILED',
         loudnessRange: lraVal,
       );
     } catch (e, stack) {
@@ -906,7 +901,8 @@ class MediaScannerService {
                   } else if (mp4Probe.isAac) {
                     bitDepth = null;
                   }
-                  if (mp4Probe.bitrateKbps != null && mp4Probe.bitrateKbps! > 0) {
+                  if (mp4Probe.bitrateKbps != null &&
+                      mp4Probe.bitrateKbps! > 0) {
                     bitrateKbps = mp4Probe.bitrateKbps;
                   }
                 }
@@ -920,8 +916,9 @@ class MediaScannerService {
                   sampleRate:
                       sampleRate != null && sampleRate > 0 ? sampleRate : 44100,
                   bitDepth: bitDepth != null && bitDepth > 0 ? bitDepth : null,
-                  bitrateKbps:
-                      bitrateKbps != null && bitrateKbps > 0 ? bitrateKbps : null,
+                  bitrateKbps: bitrateKbps != null && bitrateKbps > 0
+                      ? bitrateKbps
+                      : null,
                   codec: (codec != null && codec.isNotEmpty)
                       ? codec
                       : 'UNPROBED_FAILED',
@@ -1197,9 +1194,7 @@ _ScanMediaResult _parseScannedMediaInIsolate(_ScanMediaInput input) {
           artistId: Value(artistId),
           year: year != null && year > 0 ? Value(year) : const Value.absent(),
         );
-      } else if (year != null &&
-          year > 0 &&
-          !albumMap[albumId]!.year.present) {
+      } else if (year != null && year > 0 && !albumMap[albumId]!.year.present) {
         albumMap[albumId] = albumMap[albumId]!.copyWith(year: Value(year));
       }
     }

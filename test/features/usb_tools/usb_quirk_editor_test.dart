@@ -39,7 +39,8 @@ void main() {
     await tester.pump();
   }
 
-  testWidgets('renders all fields including volumeCalibrationDb', (tester) async {
+  testWidgets('renders all fields including volumeCalibrationDb',
+      (tester) async {
     await pumpEditor(
       tester,
       profile: UsbQuirkProfile.defaults,
@@ -51,10 +52,12 @@ void main() {
     expect(find.text(UsbErgonomicsStrings.bufferLabel), findsOneWidget);
     expect(find.text(UsbErgonomicsStrings.transferSizeLabel), findsOneWidget);
     expect(find.text(UsbErgonomicsStrings.selectorPinLabel), findsOneWidget);
-    expect(find.text(UsbErgonomicsStrings.volumeCalibrationLabel), findsOneWidget);
+    expect(
+        find.text(UsbErgonomicsStrings.volumeCalibrationLabel), findsOneWidget);
   });
 
-  testWidgets('valid volumeCalibrationDb emits updated profile', (tester) async {
+  testWidgets('valid volumeCalibrationDb emits updated profile',
+      (tester) async {
     UsbQuirkProfile current = UsbQuirkProfile.defaults;
     await pumpEditor(
       tester,
@@ -75,7 +78,8 @@ void main() {
     expect(find.text(UsbErgonomicsStrings.numberInvalid), findsNothing);
   });
 
-  testWidgets('out of range volumeCalibrationDb displays error', (tester) async {
+  testWidgets('out of range volumeCalibrationDb displays error',
+      (tester) async {
     UsbQuirkProfile current = UsbQuirkProfile.defaults;
     await pumpEditor(
       tester,
@@ -94,7 +98,8 @@ void main() {
     expect(current.volumeCalibrationDb, 0.0); // Not updated
   });
 
-  testWidgets('external profile update syncs TextEditingController in didUpdateWidget',
+  testWidgets(
+      'external profile update syncs TextEditingController in didUpdateWidget',
       (tester) async {
     UsbQuirkProfile current = UsbQuirkProfile.defaults;
     await pumpEditor(

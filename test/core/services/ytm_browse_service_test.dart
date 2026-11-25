@@ -348,7 +348,8 @@ void main() {
       );
     });
 
-    test('refreshSection keeps existing cached items when refresh returns empty',
+    test(
+        'refreshSection keeps existing cached items when refresh returns empty',
         () async {
       var now = DateTime(2026, 1, 1);
       final clocked = YtmBrowseService(ytm, clock: () => now);

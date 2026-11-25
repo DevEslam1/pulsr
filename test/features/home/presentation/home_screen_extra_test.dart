@@ -181,7 +181,8 @@ void main() {
         )).called(1);
   });
 
-  testWidgets('the See All action opens the discovery tools sheet', (tester) async {
+  testWidgets('the See All action opens the discovery tools sheet',
+      (tester) async {
     await pumpScreen(tester);
 
     final seeAll =
@@ -202,7 +203,8 @@ void main() {
     expect(find.text(l10n.themeStudio), findsWidgets);
   });
 
-  testWidgets('the notification banner Open Settings clears the denied flag when granted on resume',
+  testWidgets(
+      'the notification banner Open Settings clears the denied flag when granted on resume',
       (tester) async {
     SharedPreferences.setMockInitialValues(
         {'notification_permission_denied': true});

@@ -343,7 +343,8 @@ void main() {
     expect(harness.engine.duckRequests, [true, false]);
   });
 
-  test('BUG-P2-28: MethodChannelTtsEngine retries init after cooldown on transient failure',
+  test(
+      'BUG-P2-28: MethodChannelTtsEngine retries init after cooldown on transient failure',
       () async {
     const channel = MethodChannel('test/tts_recovery');
     var shouldFailInit = true;
@@ -355,7 +356,8 @@ void main() {
       switch (call.method) {
         case 'init':
           if (shouldFailInit) {
-            throw PlatformException(code: 'TIMEOUT', message: 'Transient init timeout');
+            throw PlatformException(
+                code: 'TIMEOUT', message: 'Transient init timeout');
           }
           return true;
         case 'speak':

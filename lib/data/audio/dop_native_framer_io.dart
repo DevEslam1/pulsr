@@ -38,8 +38,7 @@ class _DopNativeBindings {
   _DopNativeBindings(DynamicLibrary lib)
       : alloc = lib.lookupFunction<_AllocNative, _AllocDart>('pulsr_dop_alloc'),
         free = lib.lookupFunction<_FreeNative, _FreeDart>('pulsr_dop_free'),
-        framePlanar =
-            lib.lookupFunction<_FramePlanarNative, _FramePlanarDart>(
+        framePlanar = lib.lookupFunction<_FramePlanarNative, _FramePlanarDart>(
           'pulsr_dop_frame_planar',
         );
 

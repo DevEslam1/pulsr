@@ -15,6 +15,7 @@ import 'package:pulsr/features/settings/cubit/settings_state.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 class MockPlayerCubit extends Mock implements PlayerCubit {}
 
 class MockSettingsCubit extends Mock implements SettingsCubit {}
@@ -69,8 +70,7 @@ void main() {
   testWidgets(
       'Theme switching crossfades smoothly mid-transition with continuity',
       (tester) async {
-    final modeNotifier =
-        ValueNotifier<PlayerThemeMode>(PlayerThemeMode.clean);
+    final modeNotifier = ValueNotifier<PlayerThemeMode>(PlayerThemeMode.clean);
 
     final props = PlayerThemeProps(
       state: mockPlayerCubit.state,

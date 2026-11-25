@@ -441,7 +441,8 @@ class EqualizerManager {
     final sanitizedGains = currentPreset.gains
         .map((g) => DspParamRanges.eqBandGainDb.clamp(g))
         .toList(growable: false);
-    final sanitizedBassBoost = _finiteClamp(currentPreset.bassBoost, 0.0, 1.0, 0.0);
+    final sanitizedBassBoost =
+        _finiteClamp(currentPreset.bassBoost, 0.0, 1.0, 0.0);
     currentPreset = currentPreset.copyWith(
       gains: sanitizedGains,
       bassBoost: sanitizedBassBoost,
@@ -517,7 +518,8 @@ class EqualizerManager {
         dynamicEqBands.map((b) => b.sanitized()).toList(growable: false);
     multibandCompressorBands = multibandCompressorBands
         .map((b) => MultibandCompressorBandConfig(
-              thresholdDb: DspParamRanges.multibandThresholdDb.clamp(b.thresholdDb),
+              thresholdDb:
+                  DspParamRanges.multibandThresholdDb.clamp(b.thresholdDb),
               ratio: DspParamRanges.multibandRatio.clamp(b.ratio),
               attackMs: DspParamRanges.multibandAttackMs.clamp(b.attackMs),
               releaseMs: DspParamRanges.multibandReleaseMs.clamp(b.releaseMs),
@@ -1043,7 +1045,8 @@ class EqualizerManager {
     currentPreset = currentPreset.copyWith(name: 'Custom', gains: newGains);
     comparisonSlots[activeComparisonSlot] = currentPreset;
     if (autoPreampEnabled && !isFirCorrectionActive) {
-      preampDb = DspParamRanges.preampDb.clamp(currentPreset.recommendedPreampDb);
+      preampDb =
+          DspParamRanges.preampDb.clamp(currentPreset.recommendedPreampDb);
     }
 
     // Coalesce rapid slider drags: apply state immediately, push to native
@@ -2304,9 +2307,8 @@ class EqualizerManager {
 
   Future<int> syncNativeLatency(double sampleRate,
       {OptimizedDspPipeline? dspPipeline, double? outputRate}) async {
-    final rate = (outputRate != null && outputRate > 0)
-        ? outputRate
-        : sampleRate;
+    final rate =
+        (outputRate != null && outputRate > 0) ? outputRate : sampleRate;
     if (rate.isFinite && rate > 0) nativeSampleRate = rate;
     if (!PlatformCapabilities.isAndroid) return 0;
     try {

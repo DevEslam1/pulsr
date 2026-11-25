@@ -110,8 +110,7 @@ class LyricsOffsetStore {
     });
   }
 
-  Future<void> _appendAndEvictIndex(
-      SharedPreferences prefs, String key) async {
+  Future<void> _appendAndEvictIndex(SharedPreferences prefs, String key) async {
     try {
       final index = prefs.getStringList(_indexKey) ?? <String>[];
       index.remove(key);

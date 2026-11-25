@@ -236,8 +236,8 @@ mixin SettingsAppearanceSection
             AppButtonStyle.classic => context.l10n.buttonStyleClassic,
           },
           trailingBadge: context.l10n.settingsBadgeStyle,
-          onTap: () => showButtonStylePickerSheet(
-              context, cubit, state.appButtonStyle),
+          onTap: () =>
+              showButtonStylePickerSheet(context, cubit, state.appButtonStyle),
         ),
         _divider(p),
         _navTile(

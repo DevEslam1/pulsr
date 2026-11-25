@@ -231,7 +231,8 @@ class _AuthSheetState extends State<AuthSheet> {
                                     header: true,
                                     child: Text(
                                       _isSignUp
-                                          ? context.l10n.browseCreateCloudAccount
+                                          ? context
+                                              .l10n.browseCreateCloudAccount
                                           : context.l10n.browseSignInToCloud,
                                       style: TextStyle(
                                         color: p.textPrimary,
@@ -583,8 +584,8 @@ class _AuthSheetState extends State<AuthSheet> {
                                         await showYtmAccountDisconnectDialog(
                                             context);
                                       } else {
-                                        final ok =
-                                            await YtmWebLoginSheet.show(context);
+                                        final ok = await YtmWebLoginSheet.show(
+                                            context);
                                         if (ok == true && context.mounted) {
                                           ScaffoldMessenger.of(context)
                                             ..clearSnackBars()

@@ -178,8 +178,8 @@ class PlaylistSuggestionsService {
         ),
       if (buckets.forgotten.isNotEmpty)
         PlaylistSuggestion(
-          title: l10n?.suggestionForgottenFavoritesTitle ??
-              'Forgotten Favorites',
+          title:
+              l10n?.suggestionForgottenFavoritesTitle ?? 'Forgotten Favorites',
           description: l10n?.suggestionForgottenFavoritesDesc ??
               'Starred gems you haven\'t heard in a while',
           songs: buckets.forgotten,

@@ -282,92 +282,92 @@ class _KaraokePitchHighwayState extends State<KaraokePitchHighway>
                 ),
               ),
             ),
-          // Simulated Pitch Indicator Badge ("SIM")
-          if (widget.audioBuffer == null || widget.audioBuffer!.isEmpty)
-            PositionedDirectional(
-              top: AppSpacing.xxs,
-              start: AppSpacing.xs,
-              child: Container(
-                key: const ValueKey('simulated_pitch_badge'),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 5,
-                  vertical: 2,
-                ),
-                decoration: BoxDecoration(
-                  color: p.warning.withValues(alpha: 0.18),
-                  borderRadius: AppRadii.r4All,
-                  border: Border.all(
-                    color: p.warning.withValues(alpha: 0.45),
-                    width: 0.8,
-                  ),
-                ),
-                child: Text(
-                  context.l10n.simulatedPitchBadge,
-                  style: TextStyle(
-                    fontSize: AppFontSize.caption,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 0.8,
-                    color: p.warning,
-                  ),
-                ),
-              ),
-            ),
-          // Pitch & Note Readout Chip
-          PositionedDirectional(
-            top: AppSpacing.xxs,
-            end: AppSpacing.xs,
-            child: ValueListenableBuilder<PitchResult>(
-              valueListenable: _pitchNotifier,
-              builder: (context, smoothed, _) {
-                if (!smoothed.isVoiced) return const SizedBox.shrink();
-                return Container(
+            // Simulated Pitch Indicator Badge ("SIM")
+            if (widget.audioBuffer == null || widget.audioBuffer!.isEmpty)
+              PositionedDirectional(
+                top: AppSpacing.xxs,
+                start: AppSpacing.xs,
+                child: Container(
+                  key: const ValueKey('simulated_pitch_badge'),
                   padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.s6,
+                    horizontal: 5,
                     vertical: 2,
                   ),
                   decoration: BoxDecoration(
-                    color: p.surfaceContainerHigh.withValues(alpha: 0.8),
-                    borderRadius: AppRadii.r6All,
+                    color: p.warning.withValues(alpha: 0.18),
+                    borderRadius: AppRadii.r4All,
                     border: Border.all(
-                      color: accent.withValues(alpha: 0.4),
+                      color: p.warning.withValues(alpha: 0.45),
                       width: 0.8,
                     ),
                   ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 6,
-                        height: 6,
-                        decoration: BoxDecoration(
-                          color: accent,
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: accent.withValues(alpha: 0.6),
-                              blurRadius: 4,
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: AppSpacing.xxs),
-                      Text(
-                        '${smoothed.noteName} • ${smoothed.frequencyHz.toStringAsFixed(0)} Hz',
-                        style: TextStyle(
-                          fontSize: AppFontSize.caption,
-                          fontWeight: FontWeight.w700,
-                          color: p.textPrimary,
-                          fontFeatures: const [FontFeature.tabularFigures()],
-                        ),
-                      ),
-                    ],
+                  child: Text(
+                    context.l10n.simulatedPitchBadge,
+                    style: TextStyle(
+                      fontSize: AppFontSize.caption,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.8,
+                      color: p.warning,
+                    ),
                   ),
-                );
-              },
+                ),
+              ),
+            // Pitch & Note Readout Chip
+            PositionedDirectional(
+              top: AppSpacing.xxs,
+              end: AppSpacing.xs,
+              child: ValueListenableBuilder<PitchResult>(
+                valueListenable: _pitchNotifier,
+                builder: (context, smoothed, _) {
+                  if (!smoothed.isVoiced) return const SizedBox.shrink();
+                  return Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.s6,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: p.surfaceContainerHigh.withValues(alpha: 0.8),
+                      borderRadius: AppRadii.r6All,
+                      border: Border.all(
+                        color: accent.withValues(alpha: 0.4),
+                        width: 0.8,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: BoxDecoration(
+                            color: accent,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: accent.withValues(alpha: 0.6),
+                                blurRadius: 4,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.xxs),
+                        Text(
+                          '${smoothed.noteName} • ${smoothed.frequencyHz.toStringAsFixed(0)} Hz',
+                          style: TextStyle(
+                            fontSize: AppFontSize.caption,
+                            fontWeight: FontWeight.w700,
+                            color: p.textPrimary,
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
             ),
-          ),
-        ],
-      ),
+          ],
+        ),
       ),
     );
   }
@@ -426,8 +426,7 @@ class _PitchHighwayPainter extends CustomPainter {
     if (w <= 0 || h <= 0) return;
 
     // 1. Draw Pitch Guide Lanes (C3, E3, G3, C4, E4, G4, C5)
-    final linePaint = _linePaint
-      ..color = hairlineColor.withValues(alpha: 0.35);
+    final linePaint = _linePaint..color = hairlineColor.withValues(alpha: 0.35);
 
     const guideNotes = [48, 52, 55, 60, 64, 67, 72];
     for (final note in guideNotes) {
@@ -503,8 +502,7 @@ class _PitchHighwayPainter extends CustomPainter {
       canvas.drawCircle(cursorCenter, 4.5, corePaint);
 
       // Specular highlight
-      final specularPaint = _specularPaint
-        ..color = AppColors.specularAt(0.9);
+      final specularPaint = _specularPaint..color = AppColors.specularAt(0.9);
       canvas.drawCircle(
           cursorCenter - const Offset(1.2, 1.2), 1.5, specularPaint);
     }

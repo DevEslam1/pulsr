@@ -75,10 +75,12 @@ class FeatureGate {
           userMessage: 'DSP is not applied to remote streaming devices.',
         );
       }
-      if (feature == AudioFeature.softwareVolume && !backend.canSoftwareVolume) {
+      if (feature == AudioFeature.softwareVolume &&
+          !backend.canSoftwareVolume) {
         return const FeatureGateDecision.blocked(
           reason: FeatureBlockReason.remoteBackend,
-          userMessage: 'Software volume is controlled directly on the remote receiver.',
+          userMessage:
+              'Software volume is controlled directly on the remote receiver.',
         );
       }
     }
@@ -145,8 +147,7 @@ class FeatureGate {
             feature == AudioFeature.crossfeed)) {
       return const FeatureGateDecision.blocked(
         reason: FeatureBlockReason.lowPowerInterlock,
-        userMessage:
-            'Enabling DSP stages automatically exits low-power mode.',
+        userMessage: 'Enabling DSP stages automatically exits low-power mode.',
       );
     }
 
@@ -154,13 +155,15 @@ class FeatureGate {
     if (feature == AudioFeature.hrtf && crossfeedActive) {
       return const FeatureGateDecision.blocked(
         reason: FeatureBlockReason.hrtfCrossfeedExclusivity,
-        userMessage: 'HRTF binaural rendering and crossfeed are mutually exclusive.',
+        userMessage:
+            'HRTF binaural rendering and crossfeed are mutually exclusive.',
       );
     }
     if (feature == AudioFeature.crossfeed && hrtfActive) {
       return const FeatureGateDecision.blocked(
         reason: FeatureBlockReason.hrtfCrossfeedExclusivity,
-        userMessage: 'Crossfeed cannot be enabled while HRTF binaural rendering is active.',
+        userMessage:
+            'Crossfeed cannot be enabled while HRTF binaural rendering is active.',
       );
     }
 
@@ -169,7 +172,8 @@ class FeatureGate {
       if (channels > 2 && isAAudio) {
         return const FeatureGateDecision.blocked(
           reason: FeatureBlockReason.unsupportedRoute,
-          userMessage: 'Multichannel audio (>2 channels) requires AudioTrack float mode.',
+          userMessage:
+              'Multichannel audio (>2 channels) requires AudioTrack float mode.',
         );
       }
     }

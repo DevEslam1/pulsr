@@ -1,4 +1,4 @@
-﻿part of '../equalizer_sheet.dart';
+part of '../equalizer_sheet.dart';
 
 /// Hardware output device profile selector bar for [EqualizerSheet].
 extension _EqDeviceProfileBar on _EqualizerSheetState {
@@ -133,9 +133,7 @@ extension _EqDeviceProfileBar on _EqualizerSheetState {
                   : p.surfaceContainer.withValues(alpha: 0.0),
               borderRadius: AppRadii.r16All,
               border: Border.all(
-                color: isActive
-                    ? p.accent
-                    : p.hairline.withValues(alpha: 0.0),
+                color: isActive ? p.accent : p.hairline.withValues(alpha: 0.0),
                 width: 1.2,
               ),
             ),

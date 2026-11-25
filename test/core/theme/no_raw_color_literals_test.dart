@@ -32,7 +32,8 @@ const List<String> _wave1ACleanedNoColorsFiles = [
   'lib/features/player/presentation/themes/painters/waveform_stage.dart',
 ];
 
-final RegExp _rawHexColorPattern = RegExp(r'\bColor\s*\(\s*0x[0-9A-Fa-f]+\s*\)');
+final RegExp _rawHexColorPattern =
+    RegExp(r'\bColor\s*\(\s*0x[0-9A-Fa-f]+\s*\)');
 final RegExp _rawFromColorPattern = RegExp(r'\bColor\.from(?:ARGB|RGBO)\s*\(');
 final RegExp _materialColorsPattern = RegExp(r'\bColors\.[A-Za-z0-9_]+');
 
@@ -126,7 +127,8 @@ void main() {
       );
     });
 
-    test('Wave 1A player painters and Milkdrop theme have zero Colors.* literals',
+    test(
+        'Wave 1A player painters and Milkdrop theme have zero Colors.* literals',
         () {
       final violations = <String>[];
       for (final relPath in _wave1ACleanedNoColorsFiles) {

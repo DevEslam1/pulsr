@@ -20,7 +20,9 @@ void main() {
       expect(observer.countFor(PlayerState), 0);
     });
 
-    test('dspSheetRebuildGate rejects position ticks and preserves EqualizerSheet budget', () {
+    test(
+        'dspSheetRebuildGate rejects position ticks and preserves EqualizerSheet budget',
+        () {
       const initial = PlayerState(
         playback: PlaybackSlice(
           position: Duration(seconds: 10),
@@ -59,8 +61,8 @@ void main() {
       );
 
       // Verify fields gated by TabletPlayerBar buildWhen
-      final bool shouldRebuild =
-          initial.currentSong?.id != nextTick.currentSong?.id ||
+      final bool shouldRebuild = initial.currentSong?.id !=
+              nextTick.currentSong?.id ||
           initial.currentSong?.title != nextTick.currentSong?.title ||
           initial.currentSong?.artist != nextTick.currentSong?.artist ||
           initial.currentSong?.isFavorite != nextTick.currentSong?.isFavorite ||

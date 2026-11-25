@@ -574,9 +574,7 @@ class PlayerThemeScaffold extends StatelessWidget {
                     SizedBox(height: metrics.spacingSeekToControls),
                   ],
                   resolvedControls,
-                  if (!isPreview &&
-                      isInSplitView &&
-                      !metrics.isVeryShortHeight)
+                  if (!isPreview && isInSplitView && !metrics.isVeryShortHeight)
                     PlayerVolumeBar(cubit: cubit, activeColor: activeColor),
                   SizedBox(height: metrics.spacingControlsToDock),
                   resolvedDock,
@@ -658,7 +656,8 @@ class PlayerThemeScaffold extends StatelessWidget {
 
         // Portrait Mode: Fallback to scrolling on very short screens or large
         // accessibility text scales so chrome never overflows the viewport.
-        final double portraitScrollThreshold = 560.0 + (textScale - 1.0) * 120.0;
+        final double portraitScrollThreshold =
+            560.0 + (textScale - 1.0) * 120.0;
         if (constraints.maxHeight < portraitScrollThreshold &&
             !state.isLyricsVisible &&
             !state.isQueueVisible) {
@@ -708,8 +707,8 @@ class PlayerThemeScaffold extends StatelessWidget {
       return content;
     }
 
-    final isHighContrast = context.palette.isHighContrast ||
-        MediaQuery.highContrastOf(context);
+    final isHighContrast =
+        context.palette.isHighContrast || MediaQuery.highContrastOf(context);
     final bool effectiveScrims = !isHighContrast &&
         (showLegibilityScrims || (background == null && !isPreview));
 

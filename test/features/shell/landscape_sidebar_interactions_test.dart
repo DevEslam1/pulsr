@@ -14,6 +14,7 @@ import 'package:pulsr/features/shell/presentation/widgets/landscape_sidebar.dart
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 class MockPlayerCubit extends Mock implements PlayerCubit {}
 
 const SongsTableData _song = SongsTableData(

@@ -108,5 +108,4 @@ void main() {
       expect(kTapSrcMaxRate, 768000);
     });
   });
-
 }

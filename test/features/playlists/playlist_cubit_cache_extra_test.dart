@@ -57,8 +57,7 @@ void main() {
   OnlinePlaylistEntry entry(String id, {List<YtmTrack> tracks = const []}) =>
       OnlinePlaylistEntry(id: id, title: id, uploader: 'u', tracks: tracks);
 
-  test('the persisted cache preserves more than 10 custom playlists',
-      () async {
+  test('the persisted cache preserves more than 10 custom playlists', () async {
     final cubit = create();
     for (var i = 0; i < 12; i++) {
       cubit.restoreCustomPlaylist(entry('c$i'));

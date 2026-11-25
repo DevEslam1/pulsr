@@ -76,9 +76,11 @@ void main() {
     await getIt.reset();
   });
 
-  group('H-34: PlaylistCubit Drift restore, empty-track cache guard, Spotify Cancel',
+  group(
+      'H-34: PlaylistCubit Drift restore, empty-track cache guard, Spotify Cancel',
       () {
-    test('restoreCustomPlaylist persists entry to IMusicRepository.cacheOnlinePlaylist',
+    test(
+        'restoreCustomPlaylist persists entry to IMusicRepository.cacheOnlinePlaylist',
         () async {
       final useCases = _PlaylistUseCases();
       final repo = _MusicRepo();
@@ -120,7 +122,8 @@ void main() {
       await cubit.close();
     });
 
-    test('_runSyncOnlineLibraryCache skips cacheOnlinePlaylist when fetched tracks are empty',
+    test(
+        '_runSyncOnlineLibraryCache skips cacheOnlinePlaylist when fetched tracks are empty',
         () async {
       final useCases = _PlaylistUseCases();
       final repo = _MusicRepo();
@@ -208,7 +211,8 @@ void main() {
       expect(find.text('SMART PLAYLISTS'), findsOneWidget);
 
       // Emit an error while playlists are non-empty -> BlocConsumer shows toast and clears error
-      states.add(PlaylistState(playlists: [pl], error: uiError('Rename failed')));
+      states
+          .add(PlaylistState(playlists: [pl], error: uiError('Rename failed')));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 100));
 
@@ -270,9 +274,11 @@ void main() {
     });
   });
 
-  group('H-35: PlaylistDetailScreen reactive watchPlaylists & OnlinePlaylistDetailScreen',
+  group(
+      'H-35: PlaylistDetailScreen reactive watchPlaylists & OnlinePlaylistDetailScreen',
       () {
-    testWidgets('PlaylistDetailScreen updates title reactively from watchPlaylists',
+    testWidgets(
+        'PlaylistDetailScreen updates title reactively from watchPlaylists',
         (tester) async {
       SharedPreferences.setMockInitialValues({
         'pulsr_hint_song_tile_swipe': true,
@@ -331,7 +337,8 @@ void main() {
 
       when(() => useCases.watchPlaylistSongs(1))
           .thenAnswer((_) => Stream.value(Right([s1])));
-      when(() => getSongs.watchSongs(excludedFolders: any(named: 'excludedFolders')))
+      when(() => getSongs.watchSongs(
+              excludedFolders: any(named: 'excludedFolders')))
           .thenAnswer((_) => Stream.value(Right([s1, s2])));
 
       // addSongsToPlaylist inserts a row into db.playlistsTable inside the transaction,
@@ -345,8 +352,8 @@ void main() {
             );
         return const Right(null);
       });
-      when(() => useCases.removeSongFromPlaylist(1, 1))
-          .thenAnswer((_) async => const Left(DatabaseFailure('Remove failed')));
+      when(() => useCases.removeSongFromPlaylist(1, 1)).thenAnswer(
+          (_) async => const Left(DatabaseFailure('Remove failed')));
 
       useScreenSize(tester, const Size(800, 1400));
       await tester.pumpWidget(

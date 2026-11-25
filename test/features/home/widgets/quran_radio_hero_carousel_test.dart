@@ -14,6 +14,7 @@ import 'package:pulsr/features/player/cubit/player_state.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 class _MockPlayerCubit extends Mock implements PlayerCubit {}
 
 class _FakeRadioStation extends Fake implements RadioStation {}
@@ -191,7 +192,9 @@ void main() {
     verify(() => playerCubit.togglePlayPause()).called(1);
   });
 
-  testWidgets('decluttered carousel chrome renders minimal dots without redundant chips', (tester) async {
+  testWidgets(
+      'decluttered carousel chrome renders minimal dots without redundant chips',
+      (tester) async {
     await tester.pumpWidget(
       buildHarness(
         locale: const Locale('en'),

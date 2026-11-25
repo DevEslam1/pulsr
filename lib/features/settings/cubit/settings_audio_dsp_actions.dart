@@ -3,7 +3,8 @@ part of 'settings_cubit.dart';
 /// Bluetooth, DSP, AAudio/DVC, playback feature toggles, and audio presets
 /// split out of [SettingsAudioActions] to keep each file cohesive and well
 /// below the size ratchet.
-mixin SettingsAudioDspActions on PulsrCubit<SettingsState>, SettingsAudioActions {
+mixin SettingsAudioDspActions
+    on PulsrCubit<SettingsState>, SettingsAudioActions {
   /// Returns true when the platform accepted the request; false means the
   /// stock ROM refused it (SystemApi) — caller must offer Developer Options.
   Future<bool> setBluetoothCodec(String codec) async {
@@ -161,7 +162,8 @@ mixin SettingsAudioDspActions on PulsrCubit<SettingsState>, SettingsAudioActions
         safeEmit(state.copyWith(systemEffectsStatus: status));
       }
     } catch (e) {
-      ErrorLogger.logSwallowed('SettingsAudioDspActions.setSystemEffectsPolicy', e);
+      ErrorLogger.logSwallowed(
+          'SettingsAudioDspActions.setSystemEffectsPolicy', e);
     }
   }
 
@@ -651,8 +653,7 @@ mixin SettingsAudioDspActions on PulsrCubit<SettingsState>, SettingsAudioActions
   /// the one before it actually applying: when the platform refuses exclusive
   /// output, silently bypassing the user's EQ and gain would leave a chain with
   /// no processing and no bit-perfect either.
-  Future<void> applyMaximumQualityPreset() =>
-      _audioModeMutex.protect(() async {
+  Future<void> applyMaximumQualityPreset() => _audioModeMutex.protect(() async {
         await SettingsAudioOutputSync(this).runMaximumQualityPreset();
       });
 

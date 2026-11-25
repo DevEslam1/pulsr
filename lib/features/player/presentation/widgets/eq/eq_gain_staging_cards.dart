@@ -1,4 +1,4 @@
-﻿part of '../equalizer_sheet.dart';
+part of '../equalizer_sheet.dart';
 
 /// Gain staging and tone cards for Pro Rack Tab 0: Preamp (with live P0-8
 /// clip-risk warning), Bass Boost, Volume Boost (with headroom-clamp warning),
@@ -33,8 +33,7 @@ extension _EqGainStagingCards on _EqualizerSheetState {
               color: p.surfaceContainer,
               borderRadius: AppRadii.cardRadius,
               border: Border.all(
-                color:
-                    clipRisk ? p.error.withValues(alpha: 0.45) : p.hairline,
+                color: clipRisk ? p.error.withValues(alpha: 0.45) : p.hairline,
               ),
             ),
             child: Column(
@@ -95,8 +94,7 @@ extension _EqGainStagingCards on _EqualizerSheetState {
                     ),
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.xs,
-                          vertical: AppSpacing.xxs),
+                          horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
                       decoration: BoxDecoration(
                         color: (clipRisk
                                 ? p.error
@@ -130,25 +128,25 @@ extension _EqGainStagingCards on _EqualizerSheetState {
                     IconButton(
                       icon: Icon(Icons.settings_backup_restore,
                           size: 16,
-                          color: currentPreamp.abs() <= 0.05 ||
-                                  dspBlocked != null
-                              ? p.textTertiary.withValues(alpha: 0.35)
-                              : p.accent),
+                          color:
+                              currentPreamp.abs() <= 0.05 || dspBlocked != null
+                                  ? p.textTertiary.withValues(alpha: 0.35)
+                                  : p.accent),
                       tooltip: context.l10n.dspResetPreamp,
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(
                           minWidth: AppSpacing.minTouchTarget,
                           minHeight: AppSpacing.minTouchTarget),
-                      onPressed:
-                          currentPreamp.abs() <= 0.05 || dspBlocked != null
-                              ? null
-                              : () {
-                                  final target = state.selectedHeadphoneProfile
-                                          ?.preampGain ??
+                      onPressed: currentPreamp.abs() <= 0.05 ||
+                              dspBlocked != null
+                          ? null
+                          : () {
+                              final target =
+                                  state.selectedHeadphoneProfile?.preampGain ??
                                       0.0;
-                                  _setPreampImmediate(cubit, target);
-                                  setCardState(() {});
-                                },
+                              _setPreampImmediate(cubit, target);
+                              setCardState(() {});
+                            },
                     ),
                   ],
                 ),
@@ -193,8 +191,8 @@ extension _EqGainStagingCards on _EqualizerSheetState {
                           trackHeight: 4,
                           thumbShape: const RoundSliderThumbShape(
                               enabledThumbRadius: 6),
-                          overlayShape: const RoundSliderOverlayShape(
-                              overlayRadius: 14),
+                          overlayShape:
+                              const RoundSliderOverlayShape(overlayRadius: 14),
                           activeTrackColor: clipRisk ? p.error : p.accent,
                           inactiveTrackColor: p.surface,
                           thumbColor: clipRisk ? p.error : p.accent,
@@ -252,8 +250,7 @@ extension _EqGainStagingCards on _EqualizerSheetState {
                     decoration: BoxDecoration(
                       color: p.error.withValues(alpha: 0.15),
                       borderRadius: AppRadii.r10All,
-                      border: Border.all(
-                          color: p.error.withValues(alpha: 0.4)),
+                      border: Border.all(color: p.error.withValues(alpha: 0.4)),
                     ),
                     child: Row(
                       children: [
@@ -373,9 +370,8 @@ extension _EqGainStagingCards on _EqualizerSheetState {
                           ? '${(preset.bassBoost * 100).round()}%'
                           : context.l10n.dspOff,
                       style: TextStyle(
-                        color: preset.bassBoost > 0
-                            ? p.accent
-                            : p.textSecondary,
+                        color:
+                            preset.bassBoost > 0 ? p.accent : p.textSecondary,
                         fontSize: AppFontSize.caption,
                         fontWeight: FontWeight.w700,
                       ),
@@ -409,8 +405,7 @@ extension _EqGainStagingCards on _EqualizerSheetState {
               final bVal = preset.bassBoost.clamp(0.0, 1.0);
               final nextBVal = (bVal + 0.05).clamp(0.0, 1.0);
               final prevBVal = (bVal - 0.05).clamp(0.0, 1.0);
-              final bEnabled =
-                  dspBlocked == null && state.isBassBoostSupported;
+              final bEnabled = dspBlocked == null && state.isBassBoostSupported;
               return SliderTheme(
                 data: SliderTheme.of(context).copyWith(
                   trackHeight: 4,
@@ -487,5 +482,4 @@ extension _EqGainStagingCards on _EqualizerSheetState {
       ),
     );
   }
-
 }

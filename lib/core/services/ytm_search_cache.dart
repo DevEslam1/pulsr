@@ -78,7 +78,9 @@ class YtmSearchCache {
                 {
                   'q': entry.query,
                   'at': entry.savedAt.toIso8601String(),
-                  'results': [for (final track in entry.results) track.toJson()],
+                  'results': [
+                    for (final track in entry.results) track.toJson()
+                  ],
                 },
             ]),
           );

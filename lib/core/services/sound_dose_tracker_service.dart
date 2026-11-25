@@ -25,13 +25,14 @@ class DoseSnapshot {
 
   /// Fraction of the *budget* consumed, not of the reference: at a 25 % budget
   /// the limit lands after a quarter of the reference dose.
-  double get usedFraction =>
-      SoundDoseTrackerService.budgetUsedFraction(weeklyDose: weeklyDose, budget: budget);
+  double get usedFraction => SoundDoseTrackerService.budgetUsedFraction(
+      weeklyDose: weeklyDose, budget: budget);
 
   /// How long playback must stay off before the engine releases attenuation,
   /// or null when the limit is not currently engaged.
   Duration? get quietTimeUntilClear =>
-      SoundDoseTrackerService.quietTimeUntilClear(weeklyDose: weeklyDose, budget: budget);
+      SoundDoseTrackerService.quietTimeUntilClear(
+          weeklyDose: weeklyDose, budget: budget);
 }
 
 /// Weekly sound-dose budget.
@@ -114,8 +115,8 @@ class SoundDoseTrackerService {
     return Duration(seconds: seconds.round());
   }
 
-  double readPersistedBudget(SharedPreferences prefs) =>
-      normalizeBudget(prefs.getDouble(PrefsKeys.audioDoseBudget) ?? defaultBudget);
+  double readPersistedBudget(SharedPreferences prefs) => normalizeBudget(
+      prefs.getDouble(PrefsKeys.audioDoseBudget) ?? defaultBudget);
 
   Future<void> applyBudget({
     required double budget,

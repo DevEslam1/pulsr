@@ -135,10 +135,12 @@ void main() {
     firstSwitchGate.complete();
     await Future.wait([playFuture, closeFuture]);
 
-    expect(events, ['bypass:start', 'bypass:end', 'restore:start', 'restore:end']);
+    expect(
+        events, ['bypass:start', 'bypass:end', 'restore:start', 'restore:end']);
   });
 
-  test('BUG-P2-10: DspChainValidator.runDiagnosticSweep marks isSyntheticSelfCheck',
+  test(
+      'BUG-P2-10: DspChainValidator.runDiagnosticSweep marks isSyntheticSelfCheck',
       () async {
     final channel = _MockEffectsChannel();
     when(() => channel.getDspDebugStatus()).thenAnswer((_) async => null);
@@ -148,7 +150,8 @@ void main() {
     expect(report.toMap()['isSyntheticSelfCheck'], isTrue);
   });
 
-  test('BUG-P3-1: SilenceSkipController.load preserves saved sensitivity when disabled',
+  test(
+      'BUG-P3-1: SilenceSkipController.load preserves saved sensitivity when disabled',
       () async {
     SharedPreferences.setMockInitialValues(<String, Object>{
       SilenceSkipController.prefsEnabledKey: false,
@@ -160,7 +163,8 @@ void main() {
     expect(controller.sensitivity, 82);
   });
 
-  test('BUG-P3-1: DspTelemetryCubit.refreshOnce emits even when listenerCount == 0',
+  test(
+      'BUG-P3-1: DspTelemetryCubit.refreshOnce emits even when listenerCount == 0',
       () async {
     final channel = _MockEffectsChannel();
     when(() => channel.getTelemetry()).thenAnswer(
@@ -198,7 +202,8 @@ void main() {
     expect(DspReliabilityTracker.instance.counters.nativeSetterRejection, 1);
   });
 
-  test('BUG-P3-1: PlaybackQueueStateMachine shuffle offset 2 returns distinct N+2 pick',
+  test(
+      'BUG-P3-1: PlaybackQueueStateMachine shuffle offset 2 returns distinct N+2 pick',
       () {
     final sm = PlaybackQueueStateMachine(
       initialSongs: [_song(1), _song(2), _song(3), _song(4), _song(5)],

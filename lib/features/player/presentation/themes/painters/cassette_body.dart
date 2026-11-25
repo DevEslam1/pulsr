@@ -67,7 +67,8 @@ class _AnodizedDeckChassisPainter extends CustomPainter {
 
     for (final ratio in const [0.54, 0.78]) {
       final y = size.height * ratio;
-      canvas.drawLine(Offset(14, y), Offset(size.width - 14, y), seamShadowPaint);
+      canvas.drawLine(
+          Offset(14, y), Offset(size.width - 14, y), seamShadowPaint);
       canvas.drawLine(
         Offset(14, y + 1.2),
         Offset(size.width - 14, y + 1.2),
@@ -462,8 +463,7 @@ class _CassetteBodyState extends State<_CassetteBody> {
       return Duration(milliseconds: nextMs.clamp(0, math.max(0, durationMs)));
     }
 
-    String seekLabel(Duration value) =>
-        '${Formatters.formatDuration(value)} / '
+    String seekLabel(Duration value) => '${Formatters.formatDuration(value)} / '
         '${Formatters.formatDuration(state.duration)}';
 
     return LayoutBuilder(
@@ -1099,8 +1099,8 @@ class _CassetteStereoVuMeterPainter extends CustomPainter {
       final val = controller.value;
       final theta = val * 2 * math.pi;
 
-      final beatBase = math.sin(theta).abs() * 0.45 +
-          (math.sin(theta * 2.0).abs() * 0.22);
+      final beatBase =
+          math.sin(theta).abs() * 0.45 + (math.sin(theta * 2.0).abs() * 0.22);
 
       final leftHarmonic = math.sin(theta * 3.0 + 0.4).abs() * 0.18 +
           math.cos(theta * 7.0).abs() * 0.08;

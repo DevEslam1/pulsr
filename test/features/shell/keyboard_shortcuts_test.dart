@@ -120,7 +120,8 @@ void main() {
     expect(PlayerShortcutScope.isTextInputFocused(), isFalse);
   });
 
-  testWidgets('H-50 character "?" opens ShortcutHelpSheet even without US slash key',
+  testWidgets(
+      'H-50 character "?" opens ShortcutHelpSheet even without US slash key',
       (tester) async {
     await tester.pumpWidget(
       MaterialApp(
@@ -153,7 +154,8 @@ void main() {
     expect(find.byType(ShortcutHelpSheet), findsOneWidget);
   });
 
-  testWidgets('H-50 rootNavigatorKey pages wrap content in PlayerShortcutScope on createRoute',
+  testWidgets(
+      'H-50 rootNavigatorKey pages wrap content in PlayerShortcutScope on createRoute',
       (tester) async {
     final mockPlayer = _MockPlayerCubit();
     when(() => mockPlayer.state).thenReturn(const PlayerState());

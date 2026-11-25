@@ -116,8 +116,7 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
     final explicit = widget.deviceLabel?.call();
     if (explicit != null && explicit.trim().isNotEmpty) return explicit;
     if (getIt.isRegistered<SettingsCubit>()) {
-      final name =
-          getIt<SettingsCubit>().state.currentOutputDevice?.deviceName;
+      final name = getIt<SettingsCubit>().state.currentOutputDevice?.deviceName;
       if (name != null && name.trim().isNotEmpty) return name;
     }
     return null;
@@ -488,8 +487,7 @@ class _CountersCard extends StatelessWidget {
             ),
           ),
         if (paths.isEmpty)
-          _Row(
-              label: 'paths', value: DiagnosticsStrings.pathsUnavailable),
+          _Row(label: 'paths', value: DiagnosticsStrings.pathsUnavailable),
         _Row(
           label: 'source',
           value: DiagnosticsStrings.countersReported(reported),

@@ -17,7 +17,8 @@ void main() {
       expect(GlassPreset.dock.opacity, 0.72);
 
       expect(GlassPreset.sheet.blur, AppBlur.maxSigma);
-      expect(GlassPreset.sheet.blur, AppBlur.clampSigma(GlassPreset.sheet.blur));
+      expect(
+          GlassPreset.sheet.blur, AppBlur.clampSigma(GlassPreset.sheet.blur));
       expect(GlassPreset.sheet.opacity, 0.82);
 
       expect(GlassPreset.dialog.blur, 16.0);

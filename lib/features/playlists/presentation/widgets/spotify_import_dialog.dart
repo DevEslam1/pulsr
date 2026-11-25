@@ -17,6 +17,7 @@ import '../../../../data/services/spotify_importer_service.dart';
 import '../../../../domain/usecases/playlist_usecases.dart';
 
 import '../../../../core/utils/pulsr_haptics.dart';
+
 /// Modal dialog for importing a Spotify playlist into Pulsr.
 class SpotifyImportDialog extends StatefulWidget {
   final VoidCallback? onImportFinished;
@@ -115,7 +116,8 @@ class _SpotifyImportDialogState extends State<SpotifyImportDialog> {
         onProgress: (completed, total) {
           if (isCancelled()) return;
           setState(() {
-            _statusMessage = context.l10n.spotifyMatchingTracks(completed, total);
+            _statusMessage =
+                context.l10n.spotifyMatchingTracks(completed, total);
             _progressFraction = total > 0 ? completed / total : null;
           });
         },
@@ -278,7 +280,8 @@ class _SpotifyImportDialogState extends State<SpotifyImportDialog> {
                         size: 18,
                         color: p.textSecondary,
                       ),
-                      tooltip: hasText ? context.l10n.clear : context.l10n.paste,
+                      tooltip:
+                          hasText ? context.l10n.clear : context.l10n.paste,
                       onPressed: () {
                         if (hasText) {
                           _urlController.clear();

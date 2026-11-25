@@ -560,8 +560,8 @@ final class SubsonicClient {
     };
 
     final envelope = await _call('search3', params);
-    final container = _asMap(envelope['searchResult3']) ??
-        _asMap(envelope['searchResult2']);
+    final container =
+        _asMap(envelope['searchResult3']) ?? _asMap(envelope['searchResult2']);
     if (container == null) return const SubsonicSearchResult();
 
     final artists = <SubsonicArtist>[];

@@ -17,6 +17,7 @@ import 'package:pulsr/l10n/generated/app_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 class MockMediaScannerService extends Mock implements MediaScannerService {}
 
 class MockPlayerCubit extends Mock implements PlayerCubit {}
@@ -28,7 +29,8 @@ class MockAuthCubit extends Mock implements AuthCubit {}
 /// Flutter's test binding.
 Future<void> _loadFonts() async {
   await (FontLoader('Manrope')
-        ..addFont(rootBundle.load('assets/fonts/Manrope-VariableFont_wght.ttf')))
+        ..addFont(
+            rootBundle.load('assets/fonts/Manrope-VariableFont_wght.ttf')))
       .load();
   await (FontLoader('MaterialIcons')
         ..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf')))

@@ -147,8 +147,8 @@ void main() {
         conflictsWith: 'Exclusive bit-perfect output',
         conflictKey: 'bitPerfectBypass',
       );
-      expect(rephrased.localized(l10n).conflictsWith,
-          l10n.conflictWithBitPerfect);
+      expect(
+          rephrased.localized(l10n).conflictsWith, l10n.conflictWithBitPerfect);
       // Every registry entry with a conflict names a key, so none of them can
       // regress into untranslated English.
       for (final feature in _features) {
@@ -576,32 +576,39 @@ void main() {
       );
     });
 
-    test('bitPerfectSourceBlockedReason accurately identifies lossy, radio, and 32-bit formats', () {
+    test(
+        'bitPerfectSourceBlockedReason accurately identifies lossy, radio, and 32-bit formats',
+        () {
       // Radio blocked: explicit flag or radio:// scheme
       expect(
         AudioConflicts.bitPerfectSourceBlockedReason(isRadio: true),
         contains('Live radio and lossy streams'),
       );
       expect(
-        AudioConflicts.bitPerfectSourceBlockedReason(path: 'radio://live-stream'),
+        AudioConflicts.bitPerfectSourceBlockedReason(
+            path: 'radio://live-stream'),
         contains('Live radio and lossy streams'),
       );
       // A normal HTTP URL that merely contains "radio" in its path is NOT blocked
       expect(
-        AudioConflicts.bitPerfectSourceBlockedReason(path: 'https://example.com/radio/track.flac', bitDepth: 16),
+        AudioConflicts.bitPerfectSourceBlockedReason(
+            path: 'https://example.com/radio/track.flac', bitDepth: 16),
         isNull,
       );
       // MP3 allows bit-perfect (decoded 16-bit PCM pass-through)
       expect(
-        AudioConflicts.bitPerfectSourceBlockedReason(path: '/music/track.mp3', bitDepth: 16),
+        AudioConflicts.bitPerfectSourceBlockedReason(
+            path: '/music/track.mp3', bitDepth: 16),
         isNull,
       );
       expect(
-        AudioConflicts.bitPerfectSourceBlockedReason(path: '/music/track.aac', bitDepth: 0),
+        AudioConflicts.bitPerfectSourceBlockedReason(
+            path: '/music/track.aac', bitDepth: 0),
         contains('Live radio and lossy streams'),
       );
       expect(
-        AudioConflicts.bitPerfectSourceBlockedReason(path: '/music/stream.ogg', isLossy: true),
+        AudioConflicts.bitPerfectSourceBlockedReason(
+            path: '/music/stream.ogg', isLossy: true),
         contains('Live radio and lossy streams'),
       );
       // ALAC in .m4a container with codec='alac' is allowed
@@ -615,7 +622,8 @@ void main() {
       );
       // 32-bit float audio rejected with dedicated 32-bit conversion code
       expect(
-        AudioConflicts.bitPerfectSourceBlockedReason(path: '/music/track.flac', bitDepth: 32),
+        AudioConflicts.bitPerfectSourceBlockedReason(
+            path: '/music/track.flac', bitDepth: 32),
         contains('32-bit floating point audio requires lossy conversion'),
       );
       // MediaStore content:// URI with isLossy=false is NOT falsely flagged as lossy
@@ -628,84 +636,174 @@ void main() {
         isNull,
       );
       // Complete lossless extensions whitelist pass
-      for (final ext in ['.flac', '.wav', '.wave', '.alac', '.aiff', '.aif', '.dsf', '.dff', '.wv', '.ape', '.tta', '.mka']) {
+      for (final ext in [
+        '.flac',
+        '.wav',
+        '.wave',
+        '.alac',
+        '.aiff',
+        '.aif',
+        '.dsf',
+        '.dff',
+        '.wv',
+        '.ape',
+        '.tta',
+        '.mka'
+      ]) {
         expect(
-          AudioConflicts.bitPerfectSourceBlockedReason(path: '/music/track$ext', bitDepth: 24),
+          AudioConflicts.bitPerfectSourceBlockedReason(
+              path: '/music/track$ext', bitDepth: 24),
           isNull,
           reason: 'Extension $ext should be recognized as lossless',
         );
       }
     });
 
-    test('AudioConflicts.classifySourceCodec prefix, MIME normalization and ambiguous containers', () {
+    test(
+        'AudioConflicts.classifySourceCodec prefix, MIME normalization and ambiguous containers',
+        () {
       // Prefix matching for pcm_ and dsd
-      expect(AudioConflicts.classifySourceCodec(codec: 'pcm_s16be'), AudioSourceCodecState.lossless);
-      expect(AudioConflicts.classifySourceCodec(codec: 'pcm_s24be'), AudioSourceCodecState.lossless);
-      expect(AudioConflicts.classifySourceCodec(codec: 'pcm_f32le'), AudioSourceCodecState.lossless);
-      expect(AudioConflicts.classifySourceCodec(codec: 'dsd_lsbf_planar'), AudioSourceCodecState.lossless);
-      expect(AudioConflicts.classifySourceCodec(codec: 'dsd_msbf'), AudioSourceCodecState.lossless);
+      expect(AudioConflicts.classifySourceCodec(codec: 'pcm_s16be'),
+          AudioSourceCodecState.lossless);
+      expect(AudioConflicts.classifySourceCodec(codec: 'pcm_s24be'),
+          AudioSourceCodecState.lossless);
+      expect(AudioConflicts.classifySourceCodec(codec: 'pcm_f32le'),
+          AudioSourceCodecState.lossless);
+      expect(AudioConflicts.classifySourceCodec(codec: 'dsd_lsbf_planar'),
+          AudioSourceCodecState.lossless);
+      expect(AudioConflicts.classifySourceCodec(codec: 'dsd_msbf'),
+          AudioSourceCodecState.lossless);
 
       // Companding PCM is lossy
-      expect(AudioConflicts.classifySourceCodec(codec: 'pcm_alaw'), AudioSourceCodecState.lossy);
-      expect(AudioConflicts.classifySourceCodec(codec: 'pcm_mulaw'), AudioSourceCodecState.lossy);
+      expect(AudioConflicts.classifySourceCodec(codec: 'pcm_alaw'),
+          AudioSourceCodecState.lossy);
+      expect(AudioConflicts.classifySourceCodec(codec: 'pcm_mulaw'),
+          AudioSourceCodecState.lossy);
 
       // Explicit lossy codecs
-      expect(AudioConflicts.classifySourceCodec(codec: 'mp3'), AudioSourceCodecState.lossy);
-      expect(AudioConflicts.classifySourceCodec(codec: 'aac'), AudioSourceCodecState.lossy);
-      expect(AudioConflicts.classifySourceCodec(codec: 'mp4a.40.2'), AudioSourceCodecState.lossy);
-      expect(AudioConflicts.classifySourceCodec(codec: 'opus'), AudioSourceCodecState.lossy);
-      expect(AudioConflicts.classifySourceCodec(codec: 'vorbis'), AudioSourceCodecState.lossy);
+      expect(AudioConflicts.classifySourceCodec(codec: 'mp3'),
+          AudioSourceCodecState.lossy);
+      expect(AudioConflicts.classifySourceCodec(codec: 'aac'),
+          AudioSourceCodecState.lossy);
+      expect(AudioConflicts.classifySourceCodec(codec: 'mp4a.40.2'),
+          AudioSourceCodecState.lossy);
+      expect(AudioConflicts.classifySourceCodec(codec: 'opus'),
+          AudioSourceCodecState.lossy);
+      expect(AudioConflicts.classifySourceCodec(codec: 'vorbis'),
+          AudioSourceCodecState.lossy);
 
       // Explicit lossless codecs
-      for (final c in ['flac', 'alac', 'wavpack', 'ape', 'tta', 'wav', 'aiff']) {
-        expect(AudioConflicts.classifySourceCodec(codec: c), AudioSourceCodecState.lossless);
+      for (final c in [
+        'flac',
+        'alac',
+        'wavpack',
+        'ape',
+        'tta',
+        'wav',
+        'aiff'
+      ]) {
+        expect(AudioConflicts.classifySourceCodec(codec: c),
+            AudioSourceCodecState.lossless);
       }
 
       // MIME types
-      expect(AudioConflicts.classifySourceCodec(mimeType: 'audio/vnd.wave'), AudioSourceCodecState.lossless);
-      expect(AudioConflicts.classifySourceCodec(mimeType: 'audio/l16'), AudioSourceCodecState.lossless);
-      expect(AudioConflicts.classifySourceCodec(mimeType: 'audio/l24'), AudioSourceCodecState.lossless);
-      expect(AudioConflicts.classifySourceCodec(mimeType: 'audio/flac'), AudioSourceCodecState.lossless);
+      expect(AudioConflicts.classifySourceCodec(mimeType: 'audio/vnd.wave'),
+          AudioSourceCodecState.lossless);
+      expect(AudioConflicts.classifySourceCodec(mimeType: 'audio/l16'),
+          AudioSourceCodecState.lossless);
+      expect(AudioConflicts.classifySourceCodec(mimeType: 'audio/l24'),
+          AudioSourceCodecState.lossless);
+      expect(AudioConflicts.classifySourceCodec(mimeType: 'audio/flac'),
+          AudioSourceCodecState.lossless);
 
       // MIME normalization: trimming, case insensitivity, stripping parameters after semicolon
-      expect(AudioConflicts.classifySourceCodec(mimeType: ' Audio/VND.WAVE ; rate=48000 '), AudioSourceCodecState.lossless);
-      expect(AudioConflicts.classifySourceCodec(mimeType: 'audio/mp4; codecs="mp4a.40.2"'), AudioSourceCodecState.lossy);
+      expect(
+          AudioConflicts.classifySourceCodec(
+              mimeType: ' Audio/VND.WAVE ; rate=48000 '),
+          AudioSourceCodecState.lossless);
+      expect(
+          AudioConflicts.classifySourceCodec(
+              mimeType: 'audio/mp4; codecs="mp4a.40.2"'),
+          AudioSourceCodecState.lossy);
 
       // Section 1.1 codecs= extraction from MIME string without character truncation
-      expect(AudioConflicts.classifySourceCodec(mimeType: 'audio/ogg; codecs="opus"'), AudioSourceCodecState.lossy);
-      expect(AudioConflicts.classifySourceCodec(mimeType: 'audio/mp4; codecs=alac'), AudioSourceCodecState.lossless);
-      expect(AudioConflicts.classifySourceCodec(mimeType: 'audio/ogg; codecs=vorbis'), AudioSourceCodecState.lossy);
-      expect(AudioConflicts.classifySourceCodec(mimeType: 'audio/x-dsd; codecs=dsd_lsbf_planar'), AudioSourceCodecState.lossless);
+      expect(
+          AudioConflicts.classifySourceCodec(
+              mimeType: 'audio/ogg; codecs="opus"'),
+          AudioSourceCodecState.lossy);
+      expect(
+          AudioConflicts.classifySourceCodec(
+              mimeType: 'audio/mp4; codecs=alac'),
+          AudioSourceCodecState.lossless);
+      expect(
+          AudioConflicts.classifySourceCodec(
+              mimeType: 'audio/ogg; codecs=vorbis'),
+          AudioSourceCodecState.lossy);
+      expect(
+          AudioConflicts.classifySourceCodec(
+              mimeType: 'audio/x-dsd; codecs=dsd_lsbf_planar'),
+          AudioSourceCodecState.lossless);
 
       // Ambiguous containers without codec / MIME return unknown
       for (final ext in ['.m4a', '.mp4', '.ogg', '.oga', '.mka', '.webm']) {
-        expect(AudioConflicts.classifySourceCodec(path: 'track$ext'), AudioSourceCodecState.unknown);
+        expect(AudioConflicts.classifySourceCodec(path: 'track$ext'),
+            AudioSourceCodecState.unknown);
       }
-      expect(AudioConflicts.classifySourceCodec(mimeType: 'audio/mp4'), AudioSourceCodecState.unknown);
-      expect(AudioConflicts.classifySourceCodec(mimeType: 'audio/x-m4a'), AudioSourceCodecState.unknown);
-      expect(AudioConflicts.classifySourceCodec(mimeType: 'audio/ogg'), AudioSourceCodecState.unknown);
+      expect(AudioConflicts.classifySourceCodec(mimeType: 'audio/mp4'),
+          AudioSourceCodecState.unknown);
+      expect(AudioConflicts.classifySourceCodec(mimeType: 'audio/x-m4a'),
+          AudioSourceCodecState.unknown);
+      expect(AudioConflicts.classifySourceCodec(mimeType: 'audio/ogg'),
+          AudioSourceCodecState.unknown);
 
       // bitPerfectSourceBlockedReason handles codecs and 32-bit correctly
-      expect(AudioConflicts.bitPerfectSourceBlockedReason(codec: 'pcm_s16be', bitDepth: 16), isNull);
-      expect(AudioConflicts.bitPerfectSourceBlockedReason(codec: 'pcm_s24be', bitDepth: 24), isNull);
       expect(
-        AudioConflicts.bitPerfectSourceBlockedReason(codec: 'pcm_f32le', bitDepth: 32),
+          AudioConflicts.bitPerfectSourceBlockedReason(
+              codec: 'pcm_s16be', bitDepth: 16),
+          isNull);
+      expect(
+          AudioConflicts.bitPerfectSourceBlockedReason(
+              codec: 'pcm_s24be', bitDepth: 24),
+          isNull);
+      expect(
+        AudioConflicts.bitPerfectSourceBlockedReason(
+            codec: 'pcm_f32le', bitDepth: 32),
         contains('32-bit floating point audio requires lossy conversion'),
       );
-      expect(AudioConflicts.bitPerfectSourceBlockedReason(codec: 'dsd_lsbf_planar'), isNull);
-      expect(AudioConflicts.bitPerfectSourceBlockedReason(codec: 'dsd_msbf'), isNull);
-      expect(AudioConflicts.bitPerfectSourceBlockedReason(codec: 'mp3'), isNull);
-      expect(AudioConflicts.bitPerfectSourceBlockedReason(codec: 'aac'), contains('Live radio and lossy streams'));
-      expect(AudioConflicts.bitPerfectSourceBlockedReason(codec: 'mp4a.40.2'), contains('Live radio and lossy streams'));
-      expect(AudioConflicts.bitPerfectSourceBlockedReason(codec: 'opus'), contains('Live radio and lossy streams'));
-      expect(AudioConflicts.bitPerfectSourceBlockedReason(codec: 'vorbis'), contains('Live radio and lossy streams'));
-      expect(AudioConflicts.bitPerfectSourceBlockedReason(codec: 'pcm_alaw'), contains('Live radio and lossy streams'));
-      expect(AudioConflicts.bitPerfectSourceBlockedReason(codec: 'pcm_mulaw'), contains('Live radio and lossy streams'));
+      expect(
+          AudioConflicts.bitPerfectSourceBlockedReason(
+              codec: 'dsd_lsbf_planar'),
+          isNull);
+      expect(AudioConflicts.bitPerfectSourceBlockedReason(codec: 'dsd_msbf'),
+          isNull);
+      expect(
+          AudioConflicts.bitPerfectSourceBlockedReason(codec: 'mp3'), isNull);
+      expect(AudioConflicts.bitPerfectSourceBlockedReason(codec: 'aac'),
+          contains('Live radio and lossy streams'));
+      expect(AudioConflicts.bitPerfectSourceBlockedReason(codec: 'mp4a.40.2'),
+          contains('Live radio and lossy streams'));
+      expect(AudioConflicts.bitPerfectSourceBlockedReason(codec: 'opus'),
+          contains('Live radio and lossy streams'));
+      expect(AudioConflicts.bitPerfectSourceBlockedReason(codec: 'vorbis'),
+          contains('Live radio and lossy streams'));
+      expect(AudioConflicts.bitPerfectSourceBlockedReason(codec: 'pcm_alaw'),
+          contains('Live radio and lossy streams'));
+      expect(AudioConflicts.bitPerfectSourceBlockedReason(codec: 'pcm_mulaw'),
+          contains('Live radio and lossy streams'));
 
       // Ambiguous container without codec is NOT blocked by bitPerfectSourceBlockedReason
-      expect(AudioConflicts.bitPerfectSourceBlockedReason(path: '/storage/music/track.m4a', bitDepth: 16), isNull);
-      expect(AudioConflicts.bitPerfectSourceBlockedReason(path: '/storage/music/track.ogg', bitDepth: 16), isNull);
-      expect(AudioConflicts.bitPerfectSourceBlockedReason(mimeType: 'audio/mp4', bitDepth: 16), isNull);
+      expect(
+          AudioConflicts.bitPerfectSourceBlockedReason(
+              path: '/storage/music/track.m4a', bitDepth: 16),
+          isNull);
+      expect(
+          AudioConflicts.bitPerfectSourceBlockedReason(
+              path: '/storage/music/track.ogg', bitDepth: 16),
+          isNull);
+      expect(
+          AudioConflicts.bitPerfectSourceBlockedReason(
+              mimeType: 'audio/mp4', bitDepth: 16),
+          isNull);
     });
 
     test('reason code mapping table', () {
@@ -723,11 +821,11 @@ void main() {
       expect(
           AudioConflicts.bitPerfectReasonMessage('audio_mixer_class_not_found'),
           contains('not available'));
-      expect(
-          AudioConflicts.bitPerfectReasonMessage('uac3_unsupported'),
+      expect(AudioConflicts.bitPerfectReasonMessage('uac3_unsupported'),
           contains('UAC3'));
       expect(
-          AudioConflicts.bitPerfectReasonMessage('source_32bit_float_conversion_not_lossless'),
+          AudioConflicts.bitPerfectReasonMessage(
+              'source_32bit_float_conversion_not_lossless'),
           contains('32-bit floating point audio requires lossy conversion'));
     });
 
@@ -996,14 +1094,17 @@ void main() {
     });
 
     group('case-insensitive codes and bypass consistency', () {
-      test('bitPerfectReasonMessage handles uppercase and surrounding whitespace',
+      test(
+          'bitPerfectReasonMessage handles uppercase and surrounding whitespace',
           () {
         expect(
-          AudioConflicts.bitPerfectReasonMessage('  EXCLUSIVE_REQUIRES_USB_DAC  '),
+          AudioConflicts.bitPerfectReasonMessage(
+              '  EXCLUSIVE_REQUIRES_USB_DAC  '),
           isNotNull,
         );
         expect(
-          AudioConflicts.bitPerfectReasonMessage('No_Supported_Mixer_Attributes'),
+          AudioConflicts.bitPerfectReasonMessage(
+              'No_Supported_Mixer_Attributes'),
           isNotNull,
         );
       });

@@ -79,8 +79,8 @@ void main() {
   });
 
   test('player chrome has no sub-48 circle buttons', () {
-    final file =
-        File('lib/features/player/presentation/themes/player_theme_chrome.dart');
+    final file = File(
+        'lib/features/player/presentation/themes/player_theme_chrome.dart');
     if (!file.existsSync()) return;
     final content = file.readAsStringSync();
     expect(content.contains('width: 46'), isFalse,

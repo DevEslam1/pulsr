@@ -19,7 +19,8 @@ void main() {
   final String flagKey = AudioProfileKeys.whitelist.first;
 
   setUp(() async {
-    tempDir = await Directory.systemTemp.createTemp('pulsr_audio_profile_sched');
+    tempDir =
+        await Directory.systemTemp.createTemp('pulsr_audio_profile_sched');
     SharedPreferences.setMockInitialValues(<String, Object>{flagKey: true});
     prefs = await SharedPreferences.getInstance();
   });
@@ -115,7 +116,8 @@ void main() {
   test('no default profile means nothing runs', () async {
     final service = buildService();
     expect(await service.applyDefaultProfile(startup: true), isNull);
-    expect(await service.applyDefaultProfile(deviceVid: 1, devicePid: 2), isNull);
+    expect(
+        await service.applyDefaultProfile(deviceVid: 1, devicePid: 2), isNull);
   });
 
   test('a missing profile file is skipped without throwing', () async {
@@ -138,7 +140,8 @@ void main() {
 
     Future<void> waitForMarker(Object? expected) async {
       for (var i = 0; i < 200; i++) {
-        final marker = prefs.getString(AudioProfileService.lastAppliedProfileKey);
+        final marker =
+            prefs.getString(AudioProfileService.lastAppliedProfileKey);
         if (marker == expected) return;
         await Future<void>.delayed(const Duration(milliseconds: 10));
       }
@@ -164,7 +167,8 @@ void main() {
 
       // Startup with no DAC attached: a pinned profile has no device to match.
       expect(await bootstrap.start(), isNull);
-      expect(prefs.getString(AudioProfileService.lastAppliedProfileKey), isNull);
+      expect(
+          prefs.getString(AudioProfileService.lastAppliedProfileKey), isNull);
       expect(prefs.getBool(flagKey), isFalse);
 
       // Matching DAC attached: the listener applies the profile.
@@ -218,7 +222,8 @@ void main() {
       expect(prefs.getBool(flagKey), isTrue);
     });
 
-    test('BUG-P2-9: detects DAC A -> DAC B hot-swap without intermediate detach',
+    test(
+        'BUG-P2-9: detects DAC A -> DAC B hot-swap without intermediate detach',
         () async {
       final service = buildService();
       final profile = await service.captureCurrent(

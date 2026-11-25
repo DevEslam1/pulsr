@@ -159,7 +159,9 @@ void main() {
     ]);
   });
 
-  test('coalesces rapid concurrent save calls without dropping the latest value', () async {
+  test(
+      'coalesces rapid concurrent save calls without dropping the latest value',
+      () async {
     final settings = await AnnouncementSettings.load();
     addTearDown(settings.dispose);
 
@@ -175,7 +177,9 @@ void main() {
     expect(restored.delayMs, 1000 + 20 * 50);
   });
 
-  test('AnnouncementSettings.save() rapid concurrent calls preserving final value', () async {
+  test(
+      'AnnouncementSettings.save() rapid concurrent calls preserving final value',
+      () async {
     final settings = await AnnouncementSettings.load();
     addTearDown(settings.dispose);
 

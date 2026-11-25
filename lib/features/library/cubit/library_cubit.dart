@@ -327,7 +327,10 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
       repo.getTotalSongCount(excludedFolders: excluded).then((res) {
         if (isClosed || token != _songsToken) return;
         final total = res.fold(
-          (_) => snapshotPage?.length ?? totalSongCount.value ?? state.songs.length,
+          (_) =>
+              snapshotPage?.length ??
+              totalSongCount.value ??
+              state.songs.length,
           (r) => r,
         );
         totalSongCount.value = total;
@@ -991,10 +994,12 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
     }, (count) => count);
   }
 
-  YtmService? get _resolvedYtmService => _ytmService ??
+  YtmService? get _resolvedYtmService =>
+      _ytmService ??
       (getIt.isRegistered<YtmService>() ? getIt<YtmService>() : null);
 
-  YtmAccountService? get _resolvedYtmAccountService => _ytmAccountService ??
+  YtmAccountService? get _resolvedYtmAccountService =>
+      _ytmAccountService ??
       (getIt.isRegistered<YtmAccountService>()
           ? getIt<YtmAccountService>()
           : null);
@@ -1015,8 +1020,8 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
             rawUrl == 'LL')) {
       final ytmAccount = _resolvedYtmAccountService;
       if (ytmAccount != null && ytmAccount.isLoggedIn) {
-        tracks = await ytmAccount.fetchLikedSongs(
-            maxTracks: kYtmMaxPlaylistTracks);
+        tracks =
+            await ytmAccount.fetchLikedSongs(maxTracks: kYtmMaxPlaylistTracks);
       }
     }
     if (tracks.isEmpty) return 0;
@@ -1039,8 +1044,8 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
 
     final List<YtmTrack> tracks;
     try {
-      tracks =
-          await accountService.fetchLikedSongs(maxTracks: kYtmMaxPlaylistTracks);
+      tracks = await accountService.fetchLikedSongs(
+          maxTracks: kYtmMaxPlaylistTracks);
     } catch (e, st) {
       ErrorLogger.log('Failed to sync YTM account likes',
           error: e, stackTrace: st, category: 'LibraryCubit');
@@ -1059,10 +1064,8 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
             error: uiError(L10nHolder.current?.importFailed ??
                 'Failed to import YouTube Music liked songs')));
       }
-      throw YtmException(
-          'YTM_IMPORT_FAILED',
-          L10nHolder.current?.importFailed ??
-              'Failed to import liked songs');
+      throw YtmException('YTM_IMPORT_FAILED',
+          L10nHolder.current?.importFailed ?? 'Failed to import liked songs');
     }
     return count;
   }

@@ -42,7 +42,8 @@ void main() {
       .toList(growable: false);
 
   Map<String, dynamic> readIndex() {
-    final indexFile = File(p.join(tempDir.path, RemoteCacheStore.indexFileName));
+    final indexFile =
+        File(p.join(tempDir.path, RemoteCacheStore.indexFileName));
     expect(indexFile.existsSync(), isTrue);
     return jsonDecode(indexFile.readAsStringSync()) as Map<String, dynamic>;
   }
@@ -74,7 +75,8 @@ void main() {
     expect(await store.currentBytes(), expectedBytes);
 
     expect(
-      fileNames().where((name) => name.endsWith(RemoteCacheStore.partialSuffix)),
+      fileNames()
+          .where((name) => name.endsWith(RemoteCacheStore.partialSuffix)),
       isEmpty,
       reason: 'neither writer may leave a .partial behind',
     );
@@ -98,7 +100,8 @@ void main() {
     expect(bytes.length, 2048);
     expect(bytes.every((value) => value == 0x11), isTrue);
     expect(
-      fileNames().where((name) => name.endsWith(RemoteCacheStore.partialSuffix)),
+      fileNames()
+          .where((name) => name.endsWith(RemoteCacheStore.partialSuffix)),
       isEmpty,
       reason: 'abort deletes only its own partial file',
     );

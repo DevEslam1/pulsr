@@ -120,9 +120,7 @@ class YtDownloadFileNaming {
       return (ext: 'mp3', mime: 'audio/mpeg');
     }
     // ADTS AAC frame sync: 12-bit syncword (0xFFF) with MPEG layer == 00.
-    if (header.length >= 2 &&
-        header[0] == 0xFF &&
-        (header[1] & 0xF6) == 0xF0) {
+    if (header.length >= 2 && header[0] == 0xFF && (header[1] & 0xF6) == 0xF0) {
       return (ext: 'aac', mime: 'audio/aac');
     }
     // MPEG audio frame sync: eleven set bits with layer != 00.

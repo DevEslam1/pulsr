@@ -411,7 +411,9 @@ void main() {
     await cubit.close();
   });
 
-  test('cancelDownload suppresses transient paused stream events and serializes retry queue', () async {
+  test(
+      'cancelDownload suppresses transient paused stream events and serializes retry queue',
+      () async {
     final repo = _Repo();
     final controller = StreamController<DownloadTask>.broadcast();
     final pauseCompleter = Completer<Either<AppFailure, Unit>>();
@@ -450,7 +452,8 @@ void main() {
     });
 
     final cancelFuture = cubit.cancelDownload('c1');
-    final queueFuture = cubit.queueDownload(_task('c1', status: DownloadStatus.queued));
+    final queueFuture =
+        cubit.queueDownload(_task('c1', status: DownloadStatus.queued));
     await pumpEventQueue();
     expect(seenStatuses, isNot(contains(DownloadStatus.paused)));
     expect(events, equals(['pause-start']));

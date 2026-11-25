@@ -319,7 +319,8 @@ extension _PulsrAudioLifecycleExt on PulsrAudioHandler {
     try {
       final f = duckingController.duckFactor;
       _volumeController?.updateSettings(duckFactor: f, isDucked: true);
-      final targetDuck = (f * (_preDuckVolume ?? _activePlayer.volume)).clamp(0.0, 1.0);
+      final targetDuck =
+          (f * (_preDuckVolume ?? _activePlayer.volume)).clamp(0.0, 1.0);
       await Future.wait([
         _syncDirectUsbVolume(targetDuck, song: currentSong),
         _activePlayer.setVolume(targetDuck),

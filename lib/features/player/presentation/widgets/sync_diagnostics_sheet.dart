@@ -182,53 +182,54 @@ class _SyncDiagnosticsSheetState extends State<SyncDiagnosticsSheet>
                         ),
                       ],
                     ),
-                  const SizedBox(height: AppSpacing.sm),
-                  Text(
-                    context.l10n.latencySyncDiagnosticsDesc,
-                    style: TextStyle(
-                      fontSize: AppFontSize.bodySmall,
-                      color: p.textSecondary,
+                    const SizedBox(height: AppSpacing.sm),
+                    Text(
+                      context.l10n.latencySyncDiagnosticsDesc,
+                      style: TextStyle(
+                        fontSize: AppFontSize.bodySmall,
+                        color: p.textSecondary,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  _buildMetricTile(
-                    p: p,
-                    icon: Icons.tune_rounded,
-                    title: context.l10n.dspPipelineDelay,
-                    subtitle: context.l10n.dspPipelineDelayDesc,
-                    value: '${dspMs.toStringAsFixed(2)} ms',
-                    detail: context.l10n.syncPipelineFramesDetail(
-                      _pipelineLatencyFrames,
-                      (sr / 1000.0).toStringAsFixed(1),
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  if (isUsbStreaming) ...[
+                    const SizedBox(height: AppSpacing.md),
                     _buildMetricTile(
                       p: p,
-                      icon: Icons.usb_rounded,
-                      title: context.l10n.usbBufferedDelay,
-                      subtitle: context.l10n.usbBufferedDelayDesc,
-                      value: '${_usbBufferedMs.toStringAsFixed(1)} ms',
-                      detail: context.l10n.syncUsbUnderrunsOverrunsDetail(
-                        (_usbDiagnostics['underrunCount'] as num?)?.toInt() ??
-                            0,
-                        (_usbDiagnostics['overrunCount'] as num?)?.toInt() ?? 0,
+                      icon: Icons.tune_rounded,
+                      title: context.l10n.dspPipelineDelay,
+                      subtitle: context.l10n.dspPipelineDelayDesc,
+                      value: '${dspMs.toStringAsFixed(2)} ms',
+                      detail: context.l10n.syncPipelineFramesDetail(
+                        _pipelineLatencyFrames,
+                        (sr / 1000.0).toStringAsFixed(1),
                       ),
                     ),
                     const SizedBox(height: AppSpacing.sm),
-                  ],
-                  _buildMetricTile(
-                    p: p,
-                    icon: Icons.speed_rounded,
-                    title: context.l10n.totalMonitoredLatency,
-                    subtitle: context.l10n.totalMonitoredLatencyDesc,
-                    value:
-                        '${(dspMs + (isUsbStreaming ? _usbBufferedMs : 0.0)).toStringAsFixed(2)} ms',
-                    detail: isUsbStreaming
-                        ? context.l10n.directUsbExclusivePath
-                        : context.l10n.lowLatencyDirectOutput,
-                  ),
+                    if (isUsbStreaming) ...[
+                      _buildMetricTile(
+                        p: p,
+                        icon: Icons.usb_rounded,
+                        title: context.l10n.usbBufferedDelay,
+                        subtitle: context.l10n.usbBufferedDelayDesc,
+                        value: '${_usbBufferedMs.toStringAsFixed(1)} ms',
+                        detail: context.l10n.syncUsbUnderrunsOverrunsDetail(
+                          (_usbDiagnostics['underrunCount'] as num?)?.toInt() ??
+                              0,
+                          (_usbDiagnostics['overrunCount'] as num?)?.toInt() ??
+                              0,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                    ],
+                    _buildMetricTile(
+                      p: p,
+                      icon: Icons.speed_rounded,
+                      title: context.l10n.totalMonitoredLatency,
+                      subtitle: context.l10n.totalMonitoredLatencyDesc,
+                      value:
+                          '${(dspMs + (isUsbStreaming ? _usbBufferedMs : 0.0)).toStringAsFixed(2)} ms',
+                      detail: isUsbStreaming
+                          ? context.l10n.directUsbExclusivePath
+                          : context.l10n.lowLatencyDirectOutput,
+                    ),
                   ],
                 ),
               ),

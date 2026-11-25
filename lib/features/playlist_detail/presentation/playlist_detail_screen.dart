@@ -510,7 +510,8 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('${context.l10n.playlistExported(songs.length)} ($savedPath)'),
+          content: Text(
+              '${context.l10n.playlistExported(songs.length)} ($savedPath)'),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -929,8 +930,8 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
               Row(
                 children: [
                   ExcludeSemantics(
-                    child:
-                        Icon(Icons.swap_vert_rounded, size: 16, color: p.accent),
+                    child: Icon(Icons.swap_vert_rounded,
+                        size: 16, color: p.accent),
                   ),
                   const SizedBox(width: AppSpacing.s6),
                   Expanded(

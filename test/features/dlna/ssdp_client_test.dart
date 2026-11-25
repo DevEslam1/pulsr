@@ -107,8 +107,7 @@ void main() {
           'usn: uuid:xyz::urn:schemas-upnp-org:device:MediaRenderer:1\n'
           '\n';
 
-      final response =
-          SsdpClient.parseResponse(raw, sourceAddress: '10.0.0.7');
+      final response = SsdpClient.parseResponse(raw, sourceAddress: '10.0.0.7');
 
       expect(response, isNotNull);
       expect(response!.location, 'http://10.0.0.7:8080/desc.xml');
@@ -208,8 +207,7 @@ void main() {
   group('SsdpClient.search', () {
     test('sends both M-SEARCH targets and de-duplicates by USN', () async {
       final socket = _FakeRawDatagramSocket();
-      final sharedUsn =
-          'uuid:abc::urn:schemas-upnp-org:device:MediaRenderer:1';
+      final sharedUsn = 'uuid:abc::urn:schemas-upnp-org:device:MediaRenderer:1';
       socket
         ..queue(
           _response(
@@ -288,7 +286,8 @@ void main() {
       );
 
       expect(results, hasLength(1));
-      expect(results.single.location, 'http://192.168.1.20:49152/description.xml');
+      expect(
+          results.single.location, 'http://192.168.1.20:49152/description.xml');
 
       await socket.dispose();
     });

@@ -316,8 +316,7 @@ void main() {
 
       // Verify FTS table and triggers exist and work
       final ftsRows = await db
-          .customSelect(
-              "SELECT * FROM songs_fts WHERE songs_fts MATCH 'Test';")
+          .customSelect("SELECT * FROM songs_fts WHERE songs_fts MATCH 'Test';")
           .get();
       expect(ftsRows.length, equals(1));
 
@@ -333,7 +332,8 @@ void main() {
       final validator = DatabaseMigrationValidator(db);
       final validation = await validator.validateSchema();
       expect(validation.isValid, isTrue,
-          reason: 'Validation failed: missingTables=${validation.missingTables}, '
+          reason:
+              'Validation failed: missingTables=${validation.missingTables}, '
               'missingColumns=${validation.missingColumns}, '
               'missingIndexes=${validation.missingIndexes}');
       expect(validation.missingTables, isEmpty);

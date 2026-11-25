@@ -86,7 +86,8 @@ void main() {
       await handoff.dispose();
     });
 
-    test('does not resume if local was not playing when cast connected', () async {
+    test('does not resume if local was not playing when cast connected',
+        () async {
       var paused = false;
       var resumed = false;
 

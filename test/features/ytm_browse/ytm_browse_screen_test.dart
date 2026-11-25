@@ -15,6 +15,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../helpers/screen_harness.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 class MockYtmBrowseService extends Mock implements YtmBrowseService {}
 
 void main() {
@@ -210,7 +211,8 @@ void main() {
     expect(find.text('Recovered'), findsOneWidget);
   });
 
-  testWidgets('container items route to playlist detail or artist search instead of playback',
+  testWidgets(
+      'container items route to playlist detail or artist search instead of playback',
       (tester) async {
     final player = stubPlayerCubit();
     Object? pushedExtra;

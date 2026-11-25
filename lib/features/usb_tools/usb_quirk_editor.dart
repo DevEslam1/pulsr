@@ -69,7 +69,8 @@ class UsbQuirkEditor extends StatelessWidget {
           const SizedBox(height: AppSpacing.xxs),
           Text(
             UsbErgonomicsStrings.audioSectionHint,
-            style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.caption),
+            style: TextStyle(
+                color: p.textSecondary, fontSize: AppFontSize.caption),
           ),
           const SizedBox(height: AppSpacing.sm),
           _QuirkSwitch(
@@ -135,8 +136,9 @@ class UsbQuirkEditor extends StatelessWidget {
           ),
           _QuirkNumberField<int>(
             label: UsbErgonomicsStrings.transferSizeLabel,
-            initialValue:
-                profile.transferSizeBytes == 0 ? '' : '${profile.transferSizeBytes}',
+            initialValue: profile.transferSizeBytes == 0
+                ? ''
+                : '${profile.transferSizeBytes}',
             enabled: enabled,
             allowBlank: true,
             isValid: (v) =>

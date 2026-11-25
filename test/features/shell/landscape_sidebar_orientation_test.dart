@@ -8,6 +8,7 @@ import 'package:pulsr/features/shell/presentation/widgets/landscape_sidebar.dart
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 class MockPlayerCubit extends Mock implements PlayerCubit {}
 
 void main() {
@@ -104,6 +105,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // Desktop expanded rail width (240) + RTL start cutout inset (44) = 284.
-    expect(tester.getSize(find.byType(LandscapeSidebar)).width, closeTo(284.0, 0.5));
+    expect(tester.getSize(find.byType(LandscapeSidebar)).width,
+        closeTo(284.0, 0.5));
   });
 }

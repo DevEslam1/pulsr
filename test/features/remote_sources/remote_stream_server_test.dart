@@ -134,7 +134,8 @@ void main() {
       expect(suffix.range?.end, 9);
     });
 
-    test('clamps an end past the file and uses the first of several windows', () {
+    test('clamps an end past the file and uses the first of several windows',
+        () {
       final clamped =
           RemoteStreamServer.parseRangeHeader('bytes=5-99', totalLength: 10);
       expect(clamped.range?.end, 9);
@@ -187,7 +188,8 @@ void main() {
       String method = 'GET',
       String? range,
     }) async {
-      final request = await client.openUrl(method, server.uriFor(_source(), path));
+      final request =
+          await client.openUrl(method, server.uriFor(_source(), path));
       if (range != null) request.headers.set(HttpHeaders.rangeHeader, range);
       return request.close();
     }
@@ -275,7 +277,8 @@ void main() {
       await response.drain<void>();
     });
 
-    test('an unknown source id answers 404 even with a well-formed token', () async {
+    test('an unknown source id answers 404 even with a well-formed token',
+        () async {
       final uri = Uri.parse(
         'http://127.0.0.1:${server.port}/stream/unknown/'
         '${'a' * 22}/${base64UrlEncode(utf8.encode('a.mp3'))}',
@@ -326,7 +329,8 @@ void main() {
       await response.drain<void>();
     });
 
-    test('unregisterSource revokes the token and closes the provider', () async {
+    test('unregisterSource revokes the token and closes the provider',
+        () async {
       final uri = server.uriFor(_source(), 'Music/a.mp3');
 
       await server.unregisterSource(_source().id);
@@ -374,7 +378,8 @@ void main() {
       await warming.registerProvider(provider);
       await warming.start();
       try {
-        final first = await client.getUrl(warming.uriFor(_source(), 'Music/a.mp3'));
+        final first =
+            await client.getUrl(warming.uriFor(_source(), 'Music/a.mp3'));
         final firstResponse = await first.close();
         await firstResponse.drain<void>();
         expect(provider.openReadCount, 1);
@@ -400,7 +405,8 @@ void main() {
         expect(
           provider.openReadCount,
           1,
-          reason: 'the cached file must serve the range without a provider read',
+          reason:
+              'the cached file must serve the range without a provider read',
         );
         expect(
           secondResponse.headers.value(HttpHeaders.contentLengthHeader),
@@ -556,7 +562,8 @@ void main() {
 
       await head('Music/a.mp3');
       expect(replacement.statCount, 1);
-      expect(provider.statCount, 1, reason: 'the old provider is not consulted');
+      expect(provider.statCount, 1,
+          reason: 'the old provider is not consulted');
     });
 
     test('serves audio MIME type and 416 for unsatisfiable range on empty file',
@@ -578,7 +585,8 @@ void main() {
       await rangeRes.drain<void>();
       expect(rangeRes.headers.contentType?.mimeType, 'audio/flac');
       expect(rangeRes.statusCode, HttpStatus.requestedRangeNotSatisfiable);
-      expect(rangeRes.headers.value(HttpHeaders.contentRangeHeader), 'bytes */0');
+      expect(
+          rangeRes.headers.value(HttpHeaders.contentRangeHeader), 'bytes */0');
     });
   });
 
@@ -593,7 +601,8 @@ void main() {
       if (await tempDir.exists()) await tempDir.delete(recursive: true);
     });
 
-    test('truncated upstream stream is not committed to cache and pin: true pins on commit',
+    test(
+        'truncated upstream stream is not committed to cache and pin: true pins on commit',
         () async {
       final cache = RemoteCacheStore(
         directoryProvider: () async => tempDir,
@@ -606,7 +615,8 @@ void main() {
       final client = HttpClient();
       try {
         // First: truncated stream (returns 4 of 10 bytes) must NOT commit.
-        final req = await client.getUrl(srv.uriFor(_source(), 'Music/trunc.mp3'));
+        final req =
+            await client.getUrl(srv.uriFor(_source(), 'Music/trunc.mp3'));
         final res = await req.close();
         try {
           await res.drain<void>();

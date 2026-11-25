@@ -98,8 +98,8 @@ void main() {
     expect(track['codec'], 'FLAC');
     expect(track.containsKey('path'), isFalse);
 
-    final trials = (decoded['trials'] as List<dynamic>)
-        .cast<Map<String, dynamic>>();
+    final trials =
+        (decoded['trials'] as List<dynamic>).cast<Map<String, dynamic>>();
     expect(trials, hasLength(12));
     for (var i = 0; i < 12; i++) {
       expect(trials[i]['index'], i);
@@ -120,7 +120,8 @@ void main() {
       'Playing from [PATH_REDACTED]',
     );
     expect(
-      AbxRedactor.redact('Streamed via https://subsonic.server.com/rest/stream'),
+      AbxRedactor.redact(
+          'Streamed via https://subsonic.server.com/rest/stream'),
       'Streamed via [URL_REDACTED]',
     );
     expect(
@@ -128,7 +129,8 @@ void main() {
       'Device DAC SN: [SERIAL_REDACTED]',
     );
     expect(
-      AbxRedactor.redact('Session ID 12345678-1234-1234-1234-123456789abc finished'),
+      AbxRedactor.redact(
+          'Session ID 12345678-1234-1234-1234-123456789abc finished'),
       'Session ID [UUID_REDACTED] finished',
     );
     expect(
@@ -176,7 +178,8 @@ void main() {
 
   test('golden abx_report_fixture matches contract structure', () {
     final file = File('test/fixtures/contracts/abx_report_fixture.json');
-    expect(file.existsSync(), isTrue, reason: 'abx_report_fixture.json must exist');
+    expect(file.existsSync(), isTrue,
+        reason: 'abx_report_fixture.json must exist');
     final decoded = jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
 
     expect(decoded['schemaVersion'], 1);

@@ -668,9 +668,7 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
                                         ? Icons.stop_rounded
                                         : Icons.volume_up_rounded,
                                     size: 16,
-                                    color: _isPlayingTone
-                                        ? p.error
-                                        : p.primary,
+                                    color: _isPlayingTone ? p.error : p.primary,
                                   ),
                                   label: Text(
                                     _isPlayingTone
@@ -681,9 +679,8 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
                                   ),
                                   style: OutlinedButton.styleFrom(
                                     side: BorderSide(
-                                      color: _isPlayingTone
-                                          ? p.error
-                                          : p.hairline,
+                                      color:
+                                          _isPlayingTone ? p.error : p.hairline,
                                     ),
                                     shape: RoundedRectangleBorder(
                                       borderRadius: AppRadii.r12All,
@@ -705,8 +702,8 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
                                   final activeMsg = context.l10n.viperAbActive;
                                   final prevState = cubit.state;
                                   final nowBypassed = !_abBypassed;
-                                  final didDisableByBypass =
-                                      nowBypassed && prevState.isViperDdcEnabled;
+                                  final didDisableByBypass = nowBypassed &&
+                                      prevState.isViperDdcEnabled;
                                   if (nowBypassed) {
                                     if (prevState.isViperDdcEnabled) {
                                       await cubit.setViperDdcEnabled(false);
@@ -724,8 +721,9 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
                                   if (failed) return;
                                   setState(() {
                                     _abBypassed = nowBypassed;
-                                    _ddcDisabledBySheetBypass =
-                                        nowBypassed ? didDisableByBypass : false;
+                                    _ddcDisabledBySheetBypass = nowBypassed
+                                        ? didDisableByBypass
+                                        : false;
                                   });
                                   messenger?.showSnackBar(
                                     SnackBar(

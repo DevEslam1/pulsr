@@ -673,14 +673,17 @@ void main() {
 
   group('getCoverArtCacheKey', () {
     test('produces stable key without ephemeral auth salt or token', () {
-      final client1 = _client(_FakeHttpClient((_) async => _textResponse('')), salt: 'salt1');
-      final client2 = _client(_FakeHttpClient((_) async => _textResponse('')), salt: 'salt2');
+      final client1 = _client(_FakeHttpClient((_) async => _textResponse('')),
+          salt: 'salt1');
+      final client2 = _client(_FakeHttpClient((_) async => _textResponse('')),
+          salt: 'salt2');
 
       final key1 = client1.getCoverArtCacheKey('cov-album-1', size: 300);
       final key2 = client2.getCoverArtCacheKey('cov-album-1', size: 300);
 
       expect(key1, key2);
-      expect(key1, 'subsonic://music.example.com/rest/getCoverArt?id=cov-album-1&size=300');
+      expect(key1,
+          'subsonic://music.example.com/rest/getCoverArt?id=cov-album-1&size=300');
       expect(key1, isNot(contains('salt')));
       expect(key1, isNot(contains('token')));
       expect(key1, isNot(contains(_password)));
@@ -720,7 +723,12 @@ void main() {
         return _jsonResponse(_envelope({
           'searchResult3': {
             'artist': [
-              {'id': 'art-1', 'name': 'Radiohead', 'albumCount': 9, 'coverArt': 'c-art-1'}
+              {
+                'id': 'art-1',
+                'name': 'Radiohead',
+                'albumCount': 9,
+                'coverArt': 'c-art-1'
+              }
             ],
             'album': [
               {
@@ -772,7 +780,8 @@ void main() {
       expect(result.songs.first.duration, const Duration(seconds: 387));
     });
 
-    test('returns empty result on blank query without network request', () async {
+    test('returns empty result on blank query without network request',
+        () async {
       final fake = _FakeHttpClient((_) async => _jsonResponse(_envelope()));
       final client = _client(fake);
 

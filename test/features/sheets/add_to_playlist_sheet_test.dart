@@ -10,6 +10,7 @@ import 'package:pulsr/features/sheets/add_to_playlist_sheet.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 class MockPlaylistUseCases extends Mock implements PlaylistUseCases {}
 
 void main() {

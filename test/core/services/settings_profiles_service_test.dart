@@ -120,9 +120,12 @@ void main() {
       expect(p1.hashCode, equals(p3.hashCode));
     });
 
-    test('getProfiles skips malformed entries individually without wiping profiles', () async {
+    test(
+        'getProfiles skips malformed entries individually without wiping profiles',
+        () async {
       SharedPreferences.setMockInitialValues({
-        'setting_custom_profiles': '[{"id":"valid_1","name":"Valid 1"}, {"corrupt":true}, 12345, {"id":"valid_2","name":"Valid 2"}]',
+        'setting_custom_profiles':
+            '[{"id":"valid_1","name":"Valid 1"}, {"corrupt":true}, 12345, {"id":"valid_2","name":"Valid 2"}]',
       });
       final service = SettingsProfilesService();
       final profiles = await service.getProfiles();

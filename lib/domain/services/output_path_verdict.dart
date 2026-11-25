@@ -136,7 +136,6 @@ class OutputPathVerdict {
     );
   }
 
-
   static String _khz(int hz) {
     final k = hz / 1000.0;
     final text =

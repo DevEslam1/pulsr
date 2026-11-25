@@ -327,9 +327,8 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
                           avatar: Icon(
                             _getThemeIcon(mode),
                             size: 16,
-                            color: isSelected
-                                ? readableAccent
-                                : p.textSecondary,
+                            color:
+                                isSelected ? readableAccent : p.textSecondary,
                           ),
                           label: Text(
                             _getThemeTitle(mode, context),
@@ -338,18 +337,15 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
                               fontWeight: isSelected
                                   ? FontWeight.w700
                                   : FontWeight.w500,
-                              color: isSelected
-                                  ? readableAccent
-                                  : p.textSecondary,
+                              color:
+                                  isSelected ? readableAccent : p.textSecondary,
                             ),
                           ),
                           selected: isSelected,
-                          selectedColor:
-                              readableAccent.withValues(alpha: 0.16),
+                          selectedColor: readableAccent.withValues(alpha: 0.16),
                           backgroundColor: p.surfaceCard,
                           side: BorderSide(
-                            color:
-                                isSelected ? readableAccent : p.hairline,
+                            color: isSelected ? readableAccent : p.hairline,
                             width: isSelected ? 1.5 : 1.0,
                           ),
                           shape: RoundedRectangleBorder(
@@ -500,8 +496,8 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
                               ),
                               child: Icon(
                                 Icons.play_arrow_rounded,
-                                color: AppColors.textOnAccent(
-                                    Color(_accentColor)),
+                                color:
+                                    AppColors.textOnAccent(Color(_accentColor)),
                                 size: 28,
                               ),
                             ),
@@ -531,7 +527,8 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
                     return Semantics(
                       button: true,
                       selected: isSelected,
-                      label: '#${colorVal.toRadixString(16).substring(2).toUpperCase()}',
+                      label:
+                          '#${colorVal.toRadixString(16).substring(2).toUpperCase()}',
                       child: GestureDetector(
                         onTap: () {
                           setState(() => _accentColor = colorVal);

@@ -237,97 +237,96 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
               activeColor: activeColor,
               onDismiss: () => _safePop(context),
               child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    // Surface colour lives inside the dismiss transform so it
-                    // travels (and fades) with the player.
+                fit: StackFit.expand,
+                children: [
+                  // Surface colour lives inside the dismiss transform so it
+                  // travels (and fades) with the player.
+                  Positioned.fill(
+                    child: ColoredBox(color: bgColor),
+                  ),
+                  if (settingsConfig.canvasEnabled &&
+                      settingsConfig.canvasAsBackdrop)
                     Positioned.fill(
-                      child: ColoredBox(color: bgColor),
-                    ),
-                    if (settingsConfig.canvasEnabled &&
-                        settingsConfig.canvasAsBackdrop)
-                      Positioned.fill(
-                        child: CanvasBackdrop(
-                          song: state.currentSong,
-                          isPlaying: state.isPlaying,
-                          isBackdropMode: true,
-                        ),
+                      child: CanvasBackdrop(
+                        song: state.currentSong,
+                        isPlaying: state.isPlaying,
+                        isBackdropMode: true,
                       ),
+                    ),
 
-                    // Adaptive top status-bar legibility scrim (portrait only,
-                    // suppressed while full-screen lyrics/queue overlays are shown
-                    // or in pure-black AMOLED / High Contrast modes).
-                    if (MediaQuery.orientationOf(context) !=
-                            Orientation.landscape &&
-                        !isOverlayActive &&
-                        !isAmoled &&
-                        !isHighContrast)
-                      PositionedDirectional(
-                        top: 0,
-                        start: 0,
-                        end: 0,
-                        height: 88,
-                        child: ExcludeSemantics(
-                          child: IgnorePointer(
-                            child: DecoratedBox(
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  begin: Alignment.topCenter,
-                                  end: Alignment.bottomCenter,
-                                  colors: [
-                                    context.playerSurfacePalette.scrimStart
-                                        .withValues(
-                                            alpha: isDark ? 0.42 : 0.10),
-                                    context.playerSurfacePalette.scrimStart
-                                        .withValues(alpha: 0.0),
-                                  ],
-                                ),
+                  // Adaptive top status-bar legibility scrim (portrait only,
+                  // suppressed while full-screen lyrics/queue overlays are shown
+                  // or in pure-black AMOLED / High Contrast modes).
+                  if (MediaQuery.orientationOf(context) !=
+                          Orientation.landscape &&
+                      !isOverlayActive &&
+                      !isAmoled &&
+                      !isHighContrast)
+                    PositionedDirectional(
+                      top: 0,
+                      start: 0,
+                      end: 0,
+                      height: 88,
+                      child: ExcludeSemantics(
+                        child: IgnorePointer(
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [
+                                  context.playerSurfacePalette.scrimStart
+                                      .withValues(alpha: isDark ? 0.42 : 0.10),
+                                  context.playerSurfacePalette.scrimStart
+                                      .withValues(alpha: 0.0),
+                                ],
                               ),
                             ),
                           ),
                         ),
                       ),
-
-                    ResponsivePlayerLayout(
-                      state: state,
-                      cubit: cubit,
-                      themeWidget: AnimatedSwitcher(
-                        duration: context.motion(PulsrMotion.page),
-                        switchInCurve: context.motionCurve(PulsrMotion.enter),
-                        switchOutCurve: context.motionCurve(PulsrMotion.exit),
-                        transitionBuilder: (child, animation) {
-                          if (!PulsrMotion.shouldAnimate(context)) {
-                            return child;
-                          }
-                          final scale = Tween<double>(
-                            begin: 0.965,
-                            end: 1.0,
-                          ).animate(animation);
-                          return FadeTransition(
-                            opacity: animation,
-                            child: ScaleTransition(
-                              scale: scale,
-                              child: child,
-                            ),
-                          );
-                        },
-                        child: KeyedSubtree(
-                          key: ValueKey(settingsConfig.playerThemeMode),
-                          child: themeWidget,
-                        ),
-                      ),
-                      activeColor: activeColor,
-                      bgColor: bgColor,
                     ),
 
-                    const _NowPlayingGestureHintOverlay(),
-                  ],
-                ),
+                  ResponsivePlayerLayout(
+                    state: state,
+                    cubit: cubit,
+                    themeWidget: AnimatedSwitcher(
+                      duration: context.motion(PulsrMotion.page),
+                      switchInCurve: context.motionCurve(PulsrMotion.enter),
+                      switchOutCurve: context.motionCurve(PulsrMotion.exit),
+                      transitionBuilder: (child, animation) {
+                        if (!PulsrMotion.shouldAnimate(context)) {
+                          return child;
+                        }
+                        final scale = Tween<double>(
+                          begin: 0.965,
+                          end: 1.0,
+                        ).animate(animation);
+                        return FadeTransition(
+                          opacity: animation,
+                          child: ScaleTransition(
+                            scale: scale,
+                            child: child,
+                          ),
+                        );
+                      },
+                      child: KeyedSubtree(
+                        key: ValueKey(settingsConfig.playerThemeMode),
+                        child: themeWidget,
+                      ),
+                    ),
+                    activeColor: activeColor,
+                    bgColor: bgColor,
+                  ),
+
+                  const _NowPlayingGestureHintOverlay(),
+                ],
               ),
             ),
-          );
-        },
-      );
+          ),
+        );
+      },
+    );
   }
 }
 

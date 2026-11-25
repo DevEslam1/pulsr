@@ -118,7 +118,8 @@ class FileIntentHandler {
 
   Future<List<String>> _invokeInitialAudioUris() async {
     try {
-      final list = await _channel.invokeListMethod<String>('getInitialAudioUris');
+      final list =
+          await _channel.invokeListMethod<String>('getInitialAudioUris');
       if (list != null && list.isNotEmpty) {
         return list.where((u) => u.isNotEmpty).toList();
       }
@@ -275,9 +276,12 @@ class FileIntentHandler {
     } on TimeoutException catch (e, st) {
       // A wedged resolver/repository must release the platform channel; the
       // Search screen (prefilled) is the honest fallback.
-      ErrorLogger.log('Voice search timed out after '
+      ErrorLogger.log(
+          'Voice search timed out after '
           '${voiceSearchTimeout.inSeconds}s: $q',
-          error: e, stackTrace: st, category: 'FileIntentHandler');
+          error: e,
+          stackTrace: st,
+          category: 'FileIntentHandler');
       _openSearchFor(q);
     } catch (e, st) {
       ErrorLogger.log('Failed to handle voice search: $query',

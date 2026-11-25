@@ -444,7 +444,8 @@ extension EqualizerSnapshotOps on EqualizerManager {
       if (delays != null && delays.length == 8) channelManagerDelayMs = delays;
       await setChannelManagerEnabled(
         b('channelManagerEnabled', isChannelManagerEnabled),
-        channelCount: (m['channelManagerChannelCount'] as num?)?.toInt() ?? channelManagerChannelCount,
+        channelCount: (m['channelManagerChannelCount'] as num?)?.toInt() ??
+            channelManagerChannelCount,
       );
       for (int ch = 0; ch < 8; ++ch) {
         await setChannelManagerChannel(
@@ -463,7 +464,8 @@ extension EqualizerSnapshotOps on EqualizerManager {
         lfeLowPassHz: d('lfeLowPassHz', lfeLowPassHz),
         slopeDbPerOct: d('lfeSlopeDbPerOct', lfeSlopeDbPerOct),
         lfeGainDb: d('lfeGainDb', lfeGainDb),
-        lfeChannelIndex: (m['lfeChannelIndex'] as num?)?.toInt() ?? lfeChannelIndex,
+        lfeChannelIndex:
+            (m['lfeChannelIndex'] as num?)?.toInt() ?? lfeChannelIndex,
         redirectBass: b('lfeRedirectBass', lfeRedirectBass),
       );
     }

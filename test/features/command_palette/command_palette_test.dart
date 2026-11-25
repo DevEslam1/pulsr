@@ -11,6 +11,7 @@ import 'package:pulsr/features/player/cubit/player_state.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 class MockPlayerCubit extends Mock implements PlayerCubit {}
 
 Widget _buildHarness({
@@ -185,7 +186,8 @@ void main() {
       expect(popped, isTrue);
     });
 
-    testWidgets('BUG-P2-29: Escape dismisses command palette even when search results are empty',
+    testWidgets(
+        'BUG-P2-29: Escape dismisses command palette even when search results are empty',
         (tester) async {
       bool popped = false;
 

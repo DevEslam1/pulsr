@@ -62,7 +62,8 @@ void main() {
       expect(RadioStation.isHttpUrl(''), isFalse);
     });
 
-    test('isSafeHost checks syntactic host and resolved IP addresses', () async {
+    test('isSafeHost checks syntactic host and resolved IP addresses',
+        () async {
       expect(await RadioStation.isSafeHost('localhost'), isFalse);
       expect(await RadioStation.isSafeHost('127.0.0.1'), isFalse);
       expect(await RadioStation.isSafeHost('192.168.1.1'), isFalse);

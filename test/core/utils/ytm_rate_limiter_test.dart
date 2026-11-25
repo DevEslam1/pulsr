@@ -99,7 +99,8 @@ void main() {
       });
     });
 
-    test('releases mutex during backoff sleep so concurrent fastFail rejects immediately',
+    test(
+        'releases mutex during backoff sleep so concurrent fastFail rejects immediately',
         () {
       fakeAsync((async) {
         YtmRateLimiter.debugReset();
@@ -111,12 +112,10 @@ void main() {
         Duration? fastFailElapsed;
 
         limiter.acquirePermit().then((_) => sleeperDone = true);
-        limiter
-            .acquirePermit(fastFail: true)
-            .catchError((Object e) {
-              fastFailError = e;
-              fastFailElapsed = async.elapsed;
-            });
+        limiter.acquirePermit(fastFail: true).catchError((Object e) {
+          fastFailError = e;
+          fastFailElapsed = async.elapsed;
+        });
 
         async.flushMicrotasks();
         expect(sleeperDone, isFalse);
@@ -127,7 +126,8 @@ void main() {
       });
     });
 
-    test('runDeduplicated shares active future cleanly and removes on completion',
+    test(
+        'runDeduplicated shares active future cleanly and removes on completion',
         () async {
       YtmRateLimiter.debugReset();
       final limiter = YtmRateLimiter.shared;

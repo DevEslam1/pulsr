@@ -129,8 +129,10 @@ extension YtmAccountParsing on YtmAccountService {
 
   String _joinRunsText(List<dynamic>? runs, String fallback) {
     if (runs == null || runs.isEmpty) return fallback;
-    final joined =
-        runs.map((r) => (r is Map ? r['text']?.toString() : null) ?? '').join().trim();
+    final joined = runs
+        .map((r) => (r is Map ? r['text']?.toString() : null) ?? '')
+        .join()
+        .trim();
     return joined.isNotEmpty ? joined : fallback;
   }
 
@@ -431,8 +433,7 @@ extension YtmAccountParsing on YtmAccountService {
         final col1Runs = flexColumns[1]
             ['musicResponsiveListItemFlexColumnRenderer']?['text']?['runs'];
         if (col1Runs is List && col1Runs.isNotEmpty) {
-          artist =
-              YtmMediaHelpers.firstArtistRun(col1Runs) ?? 'Unknown Artist';
+          artist = YtmMediaHelpers.firstArtistRun(col1Runs) ?? 'Unknown Artist';
         }
       }
 
@@ -552,8 +553,8 @@ extension YtmAccountParsing on YtmAccountService {
                 !seenIds.contains(cleanId)) {
               seenIds.add(cleanId);
 
-              String title = L10nHolder.current?.ytmFallbackPlaylistTitle ??
-                  'Playlist';
+              String title =
+                  L10nHolder.current?.ytmFallbackPlaylistTitle ?? 'Playlist';
               final flexCols = renderer['flexColumns'] as List<dynamic>?;
               if (flexCols != null && flexCols.isNotEmpty) {
                 final r = flexCols[0]

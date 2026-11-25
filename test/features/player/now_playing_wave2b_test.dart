@@ -184,7 +184,8 @@ void main() {
     );
   });
 
-  group('1.3x and 1.6x text scale zero-overflow on NowPlayingScreen & MiniPlayer',
+  group(
+      '1.3x and 1.6x text scale zero-overflow on NowPlayingScreen & MiniPlayer',
       () {
     for (final textScale in const [1.3, 1.6]) {
       testWidgets(

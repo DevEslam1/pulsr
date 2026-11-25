@@ -391,8 +391,8 @@ extension _AudioQualityOutputTab on AudioQualitySheet {
             style: TextButton.styleFrom(
               foregroundColor: p.textSecondary,
               padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
-              minimumSize: const Size(AppSpacing.minTouchTarget,
-                  AppSpacing.minTouchTarget),
+              minimumSize: const Size(
+                  AppSpacing.minTouchTarget, AppSpacing.minTouchTarget),
             ),
           ),
         ),

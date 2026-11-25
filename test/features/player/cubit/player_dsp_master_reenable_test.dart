@@ -79,7 +79,8 @@ void main() {
           }.contains)
           .toList();
       expect(stageCalls, isEmpty,
-          reason: 'enabling must not push invented stage defaults to the engine');
+          reason:
+              'enabling must not push invented stage defaults to the engine');
     });
 
     test('a real snapshot still restores exactly what was on', () async {
@@ -101,8 +102,8 @@ void main() {
       expect(state.dsp.limiterReleaseMs, 80.0);
       expect(state.dsp.isSpatializerEnabled, isFalse,
           reason: 'only the captured stages come back');
-      expect(handler.calls.where((c) => c == 'setLookaheadLimiter'),
-          isNotEmpty);
+      expect(
+          handler.calls.where((c) => c == 'setLookaheadLimiter'), isNotEmpty);
     });
   });
 }

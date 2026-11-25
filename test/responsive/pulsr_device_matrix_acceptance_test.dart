@@ -248,7 +248,8 @@ void main() {
     expect(state.customWidth, 420.0);
 
     // Find the start-edge resize handle
-    final handleFinder = find.byKey(const Key('tablet_inspector_resize_handle'));
+    final handleFinder =
+        find.byKey(const Key('tablet_inspector_resize_handle'));
     expect(handleFinder, findsOneWidget);
 
     final handleCenter = tester.getCenter(handleFinder);

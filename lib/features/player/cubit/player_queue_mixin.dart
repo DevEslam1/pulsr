@@ -55,8 +55,7 @@ mixin PlayerQueueOps on PulsrCubit<PlayerState> {
 
   Future<void> restoreQueue(
       List<SongsTableData> previousQueue, int previousIndex,
-      {Duration? initialPosition,
-      Map<int, QueueTier>? previousTrackTiers}) {
+      {Duration? initialPosition, Map<int, QueueTier>? previousTrackTiers}) {
     invalidateMediaItemResolution();
     return queueController.restoreQueue(previousQueue, previousIndex,
         initialPosition: initialPosition,

@@ -269,12 +269,14 @@ class RemoteStreamServer {
     try {
       final segments = request.uri.pathSegments;
       if (segments.length < 4 || segments.first != 'stream') {
-        await _pump.sendText(response, HttpStatus.notFound, 'Not a stream URL.');
+        await _pump.sendText(
+            response, HttpStatus.notFound, 'Not a stream URL.');
         return;
       }
       if (request.method != 'GET' && request.method != 'HEAD') {
         response.headers.set(HttpHeaders.allowHeader, 'GET, HEAD');
-        await _pump.sendText(response, HttpStatus.methodNotAllowed, 'GET only.');
+        await _pump.sendText(
+            response, HttpStatus.methodNotAllowed, 'GET only.');
         return;
       }
       if (segments.any(_isTraversalSegment)) {
@@ -307,7 +309,8 @@ class RemoteStreamServer {
       }
       final path = _decodePath(segments.sublist(3).join('/'));
       if (path == null || _hasTraversal(path)) {
-        await _pump.sendText(response, HttpStatus.badRequest, 'Bad stream path.');
+        await _pump.sendText(
+            response, HttpStatus.badRequest, 'Bad stream path.');
         return;
       }
       await _serve(request, response, provider, path);
@@ -348,7 +351,8 @@ class RemoteStreamServer {
         stackTrace: st,
         category: 'RemoteSources',
       );
-      await _pump.sendText(response, HttpStatus.internalServerError, 'Stream failed.');
+      await _pump.sendText(
+          response, HttpStatus.internalServerError, 'Stream failed.');
     }
   }
 

@@ -85,15 +85,18 @@ class StreamResolutionPipeline {
     // The native extractor already hedges its top two clients and bounds each
     // call, so racing a second independent chain here only doubled native
     // load for no tail-latency gain. One chain; the extractor owns the hedge.
-    final YtmStream stream = await ytmService.resolveStream(
-      videoId,
-      quality: effectiveQuality,
-      forceRefresh: forceRefresh,
-      title: song.title,
-      artist: song.artist,
-      duration:
-          song.durationMs > 0 ? Duration(milliseconds: song.durationMs) : null,
-    ).timeout(const Duration(seconds: 20));
+    final YtmStream stream = await ytmService
+        .resolveStream(
+          videoId,
+          quality: effectiveQuality,
+          forceRefresh: forceRefresh,
+          title: song.title,
+          artist: song.artist,
+          duration: song.durationMs > 0
+              ? Duration(milliseconds: song.durationMs)
+              : null,
+        )
+        .timeout(const Duration(seconds: 20));
     if (stream.url.trim().isEmpty) {
       throw const YtmException(
           'YTM_UNAVAILABLE', 'Resolved stream URL is empty');

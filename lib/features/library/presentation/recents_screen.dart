@@ -270,8 +270,7 @@ class _RecentsScreenState extends State<RecentsScreen> {
                       0,
                       (acc, s) => acc + s.durationMs,
                     );
-                    final losslessCount =
-                        filtered.where(isLosslessSong).length;
+                    final losslessCount = filtered.where(isLosslessSong).length;
 
                     return RefreshIndicator(
                       color: p.accent,
@@ -481,10 +480,9 @@ class _RecentsScreenState extends State<RecentsScreen> {
                                     startToEndLabel: l10n.playNext,
                                     dismissDirection:
                                         DismissDirection.startToEnd,
-                                    backgroundBuilder:
-                                        (context, isConfirming) =>
-                                            PulsrDismissible
-                                                .buildActionBackground(
+                                    backgroundBuilder: (context,
+                                            isConfirming) =>
+                                        PulsrDismissible.buildActionBackground(
                                       context: context,
                                       icon: Icons.playlist_play_rounded,
                                       label: l10n.playNext,
@@ -557,11 +555,11 @@ class _RecentsScreenState extends State<RecentsScreen> {
                                         return;
                                       }
                                       setState(() {
-                                        _historyLimit = (_historyLimit + 100)
-                                            .clamp(
-                                              _persistedHistoryLimit,
-                                              _maxHistoryLimit,
-                                            );
+                                        _historyLimit =
+                                            (_historyLimit + 100).clamp(
+                                          _persistedHistoryLimit,
+                                          _maxHistoryLimit,
+                                        );
                                         _updateStream();
                                       });
                                     },

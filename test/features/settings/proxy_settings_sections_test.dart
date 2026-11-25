@@ -13,6 +13,7 @@ import 'package:pulsr/features/settings/presentation/proxy_settings_screen.dart'
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 class MockSettingsCubit extends MockCubit<SettingsState>
     implements SettingsCubit {}
 

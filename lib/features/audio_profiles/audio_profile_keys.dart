@@ -169,8 +169,7 @@ abstract final class AudioProfileKeys {
   };
 
   /// SharedPreferences keys owned by the audio profile format.
-  static final List<String> whitelist =
-      List<String>.unmodifiable(schema.keys);
+  static final List<String> whitelist = List<String>.unmodifiable(schema.keys);
 
   /// Whether [key] may be captured into, or applied from, a profile.
   static bool isWhitelisted(String key) => schema.containsKey(key);

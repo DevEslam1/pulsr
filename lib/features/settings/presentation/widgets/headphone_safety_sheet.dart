@@ -259,9 +259,7 @@ class _HeadphoneSafetySheetState extends State<HeadphoneSafetySheet> {
                 color: p.surfaceContainer.withValues(alpha: 0.7),
                 borderRadius: AppRadii.r16All,
                 border: Border.all(
-                  color: _attenuationActive
-                      ? AppColors.error
-                      : p.hairline,
+                  color: _attenuationActive ? AppColors.error : p.hairline,
                   width: _attenuationActive ? 1.5 : 1.0,
                 ),
               ),

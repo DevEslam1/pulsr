@@ -64,14 +64,12 @@ extension _AudioQualityNowPlayingTab on AudioQualitySheet {
                     children: [
                       Text(
                         info.tierLabel,
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleMedium
-                            ?.copyWith(
-                              fontWeight: FontWeight.w900,
-                              color: p.textPrimary,
-                              letterSpacing: AppTracking.label,
-                            ),
+                        style:
+                            Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w900,
+                                  color: p.textPrimary,
+                                  letterSpacing: AppTracking.label,
+                                ),
                       ),
                       const SizedBox(height: AppSpacing.s2),
                       Text(

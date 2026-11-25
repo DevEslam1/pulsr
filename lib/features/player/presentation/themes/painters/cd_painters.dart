@@ -337,9 +337,8 @@ class _CdJewelCasePainter extends CustomPainter {
       Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.0
-        ..color = isDark
-            ? AppColors.specularAt(0.16)
-            : AppColors.specularAt(0.65),
+        ..color =
+            isDark ? AppColors.specularAt(0.16) : AppColors.specularAt(0.65),
     );
 
     // 4. Translucent Ribbed Jewel-Case Spine along the leading (left) edge.

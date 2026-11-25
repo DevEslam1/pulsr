@@ -33,7 +33,8 @@ class PlayerShapePreviewOverride extends InheritedWidget {
 /// Only when the user selected the custom colour source does their radius win;
 /// preset themes keep their own hand-tuned geometry and [fallback] is returned.
 double resolveCustomRadius(BuildContext context, double fallback) {
-  final previewOverride = PlayerShapePreviewOverride.maybeOf(context)?.cornerRadius;
+  final previewOverride =
+      PlayerShapePreviewOverride.maybeOf(context)?.cornerRadius;
   if (previewOverride != null) return previewOverride;
   final shape =
       context.select<SettingsCubit, ({double radius, bool active})>((c) => (
@@ -45,7 +46,8 @@ double resolveCustomRadius(BuildContext context, double fallback) {
 
 /// Whether the custom Ambient Glow should be applied (custom source + enabled).
 bool resolveCustomGlow(BuildContext context) {
-  final previewOverride = PlayerShapePreviewOverride.maybeOf(context)?.ambientGlow;
+  final previewOverride =
+      PlayerShapePreviewOverride.maybeOf(context)?.ambientGlow;
   if (previewOverride != null) return previewOverride;
   final glow =
       context.select<SettingsCubit, ({bool glow, bool active})>((c) => (

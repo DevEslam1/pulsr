@@ -24,7 +24,8 @@ void main() {
       service = DeviceProfileService();
     });
 
-    test('corrupt JSON in links does not get wiped on rememberLink/forgetLink', () async {
+    test('corrupt JSON in links does not get wiped on rememberLink/forgetLink',
+        () async {
       SharedPreferences.setMockInitialValues({
         'setting_device_profile_links': '{corrupt: json-string...',
       });
@@ -41,14 +42,17 @@ void main() {
       );
 
       final prefs = await SharedPreferences.getInstance();
-      expect(prefs.getString('setting_device_profile_links'), '{corrupt: json-string...');
+      expect(prefs.getString('setting_device_profile_links'),
+          '{corrupt: json-string...');
 
       // forgetLink also refuses to wipe corrupt storage
       await service.forgetLink('bt:headphones');
-      expect(prefs.getString('setting_device_profile_links'), '{corrupt: json-string...');
+      expect(prefs.getString('setting_device_profile_links'),
+          '{corrupt: json-string...');
     });
 
-    test('importLinksJson validates JSON format and refuses on corrupt storage', () async {
+    test('importLinksJson validates JSON format and refuses on corrupt storage',
+        () async {
       // Invalid JSON string returns false
       expect(await service.importLinksJson('not json'), isFalse);
       expect(await service.importLinksJson(''), isFalse);
@@ -92,7 +96,8 @@ void main() {
       service = SettingsProfilesService();
     });
 
-    test('distinguishes missing key from corrupt JSON and prevents wipe', () async {
+    test('distinguishes missing key from corrupt JSON and prevents wipe',
+        () async {
       SharedPreferences.setMockInitialValues({
         'setting_custom_profiles': '{corrupted json not a list',
       });
@@ -110,14 +115,18 @@ void main() {
       await service.saveProfile(newProfile);
 
       final prefs = await SharedPreferences.getInstance();
-      expect(prefs.getString('setting_custom_profiles'), '{corrupted json not a list');
+      expect(prefs.getString('setting_custom_profiles'),
+          '{corrupted json not a list');
 
       // deleteProfile also refuses to overwrite corrupt storage
       await service.deleteProfile('profile_home');
-      expect(prefs.getString('setting_custom_profiles'), '{corrupted json not a list');
+      expect(prefs.getString('setting_custom_profiles'),
+          '{corrupted json not a list');
     });
 
-    test('deleting last profile sets initialized flag and does not resurrect defaults', () async {
+    test(
+        'deleting last profile sets initialized flag and does not resurrect defaults',
+        () async {
       // Start with one profile
       const p = SettingsProfile(
         id: 'p_only',
@@ -151,32 +160,55 @@ void main() {
       final tones = [100.0, 200.0];
 
       // Zero sampleRate or toneMs
-      expect(RoomCorrectionService.analyzeResponse(pcm, 0, tones), hasLength(2));
-      expect(RoomCorrectionService.analyzeResponse(pcm, 48000, tones, toneMs: 0), hasLength(2));
-      expect(RoomCorrectionService.analyzeResponse(pcm, -100, tones), hasLength(2));
+      expect(
+          RoomCorrectionService.analyzeResponse(pcm, 0, tones), hasLength(2));
+      expect(
+          RoomCorrectionService.analyzeResponse(pcm, 48000, tones, toneMs: 0),
+          hasLength(2));
+      expect(RoomCorrectionService.analyzeResponse(pcm, -100, tones),
+          hasLength(2));
     });
 
-    test('correctionGainDbAt validates positive sorted centers and finite inputs', () {
+    test(
+        'correctionGainDbAt validates positive sorted centers and finite inputs',
+        () {
       const gains = [2.0, 4.0, 6.0];
       const centers = [100.0, 200.0, 400.0];
 
       // Normal call
-      expect(RoomCorrectionService.correctionGainDbAt(gains, centers, 200.0), 4.0);
+      expect(
+          RoomCorrectionService.correctionGainDbAt(gains, centers, 200.0), 4.0);
 
       // Non-finite frequency
-      expect(RoomCorrectionService.correctionGainDbAt(gains, centers, double.nan), 0.0);
-      expect(RoomCorrectionService.correctionGainDbAt(gains, centers, double.infinity), 0.0);
-      expect(RoomCorrectionService.correctionGainDbAt(gains, centers, -50.0), 0.0);
+      expect(
+          RoomCorrectionService.correctionGainDbAt(gains, centers, double.nan),
+          0.0);
+      expect(
+          RoomCorrectionService.correctionGainDbAt(
+              gains, centers, double.infinity),
+          0.0);
+      expect(
+          RoomCorrectionService.correctionGainDbAt(gains, centers, -50.0), 0.0);
 
       // Unsorted centers
-      expect(RoomCorrectionService.correctionGainDbAt(gains, [400.0, 200.0, 100.0], 200.0), 0.0);
+      expect(
+          RoomCorrectionService.correctionGainDbAt(
+              gains, [400.0, 200.0, 100.0], 200.0),
+          0.0);
 
       // Non-positive centers
-      expect(RoomCorrectionService.correctionGainDbAt(gains, [-100.0, 200.0, 400.0], 200.0), 0.0);
-      expect(RoomCorrectionService.correctionGainDbAt(gains, [0.0, 200.0, 400.0], 200.0), 0.0);
+      expect(
+          RoomCorrectionService.correctionGainDbAt(
+              gains, [-100.0, 200.0, 400.0], 200.0),
+          0.0);
+      expect(
+          RoomCorrectionService.correctionGainDbAt(
+              gains, [0.0, 200.0, 400.0], 200.0),
+          0.0);
     });
 
-    test('computeConvergence and evaluateLoopback handle non-finite inputs', () {
+    test('computeConvergence and evaluateLoopback handle non-finite inputs',
+        () {
       final res = RoomCorrectionService.computeConvergence(
         preResponseDb: [double.nan, 2.0, double.infinity, 4.0],
         postResponseDb: [1.0, double.nan, 3.0, 2.0],
@@ -207,7 +239,8 @@ void main() {
       SharedPreferences.setMockInitialValues({});
     });
 
-    test('mutex serializes setOffsetMs, clearOffset, and orphan removal', () async {
+    test('mutex serializes setOffsetMs, clearOffset, and orphan removal',
+        () async {
       final store = LyricsOffsetStore();
       await store.setOffsetMs('/path/a.flac', 100);
       expect(await store.getOffsetMs('/path/a.flac'), 100);
@@ -222,7 +255,8 @@ void main() {
       SharedPreferences.setMockInitialValues({});
     });
 
-    test('clamps maxConcurrent to 1..5 in constructor, load, and copyWith', () async {
+    test('clamps maxConcurrent to 1..5 in constructor, load, and copyWith',
+        () async {
       final s1 = DownloadSettings(maxConcurrent: 10);
       expect(s1.maxConcurrent, 5);
 
@@ -303,7 +337,8 @@ void main() {
       service.dispose();
     });
 
-    test('InputTools fallback works on batch 1 with script detection', () async {
+    test('InputTools fallback works on batch 1 with script detection',
+        () async {
       final mockClient = MockClient((request) async {
         if (request.url.host.contains('translate.googleapis.com')) {
           // Romanization batch fails
@@ -341,7 +376,8 @@ void main() {
       service.dispose();
     });
 
-    test('InputTools guarded against short/empty data[1][0][1][0] indices', () async {
+    test('InputTools guarded against short/empty data[1][0][1][0] indices',
+        () async {
       final mockClient = MockClient((request) async {
         if (request.url.host.contains('translate.googleapis.com')) {
           return http.Response('[]', 200);

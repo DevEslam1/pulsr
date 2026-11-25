@@ -41,11 +41,13 @@ void main() {
           StreamUrlVerifier.isProbeable(
               'https://backend.example.net/videoplayback/abc'),
           isFalse,
-          reason: 'arbitrary non-YouTube hosts must not be probed via /videoplayback');
+          reason:
+              'arbitrary non-YouTube hosts must not be probed via /videoplayback');
       expect(StreamUrlVerifier.isProbeable(_otherUrl), isFalse);
       expect(StreamUrlVerifier.isProbeable('not a url'), isFalse);
       expect(
-          StreamUrlVerifier.isProbeable('https://googlevideo.com.evil.example/x'),
+          StreamUrlVerifier.isProbeable(
+              'https://googlevideo.com.evil.example/x'),
           isFalse,
           reason: 'the check is a host suffix, not a substring');
     });
@@ -153,9 +155,9 @@ void main() {
     });
 
     test('never throws, even when the probe itself fails', () async {
-      StreamUrlVerifier.debugProbeOverride =
-          (url, {userAgent, referer, cookie}) async =>
-              throw StateError('probe exploded');
+      StreamUrlVerifier.debugProbeOverride = (url,
+              {userAgent, referer, cookie}) async =>
+          throw StateError('probe exploded');
 
       final probe = await StreamUrlVerifier().probe(_cdnUrl);
 

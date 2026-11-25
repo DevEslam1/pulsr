@@ -23,7 +23,17 @@ void main() {
   /// Documented physics / ambient loops that are not part of the UI rhythm:
   /// 650 vinyl motor spin-down, 900 tonearm, 1300/1400 & 2400/2600/3200/4000
   /// carousel and visualiser loops, 15000 idle hint auto-dismiss.
-  const physicsAllowlist = {650, 900, 1300, 1400, 2400, 2600, 3200, 4000, 15000};
+  const physicsAllowlist = {
+    650,
+    900,
+    1300,
+    1400,
+    2400,
+    2600,
+    3200,
+    4000,
+    15000
+  };
 
   test('no bare PulsrMotion durations in animated widgets', () {
     final offenders = <String>[];
@@ -95,7 +105,8 @@ void main() {
     );
   });
 
-  test('every motionMs literal is a token value or an allowlisted physics value',
+  test(
+      'every motionMs literal is a token value or an allowlisted physics value',
       () {
     final offenders = <String>[];
     final literal = RegExp(r'motionMs\((\d+)\)');

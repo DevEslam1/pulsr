@@ -157,8 +157,9 @@ class _OnlineCategorySectionState extends State<OnlineCategorySection> {
         }
       });
     }
-    final ytmCubit =
-        getIt.isRegistered<YtmDownloadCubit>() ? getIt<YtmDownloadCubit>() : null;
+    final ytmCubit = getIt.isRegistered<YtmDownloadCubit>()
+        ? getIt<YtmDownloadCubit>()
+        : null;
     final content = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -219,9 +220,7 @@ class _OnlineCategorySectionState extends State<OnlineCategorySection> {
           PulsrStaticGrid(
             crossAxisCount: context.trackGridColumns,
             mainAxisExtent: (72.0 *
-                    MediaQuery.textScalerOf(context)
-                        .scale(1.0)
-                        .clamp(1.0, 1.5))
+                    MediaQuery.textScalerOf(context).scale(1.0).clamp(1.0, 1.5))
                 .roundToDouble(),
             crossAxisSpacing: 10,
             mainAxisSpacing: 4,
@@ -234,7 +233,8 @@ class _OnlineCategorySectionState extends State<OnlineCategorySection> {
               child: SongTile(
                 song: songs[i],
                 index: i,
-                onTap: () => widget.playerCubit.playSong(songs[i], queue: songs),
+                onTap: () =>
+                    widget.playerCubit.playSong(songs[i], queue: songs),
                 trailing: YtmDownloadButton(song: songs[i]),
                 onMorePressed: () =>
                     SongOptionsSheet.show(context, song: songs[i]),
@@ -252,7 +252,8 @@ class _OnlineCategorySectionState extends State<OnlineCategorySection> {
               child: SongTile(
                 song: songs[i],
                 index: i,
-                onTap: () => widget.playerCubit.playSong(songs[i], queue: songs),
+                onTap: () =>
+                    widget.playerCubit.playSong(songs[i], queue: songs),
                 trailing: YtmDownloadButton(song: songs[i]),
                 onMorePressed: () =>
                     SongOptionsSheet.show(context, song: songs[i]),

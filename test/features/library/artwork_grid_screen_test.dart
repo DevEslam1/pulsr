@@ -17,6 +17,7 @@ import 'package:pulsr/features/settings/cubit/settings_state.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 class MockLibraryCubit extends Mock implements LibraryCubit {}
 
 class MockSettingsCubit extends Mock implements SettingsCubit {}

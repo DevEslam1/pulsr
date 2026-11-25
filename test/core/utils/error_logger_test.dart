@@ -131,7 +131,8 @@ void main() {
               'would report every crash to Sentry twice');
     });
 
-    test('redactMap recursively scrubs nested maps, lists, keys, emails, and JWTs',
+    test(
+        'redactMap recursively scrubs nested maps, lists, keys, emails, and JWTs',
         () {
       const sampleJwt =
           'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c';
@@ -151,7 +152,8 @@ void main() {
       final nested = redacted['nested'] as Map<String, dynamic>;
       expect(nested['authorization'], '[REDACTED_TOKEN]');
       expect(nested['note'], contains('[REDACTED_EMAIL]'));
-      expect(nested['note'], isNot(contains('SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c')));
+      expect(nested['note'],
+          isNot(contains('SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c')));
       final items = nested['items'] as List<dynamic>;
       expect((items[0] as Map<String, dynamic>)['cookie'], '[REDACTED_TOKEN]');
       expect(items[1], contains('[REDACTED_TOKEN]'));
@@ -166,7 +168,8 @@ void main() {
       expect(result, isA<Map<String, dynamic>>());
     });
 
-    test('redactPii scrubs full forward/backslash user paths and JWTs; Sentry payload helpers redact errors',
+    test(
+        'redactPii scrubs full forward/backslash user paths and JWTs; Sentry payload helpers redact errors',
         () {
       const sampleJwt =
           'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c';
@@ -188,7 +191,8 @@ void main() {
       expect(unixPath, isNot(contains('bob')));
       expect(unixPath, isNot(contains('secret.mp3')));
 
-      expect(ErrorLogger.redactPii('auth=$sampleJwt'), isNot(contains(sampleJwt)));
+      expect(
+          ErrorLogger.redactPii('auth=$sampleJwt'), isNot(contains(sampleJwt)));
 
       final sanitizedErr = ErrorLogger.sanitizeErrorForReport(
         Exception(r'token=tok_123 for C:\Users\alice\Downloads\file.mp3'),

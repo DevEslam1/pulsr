@@ -175,7 +175,8 @@ void main() {
       expect(group.key, equals('180-500-1'));
     });
 
-    test('Pass 2 matches identical audio across adjacent (+/-1) bucket boundary',
+    test(
+        'Pass 2 matches identical audio across adjacent (+/-1) bucket boundary',
         () async {
       final dir = await Directory.systemTemp.createTemp('pulsr_dup_boundary_');
       addTearDown(() async {
@@ -209,10 +210,12 @@ void main() {
       ]);
 
       expect(duplicates.length, 1);
-      expect(duplicates.first.songs.map((s) => s.id), unorderedEquals([10, 11]));
+      expect(
+          duplicates.first.songs.map((s) => s.id), unorderedEquals([10, 11]));
     });
 
-    test('preserves localized reason via L10nHolder when allSongs.length >= 20', () async {
+    test('preserves localized reason via L10nHolder when allSongs.length >= 20',
+        () async {
       final l10n = AppLocalizationsAr();
       L10nHolder.current = l10n;
       addTearDown(() => L10nHolder.current = null);
@@ -234,7 +237,8 @@ void main() {
       expect(duplicates.first.reason, l10n.dupReasonTitleArtist(2));
     });
 
-    test('filters out non-local sources and prevents empty-album/zero-duration false positives',
+    test(
+        'filters out non-local sources and prevents empty-album/zero-duration false positives',
         () async {
       final nonLocalA = SongsTableData(
         id: 100,

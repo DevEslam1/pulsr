@@ -531,7 +531,8 @@ class YtmUrlCache {
     // richer fields are carried forward.
     final previous = _cache[key];
     final sameUrl = previous != null && previous.url == url;
-    final effectiveUserAgent = userAgent ?? (sameUrl ? previous.userAgent : null);
+    final effectiveUserAgent =
+        userAgent ?? (sameUrl ? previous.userAgent : null);
     final effectiveCookies = cookies ?? (sameUrl ? previous.cookies : null);
     YtmStream? effectiveStream;
     if (stream != null) {

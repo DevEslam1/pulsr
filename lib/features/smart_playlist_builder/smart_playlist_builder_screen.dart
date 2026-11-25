@@ -411,8 +411,8 @@ class _SmartPlaylistBuilderViewState extends State<_SmartPlaylistBuilderView> {
                                                       context.l10n.artist)),
                                               DropdownMenuItem(
                                                   value: 'album',
-                                                  child: Text(
-                                                      context.l10n.album)),
+                                                  child:
+                                                      Text(context.l10n.album)),
                                               DropdownMenuItem(
                                                   value: 'dateAdded',
                                                   child: Text(context
@@ -763,7 +763,8 @@ class _RuleCardState extends State<_RuleCard> {
                   child: Semantics(
                     label: context.l10n.smartOperatorLabel,
                     child: DropdownButtonFormField<SmartOperator>(
-                      key: ValueKey('${widget.rule.field.key}_${selectedOperator.key}'),
+                      key: ValueKey(
+                          '${widget.rule.field.key}_${selectedOperator.key}'),
                       initialValue: selectedOperator,
                       decoration: InputDecoration(
                         filled: true,

@@ -33,8 +33,7 @@ const String _namespacedDescription = '<?xml version="1.0"?>'
 
 void main() {
   group('UpnpDeviceDescription.parse', () {
-    test('reads namespaced elements and resolves a relative control URL',
-        () {
+    test('reads namespaced elements and resolves a relative control URL', () {
       final description = UpnpDeviceDescription.parse(
         _namespacedDescription,
         location: Uri.parse('http://192.168.1.10:49152/description.xml'),
@@ -76,7 +75,8 @@ void main() {
       );
     });
 
-    test('rejects URLBase pointing to 127.0.0.1 or external untrusted host', () {
+    test('rejects URLBase pointing to 127.0.0.1 or external untrusted host',
+        () {
       const xmlLoopback = '<root><URLBase>http://127.0.0.1:8080/</URLBase>'
           '<device><friendlyName>Living Room</friendlyName>'
           '<serviceList><service>'
@@ -286,7 +286,8 @@ void main() {
   group('decodeXmlEntities', () {
     test('decodes standard XML entities and numeric code points', () {
       expect(
-        decodeXmlEntities('&lt;tag&gt; &quot;quote&quot; &amp; &apos;apostrophe&apos; &#65; &#x42;'),
+        decodeXmlEntities(
+            '&lt;tag&gt; &quot;quote&quot; &amp; &apos;apostrophe&apos; &#65; &#x42;'),
         '<tag> "quote" & \'apostrophe\' A B',
       );
     });

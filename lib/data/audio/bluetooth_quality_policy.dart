@@ -201,10 +201,10 @@ BluetoothQualityPlan resolveBluetoothQualityPlan({
       !leAudio &&
       trackBitDepth > 0 &&
       codecBitDepth != null) {
-    final int desiredDepth = trackBitDepth >= 32 &&
-            codecSelectableBitDepths.contains(32)
-        ? 32
-        : (trackBitDepth >= 24 ? 24 : 16);
+    final int desiredDepth =
+        trackBitDepth >= 32 && codecSelectableBitDepths.contains(32)
+            ? 32
+            : (trackBitDepth >= 24 ? 24 : 16);
     if (desiredDepth > codecBitDepth) {
       final bool depthSelectable =
           codecSelectableBitDepths.contains(desiredDepth);

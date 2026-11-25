@@ -11,6 +11,7 @@ import 'package:pulsr/l10n/generated/app_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 class MockSecureStorage extends Mock implements FlutterSecureStorage {}
 
 void main() {
@@ -199,7 +200,8 @@ void main() {
         isFalse);
   });
 
-  testWidgets('M-08 obscures scrobbler credential fields by default with reveal toggle',
+  testWidgets(
+      'M-08 obscures scrobbler credential fields by default with reveal toggle',
       (tester) async {
     SharedPreferences.setMockInitialValues({});
     await pumpSheet(tester);

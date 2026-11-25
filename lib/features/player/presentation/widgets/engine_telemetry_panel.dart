@@ -384,8 +384,7 @@ class _EngineTelemetryPanelState extends State<EngineTelemetryPanel>
               final name = DspBatteryEstimate.stageDisplayName(entry.key);
               final cost = entry.value;
               return Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
                   color: p.surfaceContainerHigh,
                   borderRadius: AppRadii.r4All,

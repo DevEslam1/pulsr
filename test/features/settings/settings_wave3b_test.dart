@@ -38,8 +38,7 @@ void main() {
     when(() => settingsCubit.state).thenReturn(const SettingsState());
     when(() => settingsCubit.stream)
         .thenAnswer((_) => const Stream<SettingsState>.empty());
-    when(() => settingsCubit.setExperienceMode(any()))
-        .thenAnswer((_) async {});
+    when(() => settingsCubit.setExperienceMode(any())).thenAnswer((_) async {});
     when(() => settingsCubit.setThemeMode(any())).thenAnswer((_) async {});
     when(() => settingsCubit.setOfflineOnlyMode(any()))
         .thenAnswer((_) async {});
@@ -58,8 +57,7 @@ void main() {
         .thenAnswer((_) async {});
     when(() => settingsCubit.setBluetoothHiResEnabled(any()))
         .thenAnswer((_) async {});
-    when(() => settingsCubit.setReplayGainMode(any()))
-        .thenAnswer((_) async {});
+    when(() => settingsCubit.setReplayGainMode(any())).thenAnswer((_) async {});
     when(() => settingsCubit.setCrossfade(any())).thenAnswer((_) async {});
     when(() => settingsCubit.setGapless(any())).thenAnswer((_) async {});
 
@@ -94,8 +92,7 @@ void main() {
     expect(find.text('Quick Controls'), findsOneWidget);
 
     // 1. Experience Mode tile (>= 48x48dp)
-    final expTile =
-        find.byKey(const ValueKey('quick_control_experience_mode'));
+    final expTile = find.byKey(const ValueKey('quick_control_experience_mode'));
     expect(expTile, findsOneWidget);
     expect(tester.getSize(expTile).height, greaterThanOrEqualTo(48));
     await tester.tap(expTile);
@@ -104,8 +101,7 @@ void main() {
         .called(1);
 
     // 2. Theme / AMOLED tile (>= 48x48dp)
-    final themeTile =
-        find.byKey(const ValueKey('quick_control_theme_amoled'));
+    final themeTile = find.byKey(const ValueKey('quick_control_theme_amoled'));
     expect(themeTile, findsOneWidget);
     expect(tester.getSize(themeTile).height, greaterThanOrEqualTo(48));
     await tester.tap(themeTile);

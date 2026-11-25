@@ -80,7 +80,8 @@ void main() {
 
       final defaults = UsbQuirkProfile(vid: 1, pid: 2, label: 'Plain');
       expect(defaults.isNeutral, isTrue);
-      expect(defaults.toJson().keys, <String>['vid', 'pid', 'label', 'hidEnabled']);
+      expect(defaults.toJson().keys,
+          <String>['vid', 'pid', 'label', 'hidEnabled']);
     });
 
     test('rejects out-of-range transport knobs', () {
@@ -95,8 +96,8 @@ void main() {
             .having((e) => e.field, 'field', 'bufferMs')),
       );
       expect(
-        () => UsbQuirkProfile(
-            vid: 1, pid: 2, label: 'd', transferSizeBytes: 32),
+        () =>
+            UsbQuirkProfile(vid: 1, pid: 2, label: 'd', transferSizeBytes: 32),
         throwsA(isA<QuirkValidationError>()
             .having((e) => e.field, 'field', 'transferSizeBytes')),
       );

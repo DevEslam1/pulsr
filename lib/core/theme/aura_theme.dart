@@ -405,9 +405,8 @@ class PlayerSurfacePalette extends ThemeExtension<PlayerSurfacePalette> {
       ledGlow: Color.lerp(ledGlow, other.ledGlow, t) ?? ledGlow,
       scrimStart: Color.lerp(scrimStart, other.scrimStart, t) ?? scrimStart,
       scrimEnd: Color.lerp(scrimEnd, other.scrimEnd, t) ?? scrimEnd,
-      highContrastInk:
-          Color.lerp(highContrastInk, other.highContrastInk, t) ??
-              highContrastInk,
+      highContrastInk: Color.lerp(highContrastInk, other.highContrastInk, t) ??
+          highContrastInk,
     );
   }
 
@@ -476,6 +475,7 @@ class AuraTheme {
         ? defaultSurfaceDark
         : defaultSurfaceLight;
   }
+
   static ThemeData get darkTheme =>
       customTheme(AppColors.primary, brightness: Brightness.dark);
   static ThemeData get lightTheme =>
@@ -766,8 +766,7 @@ class AuraTheme {
     final darkSurface = isHighContrast
         ? const Color(0xFF050506)
         : (isAmoled ? const Color(0xFF0A0B0F) : const Color(0xFF12151D));
-    final darkContainerAlpha =
-        isHighContrast ? 0.26 : (isAmoled ? 0.16 : 0.14);
+    final darkContainerAlpha = isHighContrast ? 0.26 : (isAmoled ? 0.16 : 0.14);
     final effectiveDarkAccent = _darkReadable(
       accent,
       surface: darkSurface,
@@ -814,7 +813,8 @@ class AuraTheme {
         accent: effectiveDarkAccent,
         onAccent: onAccent,
         accentContainer: effectiveDarkAccent.withValues(alpha: 0.24),
-        glow: effectiveDarkAccent.withValues(alpha: isCalmDensity ? 0.14 : 0.42),
+        glow:
+            effectiveDarkAccent.withValues(alpha: isCalmDensity ? 0.14 : 0.42),
         bg: Colors.black,
         surface: const Color(0xFF050506),
         surfaceContainer: const Color(0xFF111114),
@@ -853,7 +853,8 @@ class AuraTheme {
         onAccent: onAccent,
         accentContainer:
             effectiveDarkAccent.withValues(alpha: isCalmDensity ? 0.10 : 0.16),
-        glow: effectiveDarkAccent.withValues(alpha: isCalmDensity ? 0.11 : 0.30),
+        glow:
+            effectiveDarkAccent.withValues(alpha: isCalmDensity ? 0.11 : 0.30),
         bg: Colors.black,
         surface: const Color(0xFF0A0B0F),
         surfaceContainer: const Color(0xFF12131A),

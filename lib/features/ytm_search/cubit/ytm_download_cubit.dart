@@ -130,7 +130,6 @@ class YtmDownloadCubit extends PulsrCubit<YtmDownloadState> {
   final Map<String, int> _recentlyCompleted = {};
   static const int _recentlyCompletedTtlMs = 10000;
 
-
   YtmDownloadCubit(
     this._service,
     this._playerCubit, {
@@ -332,7 +331,8 @@ class YtmDownloadCubit extends PulsrCubit<YtmDownloadState> {
       _canceledVideoIds.remove(videoId);
       if (quality != null && _queuedQualityByVideoId[videoId] != quality) {
         await _downloads.cancelDownload(videoId);
-        if (isClosed) return (outcome: _AdmitOutcome.alreadyActive, error: null);
+        if (isClosed)
+          return (outcome: _AdmitOutcome.alreadyActive, error: null);
         _queuedQualityByVideoId.remove(videoId);
       } else {
         final resumed = await _downloads.resumeDownload(videoId);
@@ -588,7 +588,8 @@ class YtmDownloadCubit extends PulsrCubit<YtmDownloadState> {
     _lastEmitTimeByVideoId[videoId] = now;
     final nextItems = <String, YtDownloadItem>{...state.items, videoId: item};
     _pruneRetainedTerminalEntries(nextItems, const {});
-    safeEmit(YtmDownloadState(items: Map<String, YtDownloadItem>.unmodifiable(nextItems)));
+    safeEmit(YtmDownloadState(
+        items: Map<String, YtDownloadItem>.unmodifiable(nextItems)));
   }
 
   void _pruneRetainedTerminalEntries(

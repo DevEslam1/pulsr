@@ -17,12 +17,19 @@ import 'package:pulsr/features/library/cubit/library_cubit.dart';
 import '../../helpers/test_song_factory.dart';
 
 class MockGetSongsUseCase extends Mock implements GetSongsUseCase {}
+
 class MockGetAlbumsUseCase extends Mock implements GetAlbumsUseCase {}
+
 class MockGetArtistsUseCase extends Mock implements GetArtistsUseCase {}
+
 class MockGetGenresUseCase extends Mock implements GetGenresUseCase {}
+
 class MockGetYearsUseCase extends Mock implements GetYearsUseCase {}
+
 class MockGetFavoritesUseCase extends Mock implements GetFavoritesUseCase {}
+
 class MockToggleFavoriteUseCase extends Mock implements ToggleFavoriteUseCase {}
+
 class MockFolderUseCases extends Mock implements FolderUseCases {}
 
 void main() {
@@ -89,8 +96,10 @@ void main() {
 
   group('LibraryCubit Favorites Toggle & Rollback', () {
     test('rapid toggle race resolves sequentially via song mutex', () async {
-      final song = createTestSong(id: 42, title: 'Rapid Song', isFavorite: false);
-      final songsController = StreamController<Result<List<SongsTableData>>>.broadcast();
+      final song =
+          createTestSong(id: 42, title: 'Rapid Song', isFavorite: false);
+      final songsController =
+          StreamController<Result<List<SongsTableData>>>.broadcast();
       when(() => mockGetSongs.watchSongs(
             sortBy: any(named: 'sortBy'),
             ascending: any(named: 'ascending'),
@@ -135,9 +144,12 @@ void main() {
       await songsController.close();
     });
 
-    test('failure rollback restores pre-toggle state and sets error message', () async {
-      final song = createTestSong(id: 99, title: 'Rollback Song', isFavorite: false);
-      final songsController = StreamController<Result<List<SongsTableData>>>.broadcast();
+    test('failure rollback restores pre-toggle state and sets error message',
+        () async {
+      final song =
+          createTestSong(id: 99, title: 'Rollback Song', isFavorite: false);
+      final songsController =
+          StreamController<Result<List<SongsTableData>>>.broadcast();
       when(() => mockGetSongs.watchSongs(
             sortBy: any(named: 'sortBy'),
             ascending: any(named: 'ascending'),
@@ -158,16 +170,20 @@ void main() {
 
       // Should have rolled back favorite to false
       expect(cubit.state.favorites.any((s) => s.id == 99), isFalse);
-      expect(cubit.state.songs.firstWhere((s) => s.id == 99).isFavorite, isFalse);
+      expect(
+          cubit.state.songs.firstWhere((s) => s.id == 99).isFavorite, isFalse);
       expect(cubit.state.errorMessage, equals('Disk write failed'));
 
       await cubit.close();
       await songsController.close();
     });
 
-    test('failure rollback when un-favoriting restores favorite to true', () async {
-      final song = createTestSong(id: 77, title: 'Already Fav', isFavorite: true);
-      final favsController = StreamController<Result<List<SongsTableData>>>.broadcast();
+    test('failure rollback when un-favoriting restores favorite to true',
+        () async {
+      final song =
+          createTestSong(id: 77, title: 'Already Fav', isFavorite: true);
+      final favsController =
+          StreamController<Result<List<SongsTableData>>>.broadcast();
       when(() => mockGetFavorites.watchFavorites())
           .thenAnswer((_) => favsController.stream);
 
@@ -176,7 +192,8 @@ void main() {
       favsController.add(Right([song]));
       await pumpEventQueue();
 
-      when(() => mockToggleFavorite(77)).thenThrow(Exception('Simulated crash'));
+      when(() => mockToggleFavorite(77))
+          .thenThrow(Exception('Simulated crash'));
 
       await cubit.toggleFavorite(77);
 

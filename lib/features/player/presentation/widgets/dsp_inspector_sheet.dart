@@ -134,7 +134,9 @@ class _DspInspectorSheetState extends State<DspInspectorSheet>
         channel.getLimiterGrDb().catchError((_, __) => 0.0),
         channel.getDynEqGrDb().catchError((_, __) => 0.0),
         channel.getMultibandGrDb().catchError((_, __) => 0.0),
-        channel.getDspBatteryEstimate().catchError((_, __) => const DspBatteryEstimate()),
+        channel
+            .getDspBatteryEstimate()
+            .catchError((_, __) => const DspBatteryEstimate()),
       ]);
       // getDspDebugReport() is nullable (non-Android / platform failure);
       // casting it to non-null used to throw and discard the latency sample

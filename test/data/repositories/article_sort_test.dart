@@ -58,8 +58,7 @@ void main() {
   /// The four reference rows: two of them collapse to `Beatles` once the
   /// article is ignored.
   Future<void> insertReferenceRows() async {
-    await insertSong(
-        id: 1, title: 'The Beatles', artist: 'X1', album: 'X1');
+    await insertSong(id: 1, title: 'The Beatles', artist: 'X1', album: 'X1');
     await insertSong(
         id: 2, title: 'A Perfect Circle', artist: 'X2', album: 'X2');
     await insertSong(id: 3, title: 'Anathema', artist: 'X3', album: 'X3');
@@ -107,8 +106,7 @@ void main() {
       expect(await orderedIds(sortBy: 'title'), [3, 1, 4, 2]);
     });
 
-    test('artist: leading article is ignored for the primary term',
-        () async {
+    test('artist: leading article is ignored for the primary term', () async {
       await insertSong(id: 1, title: 'Z1', artist: 'The Beatles', album: 'A1');
       await insertSong(
           id: 2, title: 'Z2', artist: 'A Perfect Circle', album: 'A2');
@@ -160,8 +158,7 @@ void main() {
 
       final full = await orderedIds(sortBy: 'title');
       final firstPage = await orderedIds(sortBy: 'title', limit: 2);
-      final secondPage =
-          await orderedIds(sortBy: 'title', limit: 2, offset: 2);
+      final secondPage = await orderedIds(sortBy: 'title', limit: 2, offset: 2);
 
       expect([...firstPage, ...secondPage], full);
     });
@@ -195,7 +192,11 @@ void main() {
   group('non-article sort keys are unchanged', () {
     test('duration ignores titles that look like articles', () async {
       await insertSong(
-          id: 1, title: 'The Beatles', artist: 'X', album: 'X', durationMs: 400);
+          id: 1,
+          title: 'The Beatles',
+          artist: 'X',
+          album: 'X',
+          durationMs: 400);
       await insertSong(
           id: 2,
           title: 'A Perfect Circle',
@@ -208,15 +209,19 @@ void main() {
           id: 4, title: 'Beatles', artist: 'X', album: 'X', durationMs: 200);
 
       expect(await orderedIds(sortBy: 'duration'), [2, 4, 3, 1]);
-      expect(await orderedIds(sortBy: 'duration', ascending: false),
-          [1, 3, 4, 2]);
+      expect(
+          await orderedIds(sortBy: 'duration', ascending: false), [1, 3, 4, 2]);
     });
 
     test('year sorts by the year column, not by title', () async {
       await insertSong(
           id: 1, title: 'The Beatles', artist: 'X', album: 'X', year: 1999);
       await insertSong(
-          id: 2, title: 'A Perfect Circle', artist: 'X', album: 'X', year: 2001);
+          id: 2,
+          title: 'A Perfect Circle',
+          artist: 'X',
+          album: 'X',
+          year: 2001);
       await insertSong(
           id: 3, title: 'Anathema', artist: 'X', album: 'X', year: 1990);
       await insertSong(

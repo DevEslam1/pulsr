@@ -97,7 +97,8 @@ void main() {
   });
 
   group('speed and pitch', () {
-    test('boundary forces unity for live/restored writes without losing prefs', () async {
+    test('boundary forces unity for live/restored writes without losing prefs',
+        () async {
       handler = await ready();
       await handler!.setSpeed(1.5);
       await handler!.setPitch(0.8);

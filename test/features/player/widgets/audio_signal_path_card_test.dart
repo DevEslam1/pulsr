@@ -8,6 +8,7 @@ import 'package:pulsr/features/player/presentation/widgets/audio_signal_path_car
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 void main() {
   testWidgets('AudioSignalPathCard displays all 4 real-time signal stages',
       (tester) async {

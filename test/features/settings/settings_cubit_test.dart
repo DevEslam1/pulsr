@@ -89,8 +89,10 @@ void main() {
       restored.close();
     });
 
-    test('playerSliderStyle defaults to capsule and persists/restores', () async {
-      expect(const SettingsState().playerSliderStyle, PlayerSliderStyle.capsule);
+    test('playerSliderStyle defaults to capsule and persists/restores',
+        () async {
+      expect(
+          const SettingsState().playerSliderStyle, PlayerSliderStyle.capsule);
 
       final cubit = SettingsCubit(scannerService: mockScannerService);
       expect(cubit.state.playerSliderStyle, PlayerSliderStyle.capsule);
@@ -108,7 +110,8 @@ void main() {
       restored.close();
     });
 
-    test('appButtonStyle defaults to rectangular and persists/restores', () async {
+    test('appButtonStyle defaults to rectangular and persists/restores',
+        () async {
       expect(const SettingsState().appButtonStyle, AppButtonStyle.rectangular);
 
       final cubit = SettingsCubit(scannerService: mockScannerService);

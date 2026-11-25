@@ -224,8 +224,8 @@ class PlaybackPositionPersister {
 
   Future<bool> _persistToRepository(PlaybackPositionSnapshot snapshot) async {
     try {
-      final posRes =
-          await _repository.updateLastPosition(snapshot.songId, snapshot.positionMs);
+      final posRes = await _repository.updateLastPosition(
+          snapshot.songId, snapshot.positionMs);
       posRes.fold(
         (failure) => throw failure,
         (_) {},

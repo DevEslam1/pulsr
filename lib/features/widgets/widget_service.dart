@@ -236,10 +236,9 @@ class WidgetService {
       _lastProgressPositionMs = posMs;
       _lastProgressDurationMs = durMs;
 
-      final resolvedTitle =
-          hasSong && song.title.trim().isNotEmpty
-              ? song.title
-              : (L10nHolder.current?.appTitle ?? 'Pulsr Music');
+      final resolvedTitle = hasSong && song.title.trim().isNotEmpty
+          ? song.title
+          : (L10nHolder.current?.appTitle ?? 'Pulsr Music');
       final resolvedArtist = hasSong && song.artist.trim().isNotEmpty
           ? song.artist
           : (L10nHolder.current?.widgetNothingPlaying ?? 'Nothing playing');

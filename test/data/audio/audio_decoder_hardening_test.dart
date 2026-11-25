@@ -91,7 +91,9 @@ void main() {
       await dir.delete(recursive: true);
     });
 
-    test('BUG-P2-4: parseDsfBytes rejects DSF without data chunk and buildWavContainer handles odd float counts', () {
+    test(
+        'BUG-P2-4: parseDsfBytes rejects DSF without data chunk and buildWavContainer handles odd float counts',
+        () {
       final noDataDsf = Uint8List(80);
       final bd = ByteData.sublistView(noDataDsf);
       for (var i = 0; i < 4; i++) {
@@ -120,7 +122,9 @@ void main() {
       expect(wav.length, 44 + 6); // 1 complete stereo 24-bit frame (6 bytes)
     });
 
-    test('BUG-P2-5: MQA unfold rejects truncated fmt chunk and non-PCM audioFormat', () async {
+    test(
+        'BUG-P2-5: MQA unfold rejects truncated fmt chunk and non-PCM audioFormat',
+        () async {
       final dir = await Directory.systemTemp.createTemp('mqa_fmt');
       final file = File('${dir.path}/float_mqa.wav');
       final buf = Uint8List(64);
@@ -136,7 +140,8 @@ void main() {
       ascii(8, 'WAVE');
       ascii(12, 'fmt ');
       bd.setUint32(16, 16, Endian.little);
-      bd.setUint16(20, 3, Endian.little); // audioFormat = 3 (IEEE float, not PCM 1)
+      bd.setUint16(
+          20, 3, Endian.little); // audioFormat = 3 (IEEE float, not PCM 1)
       bd.setUint16(22, 2, Endian.little);
       bd.setUint32(24, 48000, Endian.little);
       bd.setUint16(34, 24, Endian.little);

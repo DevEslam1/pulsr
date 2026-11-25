@@ -377,7 +377,8 @@ void main() {
         }
       }
 
-      final resp = RoomCorrectionService.analyzeResponse(pcm, sampleRate, tones);
+      final resp =
+          RoomCorrectionService.analyzeResponse(pcm, sampleRate, tones);
       expect(resp.length, 2);
       expect(resp[0], closeTo(0.0, 1.5));
       expect(resp[1], closeTo(0.0, 1.5));

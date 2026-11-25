@@ -28,11 +28,23 @@ void main() {
       expect(telemetry.eqAutoHeadroomDb, 0.0);
     });
 
-    test('parses 19-slot payload including loudnessDeltaDb and eqAutoHeadroomDb', () {
+    test(
+        'parses 19-slot payload including loudnessDeltaDb and eqAutoHeadroomDb',
+        () {
       final list = <dynamic>[
         -1.0,
-        0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-        0.0, 0.0, 0.0, 0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
         0.2,
         0,
         0.1,

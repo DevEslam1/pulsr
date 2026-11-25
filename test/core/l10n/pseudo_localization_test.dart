@@ -14,6 +14,7 @@ import '../../helpers/screen_harness.dart';
 import '../../helpers/test_song_factory.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 const Map<String, String> _accentMap = {
   'a': 'á',
   'e': 'é',

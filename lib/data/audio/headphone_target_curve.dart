@@ -107,8 +107,7 @@ class HeadphoneTargetCurve {
   }
 
   @override
-  int get hashCode =>
-      Object.hash(name, description, Object.hashAll(points));
+  int get hashCode => Object.hash(name, description, Object.hashAll(points));
 
   @override
   String toString() => 'HeadphoneTargetCurve($name, ${points.length} points)';

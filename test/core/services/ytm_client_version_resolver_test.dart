@@ -307,8 +307,7 @@ void main() {
           YtmClientVersionResolver.fallbackClientVersion);
     });
 
-    test(
-        'a body with no recognizable fields does not record fetch time',
+    test('a body with no recognizable fields does not record fetch time',
         () async {
       SharedPreferences.setMockInitialValues({});
       final resolver = YtmClientVersionResolver();

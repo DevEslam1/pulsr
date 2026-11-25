@@ -118,7 +118,8 @@ enum AmbientSoundEffect {
     }
   }
 
-  String localizedDisplayName(AppLocalizations l) => '$emoji ${localizedLabel(l)}';
+  String localizedDisplayName(AppLocalizations l) =>
+      '$emoji ${localizedLabel(l)}';
 }
 
 /// Singleton manager for looping ambient background sounds.
@@ -190,7 +191,9 @@ class AmbientSoundService extends ChangeNotifier {
     if (_alwaysOnRadio) {
       if (isRadio && !isEnabled) {
         unawaited(setEnabled(true));
-      } else if (!isRadio && !(_allowDuringQuran && _quranModeActive) && isEnabled) {
+      } else if (!isRadio &&
+          !(_allowDuringQuran && _quranModeActive) &&
+          isEnabled) {
         unawaited(setEnabled(false));
       }
     }
@@ -205,7 +208,9 @@ class AmbientSoundService extends ChangeNotifier {
     if (value) {
       if (_isRadioPlaying && !isEnabled) {
         await setEnabled(true);
-      } else if (!_isRadioPlaying && !(_allowDuringQuran && _quranModeActive) && isEnabled) {
+      } else if (!_isRadioPlaying &&
+          !(_allowDuringQuran && _quranModeActive) &&
+          isEnabled) {
         await setEnabled(false);
       }
     }
@@ -656,12 +661,11 @@ class AmbientSoundService extends ChangeNotifier {
       if (savedNames.isNotEmpty) {
         _savedUserEffects.clear();
         for (final name in savedNames) {
-          final effect = AmbientSoundEffect.values
-              .cast<AmbientSoundEffect?>()
-              .firstWhere(
-                (e) => e?.name == name,
-                orElse: () => null,
-              );
+          final effect =
+              AmbientSoundEffect.values.cast<AmbientSoundEffect?>().firstWhere(
+                    (e) => e?.name == name,
+                    orElse: () => null,
+                  );
           if (effect != null) {
             _savedUserEffects.add(effect);
           }
@@ -671,12 +675,11 @@ class AmbientSoundService extends ChangeNotifier {
       // Load active effects
       final activeNames = prefs.getStringList(_keyActiveEffects) ?? [];
       for (final name in activeNames) {
-        final effect = AmbientSoundEffect.values
-            .cast<AmbientSoundEffect?>()
-            .firstWhere(
-              (e) => e?.name == name,
-              orElse: () => null,
-            );
+        final effect =
+            AmbientSoundEffect.values.cast<AmbientSoundEffect?>().firstWhere(
+                  (e) => e?.name == name,
+                  orElse: () => null,
+                );
         if (effect != null) {
           _activeEffects.add(effect);
         }

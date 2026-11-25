@@ -57,14 +57,17 @@ Map<String, Object?> _statusMap({
     };
 
 void main() {
-  test('raw integer source depth parses, copies and expires with transport', () {
+  test('raw integer source depth parses, copies and expires with transport',
+      () {
     final active = UsbExclusiveStatus.fromMap({
-      'streamingActive': true, 'rawPcmBitDepth': 32,
+      'streamingActive': true,
+      'rawPcmBitDepth': 32,
     });
     expect(active.rawPcmBitDepth, 32);
     expect(active.copyWith(streamingBitDepth: 32).rawPcmBitDepth, 32);
     expect(active.copyWith(rawPcmBitDepth: 0).rawPcmBitDepth, 0);
-    expect(UsbExclusiveStatus.fromMap({'rawPcmBitDepth': 32}).rawPcmBitDepth, 0);
+    expect(
+        UsbExclusiveStatus.fromMap({'rawPcmBitDepth': 32}).rawPcmBitDepth, 0);
     expect(UsbExclusiveStatus.none.rawPcmBitDepth, 0);
   });
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -257,7 +260,8 @@ void main() {
         expect(
           await service.startStreaming(sampleRate: rate),
           UsbStreamResult.ok,
-          reason: 'a DAC that advertised $rate must not be refused by the client',
+          reason:
+              'a DAC that advertised $rate must not be refused by the client',
         );
       }
     });
@@ -332,24 +336,29 @@ void main() {
       expect(await service.startStreaming(), UsbStreamResult.ok);
     });
 
-    test('accepts a wider wire bit depth in non-strict mode and requires exact in strict', () async {
+    test(
+        'accepts a wider wire bit depth in non-strict mode and requires exact in strict',
+        () async {
       _messenger.setMockMethodCallHandler(_method, (call) async {
         if (call.method == 'startStreaming') return {'success': true};
         return _statusMap(streaming: true, bitDepth: 24);
       });
       await service.getStatus();
       expect(
-        await service.startStreaming(sampleRate: 48000, bitDepth: 16, strict: false),
+        await service.startStreaming(
+            sampleRate: 48000, bitDepth: 16, strict: false),
         UsbStreamResult.ok,
       );
       expect(
-        await service.startStreaming(sampleRate: 48000, bitDepth: 16, strict: true),
+        await service.startStreaming(
+            sampleRate: 48000, bitDepth: 16, strict: true),
         UsbStreamResult.unknown,
       );
     });
   });
 
-  test('stop requires fresh confirmation that the stream is inactive', () async {
+  test('stop requires fresh confirmation that the stream is inactive',
+      () async {
     await service.getStatus(); // cached inactive status must not prove teardown
     _messenger.setMockMethodCallHandler(_method, (call) async {
       if (call.method == 'stopStreaming') return {'success': true};
@@ -363,7 +372,8 @@ void main() {
     expect(await service.stopStreaming(), isFalse);
   });
 
-  test('start does not trust cached permission or an unconfirmed success', () async {
+  test('start does not trust cached permission or an unconfirmed success',
+      () async {
     await service.getStatus();
     _messenger.setMockMethodCallHandler(_method, (call) async {
       if (call.method == 'startStreaming') return {'success': true};

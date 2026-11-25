@@ -185,9 +185,8 @@ class SmartRule {
   domain.SmartRule toDomain() => domain.SmartRule(
         field: field.toDomain(),
         operator: operator.toDomain(),
-        value: field == SmartRuleField.duration
-            ? _secondsToMsValue(value)
-            : value,
+        value:
+            field == SmartRuleField.duration ? _secondsToMsValue(value) : value,
       );
 
   factory SmartRule.fromDomain(domain.SmartRule domainRule, {String? id}) {

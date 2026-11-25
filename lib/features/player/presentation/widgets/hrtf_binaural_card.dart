@@ -93,8 +93,8 @@ class _HrtfBinauralCardState extends State<HrtfBinauralCard> {
     );
     if (!mounted) return false;
     final after = cubit.state;
-    final newError =
-        after.errorMessage != null && after.errorMessage != prevState.errorMessage;
+    final newError = after.errorMessage != null &&
+        after.errorMessage != prevState.errorMessage;
     final acknowledged = !verifyDatasetPath ||
         ((sofaPath == null || sofaPath.isEmpty)
             ? _hrtfDatasetAcknowledged('')
@@ -211,7 +211,8 @@ class _HrtfBinauralCardState extends State<HrtfBinauralCard> {
         }
       }
     } catch (e, st) {
-      ErrorLogger.log('Failed to pick/load SOFA dataset', error: e, stackTrace: st);
+      ErrorLogger.log('Failed to pick/load SOFA dataset',
+          error: e, stackTrace: st);
       if (context.mounted) {
         PulsrToast.show(
           context,
@@ -261,220 +262,217 @@ class _HrtfBinauralCardState extends State<HrtfBinauralCard> {
         });
       },
       child: Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: p.surfaceContainer,
-        borderRadius: AppRadii.cardRadius,
-        border: Border.all(color: p.hairline),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(AppSpacing.xs),
-                decoration: BoxDecoration(
-                  color: p.accent.withValues(alpha: 0.15),
-                  borderRadius: AppRadii.r8All,
+        padding: const EdgeInsets.all(AppSpacing.md),
+        decoration: BoxDecoration(
+          color: p.surfaceContainer,
+          borderRadius: AppRadii.cardRadius,
+          border: Border.all(color: p.hairline),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(AppSpacing.xs),
+                  decoration: BoxDecoration(
+                    color: p.accent.withValues(alpha: 0.15),
+                    borderRadius: AppRadii.r8All,
+                  ),
+                  child: Icon(Icons.spatial_audio_rounded,
+                      color: p.accent, size: 20),
                 ),
-                child: Icon(Icons.spatial_audio_rounded,
-                    color: p.accent, size: 20),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      l10n.hrtfTitle,
-                      style: TextStyle(
-                        fontSize: AppFontSize.body,
-                        fontWeight: FontWeight.w700,
-                        color: p.textPrimary,
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        l10n.hrtfTitle,
+                        style: TextStyle(
+                          fontSize: AppFontSize.body,
+                          fontWeight: FontWeight.w700,
+                          color: p.textPrimary,
+                        ),
                       ),
-                    ),
-                    Text(
-                      l10n.hrtfSubtitle,
-                      style: TextStyle(
-                        fontSize: AppFontSize.caption,
-                        color: p.textSecondary,
+                      Text(
+                        l10n.hrtfSubtitle,
+                        style: TextStyle(
+                          fontSize: AppFontSize.caption,
+                          color: p.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Switch(
+                  value: _enabled && !isBlocked,
+                  onChanged:
+                      isBlocked ? null : (val) => _toggleEnabled(context, val),
+                ),
+              ],
+            ),
+            if (widget.blockedReason != null) ...[
+              const SizedBox(height: AppSpacing.sm),
+              Container(
+                padding: const EdgeInsets.all(AppSpacing.sm),
+                decoration: BoxDecoration(
+                  color: p.error.withValues(alpha: 0.1),
+                  borderRadius: AppRadii.cardRadius,
+                  border: Border.all(color: p.error.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.block_rounded, color: p.error, size: 16),
+                    const SizedBox(width: AppSpacing.xs),
+                    Expanded(
+                      child: Text(
+                        l10n.hrtfBlockedByBitPerfect(widget.blockedReason!),
+                        style: TextStyle(
+                            fontSize: AppFontSize.caption, color: p.error),
                       ),
                     ),
                   ],
                 ),
               ),
-              Switch(
-                value: _enabled && !isBlocked,
-                onChanged: isBlocked
-                    ? null
-                    : (val) => _toggleEnabled(context, val),
+            ] else if (isCrossfeedActive && _enabled) ...[
+              const SizedBox(height: AppSpacing.sm),
+              Container(
+                padding: const EdgeInsets.all(AppSpacing.sm),
+                decoration: BoxDecoration(
+                  color: p.accent.withValues(alpha: 0.1),
+                  borderRadius: AppRadii.cardRadius,
+                  border: Border.all(color: p.accent.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline_rounded, color: p.accent, size: 16),
+                    const SizedBox(width: AppSpacing.xs),
+                    Expanded(
+                      child: Text(
+                        l10n.hrtfCrossfeedConflict,
+                        style: TextStyle(
+                            fontSize: AppFontSize.caption, color: p.accent),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
-          ),
+            if (_enabled && !isBlocked) ...[
+              const SizedBox(height: AppSpacing.md),
+              const Divider(height: 1),
+              const SizedBox(height: AppSpacing.md),
 
-          if (widget.blockedReason != null) ...[
-            const SizedBox(height: AppSpacing.sm),
-            Container(
-              padding: const EdgeInsets.all(AppSpacing.sm),
-              decoration: BoxDecoration(
-                color: p.error.withValues(alpha: 0.1),
-                borderRadius: AppRadii.cardRadius,
-                border: Border.all(color: p.error.withValues(alpha: 0.3)),
-              ),
-              child: Row(
+              // Azimuth Slider
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Icon(Icons.block_rounded, color: p.error, size: 16),
-                  const SizedBox(width: AppSpacing.xs),
-                  Expanded(
-                    child: Text(
-                      l10n.hrtfBlockedByBitPerfect(widget.blockedReason!),
-                      style: TextStyle(
-                          fontSize: AppFontSize.caption, color: p.error),
+                  Text(
+                    l10n.hrtfVirtualSpeakerAzimuth,
+                    style: TextStyle(
+                      fontSize: AppFontSize.caption,
+                      fontWeight: FontWeight.w600,
+                      color: p.textPrimary,
+                    ),
+                  ),
+                  Text(
+                    l10n.hrtfAngleDirection(
+                      _azimuth.toStringAsFixed(0),
+                      _azimuth < 0
+                          ? l10n.hrtfDirectionLeft
+                          : (_azimuth > 0
+                              ? l10n.hrtfDirectionRight
+                              : l10n.hrtfDirectionCenter),
+                    ),
+                    style: TextStyle(
+                      fontSize: AppFontSize.caption,
+                      fontWeight: FontWeight.w700,
+                      color: p.accent,
                     ),
                   ),
                 ],
               ),
-            ),
-          ] else if (isCrossfeedActive && _enabled) ...[
-            const SizedBox(height: AppSpacing.sm),
-            Container(
-              padding: const EdgeInsets.all(AppSpacing.sm),
-              decoration: BoxDecoration(
-                color: p.accent.withValues(alpha: 0.1),
-                borderRadius: AppRadii.cardRadius,
-                border: Border.all(color: p.accent.withValues(alpha: 0.3)),
+              ThrottledSlider(
+                value: _azimuth,
+                min: -90.0,
+                max: 90.0,
+                divisions: 36,
+                onChanged: (val) => _updateAzimuth(context, val),
               ),
-              child: Row(
+
+              const SizedBox(height: AppSpacing.sm),
+
+              // Elevation Slider
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Icon(Icons.info_outline_rounded, color: p.accent, size: 16),
-                  const SizedBox(width: AppSpacing.xs),
-                  Expanded(
-                    child: Text(
-                      l10n.hrtfCrossfeedConflict,
-                      style: TextStyle(
-                          fontSize: AppFontSize.caption, color: p.accent),
+                  Text(
+                    l10n.hrtfVirtualSpeakerElevation,
+                    style: TextStyle(
+                      fontSize: AppFontSize.caption,
+                      fontWeight: FontWeight.w600,
+                      color: p.textPrimary,
+                    ),
+                  ),
+                  Text(
+                    l10n.hrtfAngleDirection(
+                      _elevation.toStringAsFixed(0),
+                      _elevation < 0
+                          ? l10n.hrtfElevationBelow
+                          : (_elevation > 0
+                              ? l10n.hrtfElevationAbove
+                              : l10n.hrtfElevationEarLevel),
+                    ),
+                    style: TextStyle(
+                      fontSize: AppFontSize.caption,
+                      fontWeight: FontWeight.w700,
+                      color: p.accent,
                     ),
                   ),
                 ],
               ),
-            ),
-          ],
+              ThrottledSlider(
+                value: _elevation,
+                min: -45.0,
+                max: 45.0,
+                divisions: 18,
+                onChanged: (val) => _updateElevation(context, val),
+              ),
 
-          if (_enabled && !isBlocked) ...[
-            const SizedBox(height: AppSpacing.md),
-            const Divider(height: 1),
-            const SizedBox(height: AppSpacing.md),
+              const SizedBox(height: AppSpacing.sm),
 
-            // Azimuth Slider
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  l10n.hrtfVirtualSpeakerAzimuth,
-                  style: TextStyle(
-                    fontSize: AppFontSize.caption,
-                    fontWeight: FontWeight.w600,
-                    color: p.textPrimary,
-                  ),
-                ),
-                Text(
-                  l10n.hrtfAngleDirection(
-                    _azimuth.toStringAsFixed(0),
-                    _azimuth < 0
-                        ? l10n.hrtfDirectionLeft
-                        : (_azimuth > 0
-                            ? l10n.hrtfDirectionRight
-                            : l10n.hrtfDirectionCenter),
-                  ),
-                  style: TextStyle(
-                    fontSize: AppFontSize.caption,
-                    fontWeight: FontWeight.w700,
-                    color: p.accent,
-                  ),
-                ),
-              ],
-            ),
-            ThrottledSlider(
-              value: _azimuth,
-              min: -90.0,
-              max: 90.0,
-              divisions: 36,
-              onChanged: (val) => _updateAzimuth(context, val),
-            ),
-
-            const SizedBox(height: AppSpacing.sm),
-
-            // Elevation Slider
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  l10n.hrtfVirtualSpeakerElevation,
-                  style: TextStyle(
-                    fontSize: AppFontSize.caption,
-                    fontWeight: FontWeight.w600,
-                    color: p.textPrimary,
-                  ),
-                ),
-                Text(
-                  l10n.hrtfAngleDirection(
-                    _elevation.toStringAsFixed(0),
-                    _elevation < 0
-                        ? l10n.hrtfElevationBelow
-                        : (_elevation > 0
-                            ? l10n.hrtfElevationAbove
-                            : l10n.hrtfElevationEarLevel),
-                  ),
-                  style: TextStyle(
-                    fontSize: AppFontSize.caption,
-                    fontWeight: FontWeight.w700,
-                    color: p.accent,
-                  ),
-                ),
-              ],
-            ),
-            ThrottledSlider(
-              value: _elevation,
-              min: -45.0,
-              max: 45.0,
-              divisions: 18,
-              onChanged: (val) => _updateElevation(context, val),
-            ),
-
-            const SizedBox(height: AppSpacing.sm),
-
-            // Dataset selection row
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    icon: const Icon(Icons.file_open_rounded, size: 16),
-                    label: Text(
-                      _sofaPath != null && _sofaPath!.isNotEmpty
-                          ? l10n.hrtfSofaLoadedLabel(
-                              _sofaPath!.split(RegExp(r'[/\\]')).last,
-                            )
-                          : l10n.hrtfLoadCustomSofa,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: AppFontSize.caption),
+              // Dataset selection row
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      icon: const Icon(Icons.file_open_rounded, size: 16),
+                      label: Text(
+                        _sofaPath != null && _sofaPath!.isNotEmpty
+                            ? l10n.hrtfSofaLoadedLabel(
+                                _sofaPath!.split(RegExp(r'[/\\]')).last,
+                              )
+                            : l10n.hrtfLoadCustomSofa,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: AppFontSize.caption),
+                      ),
+                      onPressed: () => _pickSofaFile(context),
                     ),
-                    onPressed: () => _pickSofaFile(context),
                   ),
-                ),
-                const SizedBox(width: AppSpacing.xs),
-                IconButton(
-                  icon: const Icon(Icons.refresh_rounded, size: 18),
-                  tooltip: l10n.hrtfResetTooltip,
-                  onPressed: () => _resetToDefault(context),
-                ),
-              ],
-            ),
+                  const SizedBox(width: AppSpacing.xs),
+                  IconButton(
+                    icon: const Icon(Icons.refresh_rounded, size: 18),
+                    tooltip: l10n.hrtfResetTooltip,
+                    onPressed: () => _resetToDefault(context),
+                  ),
+                ],
+              ),
+            ],
           ],
-        ],
+        ),
       ),
-    ),
     );
   }
 }

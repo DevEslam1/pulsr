@@ -317,7 +317,8 @@ void main() {
       expect(probedUa, 'UA',
           reason: 'the probe must ask as the same client that minted the URL');
       expect(resolveCalls, equals(1),
-          reason: 'the rejection falls through to a fresh resolve in this call');
+          reason:
+              'the rejection falls through to a fresh resolve in this call');
       expect(sawForceRefresh, isTrue,
           reason: 'a dead signature must not be read back from any memo');
       expect(cache.getUrl(videoId), isNot(deadUrl));
@@ -332,9 +333,9 @@ void main() {
       final cachedUrl = _streamUrl();
       cache.put(videoId, cachedUrl);
 
-      StreamUrlVerifier.debugProbeOverride =
-          (url, {userAgent, referer, cookie}) async =>
-              const StreamUrlProbe.unknown('timeout');
+      StreamUrlVerifier.debugProbeOverride = (url,
+              {userAgent, referer, cookie}) async =>
+          const StreamUrlProbe.unknown('timeout');
 
       var resolveCalls = 0;
       final source = YtmResolvingSource(
@@ -473,9 +474,8 @@ void main() {
     test('debugInnerFactory also disables probing', () async {
       const videoId = 'factoryvid';
       cache.put(videoId, _streamUrl());
-      YtmResolvingSource.debugInnerFactory =
-          (uri, headers, cacheFile) =>
-              _ServingCacheSource(uri, cacheFile: cacheFile);
+      YtmResolvingSource.debugInnerFactory = (uri, headers, cacheFile) =>
+          _ServingCacheSource(uri, cacheFile: cacheFile);
       addTearDown(() => YtmResolvingSource.debugInnerFactory = null);
 
       var probes = 0;

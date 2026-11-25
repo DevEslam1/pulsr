@@ -121,7 +121,8 @@ void main() {
         reason: 'one failed tool must not blank the hub');
   });
 
-  testWidgets('M-08 awaits MethodChannelTtsEngine.init before registering in getIt',
+  testWidgets(
+      'M-08 awaits MethodChannelTtsEngine.init before registering in getIt',
       (tester) async {
     await getIt.reset();
     SharedPreferences.setMockInitialValues(<String, Object>{});
@@ -161,8 +162,8 @@ void main() {
       home: const ExtrasScreen(),
     ));
 
-    await tester.runAsync(
-        () => Future<void>.delayed(const Duration(milliseconds: 20)));
+    await tester
+        .runAsync(() => Future<void>.delayed(const Duration(milliseconds: 20)));
     await tester.pump();
     expect(registeredBeforeInitFinished, isFalse);
     expect(getIt.isRegistered<MethodChannelTtsEngine>(), isFalse);

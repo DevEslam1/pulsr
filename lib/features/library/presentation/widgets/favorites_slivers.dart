@@ -62,8 +62,8 @@ List<Widget> buildFavoritesSlivers({
   final hasOnlineTracks =
       songs.any((s) => s.remoteId != null && s.remoteId!.isNotEmpty);
 
-  final isCenteredEmpty =
-      (!hasAnyInScope && !isLoading) || (songs.isEmpty && searchQuery.isNotEmpty);
+  final isCenteredEmpty = (!hasAnyInScope && !isLoading) ||
+      (songs.isEmpty && searchQuery.isNotEmpty);
 
   return [
     // ---------- Canonical Local / Online Scope Switcher ----------
@@ -238,7 +238,8 @@ List<Widget> buildFavoritesSlivers({
             final song = songs[index];
             return StaggeredReveal(
               index: index,
-              groupKey: songs.isEmpty ? '' : '${songs.first.id}-${songs.length}',
+              groupKey:
+                  songs.isEmpty ? '' : '${songs.first.id}-${songs.length}',
               child: _FavoriteGridCard(
                 song: song,
                 queue: songs,
@@ -407,8 +408,7 @@ class _FavoritesHeaderCard extends StatelessWidget {
                   builder: (context, constraints) {
                     final inlineAction =
                         onViewAll != null && constraints.maxWidth >= 480;
-                    final stackedAction =
-                        onViewAll != null && !inlineAction;
+                    final stackedAction = onViewAll != null && !inlineAction;
 
                     Widget buildViewAllPill() {
                       return Container(
@@ -781,10 +781,10 @@ class _FavoriteGridCard extends StatelessWidget {
                             ),
                             child: YtmDownloadButton(
                               song: song,
-                              activeColor: context
-                                  .playerSurfacePalette.highContrastInk,
-                              iconColor: context
-                                  .playerSurfacePalette.highContrastInk,
+                              activeColor:
+                                  context.playerSurfacePalette.highContrastInk,
+                              iconColor:
+                                  context.playerSurfacePalette.highContrastInk,
                               iconSize: 18,
                             ),
                           ),

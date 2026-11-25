@@ -8,8 +8,12 @@ import 'package:pulsr/features/player/cubit/player_state.dart';
 import 'package:pulsr/features/player/presentation/widgets/equalizer_sheet.dart';
 
 void main() {
-  group('Phase 3 Architecture — DspSlice Table-Driven Descriptors & Rollback Policy', () {
-    test('dspSliceFields contains complete descriptors for all DSP effect fields', () {
+  group(
+      'Phase 3 Architecture — DspSlice Table-Driven Descriptors & Rollback Policy',
+      () {
+    test(
+        'dspSliceFields contains complete descriptors for all DSP effect fields',
+        () {
       expect(dspSliceFields, isNotEmpty);
       expect(dspSliceFields.length, greaterThanOrEqualTo(25));
 
@@ -18,27 +22,31 @@ void main() {
           reason: 'Every descriptor must have a unique name');
 
       // Core DSP fields verified
-      expect(names, containsAll([
-        'isEqEnabled',
-        'eqPreset',
-        'isVirtualizerEnabled',
-        'virtualizerStrength',
-        'isDynamicsEnabled',
-        'dynamicsPreset',
-        'selectedHeadphoneProfile',
-        'volumeBoost',
-        'effectiveVolumeBoost',
-        'effectiveBassBoost',
-        'isReverbEnabled',
-        'reverbPreset',
-        'isLimiterEnabled',
-        'isSaturationEnabled',
-        'isCrossfeedEnabled',
-        'isStereoWidthEnabled',
-      ]));
+      expect(
+          names,
+          containsAll([
+            'isEqEnabled',
+            'eqPreset',
+            'isVirtualizerEnabled',
+            'virtualizerStrength',
+            'isDynamicsEnabled',
+            'dynamicsPreset',
+            'selectedHeadphoneProfile',
+            'volumeBoost',
+            'effectiveVolumeBoost',
+            'effectiveBassBoost',
+            'isReverbEnabled',
+            'reverbPreset',
+            'isLimiterEnabled',
+            'isSaturationEnabled',
+            'isCrossfeedEnabled',
+            'isStereoWidthEnabled',
+          ]));
     });
 
-    test('Property test: DspRollbackPolicy.merge reverts exactly the attempted fields without clobbering concurrent current values', () {
+    test(
+        'Property test: DspRollbackPolicy.merge reverts exactly the attempted fields without clobbering concurrent current values',
+        () {
       const previous = DspSlice();
 
       // For every descriptor in dspSliceFields:
@@ -57,11 +65,13 @@ void main() {
             break;
           case 'eqPreset':
             attempted = previous.copyWith(
-              eqPreset: const EqPreset(name: 'TestPreset', gains: [1, 2, 3, 4, 5]),
+              eqPreset:
+                  const EqPreset(name: 'TestPreset', gains: [1, 2, 3, 4, 5]),
             );
             break;
           case 'isVirtualizerEnabled':
-            attempted = previous.copyWith(isVirtualizerEnabled: !previous.isVirtualizerEnabled);
+            attempted = previous.copyWith(
+                isVirtualizerEnabled: !previous.isVirtualizerEnabled);
             break;
           case 'virtualizerStrength':
             attempted = previous.copyWith(virtualizerStrength: 0.65);
@@ -73,19 +83,24 @@ void main() {
             attempted = previous.copyWith(effectiveVolumeBoost: 4.5);
             break;
           case 'isReverbEnabled':
-            attempted = previous.copyWith(isReverbEnabled: !previous.isReverbEnabled);
+            attempted =
+                previous.copyWith(isReverbEnabled: !previous.isReverbEnabled);
             break;
           case 'isLimiterEnabled':
-            attempted = previous.copyWith(isLimiterEnabled: !previous.isLimiterEnabled);
+            attempted =
+                previous.copyWith(isLimiterEnabled: !previous.isLimiterEnabled);
             break;
           case 'isSaturationEnabled':
-            attempted = previous.copyWith(isSaturationEnabled: !previous.isSaturationEnabled);
+            attempted = previous.copyWith(
+                isSaturationEnabled: !previous.isSaturationEnabled);
             break;
           case 'isCrossfeedEnabled':
-            attempted = previous.copyWith(isCrossfeedEnabled: !previous.isCrossfeedEnabled);
+            attempted = previous.copyWith(
+                isCrossfeedEnabled: !previous.isCrossfeedEnabled);
             break;
           case 'isStereoWidthEnabled':
-            attempted = previous.copyWith(isStereoWidthEnabled: !previous.isStereoWidthEnabled);
+            attempted = previous.copyWith(
+                isStereoWidthEnabled: !previous.isStereoWidthEnabled);
             break;
           default:
             // For any other descriptor, skip
@@ -103,13 +118,15 @@ void main() {
         expect(
           descriptor.valuesEqual(merged, previous),
           isTrue,
-          reason: 'Field "${descriptor.name}" should revert to previous value in merged state',
+          reason:
+              'Field "${descriptor.name}" should revert to previous value in merged state',
         );
 
         // The sentinel field present on current must NOT be clobbered
         if (!isVirtualizer) {
           expect(merged.virtualizerStrength, equals(0.95),
-              reason: 'Concurrent current field virtualizerStrength must be preserved');
+              reason:
+                  'Concurrent current field virtualizerStrength must be preserved');
         } else {
           expect(merged.preampDb, equals(-3.5),
               reason: 'Concurrent current field preampDb must be preserved');
@@ -117,7 +134,9 @@ void main() {
       }
     });
 
-    test('dspSheetRebuildGate ignores playback position ticks and triggers on DSP changes', () {
+    test(
+        'dspSheetRebuildGate ignores playback position ticks and triggers on DSP changes',
+        () {
       const baseState = PlayerState(
         playback: PlaybackSlice(
           position: Duration(seconds: 10),
@@ -128,13 +147,15 @@ void main() {
 
       // Position change only -> must NOT rebuild
       final tickedState = baseState.copyWith(
-        playback: baseState.playback.copyWith(position: const Duration(seconds: 11)),
+        playback:
+            baseState.playback.copyWith(position: const Duration(seconds: 11)),
       );
       expect(dspSheetRebuildGate(baseState, tickedState), isFalse);
 
       // Duration change -> must NOT rebuild
       final durationState = baseState.copyWith(
-        playback: baseState.playback.copyWith(duration: const Duration(minutes: 4)),
+        playback:
+            baseState.playback.copyWith(duration: const Duration(minutes: 4)),
       );
       expect(dspSheetRebuildGate(baseState, durationState), isFalse);
 
@@ -151,7 +172,9 @@ void main() {
       expect(dspSheetRebuildGate(baseState, headroomState), isTrue);
     });
 
-    test('AudioOutputInfo type flags accurately identify USB, Bluetooth, Headphones, and Speakers', () {
+    test(
+        'AudioOutputInfo type flags accurately identify USB, Bluetooth, Headphones, and Speakers',
+        () {
       const usbDac = AudioOutputInfo(
         deviceName: 'FiiO KA13',
         isUsbDac: true,

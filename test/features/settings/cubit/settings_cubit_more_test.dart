@@ -134,7 +134,8 @@ void main() {
         expect(
           prefs.getString('setting_player_theme_mode'),
           entry.value.name,
-          reason: 'Saved "${entry.key}" must self-heal to "${entry.value.name}"',
+          reason:
+              'Saved "${entry.key}" must self-heal to "${entry.value.name}"',
         );
         await cubit.close();
       }

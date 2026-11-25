@@ -577,12 +577,16 @@ void main() {
   });
 
   group('PlayerQueueRadioExtension deduplication', () {
-    test('normalizeTitle preserves Arabic characters and strips punctuation', () {
-      final norm = PlayerQueueController.normalizeTitle('أغنية جميلة (فيديو كليب)!');
+    test('normalizeTitle preserves Arabic characters and strips punctuation',
+        () {
+      final norm =
+          PlayerQueueController.normalizeTitle('أغنية جميلة (فيديو كليب)!');
       expect(norm, equals('أغنيةجميلة'));
     });
 
-    test('isSameRecording recognizes identical Arabic songs with different suffixes', () {
+    test(
+        'isSameRecording recognizes identical Arabic songs with different suffixes',
+        () {
       final same = PlayerQueueController.isSameRecording(
         'حبيبي (Official Video)',
         'عمرو دياب',

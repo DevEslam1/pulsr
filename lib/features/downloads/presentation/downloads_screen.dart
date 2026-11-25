@@ -30,6 +30,7 @@ import '../../../../core/responsive/pulsr_layout_metrics.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
 
 import '../../../core/utils/pulsr_haptics.dart';
+
 enum DownloadFilter { all, downloading, completed, failed }
 
 /// Returns the subset of [selected] that still maps to a live task. Extracted
@@ -331,7 +332,8 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
                               child: SingleChildScrollView(
                                 physics: const AlwaysScrollableScrollPhysics(),
                                 padding: EdgeInsets.only(
-                                  bottom: PulsrLayoutMetrics.scrollBottom(context),
+                                  bottom:
+                                      PulsrLayoutMetrics.scrollBottom(context),
                                 ),
                                 child: StorageStatsHeader(
                                   key: const ValueKey('storage_stats_header'),
@@ -348,7 +350,8 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
                               child: SingleChildScrollView(
                                 physics: const AlwaysScrollableScrollPhysics(),
                                 padding: EdgeInsets.only(
-                                  bottom: PulsrLayoutMetrics.scrollBottom(context),
+                                  bottom:
+                                      PulsrLayoutMetrics.scrollBottom(context),
                                 ),
                                 child: PulsrEmptyState(
                                   icon: Icons.download_done_rounded,
@@ -405,7 +408,8 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
                             child: SingleChildScrollView(
                               physics: const AlwaysScrollableScrollPhysics(),
                               padding: EdgeInsets.only(
-                                bottom: PulsrLayoutMetrics.scrollBottom(context),
+                                bottom:
+                                    PulsrLayoutMetrics.scrollBottom(context),
                               ),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -905,12 +909,10 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
     final shouldAnimate = PulsrMotion.shouldAnimate(context);
 
     return AnimatedSwitcher(
-      duration: shouldAnimate
-          ? context.motion(PulsrDurations.layout)
-          : Duration.zero,
-      reverseDuration: shouldAnimate
-          ? context.motion(PulsrDurations.layout)
-          : Duration.zero,
+      duration:
+          shouldAnimate ? context.motion(PulsrDurations.layout) : Duration.zero,
+      reverseDuration:
+          shouldAnimate ? context.motion(PulsrDurations.layout) : Duration.zero,
       switchInCurve: context.motionCurve(PulsrMotion.enter),
       switchOutCurve: context.motionCurve(PulsrMotion.exit),
       transitionBuilder: (child, animation) {
@@ -969,8 +971,8 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
                       ),
                     if (completedWithSong.isNotEmpty)
                       TextButton.icon(
-                        style:
-                            TextButton.styleFrom(foregroundColor: p.textPrimary),
+                        style: TextButton.styleFrom(
+                            foregroundColor: p.textPrimary),
                         icon: const Icon(Icons.playlist_add_rounded, size: 20),
                         label: Text(l10n.addToPlaylist),
                         onPressed: () =>

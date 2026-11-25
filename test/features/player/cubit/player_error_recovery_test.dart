@@ -282,7 +282,8 @@ void main() {
       expect(cubit.state.errorMessage, 'fail two');
     });
 
-    test('handler cascade halt notice clears consecutive counter without skipping',
+    test(
+        'handler cascade halt notice clears consecutive counter without skipping',
         () async {
       final song1 = buildSong(1);
       final song2 = buildSong(2);

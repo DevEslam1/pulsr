@@ -60,6 +60,7 @@ import '../helpers/screen_harness.dart' as scr_h;
 import '../helpers/test_song_factory.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 class _MockYtmService extends Mock implements YtmService {}
 
 class _MockYtmAccount extends Mock implements YtmAccountService {}

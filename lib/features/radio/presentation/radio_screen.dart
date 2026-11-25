@@ -491,9 +491,8 @@ class _RadioScreenState extends State<RadioScreen> {
                 fontSize: AppFontSize.caption,
               ),
               side: BorderSide(
-                color: isSelected
-                    ? p.accent.withValues(alpha: 0.4)
-                    : p.hairline,
+                color:
+                    isSelected ? p.accent.withValues(alpha: 0.4) : p.hairline,
               ),
               shape: RoundedRectangleBorder(
                 borderRadius: AppRadii.r12All,
@@ -555,54 +554,54 @@ class _RadioScreenState extends State<RadioScreen> {
                       ),
                     ),
                   ),
-                const SizedBox(width: AppSpacing.sm),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        context.l10n.radioCardsHiddenFromHome,
-                        style: TextStyle(
-                          color: p.textPrimary,
-                          fontSize: AppFontSize.callout,
-                          fontWeight: FontWeight.w600,
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          context.l10n.radioCardsHiddenFromHome,
+                          style: TextStyle(
+                            color: p.textPrimary,
+                            fontSize: AppFontSize.callout,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        context.l10n.tapToRestoreRadioCards,
-                        style: TextStyle(
-                          color: p.textSecondary,
-                          fontSize: AppFontSize.caption,
+                        const SizedBox(height: 2),
+                        Text(
+                          context.l10n.tapToRestoreRadioCards,
+                          style: TextStyle(
+                            color: p.textSecondary,
+                            fontSize: AppFontSize.caption,
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.xs),
-                FilledButton.tonal(
-                  onPressed: () async {
-                    await RadioStationStore.setHeroCardsVisible(true);
-                    if (!context.mounted) return;
-                    PulsrToast.show(
-                      context,
-                      message: context.l10n.radioCardsRestoredToast,
-                      isSuccess: true,
-                    );
-                  },
-                  style: FilledButton.styleFrom(
-                    backgroundColor: p.accent,
-                    foregroundColor: p.onAccent,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.sm,
-                      vertical: AppSpacing.xxs,
-                    ),
-                    visualDensity: VisualDensity.compact,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: AppRadii.r12All,
+                      ],
                     ),
                   ),
+                  const SizedBox(width: AppSpacing.xs),
+                  FilledButton.tonal(
+                    onPressed: () async {
+                      await RadioStationStore.setHeroCardsVisible(true);
+                      if (!context.mounted) return;
+                      PulsrToast.show(
+                        context,
+                        message: context.l10n.radioCardsRestoredToast,
+                        isSuccess: true,
+                      );
+                    },
+                    style: FilledButton.styleFrom(
+                      backgroundColor: p.accent,
+                      foregroundColor: p.onAccent,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.sm,
+                        vertical: AppSpacing.xxs,
+                      ),
+                      visualDensity: VisualDensity.compact,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: AppRadii.r12All,
+                      ),
+                    ),
                     child: Text(
                       context.l10n.radioShowAction,
                       style: const TextStyle(fontWeight: FontWeight.w700),
@@ -1151,183 +1150,183 @@ class _RadioScreenState extends State<RadioScreen> {
           listener: (_, __) => _refresh(),
           child: Center(
             child: ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: effectiveMaxWidth),
-            child: LayoutBuilder(
-              builder: (context, viewport) {
-                if (_loading) {
-                  return Center(
-                    child: Semantics(
-                      liveRegion: true,
-                      label: context.l10n.pageLoadingProgress,
-                      child: const CircularProgressIndicator(),
-                    ),
-                  );
-                }
+              constraints: BoxConstraints(maxWidth: effectiveMaxWidth),
+              child: LayoutBuilder(
+                builder: (context, viewport) {
+                  if (_loading) {
+                    return Center(
+                      child: Semantics(
+                        liveRegion: true,
+                        label: context.l10n.pageLoadingProgress,
+                        child: const CircularProgressIndicator(),
+                      ),
+                    );
+                  }
 
-                if (_loadFailed && _stations.isEmpty) {
-                  return RefreshIndicator(
-                    onRefresh: _reload,
-                    child: SingleChildScrollView(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      child: ConstrainedBox(
-                        constraints:
-                            BoxConstraints(minHeight: viewport.maxHeight),
-                        child: Center(
-                          child: PulsrEmptyState(
-                            icon: Icons.error_outline_rounded,
-                            title: context.l10n.somethingWentWrong,
-                            subtitle: context.l10n.radioEmptySubtitle,
-                            primaryActionLabel: context.l10n.retry,
-                            onPrimaryAction: _reload,
+                  if (_loadFailed && _stations.isEmpty) {
+                    return RefreshIndicator(
+                      onRefresh: _reload,
+                      child: SingleChildScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        child: ConstrainedBox(
+                          constraints:
+                              BoxConstraints(minHeight: viewport.maxHeight),
+                          child: Center(
+                            child: PulsrEmptyState(
+                              icon: Icons.error_outline_rounded,
+                              title: context.l10n.somethingWentWrong,
+                              subtitle: context.l10n.radioEmptySubtitle,
+                              primaryActionLabel: context.l10n.retry,
+                              onPrimaryAction: _reload,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  );
-                }
+                    );
+                  }
 
-                if (_stations.isEmpty) {
-                  return _buildEmptyLibraryState(
-                    p,
-                    viewport,
-                    isCompactLandscape: isCompactLandscape,
-                  );
-                }
-
-                final width = viewport.maxWidth;
-                final crossAxisCount = width >= 960
-                    ? 3
-                    : width >= 600
-                        ? 2
-                        : 1;
-                final useSingleRowHeader = isCompactLandscape || width >= 680;
-                final bottomPadding = PulsrLayoutMetrics.scrollBottom(context);
-
-                return Column(
-                  children: [
-                    _buildCardsHiddenBanner(
+                  if (_stations.isEmpty) {
+                    return _buildEmptyLibraryState(
                       p,
+                      viewport,
                       isCompactLandscape: isCompactLandscape,
-                    ),
-                    _buildTopControls(
-                      p,
-                      availableGenres,
-                      useSingleRowHeader: useSingleRowHeader,
-                      isCompactLandscape: isCompactLandscape,
-                    ),
-                    Expanded(
-                      child: filtered.isEmpty
-                          ? LayoutBuilder(
-                              builder: (context, emptyConstraints) {
-                                return RefreshIndicator(
-                                  onRefresh: () async => _refresh(),
-                                  color: p.accent,
-                                  backgroundColor: p.surfaceContainer,
-                                  child: SingleChildScrollView(
-                                    physics:
-                                        const AlwaysScrollableScrollPhysics(),
-                                    child: ConstrainedBox(
-                                      constraints: BoxConstraints(
-                                        minHeight: emptyConstraints.maxHeight,
-                                      ),
-                                      child: Center(
-                                        child: PulsrEmptyState(
-                                          icon: Icons.search_off_rounded,
-                                          title: context.l10n
-                                              .radioNoStationsMatch(
-                                                  _searchQuery),
-                                          subtitle: context
-                                              .l10n.radioNoStationsMatchDesc,
+                    );
+                  }
+
+                  final width = viewport.maxWidth;
+                  final crossAxisCount = width >= 960
+                      ? 3
+                      : width >= 600
+                          ? 2
+                          : 1;
+                  final useSingleRowHeader = isCompactLandscape || width >= 680;
+                  final bottomPadding =
+                      PulsrLayoutMetrics.scrollBottom(context);
+
+                  return Column(
+                    children: [
+                      _buildCardsHiddenBanner(
+                        p,
+                        isCompactLandscape: isCompactLandscape,
+                      ),
+                      _buildTopControls(
+                        p,
+                        availableGenres,
+                        useSingleRowHeader: useSingleRowHeader,
+                        isCompactLandscape: isCompactLandscape,
+                      ),
+                      Expanded(
+                        child: filtered.isEmpty
+                            ? LayoutBuilder(
+                                builder: (context, emptyConstraints) {
+                                  return RefreshIndicator(
+                                    onRefresh: () async => _refresh(),
+                                    color: p.accent,
+                                    backgroundColor: p.surfaceContainer,
+                                    child: SingleChildScrollView(
+                                      physics:
+                                          const AlwaysScrollableScrollPhysics(),
+                                      child: ConstrainedBox(
+                                        constraints: BoxConstraints(
+                                          minHeight: emptyConstraints.maxHeight,
+                                        ),
+                                        child: Center(
+                                          child: PulsrEmptyState(
+                                            icon: Icons.search_off_rounded,
+                                            title: context.l10n
+                                                .radioNoStationsMatch(
+                                                    _searchQuery),
+                                            subtitle: context
+                                                .l10n.radioNoStationsMatchDesc,
+                                          ),
                                         ),
                                       ),
                                     ),
-                                  ),
-                                );
-                              },
-                            )
-                          : RefreshIndicator(
-                              onRefresh: () async => _refresh(),
-                              color: p.accent,
-                              backgroundColor: p.surfaceContainer,
-                              child: crossAxisCount == 1
-                                  ? ListView.separated(
-                                      physics:
-                                          const AlwaysScrollableScrollPhysics(),
-                                      padding: EdgeInsets.only(
-                                        top: AppSpacing.xs,
-                                        bottom: bottomPadding,
+                                  );
+                                },
+                              )
+                            : RefreshIndicator(
+                                onRefresh: () async => _refresh(),
+                                color: p.accent,
+                                backgroundColor: p.surfaceContainer,
+                                child: crossAxisCount == 1
+                                    ? ListView.separated(
+                                        physics:
+                                            const AlwaysScrollableScrollPhysics(),
+                                        padding: EdgeInsets.only(
+                                          top: AppSpacing.xs,
+                                          bottom: bottomPadding,
+                                        ),
+                                        itemCount: filtered.length,
+                                        separatorBuilder: (_, __) => Divider(
+                                          height: 1,
+                                          indent: 72,
+                                          endIndent: 16,
+                                          color: p.hairline,
+                                        ),
+                                        itemBuilder: (context, index) {
+                                          final station = filtered[index];
+                                          return StaggeredReveal(
+                                            index: index,
+                                            groupKey: filtered.length,
+                                            child: _buildStationItem(
+                                              context,
+                                              station: station,
+                                              playerCubit: playerCubit,
+                                              isCardMode: false,
+                                              isCompactLandscape:
+                                                  isCompactLandscape,
+                                            ),
+                                          );
+                                        },
+                                      )
+                                    : GridView.builder(
+                                        physics:
+                                            const AlwaysScrollableScrollPhysics(),
+                                        padding: EdgeInsetsDirectional.fromSTEB(
+                                          AppSpacing.md,
+                                          AppSpacing.xs,
+                                          AppSpacing.md,
+                                          bottomPadding,
+                                        ),
+                                        gridDelegate:
+                                            SliverGridDelegateWithFixedCrossAxisCount(
+                                          crossAxisCount: crossAxisCount,
+                                          mainAxisExtent:
+                                              isCompactLandscape ? 68 : 76,
+                                          crossAxisSpacing: AppSpacing.sm,
+                                          mainAxisSpacing: AppSpacing.sm,
+                                        ),
+                                        itemCount: filtered.length,
+                                        itemBuilder: (context, index) {
+                                          final station = filtered[index];
+                                          return StaggeredReveal(
+                                            index: index,
+                                            groupKey: filtered.length,
+                                            child: _buildStationItem(
+                                              context,
+                                              station: station,
+                                              playerCubit: playerCubit,
+                                              isCardMode: true,
+                                              isCompactLandscape:
+                                                  isCompactLandscape,
+                                            ),
+                                          );
+                                        },
                                       ),
-                                      itemCount: filtered.length,
-                                      separatorBuilder: (_, __) => Divider(
-                                        height: 1,
-                                        indent: 72,
-                                        endIndent: 16,
-                                        color: p.hairline,
-                                      ),
-                                      itemBuilder: (context, index) {
-                                        final station = filtered[index];
-                                        return StaggeredReveal(
-                                          index: index,
-                                          groupKey: filtered.length,
-                                          child: _buildStationItem(
-                                            context,
-                                            station: station,
-                                            playerCubit: playerCubit,
-                                            isCardMode: false,
-                                            isCompactLandscape:
-                                                isCompactLandscape,
-                                          ),
-                                        );
-                                      },
-                                    )
-                                  : GridView.builder(
-                                      physics:
-                                          const AlwaysScrollableScrollPhysics(),
-                                      padding: EdgeInsetsDirectional.fromSTEB(
-                                        AppSpacing.md,
-                                        AppSpacing.xs,
-                                        AppSpacing.md,
-                                        bottomPadding,
-                                      ),
-                                      gridDelegate:
-                                          SliverGridDelegateWithFixedCrossAxisCount(
-                                        crossAxisCount: crossAxisCount,
-                                        mainAxisExtent:
-                                            isCompactLandscape ? 68 : 76,
-                                        crossAxisSpacing: AppSpacing.sm,
-                                        mainAxisSpacing: AppSpacing.sm,
-                                      ),
-                                      itemCount: filtered.length,
-                                      itemBuilder: (context, index) {
-                                        final station = filtered[index];
-                                        return StaggeredReveal(
-                                          index: index,
-                                          groupKey: filtered.length,
-                                          child: _buildStationItem(
-                                            context,
-                                            station: station,
-                                            playerCubit: playerCubit,
-                                            isCardMode: true,
-                                            isCompactLandscape:
-                                                isCompactLandscape,
-                                          ),
-                                        );
-                                      },
-                                    ),
-                            ),
-                    ),
-                  ],
-                );
-              },
+                              ),
+                      ),
+                    ],
+                  );
+                },
+              ),
             ),
           ),
-        ),
         ),
       ),
     );
   }
 }
-
 
 class _RadioStationActionsSheet extends StatelessWidget {
   final RadioStation station;

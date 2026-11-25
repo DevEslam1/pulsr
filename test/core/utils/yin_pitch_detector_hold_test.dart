@@ -3,7 +3,8 @@ import 'package:pulsr/core/utils/yin_pitch_detector.dart';
 
 void main() {
   group('EmaPitchSmoother noteName during unvoiced hold', () {
-    test('computes noteName from smoothed midi instead of passing raw noteName', () {
+    test('computes noteName from smoothed midi instead of passing raw noteName',
+        () {
       final smoother = EmaPitchSmoother();
       // Feed a voiced A4 (440 Hz, MIDI 69)
       final voicedResult = PitchResult(

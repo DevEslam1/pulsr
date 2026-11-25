@@ -54,8 +54,7 @@ abstract final class AssistantStrings {
   static String get suggestionsTitle => _l10n().assistantSuggestionsTitle;
 
   /// Suggestion toggle subtitle.
-  static String get suggestionsSubtitle =>
-      _l10n().assistantSuggestionsSubtitle;
+  static String get suggestionsSubtitle => _l10n().assistantSuggestionsSubtitle;
 
   /// Section label above the toggle.
   static String get suggestionsSection => _l10n().assistantSuggestionsSection;

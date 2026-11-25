@@ -425,13 +425,11 @@ class DynamicThemeCubit extends PulsrCubit<DynamicThemeState> {
     // Warm yellows/olives (40°–75°) turn muddy easily when dark or low-sat;
     // keep them slightly brighter and cleaner.
     final isWarmYellowBand = hsl.hue >= 40.0 && hsl.hue <= 75.0;
-    final refinedSat = hsl.saturation.clamp(0.36, isWarmYellowBand ? 0.78 : 0.82);
+    final refinedSat =
+        hsl.saturation.clamp(0.36, isWarmYellowBand ? 0.78 : 0.82);
     final refinedLight =
         hsl.lightness.clamp(isWarmYellowBand ? 0.44 : 0.40, 0.62);
-    return hsl
-        .withSaturation(refinedSat)
-        .withLightness(refinedLight)
-        .toColor();
+    return hsl.withSaturation(refinedSat).withLightness(refinedLight).toColor();
   }
 
   static Color _refineArtworkSecondary(Color raw, {required Color fallback}) {

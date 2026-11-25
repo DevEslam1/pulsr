@@ -68,7 +68,8 @@ void main() {
     await tester.pump();
   }
 
-  testWidgets('shows the verified domain and measured evidence', (tester) async {
+  testWidgets('shows the verified domain and measured evidence',
+      (tester) async {
     await pump(
       tester,
       usb: status(),
@@ -133,7 +134,8 @@ void main() {
     expect(selected, UsbStreamMode.bestEffort);
   });
 
-  testWidgets('external selected change updates displayed value', (tester) async {
+  testWidgets('external selected change updates displayed value',
+      (tester) async {
     await pump(
       tester,
       usb: status(streaming: false, domain: UsbClockDomain.unknown),
@@ -142,9 +144,11 @@ void main() {
       onChanged: (_) {},
     );
     expect(
-      tester.state<FormFieldState<UsbStreamMode>>(
-        find.byKey(const ValueKey<String>('usb-stream-mode-dropdown')),
-      ).value,
+      tester
+          .state<FormFieldState<UsbStreamMode>>(
+            find.byKey(const ValueKey<String>('usb-stream-mode-dropdown')),
+          )
+          .value,
       UsbStreamMode.bitPerfectPull,
     );
 
@@ -156,9 +160,11 @@ void main() {
       onChanged: (_) {},
     );
     expect(
-      tester.state<FormFieldState<UsbStreamMode>>(
-        find.byKey(const ValueKey<String>('usb-stream-mode-dropdown')),
-      ).value,
+      tester
+          .state<FormFieldState<UsbStreamMode>>(
+            find.byKey(const ValueKey<String>('usb-stream-mode-dropdown')),
+          )
+          .value,
       UsbStreamMode.bestEffort,
     );
   });

@@ -233,8 +233,7 @@ void main() {
     });
 
     test('createdAt change breaks equality and hashCode', () {
-      final withCreatedAt =
-          base.copyWith(createdAt: DateTime.utc(2026, 2, 2));
+      final withCreatedAt = base.copyWith(createdAt: DateTime.utc(2026, 2, 2));
       expect(withCreatedAt, isNot(equals(base)));
       expect(withCreatedAt.hashCode, isNot(equals(base.hashCode)));
     });

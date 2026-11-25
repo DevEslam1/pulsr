@@ -136,10 +136,12 @@ void main() {
       );
     });
 
-    test('verifies SHA-256 checksum and deletes partial APK on mismatch', () async {
+    test('verifies SHA-256 checksum and deletes partial APK on mismatch',
+        () async {
       final payload = utf8.encode('fake-apk-binary-payload');
       final validSha = sha256.convert(payload).toString();
-      final tempDir = await Directory.systemTemp.createTemp('pulsr_updater_test_');
+      final tempDir =
+          await Directory.systemTemp.createTemp('pulsr_updater_test_');
       addTearDown(() async {
         if (await tempDir.exists()) {
           await tempDir.delete(recursive: true);
@@ -161,7 +163,8 @@ void main() {
         UpdateInfo(
           version: '1.2.0',
           tagName: 'v1.2.0',
-          releaseUrl: 'https://github.com/pulsr-audio/pulsr/releases/tag/v1.2.0',
+          releaseUrl:
+              'https://github.com/pulsr-audio/pulsr/releases/tag/v1.2.0',
           apkUrl:
               'https://github.com/pulsr-audio/pulsr/releases/download/v1.2.0/pulsr.apk',
           sha256: validSha,
@@ -204,7 +207,8 @@ void main() {
 
     test('rejects APK download when mandatory sha256 is absent', () async {
       final client = MockClient.streaming((request, _) async {
-        return http.StreamedResponse(Stream.fromIterable([utf8.encode('apk')]), 200);
+        return http.StreamedResponse(
+            Stream.fromIterable([utf8.encode('apk')]), 200);
       });
       final service = AppUpdateService(client: client);
       addTearDown(() => service.dispose());
@@ -262,7 +266,8 @@ void main() {
     });
 
     test('respects offlineOnlyMode in checkForUpdate', () async {
-      SharedPreferences.setMockInitialValues({'setting_offline_only_mode': true});
+      SharedPreferences.setMockInitialValues(
+          {'setting_offline_only_mode': true});
       var called = false;
       final client = MockClient((request) async {
         called = true;

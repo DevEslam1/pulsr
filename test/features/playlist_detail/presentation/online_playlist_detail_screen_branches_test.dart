@@ -190,7 +190,8 @@ void main() {
     expect(find.textContaining('local track skipped'), findsWidgets);
   });
 
-  testWidgets('save-to-pulsr creates a local playlist without marking favorites',
+  testWidgets(
+      'save-to-pulsr creates a local playlist without marking favorites',
       (tester) async {
     getIt.registerSingleton<PlaylistUseCases>(playlists);
     await pump(tester, title: 'Saved Mix', initialTracks: _tracks);

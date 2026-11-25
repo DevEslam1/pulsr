@@ -98,8 +98,7 @@ extension _AudioQualityDiagnosticsTab on AudioQualitySheet {
     final int? maxRateSupported = supported.isEmpty
         ? null
         : supported.map((f) => f.sampleRate).reduce((a, b) => a > b ? a : b);
-    final int? maxRate =
-        maxRateAdvertised ?? maxRateStatus ?? maxRateSupported;
+    final int? maxRate = maxRateAdvertised ?? maxRateStatus ?? maxRateSupported;
     final bits = advertised.isNotEmpty
         ? advertised
             .map((f) => f['bitResolution']?.toString() ?? '')

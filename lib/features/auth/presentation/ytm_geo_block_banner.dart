@@ -66,67 +66,67 @@ extension _YtmGeoBlockBanner on _YtmWebLoginSheetState {
           borderRadius: AppRadii.r10All,
           border: Border.all(color: p.warning.withValues(alpha: 0.4)),
         ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.public_off_rounded, color: p.warning, size: 17),
-              const SizedBox(width: AppSpacing.xs),
-              Expanded(
-                child: Text(
-                  context.l10n.ytmRestricted,
-                  style: TextStyle(
-                    fontSize: AppFontSize.label,
-                    fontWeight: FontWeight.w700,
-                    color: p.textPrimary,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.public_off_rounded, color: p.warning, size: 17),
+                const SizedBox(width: AppSpacing.xs),
+                Expanded(
+                  child: Text(
+                    context.l10n.ytmRestricted,
+                    style: TextStyle(
+                      fontSize: AppFontSize.label,
+                      fontWeight: FontWeight.w700,
+                      color: p.textPrimary,
+                    ),
                   ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.xxs),
-          Text(
-            context.l10n.ipOutsideYtm,
-            style: TextStyle(
-                fontSize: AppFontSize.caption, color: p.textSecondary),
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          Row(
-            children: [
-              FilledButton.icon(
-                onPressed: _forceEgRegionReload,
-                icon: const Text('🇪🇬',
-                    style: TextStyle(fontSize: AppFontSize.label)),
-                label: Text(context.l10n.forceEgypt,
-                    style: TextStyle(fontSize: AppFontSize.caption)),
-                style: FilledButton.styleFrom(
-                  backgroundColor: p.accent,
-                  foregroundColor: p.onAccent,
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.s10, vertical: AppSpacing.xxs),
-                  minimumSize: const Size(48, 48),
-                  tapTargetSize: MaterialTapTargetSize.padded,
+              ],
+            ),
+            const SizedBox(height: AppSpacing.xxs),
+            Text(
+              context.l10n.ipOutsideYtm,
+              style: TextStyle(
+                  fontSize: AppFontSize.caption, color: p.textSecondary),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Row(
+              children: [
+                FilledButton.icon(
+                  onPressed: _forceEgRegionReload,
+                  icon: const Text('🇪🇬',
+                      style: TextStyle(fontSize: AppFontSize.label)),
+                  label: Text(context.l10n.forceEgypt,
+                      style: TextStyle(fontSize: AppFontSize.caption)),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: p.accent,
+                    foregroundColor: p.onAccent,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.s10, vertical: AppSpacing.xxs),
+                    minimumSize: const Size(48, 48),
+                    tapTargetSize: MaterialTapTargetSize.padded,
+                  ),
                 ),
-              ),
-              const SizedBox(width: AppSpacing.xs),
-              OutlinedButton.icon(
-                onPressed: () => _navigateTo('https://www.youtube.com'),
-                icon: const Icon(Icons.video_library_rounded, size: 13),
-                label: Text(context.l10n.openYtWeb,
-                    style: TextStyle(fontSize: AppFontSize.caption)),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.s10, vertical: AppSpacing.xxs),
-                  minimumSize: const Size(48, 48),
-                  tapTargetSize: MaterialTapTargetSize.padded,
+                const SizedBox(width: AppSpacing.xs),
+                OutlinedButton.icon(
+                  onPressed: () => _navigateTo('https://www.youtube.com'),
+                  icon: const Icon(Icons.video_library_rounded, size: 13),
+                  label: Text(context.l10n.openYtWeb,
+                      style: TextStyle(fontSize: AppFontSize.caption)),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.s10, vertical: AppSpacing.xxs),
+                    minimumSize: const Size(48, 48),
+                    tapTargetSize: MaterialTapTargetSize.padded,
+                  ),
                 ),
-              ),
-            ],
-          ),
-        ],
+              ],
+            ),
+          ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 }

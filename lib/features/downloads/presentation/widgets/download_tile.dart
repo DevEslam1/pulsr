@@ -206,7 +206,8 @@ class DownloadTile extends StatelessWidget {
                                 DownloadStatus.complete =>
                                   PulsrBadgeColor.success,
                                 DownloadStatus.failed => PulsrBadgeColor.error,
-                                DownloadStatus.paused => PulsrBadgeColor.neutral,
+                                DownloadStatus.paused =>
+                                  PulsrBadgeColor.neutral,
                                 _ => PulsrBadgeColor.accent,
                               },
                             ),
@@ -377,12 +378,13 @@ class DownloadTile extends StatelessWidget {
                           end: task.progress.clamp(0.0, 1.0),
                         ),
                         builder: (context, animatedProgress, _) {
-                          final progressValue = task.status == DownloadStatus.tagging
-                              ? null
-                              : (task.status == DownloadStatus.paused ||
-                                      animatedProgress > 0
-                                  ? animatedProgress
-                                  : null);
+                          final progressValue =
+                              task.status == DownloadStatus.tagging
+                                  ? null
+                                  : (task.status == DownloadStatus.paused ||
+                                          animatedProgress > 0
+                                      ? animatedProgress
+                                      : null);
                           return Semantics(
                             label: statusLabel,
                             value: progressValue == null

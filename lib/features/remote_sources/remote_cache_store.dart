@@ -176,8 +176,8 @@ class RemoteCacheStore {
     final digest = sha256.convert(utf8.encode(key)).toString();
     // Unique per sink, still `*.partial` so removeStalePartials cleans up a
     // crash. Never delete an existing partial here: it belongs to another sink.
-    final partial = File(
-        p.join(root.path, '$digest.bin.${_partialToken()}$partialSuffix'));
+    final partial =
+        File(p.join(root.path, '$digest.bin.${_partialToken()}$partialSuffix'));
     await partial.parent.create(recursive: true);
     final sink = partial.openWrite();
     final cacheSink = RemoteCacheSink(
@@ -509,7 +509,8 @@ class RemoteCacheStore {
     }
     await partial.rename(target.path);
     final existing = _entries[key];
-    final shouldPin = pinned || _pinnedKeys.remove(key) || (existing?.pinned ?? false);
+    final shouldPin =
+        pinned || _pinnedKeys.remove(key) || (existing?.pinned ?? false);
     _entries[key] = RemoteCacheEntry(
       key: key,
       fileName: '$digest.bin',

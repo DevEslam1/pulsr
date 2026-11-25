@@ -70,7 +70,8 @@ final RegExp _collectionTag = RegExp(
   caseSensitive: false,
 );
 final RegExp _httpStatusCode = RegExp(r'\b(\d{3})\b');
-final RegExp _xmlEntity = RegExp(r'&(?:lt|gt|quot|apos|amp|#\d+|#x[0-9a-fA-F]+);');
+final RegExp _xmlEntity =
+    RegExp(r'&(?:lt|gt|quot|apos|amp|#\d+|#x[0-9a-fA-F]+);');
 
 /// Returns the concatenated 2xx `<propstat>` XML fragments inside a `<response>`,
 /// or `null` when `<status>` rejects the response (403/404/etc.).

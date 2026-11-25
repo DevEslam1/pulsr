@@ -850,7 +850,8 @@ class YtmService {
         .acquirePermit(maxWait: const Duration(seconds: 15));
     final response = await _httpClient
         .post(
-          Uri.parse('https://music.youtube.com/youtubei/v1/$path?prettyPrint=false&key=$apiKey'),
+          Uri.parse(
+              'https://music.youtube.com/youtubei/v1/$path?prettyPrint=false&key=$apiKey'),
           headers: headers,
           body: body,
         )
@@ -1648,8 +1649,8 @@ class YtmService {
           return altStream;
         }
       }
-      throw YtmException('YTM_UNAVAILABLE',
-          'Temporarily skipping failing track ($videoId)');
+      throw YtmException(
+          'YTM_UNAVAILABLE', 'Temporarily skipping failing track ($videoId)');
     }
 
     // 3. Pure-Dart InnerTube Stream Resolver (Desktop / Non-Android / Native Plugin Fallback)

@@ -240,7 +240,9 @@ void main() {
           .setMockMethodCallHandler(secureStorageChannel, null);
     });
 
-    test('migrates legacy SharedPreferences token to FlutterSecureStorage and never stores plaintext in prefs', () async {
+    test(
+        'migrates legacy SharedPreferences token to FlutterSecureStorage and never stores plaintext in prefs',
+        () async {
       SharedPreferences.setMockInitialValues({
         PrefsKeys.discordRpcToken: 'legacy_plaintext_token',
       });
@@ -267,11 +269,23 @@ void main() {
       expect(prefs.getString(PrefsKeys.discordRpcToken), isNull);
     });
 
-    test('strips local file/content artwork URIs, bounds asset cache to 256, and detects fatal close codes', () {
-      expect(DiscordRpcService.isSafeRemoteArtworkUrl('file:///storage/cover.jpg'), isFalse);
-      expect(DiscordRpcService.isSafeRemoteArtworkUrl('content://media/external/1'), isFalse);
-      expect(DiscordRpcService.isSafeRemoteArtworkUrl('/sdcard/Music/cover.jpg'), isFalse);
-      expect(DiscordRpcService.isSafeRemoteArtworkUrl('https://i.ytimg.com/vi/abc/hq.jpg'), isTrue);
+    test(
+        'strips local file/content artwork URIs, bounds asset cache to 256, and detects fatal close codes',
+        () {
+      expect(
+          DiscordRpcService.isSafeRemoteArtworkUrl('file:///storage/cover.jpg'),
+          isFalse);
+      expect(
+          DiscordRpcService.isSafeRemoteArtworkUrl(
+              'content://media/external/1'),
+          isFalse);
+      expect(
+          DiscordRpcService.isSafeRemoteArtworkUrl('/sdcard/Music/cover.jpg'),
+          isFalse);
+      expect(
+          DiscordRpcService.isSafeRemoteArtworkUrl(
+              'https://i.ytimg.com/vi/abc/hq.jpg'),
+          isTrue);
       expect(DiscordRpcService.isFatalCloseCode(4004), isTrue);
       expect(DiscordRpcService.isFatalCloseCode(4010), isTrue);
       expect(DiscordRpcService.isFatalCloseCode(1006), isFalse);
@@ -287,7 +301,8 @@ void main() {
           equals(DiscordRpcService.maxAssetCacheEntries));
     });
 
-    test('blocks remote RPC network lookups in offlineOnlyMode and enforces SSRF artwork checks',
+    test(
+        'blocks remote RPC network lookups in offlineOnlyMode and enforces SSRF artwork checks',
         () async {
       SharedPreferences.setMockInitialValues({
         PrefsKeys.offlineOnlyMode: true,

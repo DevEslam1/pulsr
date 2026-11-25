@@ -24,8 +24,10 @@ void main() {
       getActivePlayer: () => playerA,
       getInactivePlayer: () => playerB,
       prefetchPlayer: prefetchPlayer,
-      resolveAudioSource: (song, tag) async => AudioSource.uri(Uri.parse('https://example.com/audio.mp3')),
-      songToMediaItem: (song, [fastArtUri]) => MediaItem(id: '${song.id}', title: song.title),
+      resolveAudioSource: (song, tag) async =>
+          AudioSource.uri(Uri.parse('https://example.com/audio.mp3')),
+      songToMediaItem: (song, [fastArtUri]) =>
+          MediaItem(id: '${song.id}', title: song.title),
     );
   });
 
@@ -46,14 +48,18 @@ void main() {
       expect(pipeline.inactiveClaim, equals(PlayerClaim.none));
     });
 
-    test('crossfade preempts prefetch and prefetch release does not clobber crossfade', () async {
+    test(
+        'crossfade preempts prefetch and prefetch release does not clobber crossfade',
+        () async {
       // 1. Prefetch acquires claim
-      final prefetchClaimed = await pipeline.claimInactive(PlayerClaim.prefetch);
+      final prefetchClaimed =
+          await pipeline.claimInactive(PlayerClaim.prefetch);
       expect(prefetchClaimed, isTrue);
       expect(pipeline.inactiveClaim, equals(PlayerClaim.prefetch));
 
       // 2. Crossfade preempts prefetch
-      final crossfadeClaimed = await pipeline.claimInactive(PlayerClaim.crossfade);
+      final crossfadeClaimed =
+          await pipeline.claimInactive(PlayerClaim.crossfade);
       expect(crossfadeClaimed, isTrue);
       expect(pipeline.inactiveClaim, equals(PlayerClaim.crossfade));
 
@@ -68,7 +74,9 @@ void main() {
       expect(pipeline.inactiveClaim, equals(PlayerClaim.none));
     });
 
-    test('clearPreload resets cached metadata and header bytes for background release', () {
+    test(
+        'clearPreload resets cached metadata and header bytes for background release',
+        () {
       pipeline.preloadedHeaderBytes = Uint8List.fromList([1, 2, 3, 4]);
       expect(pipeline.preloadedHeaderBytes, isNotNull);
 

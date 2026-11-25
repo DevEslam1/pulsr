@@ -569,7 +569,8 @@ void main() {
       expect(identical(firstResult, secondResult), isTrue);
     });
 
-    test('three-part <mm:ss:ms> word timestamps parse without line-start collapse',
+    test(
+        'three-part <mm:ss:ms> word timestamps parse without line-start collapse',
         () {
       const lrc = '[00:10.00]<00:10:250>Alpha <00:11:500>Beta';
       final lines = LrcParser.parse(lrc);

@@ -180,7 +180,8 @@ class _PulsrButtonState extends State<PulsrButton> {
           fg = enabled ? PulsrCapsuleStyle.foregroundColor(p) : p.textTertiary;
           border = PulsrCapsuleStyle.border(p);
         } else {
-          bg = _hovered && enabled ? p.surfaceContainerHigh : p.surfaceContainer;
+          bg =
+              _hovered && enabled ? p.surfaceContainerHigh : p.surfaceContainer;
           fg = enabled ? p.textPrimary : p.textTertiary;
           border = Border.all(
             color: p.isHighContrast

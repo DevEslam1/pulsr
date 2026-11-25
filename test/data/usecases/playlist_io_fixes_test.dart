@@ -93,7 +93,9 @@ void main() {
       expect(m3u, contains('#EXTVLCOPT:stop-time=120.000'));
     });
 
-    test('exportToFile sanitizes dot, dotdot, and empty playlistName to "playlist"', () async {
+    test(
+        'exportToFile sanitizes dot, dotdot, and empty playlistName to "playlist"',
+        () async {
       final fileDot = await exportUseCase.exportToFile('.', []);
       expect(fileDot.path, endsWith('playlist.m3u'));
       if (fileDot.existsSync()) fileDot.deleteSync();
@@ -109,7 +111,9 @@ void main() {
   });
 
   group('PlaylistImportUseCase fixes', () {
-    test('never falls back to non-CUE container track when targetCueStartMs != null fails to match', () async {
+    test(
+        'never falls back to non-CUE container track when targetCueStartMs != null fails to match',
+        () async {
       final tempDir = Directory.systemTemp.createTempSync('playlist_cue_test_');
       final playlistFile = File('${tempDir.path}/test.m3u');
       playlistFile.writeAsStringSync(
@@ -120,8 +124,12 @@ void main() {
       );
 
       fakeRepo.songs = [
-        _song(id: 10, path: '/music/album.flac', cueStartMs: null), // Container track
-        _song(id: 11, path: '/music/album.flac', cueStartMs: 0), // Track 1 at 0ms
+        _song(
+            id: 10,
+            path: '/music/album.flac',
+            cueStartMs: null), // Container track
+        _song(
+            id: 11, path: '/music/album.flac', cueStartMs: 0), // Track 1 at 0ms
       ];
 
       final result = await importUseCase.importPlaylistFromFile(
@@ -143,15 +151,29 @@ void main() {
       tempDir.deleteSync(recursive: true);
     });
 
-    test('round-trips CUE Track 1 (cueStartMs == 0) and moved CUE album to new path', () async {
-      final tempDir = Directory.systemTemp.createTempSync('playlist_cue_moved_test_');
+    test(
+        'round-trips CUE Track 1 (cueStartMs == 0) and moved CUE album to new path',
+        () async {
+      final tempDir =
+          Directory.systemTemp.createTempSync('playlist_cue_moved_test_');
       final discOldPath = '/storage/emulated/0/Music/OldFolder/album.flac';
       final discNewPath = '/storage/emulated/0/Music/NewFolder/album.flac';
 
       // 1. Export M3U containing CUE Track 1 (cueStartMs: 0) and Track 2 (cueStartMs: 120000)
-      final track1Old = _song(id: 1, path: discOldPath, cueStartMs: 0, cueEndMs: 120000, title: 'Intro');
-      final track2Old = _song(id: 2, path: discOldPath, cueStartMs: 120000, cueEndMs: 240000, title: 'Verse');
-      final m3uContent = exportUseCase.generateM3uContent([track1Old, track2Old]);
+      final track1Old = _song(
+          id: 1,
+          path: discOldPath,
+          cueStartMs: 0,
+          cueEndMs: 120000,
+          title: 'Intro');
+      final track2Old = _song(
+          id: 2,
+          path: discOldPath,
+          cueStartMs: 120000,
+          cueEndMs: 240000,
+          title: 'Verse');
+      final m3uContent =
+          exportUseCase.generateM3uContent([track1Old, track2Old]);
 
       expect(m3uContent, contains('#EXTVLCOPT:start-time=0.000'));
       expect(m3uContent, contains('#EXTVLCOPT:start-time=120.000'));
@@ -160,8 +182,18 @@ void main() {
       playlistFile.writeAsStringSync(m3uContent);
 
       // 2. Repository has the songs at the NEW album path
-      final track1New = _song(id: 101, path: discNewPath, cueStartMs: 0, cueEndMs: 120000, title: 'Intro');
-      final track2New = _song(id: 102, path: discNewPath, cueStartMs: 120000, cueEndMs: 240000, title: 'Verse');
+      final track1New = _song(
+          id: 101,
+          path: discNewPath,
+          cueStartMs: 0,
+          cueEndMs: 120000,
+          title: 'Intro');
+      final track2New = _song(
+          id: 102,
+          path: discNewPath,
+          cueStartMs: 120000,
+          cueEndMs: 240000,
+          title: 'Verse');
       fakeRepo.songs = [track1New, track2New];
       fakeRepo.addedSongIds.clear();
 
@@ -178,7 +210,8 @@ void main() {
           expect(res.matchedTrackCount, 2);
           expect(res.unmatchedPaths, isEmpty);
           expect(fakeRepo.addedSongIds, [101, 102],
-              reason: 'Both Track 1 (0ms) and Track 2 should match at the new album path');
+              reason:
+                  'Both Track 1 (0ms) and Track 2 should match at the new album path');
         },
       );
 

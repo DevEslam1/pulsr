@@ -574,8 +574,7 @@ class SacdToc {
         ? master.area2TocSizeSectors
         : master.area1TocSizeSectors;
     final byteOffset = primaryLba * SacdLayout.sectorSize;
-    if (primaryLba > 0 &&
-        byteOffset + SacdLayout.sectorSize <= bytes.length) {
+    if (primaryLba > 0 && byteOffset + SacdLayout.sectorSize <= bytes.length) {
       final end = (byteOffset + primarySize * SacdLayout.sectorSize)
           .clamp(byteOffset, bytes.length);
       return parse(
@@ -680,8 +679,9 @@ class SacdToc {
     final extents = <({int start, int length})>[];
     if (trlOffset != null) {
       final base = trlOffset + 8;
-      final fullStride =
-          base + 255 * 4 + trackCount * 4 <= bytes.length ? 255 * 4 : trackCount * 4;
+      final fullStride = base + 255 * 4 + trackCount * 4 <= bytes.length
+          ? 255 * 4
+          : trackCount * 4;
       if (base + fullStride + trackCount * 4 > bytes.length) {
         throw SacdTocError(
           'Scarlet Book SACDTRL1 in "$fileName" is truncated',

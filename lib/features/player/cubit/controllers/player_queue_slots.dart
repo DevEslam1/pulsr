@@ -296,7 +296,8 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
     final preCallPlayback = state.playback;
     final preSlot = _queueSlots[state.activeQueueSlot];
     final targetIds = previousQueue.map((s) => s.id).toSet();
-    final tierSource = previousTrackTiers ?? _undoTrackTiers ?? state.trackTiers;
+    final tierSource =
+        previousTrackTiers ?? _undoTrackTiers ?? state.trackTiers;
     final restoredTiers = <int, QueueTier>{
       for (final entry in tierSource.entries)
         if (targetIds.contains(entry.key)) entry.key: entry.value,

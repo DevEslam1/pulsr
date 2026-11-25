@@ -23,7 +23,9 @@ void main() {
       expect(identical(store1, store2), isTrue);
     });
 
-    test('concurrent add calls while loading resolve safely via mutex without dropping stations', () async {
+    test(
+        'concurrent add calls while loading resolve safely via mutex without dropping stations',
+        () async {
       SharedPreferences.setMockInitialValues({
         RadioStationStore.prefsKey: jsonEncode([
           {
@@ -67,7 +69,8 @@ void main() {
       expect(store1.list.first.id, equals('station-b'));
     });
 
-    test('replaces existing station without losing order or duplicating', () async {
+    test('replaces existing station without losing order or duplicating',
+        () async {
       final store = RadioStationStore();
       await store.ready;
 
@@ -139,7 +142,8 @@ void main() {
       expect(RadioStationStore.isQuranStation(hussaryStation), isTrue);
     });
 
-    test('resolves curated cur-quran-tarteel artwork and retries after corrupt JSON load',
+    test(
+        'resolves curated cur-quran-tarteel artwork and retries after corrupt JSON load',
         () async {
       expect(
         RadioStationStore.resolveArtworkForStation(

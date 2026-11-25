@@ -103,7 +103,8 @@ void main() {
     expect(prefs.getBool(PrefsKeys.batterySaverEnabled), isFalse);
   }, variant: TargetPlatformVariant.only(TargetPlatform.android));
 
-  testWidgets('true low-power route is off by default and persists when enabled',
+  testWidgets(
+      'true low-power route is off by default and persists when enabled',
       (tester) async {
     SharedPreferences.setMockInitialValues({});
     await pumpSection(tester);

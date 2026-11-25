@@ -181,7 +181,8 @@ class _KaraokeStageBackdrop extends StatelessWidget {
                 radius: 0.95,
                 colors: [
                   activeColor.withValues(
-                    alpha: ((isDark ? 0.26 : 0.16) * glowBoost).clamp(0.0, 0.45),
+                    alpha:
+                        ((isDark ? 0.26 : 0.16) * glowBoost).clamp(0.0, 0.45),
                   ),
                   activeColor.withValues(alpha: 0.0),
                 ],
@@ -196,7 +197,8 @@ class _KaraokeStageBackdrop extends StatelessWidget {
                 radius: 0.9,
                 colors: [
                   activeColor.withValues(
-                    alpha: ((isDark ? 0.15 : 0.10) * glowBoost).clamp(0.0, 0.30),
+                    alpha:
+                        ((isDark ? 0.15 : 0.10) * glowBoost).clamp(0.0, 0.30),
                   ),
                   activeColor.withValues(alpha: 0.0),
                 ],
@@ -495,8 +497,7 @@ class _KaraokeLyricsStage extends StatelessWidget {
     final bool hasTimedLyrics = state.lyrics.any(
       (line) => line.timestamp > Duration.zero || line.words.isNotEmpty,
     );
-    final bool hasWordSync =
-        state.lyrics.any((line) => line.words.isNotEmpty);
+    final bool hasWordSync = state.lyrics.any((line) => line.words.isNotEmpty);
 
     final Widget stageContent;
     if (hasWordSync) {
@@ -1049,7 +1050,8 @@ class _KaraokeLoadingStage extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _LyricSkeletonBar(widthFactor: 0.62, opacity: 0.22, color: p.textSecondary),
+            _LyricSkeletonBar(
+                widthFactor: 0.62, opacity: 0.22, color: p.textSecondary),
             const SizedBox(height: AppSpacing.md),
             _LyricSkeletonBar(
               widthFactor: 0.90,
@@ -1058,9 +1060,11 @@ class _KaraokeLoadingStage extends StatelessWidget {
               color: activeColor,
             ),
             const SizedBox(height: AppSpacing.md),
-            _LyricSkeletonBar(widthFactor: 0.74, opacity: 0.24, color: p.textSecondary),
+            _LyricSkeletonBar(
+                widthFactor: 0.74, opacity: 0.24, color: p.textSecondary),
             const SizedBox(height: AppSpacing.sm),
-            _LyricSkeletonBar(widthFactor: 0.48, opacity: 0.16, color: p.textSecondary),
+            _LyricSkeletonBar(
+                widthFactor: 0.48, opacity: 0.16, color: p.textSecondary),
           ],
         ),
       ),
@@ -1255,7 +1259,11 @@ class _KaraokePreviewStage extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = context.palette;
     final sample = lines.isNotEmpty
-        ? lines.take(5).map((l) => l.text.trim()).where((t) => t.isNotEmpty).toList()
+        ? lines
+            .take(5)
+            .map((l) => l.text.trim())
+            .where((t) => t.isNotEmpty)
+            .toList()
         : <String>[
             'Echoes drift across the twilight air',
             'Every chord illuminating the dark',
@@ -1284,7 +1292,8 @@ class _KaraokePreviewStage extends StatelessWidget {
               for (int i = 0; i < sample.length; i++)
                 Flexible(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: AppSpacing.s6),
+                    padding:
+                        const EdgeInsets.symmetric(vertical: AppSpacing.s6),
                     child: Container(
                       padding: i == highlightIdx
                           ? const EdgeInsets.symmetric(
@@ -1640,7 +1649,8 @@ class _KaraokeSlimProgressBarState extends State<_KaraokeSlimProgressBar> {
                   style: TextStyle(
                     fontSize: AppFontSize.caption,
                     fontWeight: FontWeight.w700,
-                    color: _dragMs != null ? widget.activeColor : p.textSecondary,
+                    color:
+                        _dragMs != null ? widget.activeColor : p.textSecondary,
                     fontFeatures: const [FontFeature.tabularFigures()],
                   ),
                 ),
@@ -1697,7 +1707,8 @@ class _KaraokeSlimProgressBarState extends State<_KaraokeSlimProgressBar> {
                       onChangeEnd: widget.isBuffering
                           ? null
                           : (val) {
-                              widget.onSeek(Duration(milliseconds: val.round()));
+                              widget
+                                  .onSeek(Duration(milliseconds: val.round()));
                               setState(() => _dragMs = null);
                             },
                       onChangeCancel: () => setState(() => _dragMs = null),

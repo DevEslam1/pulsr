@@ -298,8 +298,7 @@ class DsdDecoderHelper {
     // DoP (then PCM), never a fabricated WAV source.
     final bool wantNativeFallback = forceNativeDsd;
 
-    final bool canFallbackToDop =
-        (forceDop || wantNativeFallback) &&
+    final bool canFallbackToDop = (forceDop || wantNativeFallback) &&
         dopSampleRate > 0 &&
         (dopCapabilities == null ||
             (dopCapabilities.canUseDop &&

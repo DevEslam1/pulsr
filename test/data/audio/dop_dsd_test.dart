@@ -248,7 +248,8 @@ void main() {
   });
 
   group('DsdRawEncoder Direct Native DSD packing', () {
-    test('interleaves raw L/R channels byte-for-byte without marker overhead', () {
+    test('interleaves raw L/R channels byte-for-byte without marker overhead',
+        () {
       final raw = DsdRawEncoder.encodeToDsdRawInterleaved(
         dsdLeft: _dsdL,
         dsdRight: _dsdR,

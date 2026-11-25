@@ -950,7 +950,8 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
 
     for (final job in work) {
       if (_disposed || isClosed) break;
-      if (job.kind != OnlineLibraryKind.custom && !(account?.isLoggedIn ?? false)) {
+      if (job.kind != OnlineLibraryKind.custom &&
+          !(account?.isLoggedIn ?? false)) {
         continue;
       }
       try {
@@ -1004,7 +1005,8 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
         }
 
         if (_disposed || isClosed) break;
-        if (job.kind != OnlineLibraryKind.custom && !(account?.isLoggedIn ?? false)) {
+        if (job.kind != OnlineLibraryKind.custom &&
+            !(account?.isLoggedIn ?? false)) {
           continue;
         }
 
@@ -1330,9 +1332,8 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
       YtmPlaylistDetails? details;
       if (accountService != null) {
         try {
-          details =
-              await accountService.fetchPlaylistDetails(input,
-                  maxTracks: kYtmMaxPlaylistTracks);
+          details = await accountService.fetchPlaylistDetails(input,
+              maxTracks: kYtmMaxPlaylistTracks);
         } catch (e, st) {
           ErrorLogger.log(
               'fetchPlaylistDetails failed, falling back to public tracks',

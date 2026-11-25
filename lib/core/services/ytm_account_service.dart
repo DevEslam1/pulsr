@@ -760,6 +760,7 @@ class YtmAccountService {
       debugPrint('[YTM_ACCOUNT] Session warming error (non-fatal): $e');
     }
   }
+
   static List<String> splitSetCookies(String header) =>
       YtmCookieCodec.splitSetCookies(header);
 
@@ -1074,9 +1075,7 @@ class YtmAccountService {
             .timeout(timeout);
         // A 401 on an OAuth session is an expired bearer: refresh and retry
         // once even when maxAttempts == 1 (e.g. validation calls).
-        if (res.statusCode == 401 &&
-            isOAuthSession &&
-            !oauthRetriedAfter401) {
+        if (res.statusCode == 401 && isOAuthSession && !oauthRetriedAfter401) {
           oauthRetriedAfter401 = true;
           final refreshed = await YtmOAuthService.shared.refresh();
           if (refreshed) {
@@ -1239,8 +1238,7 @@ class YtmAccountService {
                 final contJson =
                     jsonDecode(contRes.body) as Map<String, dynamic>;
                 _harvestSessionState(contJson);
-                final contPlaylists =
-                    _parseInnertubeAccountPlaylists(contJson);
+                final contPlaylists = _parseInnertubeAccountPlaylists(contJson);
                 if (contPlaylists.isNotEmpty) {
                   playlists.addAll(contPlaylists);
                   currentJson = contJson;
@@ -1256,9 +1254,7 @@ class YtmAccountService {
             while (pageCount < maxPages) {
               pageCount++;
               final ctoken = _extractContinuationToken(currentJson);
-              if (ctoken == null ||
-                  ctoken.isEmpty ||
-                  !seenTokens.add(ctoken)) {
+              if (ctoken == null || ctoken.isEmpty || !seenTokens.add(ctoken)) {
                 break;
               }
               try {
@@ -1271,8 +1267,7 @@ class YtmAccountService {
                   }),
                 );
                 if (contRes.statusCode != 200) break;
-                currentJson =
-                    jsonDecode(contRes.body) as Map<String, dynamic>;
+                currentJson = jsonDecode(contRes.body) as Map<String, dynamic>;
                 _harvestSessionState(currentJson);
                 final more = _parseInnertubeAccountPlaylists(currentJson);
                 final added =
@@ -2813,7 +2808,6 @@ class YtmAccountService {
     return null;
   }
 
-
   /// Searches for a map containing [key] in the InnerTube JSON tree.
   Map<String, dynamic>? _findShelfNode(dynamic node, String key,
       [int depth = 0]) {
@@ -2854,8 +2848,8 @@ class YtmAccountService {
     if (actions is List) {
       for (final action in actions) {
         if (action is Map<String, dynamic>) {
-          final append = action['appendContinuationItemsAction']
-              as Map<String, dynamic>?;
+          final append =
+              action['appendContinuationItemsAction'] as Map<String, dynamic>?;
           final items = append?['continuationItems'];
           if (items is List) {
             final token = _extractTokenFromItems(items);
@@ -2953,8 +2947,8 @@ class YtmAccountService {
       final tracks = <YtmTrack>[];
       for (final action in actions) {
         if (action is Map<String, dynamic>) {
-          final append = action['appendContinuationItemsAction']
-              as Map<String, dynamic>?;
+          final append =
+              action['appendContinuationItemsAction'] as Map<String, dynamic>?;
           final items = append?['continuationItems'];
           if (items is List) {
             tracks.addAll(_parseTrackItems(items));

@@ -104,16 +104,24 @@ void main() {
         nextDidlMetadata: '<DIDL-Lite/>',
       );
       expect(envelope, contains('SetNextAVTransportURI'));
-      expect(envelope, contains('<NextURI>http://192.168.1.5:5555/media/next</NextURI>'));
-      expect(envelope, contains('<NextURIMetaData>&lt;DIDL-Lite/&gt;</NextURIMetaData>'));
+      expect(envelope,
+          contains('<NextURI>http://192.168.1.5:5555/media/next</NextURI>'));
+      expect(envelope,
+          contains('<NextURIMetaData>&lt;DIDL-Lite/&gt;</NextURIMetaData>'));
     });
 
     test('builds an exact Next and Previous envelope', () {
       final nextEnvelope = AvTransportClient.buildNextEnvelope();
-      expect(nextEnvelope, contains('<u:Next xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>0</InstanceID></u:Next>'));
+      expect(
+          nextEnvelope,
+          contains(
+              '<u:Next xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>0</InstanceID></u:Next>'));
 
       final prevEnvelope = AvTransportClient.buildPreviousEnvelope();
-      expect(prevEnvelope, contains('<u:Previous xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>0</InstanceID></u:Previous>'));
+      expect(
+          prevEnvelope,
+          contains(
+              '<u:Previous xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>0</InstanceID></u:Previous>'));
     });
 
     test('builds an exact Seek envelope with a REL_TIME target', () {
@@ -170,7 +178,8 @@ void main() {
         ),
       );
       expect(metadata, contains('<dc:title>A &amp; B &lt;C&gt;</dc:title>'));
-      expect(metadata, contains('<dc:creator>Artist &quot;Q&quot;</dc:creator>'));
+      expect(
+          metadata, contains('<dc:creator>Artist &quot;Q&quot;</dc:creator>'));
       expect(metadata, contains('<upnp:album>Album&apos;s</upnp:album>'));
       expect(
         metadata,

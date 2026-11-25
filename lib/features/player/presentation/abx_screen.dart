@@ -207,8 +207,8 @@ class _AbxScreenState extends State<AbxScreen> {
     setState(() => _exporting = true);
     try {
       final report = _buildCompletedReport();
-      final directory = await (widget.getSaveDirectory ??
-          getApplicationDocumentsDirectory)();
+      final directory =
+          await (widget.getSaveDirectory ?? getApplicationDocumentsDirectory)();
       if (!mounted) return;
       final artifact = await exportAbxReport(report, directory: directory);
       if (!mounted) return;
@@ -559,7 +559,8 @@ class _AbxScreenState extends State<AbxScreen> {
                   style: OutlinedButton.styleFrom(
                     foregroundColor: p.textPrimary,
                     side: BorderSide(color: p.hairline),
-                    minimumSize: const Size.fromHeight(AppSpacing.minTouchTarget),
+                    minimumSize:
+                        const Size.fromHeight(AppSpacing.minTouchTarget),
                   ),
                 ),
               ),
@@ -575,7 +576,8 @@ class _AbxScreenState extends State<AbxScreen> {
                   style: OutlinedButton.styleFrom(
                     foregroundColor: p.textPrimary,
                     side: BorderSide(color: p.hairline),
-                    minimumSize: const Size.fromHeight(AppSpacing.minTouchTarget),
+                    minimumSize:
+                        const Size.fromHeight(AppSpacing.minTouchTarget),
                   ),
                 ),
               ),

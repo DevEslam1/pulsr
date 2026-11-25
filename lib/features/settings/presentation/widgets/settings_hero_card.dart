@@ -71,9 +71,8 @@ class SettingsQuickControlsStrip extends StatelessWidget {
         tileKey: const ValueKey('quick_control_experience_mode'),
         icon: isPro ? Icons.tune_rounded : Icons.auto_awesome_rounded,
         label: l10n.experienceModeTitle,
-        status: isPro
-            ? l10n.experienceModeProfessional
-            : l10n.experienceModeNormal,
+        status:
+            isPro ? l10n.experienceModeProfessional : l10n.experienceModeNormal,
         isActive: isPro,
         onTap: () {
           PulsrHaptics.selectionClick();
@@ -110,8 +109,7 @@ class SettingsQuickControlsStrip extends StatelessWidget {
         tileKey: const ValueKey('quick_control_audio_engine_eq'),
         icon: isBitPerfect ? Icons.usb_rounded : Icons.equalizer_rounded,
         label: l10n.equalizer,
-        status:
-            isBitPerfect ? l10n.badgeExclusive : l10n.onboardingAudioEngine,
+        status: isBitPerfect ? l10n.badgeExclusive : l10n.onboardingAudioEngine,
         isActive: isBitPerfect,
         onTap: () {
           PulsrHaptics.selectionClick();
@@ -343,8 +341,8 @@ class SettingsHeroCard extends StatelessWidget {
           }
         }
 
-        final isHighContrast =
-        p.isHighContrast || (MediaQuery.maybeHighContrastOf(context) ?? false);
+        final isHighContrast = p.isHighContrast ||
+            (MediaQuery.maybeHighContrastOf(context) ?? false);
         return Container(
           margin: const EdgeInsets.only(bottom: AppSpacing.lg),
           decoration: BoxDecoration(
@@ -426,15 +424,15 @@ class SettingsHeroCard extends StatelessWidget {
                                               fit: BoxFit.cover,
                                               cacheWidth: 104,
                                               cacheHeight: 104,
-                                              loadingBuilder: (context, child,
-                                                      progress) =>
-                                                  progress == null
-                                                      ? child
-                                                      : const SkeletonBox(
-                                                          width: 50,
-                                                          height: 50,
-                                                          radius: 25,
-                                                        ),
+                                              loadingBuilder:
+                                                  (context, child, progress) =>
+                                                      progress == null
+                                                          ? child
+                                                          : const SkeletonBox(
+                                                              width: 50,
+                                                              height: 50,
+                                                              radius: 25,
+                                                            ),
                                               errorBuilder: (_, __, ___) =>
                                                   Icon(
                                                 Icons.person_rounded,

@@ -108,8 +108,7 @@ extension _EqAutoEqViperTab on _EqualizerSheetState {
 
               // Active Headphone Profile Banner
               if (state.selectedHeadphoneProfile != null) ...[
-                _buildAutoEqAppliedBanner(
-                    context, cubit, state, p, dspBlocked),
+                _buildAutoEqAppliedBanner(context, cubit, state, p, dspBlocked),
                 const SizedBox(height: AppSpacing.xs),
               ],
             ]),
@@ -251,132 +250,133 @@ extension _EqAutoEqViperTab on _EqualizerSheetState {
                   },
             borderRadius: AppRadii.cardRadius,
             child: Ink(
-            padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.s14, vertical: AppSpacing.sm),
-            decoration: BoxDecoration(
-              color: isApplied
-                  ? p.accent.withValues(alpha: 0.14)
-                  : p.surfaceContainer,
-              borderRadius: AppRadii.cardRadius,
-              border: Border.all(
-                color: isApplied ? p.accent : p.hairline,
-                width: isApplied ? 1.5 : 1.0,
+              padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.s14, vertical: AppSpacing.sm),
+              decoration: BoxDecoration(
+                color: isApplied
+                    ? p.accent.withValues(alpha: 0.14)
+                    : p.surfaceContainer,
+                borderRadius: AppRadii.cardRadius,
+                border: Border.all(
+                  color: isApplied ? p.accent : p.hairline,
+                  width: isApplied ? 1.5 : 1.0,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: (isApplied ? p.accent : p.textTertiary)
+                          .withValues(alpha: 0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      profile.category == 'Over-Ear'
+                          ? Icons.headset_rounded
+                          : Icons.headphones_rounded,
+                      color: isApplied ? p.accent : p.textSecondary,
+                      size: 18,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          profile.name,
+                          style: TextStyle(
+                            fontSize: AppFontSize.bodySmall,
+                            fontWeight: FontWeight.w700,
+                            color: isApplied ? p.accent : p.textPrimary,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: AppSpacing.s2),
+                        Text(
+                          '${profile.brand} • ${profile.category}',
+                          style: TextStyle(
+                              fontSize: AppFontSize.caption,
+                              color: p.textTertiary),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (profile.id.startsWith('custom_')) ...[
+                    IconButton(
+                      icon: Icon(Icons.delete_outline_rounded,
+                          size: 18, color: p.error),
+                      tooltip: context.l10n.dspDeleteCustomPreset,
+                      onPressed: dspBlocked != null
+                          ? null
+                          : () async {
+                              await _headphoneRepo.removeProfile(profile.id);
+                              if (!mounted) return;
+                              if (isApplied) await cubit.resetToFlat();
+                              if (mounted) _setStateSafe(() {});
+                            },
+                    ),
+                    const SizedBox(width: AppSpacing.xxs),
+                  ],
+                  if (isApplied)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.s10, vertical: AppSpacing.s6),
+                      decoration: BoxDecoration(
+                        color: p.accent,
+                        borderRadius: AppRadii.r12All,
+                        boxShadow: [
+                          BoxShadow(
+                            color: p.accent.withValues(alpha: 0.35),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.check_rounded,
+                              color: p.onAccent, size: 13),
+                          const SizedBox(width: AppSpacing.xxs),
+                          Text(
+                            context.l10n.activeLabel,
+                            style: TextStyle(
+                              color: p.onAccent,
+                              fontSize: AppFontSize.caption,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.s10, vertical: AppSpacing.s6),
+                      decoration: BoxDecoration(
+                        color: p.surfaceContainerHigh,
+                        borderRadius: AppRadii.r12All,
+                        border: Border.all(color: p.hairline),
+                      ),
+                      child: Text(
+                        context.l10n.apply,
+                        style: TextStyle(
+                          color: p.textSecondary,
+                          fontSize: AppFontSize.caption,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
-            child: Row(
-              children: [
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: (isApplied ? p.accent : p.textTertiary)
-                        .withValues(alpha: 0.15),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    profile.category == 'Over-Ear'
-                        ? Icons.headset_rounded
-                        : Icons.headphones_rounded,
-                    color: isApplied ? p.accent : p.textSecondary,
-                    size: 18,
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.sm),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        profile.name,
-                        style: TextStyle(
-                          fontSize: AppFontSize.bodySmall,
-                          fontWeight: FontWeight.w700,
-                          color: isApplied ? p.accent : p.textPrimary,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: AppSpacing.s2),
-                      Text(
-                        '${profile.brand} • ${profile.category}',
-                        style: TextStyle(
-                            fontSize: AppFontSize.caption,
-                            color: p.textTertiary),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-                if (profile.id.startsWith('custom_')) ...[
-                  IconButton(
-                    icon: Icon(Icons.delete_outline_rounded,
-                        size: 18, color: p.error),
-                    tooltip: context.l10n.dspDeleteCustomPreset,
-                    onPressed: dspBlocked != null
-                        ? null
-                        : () async {
-                            await _headphoneRepo.removeProfile(profile.id);
-                            if (!mounted) return;
-                            if (isApplied) await cubit.resetToFlat();
-                            if (mounted) _setStateSafe(() {});
-                          },
-                  ),
-                  const SizedBox(width: AppSpacing.xxs),
-                ],
-                if (isApplied)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.s10, vertical: AppSpacing.s6),
-                    decoration: BoxDecoration(
-                      color: p.accent,
-                      borderRadius: AppRadii.r12All,
-                      boxShadow: [
-                        BoxShadow(
-                          color: p.accent.withValues(alpha: 0.35),
-                          blurRadius: 6,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.check_rounded, color: p.onAccent, size: 13),
-                        const SizedBox(width: AppSpacing.xxs),
-                        Text(
-                          context.l10n.activeLabel,
-                          style: TextStyle(
-                            color: p.onAccent,
-                            fontSize: AppFontSize.caption,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                else
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.s10, vertical: AppSpacing.s6),
-                    decoration: BoxDecoration(
-                      color: p.surfaceContainerHigh,
-                      borderRadius: AppRadii.r12All,
-                      border: Border.all(color: p.hairline),
-                    ),
-                    child: Text(
-                      context.l10n.apply,
-                      style: TextStyle(
-                        color: p.textSecondary,
-                        fontSize: AppFontSize.caption,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
           ),
-        ),
         ),
       ),
     );
@@ -449,8 +449,9 @@ extension _EqAutoEqViperTab on _EqualizerSheetState {
       p: p,
       icon: Icons.code_rounded,
       title: info.title,
-      subtitle:
-          state.liveProgStatus.isNotEmpty ? state.liveProgStatus : info.subtitle,
+      subtitle: state.liveProgStatus.isNotEmpty
+          ? state.liveProgStatus
+          : info.subtitle,
       infoTooltip: info.title,
       onInfo: () => _showFeatureInfo(context, AudioFeatureRegistry.liveProg,
           conflictReason: dspBlocked ??

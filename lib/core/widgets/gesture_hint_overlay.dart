@@ -11,6 +11,7 @@ import '../theme/aura_theme.dart';
 import '../utils/l10n_extensions.dart';
 
 import '../utils/pulsr_haptics.dart';
+
 /// {@category DesignSystem}
 /// A shared, self-dismissing hint overlay/banner that shows once to educate
 /// users about gestures (D6: swipe down to dismiss, double-tap, mini player

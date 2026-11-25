@@ -33,7 +33,8 @@ void main() {
       final seen = <String>{};
       final duplicates = <String>[];
       for (final capability in DecoderCapabilityRegistry.capabilities) {
-        if (!seen.add(capability.extension)) duplicates.add(capability.extension);
+        if (!seen.add(capability.extension))
+          duplicates.add(capability.extension);
       }
       expect(duplicates, isEmpty,
           reason: 'DecoderCapabilityRegistry.capabilities declares '
@@ -47,7 +48,8 @@ void main() {
         expect(capability.extension, capability.extension.toLowerCase(),
             reason: 'extension "${capability.extension}" must be lower-case');
         expect(capability.extension.startsWith('.'), isFalse,
-            reason: 'extension "${capability.extension}" must not keep its dot');
+            reason:
+                'extension "${capability.extension}" must not keep its dot');
         expect(capability.reasonCode, isNotEmpty,
             reason: '".${capability.extension}" has an empty reason code');
         expect(capability.displayName, isNotEmpty,
@@ -90,8 +92,7 @@ void main() {
       for (final extension in bundled) extension: DecoderSupport.bundled,
       for (final extension in platform)
         extension: DecoderSupport.platformProbeRequired,
-      for (final extension in notBundled)
-        extension: DecoderSupport.notBundled,
+      for (final extension in notBundled) extension: DecoderSupport.notBundled,
     };
 
     test('each extension reports its declared support', () {
@@ -131,7 +132,8 @@ void main() {
       final capability = DecoderCapabilityRegistry.capabilityFor('alac');
       expect(capability.support, DecoderSupport.platformProbeRequired,
           reason: 'Media3 ships no ALAC decoder, so ALAC cannot be bundled');
-      expect(capability.reasonCode, DecoderCapabilityRegistry.reasonNoAlacDecoder,
+      expect(
+          capability.reasonCode, DecoderCapabilityRegistry.reasonNoAlacDecoder,
           reason: 'ALAC must explain itself as '
               '"${DecoderCapabilityRegistry.reasonNoAlacDecoder}"');
     });
@@ -141,7 +143,8 @@ void main() {
         final capability = DecoderCapabilityRegistry.capabilityFor(extension);
         expect(capability.support, DecoderSupport.notBundled,
             reason: '".$extension" has no decoder in this build');
-        expect(capability.reasonCode, DecoderCapabilityRegistry.reasonNotBundled);
+        expect(
+            capability.reasonCode, DecoderCapabilityRegistry.reasonNotBundled);
         expect(capability.isPlayable, isFalse,
             reason: '".$extension" must not be offered for playback');
       }
@@ -150,12 +153,20 @@ void main() {
 
   group('lookup normalization', () {
     test('extensions are case-insensitive and dot-tolerant', () {
-      for (final input in <String>['FLAC', '.flac', '  Flac  ', 'a/b/Album.FLAC']) {
-        expect(DecoderCapabilityRegistry.supportFor(input), DecoderSupport.bundled,
+      for (final input in <String>[
+        'FLAC',
+        '.flac',
+        '  Flac  ',
+        'a/b/Album.FLAC'
+      ]) {
+        expect(
+            DecoderCapabilityRegistry.supportFor(input), DecoderSupport.bundled,
             reason: '"$input" should resolve to the bundled FLAC entry');
       }
-      expect(DecoderCapabilityRegistry.supportFor('DSF'), DecoderSupport.bundled);
-      expect(DecoderCapabilityRegistry.supportFor('.APE'), DecoderSupport.notBundled);
+      expect(
+          DecoderCapabilityRegistry.supportFor('DSF'), DecoderSupport.bundled);
+      expect(DecoderCapabilityRegistry.supportFor('.APE'),
+          DecoderSupport.notBundled);
     });
 
     test('MIME types resolve to their extension', () {
@@ -171,7 +182,8 @@ void main() {
       };
       for (final entry in expectations.entries) {
         expect(DecoderCapabilityRegistry.supportFor(entry.key), entry.value,
-            reason: 'MIME "${entry.key}" should resolve to ${entry.value.name}');
+            reason:
+                'MIME "${entry.key}" should resolve to ${entry.value.name}');
       }
     });
 
@@ -211,7 +223,8 @@ void main() {
             DecoderCapabilityRegistry.reasonCodeFor(capability.extension);
         if (capability.support == DecoderSupport.bundled) {
           expect(reason, isNull,
-              reason: 'bundled ".${capability.extension}" needs no reason code');
+              reason:
+                  'bundled ".${capability.extension}" needs no reason code');
         } else {
           expect(reason, isNotNull,
               reason: '".${capability.extension}" is '

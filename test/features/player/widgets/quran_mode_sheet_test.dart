@@ -642,7 +642,8 @@ void main() {
           playback: PlaybackSlice(currentSong: testSong),
         ),
       );
-      when(() => cubit.isQuranAlwaysOnRadio()).thenAnswer((_) async => alwaysOn);
+      when(() => cubit.isQuranAlwaysOnRadio())
+          .thenAnswer((_) async => alwaysOn);
       when(() => cubit.setQuranAlwaysOnRadio(true))
           .thenAnswer((_) async => throw Exception('channel error'));
 

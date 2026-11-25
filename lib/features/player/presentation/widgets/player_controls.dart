@@ -286,9 +286,10 @@ class _PlayerControlsState extends State<PlayerControls> {
                                         .withValues(alpha: p.hairline.a * 0.5),
                                 width: 1.0,
                               ),
-                              boxShadow: (widget.hasPrevious && !p.isCalmDensity)
-                                  ? PulsrElevation.level1(context)
-                                  : null,
+                              boxShadow:
+                                  (widget.hasPrevious && !p.isCalmDensity)
+                                      ? PulsrElevation.level1(context)
+                                      : null,
                             ),
                             child: Center(
                               child: Icon(
@@ -373,7 +374,8 @@ class _PlayerControlsState extends State<PlayerControls> {
                                 duration: context.motionMs(260),
                                 transitionBuilder: (child, anim) {
                                   final curve = CurveTween(
-                                    curve: context.motionCurve(PulsrMotion.spring),
+                                    curve:
+                                        context.motionCurve(PulsrMotion.spring),
                                   );
                                   return FadeTransition(
                                     opacity: anim,

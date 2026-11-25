@@ -207,7 +207,10 @@ void main() {
     test('H-27 articleInsensitive + COLLATE NOCASE parity between table & FTS',
         () async {
       await insertSong(
-          id: 1, title: 'the apple', artist: 'CommonArtist', path: '/music/1.mp3');
+          id: 1,
+          title: 'the apple',
+          artist: 'CommonArtist',
+          path: '/music/1.mp3');
       await insertSong(
           id: 2, title: 'An Ant', artist: 'CommonArtist', path: '/music/2.mp3');
       await insertSong(
@@ -220,11 +223,13 @@ void main() {
           ['An Ant', 'the apple', 'Zebra']);
 
       // FTS5 index is auto-populated by songs_fts_insert SQLite triggers.
-      final ftsRes = (await repo.watchAllSongs(
-        searchQuery: 'commonartist',
-        sortBy: 'title',
-        ascending: true,
-      ).first)
+      final ftsRes = (await repo
+              .watchAllSongs(
+                searchQuery: 'commonartist',
+                sortBy: 'title',
+                ascending: true,
+              )
+              .first)
           .getOrElse((_) => []);
       expect(ftsRes.map((s) => s.title).toList(),
           ['An Ant', 'the apple', 'Zebra']);
@@ -293,12 +298,14 @@ void main() {
       await db.into(db.excludedFoldersTable).insert(
           ExcludedFoldersTableCompanion.insert(folderPath: '/music/secret/'));
 
-      expect((await futureExcludedAlbumSongs).getOrElse((_) => []).single.id, 1);
+      expect(
+          (await futureExcludedAlbumSongs).getOrElse((_) => []).single.id, 1);
       expect(
           (await futureExcludedArtistSongs).getOrElse((_) => []).single.id, 1);
+      expect((await futureExcludedGenres).getOrElse((_) => []).single.name,
+          'Rock');
       expect(
-          (await futureExcludedGenres).getOrElse((_) => []).single.name, 'Rock');
-      expect((await futureExcludedYears).getOrElse((_) => []).single.year, 2022);
+          (await futureExcludedYears).getOrElse((_) => []).single.year, 2022);
     });
 
     test(
@@ -398,8 +405,8 @@ void main() {
               SongsTableCompanion.insert(
                 id: Value(i),
                 title: 'Title ${951 - i}',
-                artist:
-                    Value(i == 1 ? 'b-artist' : (i == 2 ? 'A-Artist' : 'Z-Artist')),
+                artist: Value(
+                    i == 1 ? 'b-artist' : (i == 2 ? 'A-Artist' : 'Z-Artist')),
                 album: Value('Album $i'),
                 playCount: Value(i),
                 path: '/music/s_$i.mp3',

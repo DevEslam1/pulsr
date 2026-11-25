@@ -18,10 +18,8 @@ void main() {
 
   group('pushTapSrcRateToPlayers (tap-side SRC bridge)', () {
     test('the mixer rate reaches every player', () async {
-      when(() => playerA.dspSetTapSrcRate(48000))
-          .thenAnswer((_) async => true);
-      when(() => playerB.dspSetTapSrcRate(48000))
-          .thenAnswer((_) async => true);
+      when(() => playerA.dspSetTapSrcRate(48000)).thenAnswer((_) async => true);
+      when(() => playerB.dspSetTapSrcRate(48000)).thenAnswer((_) async => true);
       when(() => prefetch.dspSetTapSrcRate(48000))
           .thenAnswer((_) async => true);
 

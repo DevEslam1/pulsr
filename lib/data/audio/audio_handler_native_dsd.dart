@@ -16,8 +16,7 @@ mixin PulsrAudioNativeDsd on BaseAudioHandler {
   StreamSubscription<PlaybackState>? _nativeDsdStateSub;
   StreamSubscription<Duration>? _nativeDsdPosSub;
   StreamSubscription<void>? _nativeDsdCompleteSub;
-  DateTime _lastNativeDsdPositionEmit =
-      DateTime.fromMillisecondsSinceEpoch(0);
+  DateTime _lastNativeDsdPositionEmit = DateTime.fromMillisecondsSinceEpoch(0);
   bool _nativeDsdFixedVolumeNoticeShown = false;
 
   bool get nativeDsdActive => _nativeDsdActive;
@@ -37,7 +36,9 @@ mixin PulsrAudioNativeDsd on BaseAudioHandler {
     return PlaybackPositionPersister(
       repository: _repository,
       readSnapshot: () {
-        if (_songs.isEmpty || _currentIndex < 0 || _currentIndex >= _songs.length) {
+        if (_songs.isEmpty ||
+            _currentIndex < 0 ||
+            _currentIndex >= _songs.length) {
           return null;
         }
         final currentSong = _songs[_currentIndex];
@@ -177,8 +178,7 @@ mixin PulsrAudioNativeDsd on BaseAudioHandler {
         }
       }
       session.onNativeActive = () {
-        _recordResolvedDsdTransport(song.id,
-            isDop: false, isNativeDsd: true);
+        _recordResolvedDsdTransport(song.id, isDop: false, isNativeDsd: true);
         DsdDecoderHelper.dsdNativeActive = true;
         DsdDecoderHelper.dsdDopActive = false;
         if (!_onTrackChangedSubject.isClosed) {

@@ -229,7 +229,8 @@ class SsdpClient {
     if (location == null || location.isEmpty) return null;
 
     final parsed = Uri.tryParse(location);
-    if (parsed == null || !isAllowedDescriptionLocation(parsed, sourceAddress)) {
+    if (parsed == null ||
+        !isAllowedDescriptionLocation(parsed, sourceAddress)) {
       return null;
     }
 

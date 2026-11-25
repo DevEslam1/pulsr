@@ -172,7 +172,8 @@ void main() {
     });
   });
 
-  group('M-10 EQ header Bit-Perfect switch polarity & EqCurveVisualizer min size',
+  group(
+      'M-10 EQ header Bit-Perfect switch polarity & EqCurveVisualizer min size',
       () {
     testWidgets(
         'EqShellHeader keeps Switch value true when EQ is enabled while blocked by Bit-Perfect',
@@ -247,7 +248,8 @@ void main() {
     });
   });
 
-  group('M-10 Act-then-confirm (no premature shadow flip on backend error)', () {
+  group('M-10 Act-then-confirm (no premature shadow flip on backend error)',
+      () {
     testWidgets(
         'HrtfBinauralCard does not flip switch on when cubit records an error',
         (tester) async {
@@ -601,7 +603,8 @@ void main() {
       expect(() => p2.paint(canvas, const Size(200, 200)), returnsNormally);
     });
 
-    testWidgets('H-53 CanvasBackdrop renders without off-center Transform.scale',
+    testWidgets(
+        'H-53 CanvasBackdrop renders without off-center Transform.scale',
         (tester) async {
       final settingsCubit = stubSettingsCubit();
       await tester.pumpWidget(

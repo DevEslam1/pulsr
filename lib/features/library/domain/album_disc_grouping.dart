@@ -81,9 +81,8 @@ List<AlbumDiscGroup<T>> groupAlbumDiscs<T>(
   }
 
   final discNumbers = numbered.keys.toList()..sort();
-  final mergeIntoDiscOne = unnumbered.isNotEmpty &&
-      numbered.isNotEmpty &&
-      !numbered.containsKey(1);
+  final mergeIntoDiscOne =
+      unnumbered.isNotEmpty && numbered.isNotEmpty && !numbered.containsKey(1);
   final groups = <AlbumDiscGroup<T>>[];
 
   // Disc 1 exists only implicitly when unnumbered tracks are folded into it.

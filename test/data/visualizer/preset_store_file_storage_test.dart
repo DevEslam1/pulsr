@@ -29,7 +29,9 @@ void main() {
   });
 
   group('VisualizerPresetStore file storage', () {
-    test('stores preset file in visualizer_presets/ directory and only filename in SharedPreferences', () async {
+    test(
+        'stores preset file in visualizer_presets/ directory and only filename in SharedPreferences',
+        () async {
       final store = VisualizerPresetStore();
       const preset = VisualizerPreset(
         name: 'FilePreset',
@@ -43,7 +45,8 @@ void main() {
       final storedKey = prefs.getString('setting_custom_visualizer_preset');
       expect(storedKey, 'custom_preset.json');
 
-      final expectedFile = File('${tempDir.path}/visualizer_presets/custom_preset.json');
+      final expectedFile =
+          File('${tempDir.path}/visualizer_presets/custom_preset.json');
       expect(expectedFile.existsSync(), isTrue);
       expect(expectedFile.readAsStringSync(), contains('FilePreset'));
 
@@ -53,9 +56,12 @@ void main() {
       expect(loaded.barCount, 32);
     });
 
-    test('rethrows from save so importFromFile does not report false success on failure', () async {
+    test(
+        'rethrows from save so importFromFile does not report false success on failure',
+        () async {
       // Create a directory at the file path so writeAsString fails with FileSystemException
-      Directory('${tempDir.path}/visualizer_presets/custom_preset.json').createSync(recursive: true);
+      Directory('${tempDir.path}/visualizer_presets/custom_preset.json')
+          .createSync(recursive: true);
 
       final store = VisualizerPresetStore();
       // Directly saving rethrows
@@ -66,7 +72,8 @@ void main() {
 
       // importFromFile catches and returns null
       final validPresetFile = File('${tempDir.path}/test.json');
-      validPresetFile.writeAsStringSync('{"name":"Test","shape":"bars","barCount":16}');
+      validPresetFile
+          .writeAsStringSync('{"name":"Test","shape":"bars","barCount":16}');
 
       FilePickerPlatform.instance = FakeFilePickerPlatform(
         result: () => FakePlatformFile(validPresetFile.path),
@@ -78,7 +85,9 @@ void main() {
   });
 
   group('MilkdropPresetStore file storage', () {
-    test('stores preset file in visualizer_presets/ directory and only filename/name in SharedPreferences', () async {
+    test(
+        'stores preset file in visualizer_presets/ directory and only filename/name in SharedPreferences',
+        () async {
       final store = MilkdropPresetStore();
       const preset = MilkdropPreset(name: 'MilkFilePreset', zoom: 1.5);
       const rawMilk = 'presetName=MilkFilePreset\nzoom=1.5\n';
@@ -86,11 +95,13 @@ void main() {
       await store.save(preset, rawMilk);
 
       final prefs = await SharedPreferences.getInstance();
-      expect(prefs.getString('setting_milkdrop_preset_file'), 'custom_preset.milk');
+      expect(prefs.getString('setting_milkdrop_preset_file'),
+          'custom_preset.milk');
       expect(prefs.getString('setting_milkdrop_preset_name'), 'MilkFilePreset');
       expect(prefs.getString('setting_milkdrop_preset'), isNull);
 
-      final expectedFile = File('${tempDir.path}/visualizer_presets/custom_preset.milk');
+      final expectedFile =
+          File('${tempDir.path}/visualizer_presets/custom_preset.milk');
       expect(expectedFile.existsSync(), isTrue);
       expect(expectedFile.readAsStringSync(), rawMilk);
 
@@ -99,9 +110,12 @@ void main() {
       expect(loaded.zoom, 1.5);
     });
 
-    test('rethrows from save so importFromFile does not report false success on failure', () async {
+    test(
+        'rethrows from save so importFromFile does not report false success on failure',
+        () async {
       // Create a directory at the file path so writeAsString fails with FileSystemException
-      Directory('${tempDir.path}/visualizer_presets/custom_preset.milk').createSync(recursive: true);
+      Directory('${tempDir.path}/visualizer_presets/custom_preset.milk')
+          .createSync(recursive: true);
 
       final store = MilkdropPresetStore();
       expect(

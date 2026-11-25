@@ -25,7 +25,8 @@ void main() {
   void stub(Future<Object?> Function(MethodCall call) handler) {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, (call) {
-      requested.add('${call.method}:${call.arguments is Map ? call.arguments['band'] : ''}');
+      requested.add(
+          '${call.method}:${call.arguments is Map ? call.arguments['band'] : ''}');
       return handler(call);
     });
   }

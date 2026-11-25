@@ -167,7 +167,8 @@ class _VinylTurntableDeckState extends State<_VinylTurntableDeck> {
                                   stops: const [0.0, 0.58, 1.0],
                                 ),
                                 border: Border.all(
-                                  color: AppColors.giltGold.withValues(alpha: 0.45),
+                                  color: AppColors.giltGold
+                                      .withValues(alpha: 0.45),
                                   width: 1,
                                 ),
                               ),
@@ -238,8 +239,8 @@ class _VinylTurntableDeckState extends State<_VinylTurntableDeck> {
                                 painter: _PlinthBrushedOverlayPainter(
                                   highlight: AppColors.onGiltLight
                                       .withValues(alpha: 0.045),
-                                  brassCorner:
-                                      AppColors.giltGold.withValues(alpha: 0.36),
+                                  brassCorner: AppColors.giltGold
+                                      .withValues(alpha: 0.36),
                                 ),
                               ),
                             ),
@@ -447,7 +448,8 @@ class _VinylTurntableDeckState extends State<_VinylTurntableDeck> {
                               borderRadius: AppRadii.r6All,
                               border: Border.all(
                                 color: state.isPlaying
-                                    ? AppColors.amberDeep.withValues(alpha: 0.65)
+                                    ? AppColors.amberDeep
+                                        .withValues(alpha: 0.65)
                                     : PlayerMaterialColors.recordRim,
                                 width: 1,
                               ),

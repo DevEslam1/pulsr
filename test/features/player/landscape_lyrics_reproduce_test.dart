@@ -19,6 +19,7 @@ import 'package:pulsr/features/settings/cubit/settings_state.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 class MockPlayerCubit extends Mock implements PlayerCubit {}
 
 class MockSettingsCubit extends Mock implements SettingsCubit {}
@@ -210,7 +211,8 @@ void main() {
       final landscapeControlsRect =
           tester.getRect(find.byIcon(Icons.pause_rounded));
       expect(landscapeControlsRect.bottom, lessThanOrEqualTo(390.0),
-          reason: '$themeMode controls pushed below screen bottom in landscape');
+          reason:
+              '$themeMode controls pushed below screen bottom in landscape');
       expect(landscapeControlsRect.top, greaterThanOrEqualTo(0.0),
           reason: '$themeMode controls pushed above screen top in landscape');
 

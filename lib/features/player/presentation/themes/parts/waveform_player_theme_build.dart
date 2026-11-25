@@ -480,8 +480,9 @@ class _StudioTrackBayHeader extends StatelessWidget {
                 text: song?.title ?? context.l10n.noTrackSelected,
                 textAlign: TextAlign.start,
                 style: TextStyle(
-                  fontSize:
-                      isCompact ? AppFontSize.bodyLarge : AppFontSize.titleLarge,
+                  fontSize: isCompact
+                      ? AppFontSize.bodyLarge
+                      : AppFontSize.titleLarge,
                   fontWeight: FontWeight.w800,
                   color: p.textPrimary,
                   letterSpacing: AppTracking.heading,
@@ -636,8 +637,7 @@ class _StudioTelemetryStrip extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontFamily: 'monospace',
-                fontSize:
-                    isCompact ? AppFontSize.caption : AppFontSize.label,
+                fontSize: isCompact ? AppFontSize.caption : AppFontSize.label,
                 fontWeight: FontWeight.w800,
                 letterSpacing: AppTracking.overline,
                 color: p.textPrimary,

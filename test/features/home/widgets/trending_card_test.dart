@@ -48,7 +48,8 @@ void main() {
       );
 
   group('TrendingCard', () {
-    testWidgets('renders harmonized 2-tier title, artist, frame, and play badge',
+    testWidgets(
+        'renders harmonized 2-tier title, artist, frame, and play badge',
         (tester) async {
       await tester.pumpWidget(app(TrendingCard(song: _song, onTap: () {})));
       await tester.pump();
@@ -66,7 +67,8 @@ void main() {
       expect(find.byType(HomeCardPlayBadge), findsOneWidget);
     });
 
-    testWidgets('shows equalizer badge when active and playing', (tester) async {
+    testWidgets('shows equalizer badge when active and playing',
+        (tester) async {
       await tester.pumpWidget(
         app(
           TrendingCard(

@@ -475,8 +475,7 @@ class DiscordRpcService {
         return;
       }
       _reconnectTimer?.cancel();
-      final delaySeconds =
-          math.min(60, 5 * (1 << (_reconnectAttempts - 1)));
+      final delaySeconds = math.min(60, 5 * (1 << (_reconnectAttempts - 1)));
       _reconnectTimer = Timer(Duration(seconds: delaySeconds), () {
         if (_enabled && !_disposed && !_isNetworkBlocked && !_isConnected) {
           connect();
@@ -734,9 +733,7 @@ class DiscordRpcService {
 
     String largeImage = fallbackArtUrl;
     final artUrl = song.remoteArtworkUrl ?? song.artworkUri;
-    if (artUrl != null &&
-        artUrl.isNotEmpty &&
-        isSafeRemoteArtworkUrl(artUrl)) {
+    if (artUrl != null && artUrl.isNotEmpty && isSafeRemoteArtworkUrl(artUrl)) {
       final proxied = await fetchExternalAsset(artUrl);
       if (_disposed || epoch != _presenceEpoch || _isNetworkBlocked) return;
       if (proxied != null) {
@@ -786,7 +783,10 @@ class DiscordRpcService {
       'afk': true,
     };
 
-    if (_disposed || epoch != _presenceEpoch || !_enabled || _isNetworkBlocked) {
+    if (_disposed ||
+        epoch != _presenceEpoch ||
+        !_enabled ||
+        _isNetworkBlocked) {
       return;
     }
 

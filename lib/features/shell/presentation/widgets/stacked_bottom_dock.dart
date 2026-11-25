@@ -426,9 +426,8 @@ class StackedBottomDockState extends State<StackedBottomDock> {
                                 ),
                           borderRadius: AppRadii.r24All,
                           border: Border.all(
-                            color: p.isHighContrast
-                                ? p.borderStrong
-                                : p.hairline,
+                            color:
+                                p.isHighContrast ? p.borderStrong : p.hairline,
                             width: p.isHighContrast ? 1.5 : 1.0,
                           ),
                           boxShadow: PulsrElevation.level4(context),
@@ -583,7 +582,8 @@ class StackedBottomDockState extends State<StackedBottomDock> {
               onLongPress: _showDockStylePicker,
             );
 
-            final dockShadowRadius = isTablet ? AppRadii.r28All : AppRadii.r24All;
+            final dockShadowRadius =
+                isTablet ? AppRadii.r28All : AppRadii.r24All;
 
             if (isStacked && !isMiniBehind) {
               miniPlayerWidget = DecoratedBox(

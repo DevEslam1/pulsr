@@ -928,16 +928,15 @@ class _SidebarBottomSection extends StatelessWidget {
                                         : p.hairline,
                                     width: 1.2,
                                   ),
-                                  boxShadow:
-                                      state.isPlaying && !p.isCalmDensity
-                                          ? [
-                                              BoxShadow(
-                                                color: p.accent
-                                                    .withValues(alpha: 0.25),
-                                                blurRadius: 8,
-                                              ),
-                                            ]
-                                          : null,
+                                  boxShadow: state.isPlaying && !p.isCalmDensity
+                                      ? [
+                                          BoxShadow(
+                                            color: p.accent
+                                                .withValues(alpha: 0.25),
+                                            blurRadius: 8,
+                                          ),
+                                        ]
+                                      : null,
                                 ),
                                 child: ClipRRect(
                                   borderRadius: AppRadii.r12All,

@@ -631,7 +631,8 @@ class ListenTogetherService {
     _pingTimer?.cancel();
     // Burst 4 pings initially for instant accurate clock sync
     var burstCount = 0;
-    _pingBurstTimer = Timer.periodic(const Duration(milliseconds: 300), (timer) {
+    _pingBurstTimer =
+        Timer.periodic(const Duration(milliseconds: 300), (timer) {
       if (_channel == null) {
         timer.cancel();
         return;
@@ -1019,10 +1020,9 @@ class ListenTogetherService {
           getIt<SettingsCubit>().state.currentOutputDevice?.isBluetooth ??
               false;
     }
-    _outputLatencyMs =
-        (onBluetooth && _calibratedBluetoothLatencyMs > 0)
-            ? _calibratedBluetoothLatencyMs
-            : 0;
+    _outputLatencyMs = (onBluetooth && _calibratedBluetoothLatencyMs > 0)
+        ? _calibratedBluetoothLatencyMs
+        : 0;
     return _outputLatencyMs;
   }
 
@@ -1092,8 +1092,7 @@ class ListenTogetherService {
   void _startReconciliationTicker() {
     _reconcileTimer?.cancel();
     _reconcileTimer = Timer.periodic(
-        const Duration(milliseconds: PartySyncController.reconcileTickMs),
-        (_) {
+        const Duration(milliseconds: PartySyncController.reconcileTickMs), (_) {
       if (!inParty || _isHost) return;
       final snap = partySnapshot.value;
       if (snap == null) return;
@@ -1210,9 +1209,8 @@ class ListenTogetherService {
           _activePartyTrackVideoId == targetTrack.videoId &&
           _activePartyMatchedSongId != null &&
           currentSong.id == _activePartyMatchedSongId;
-      final currentVideoId = isMatchedLocalSong
-          ? targetTrack.videoId
-          : _songPartyKey(currentSong);
+      final currentVideoId =
+          isMatchedLocalSong ? targetTrack.videoId : _songPartyKey(currentSong);
 
       if (forceTrackReconciliation || currentVideoId != targetTrack.videoId) {
         if (currentVideoId != targetTrack.videoId) {
@@ -1280,8 +1278,7 @@ class ListenTogetherService {
   }
 
   Future<SongsTableData?> _resolvePartyTrackToSong(PartyTrack track) async {
-    final isLocalOnly =
-        track.isLocalOnly || track.videoId.startsWith('local:');
+    final isLocalOnly = track.isLocalOnly || track.videoId.startsWith('local:');
     SongsTableData? match;
     try {
       if (getIt.isRegistered<IMusicRepository>()) {

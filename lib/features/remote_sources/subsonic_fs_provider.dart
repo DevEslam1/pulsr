@@ -152,7 +152,8 @@ class SubsonicFsProvider implements RemoteFsProvider {
               isDirectory: false,
               sizeBytes: song.sizeBytes,
               artworkUri: _coverArtUri(song.coverArt ?? album.coverArt),
-              artworkCacheKey: _coverArtCacheKey(song.coverArt ?? album.coverArt),
+              artworkCacheKey:
+                  _coverArtCacheKey(song.coverArt ?? album.coverArt),
             ),
         ]);
       }

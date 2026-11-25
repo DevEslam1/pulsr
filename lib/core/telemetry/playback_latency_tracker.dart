@@ -210,9 +210,8 @@ class PlaybackLatencyTracker {
   Duration? markStageAt(PlaybackStage stage, DateTime timestamp,
       {Map<String, dynamic>? data}) {
     if (_disposed || _active == null || _active!.closed) return null;
-    final clamped = timestamp.isBefore(_active!.startTime)
-        ? _active!.startTime
-        : timestamp;
+    final clamped =
+        timestamp.isBefore(_active!.startTime) ? _active!.startTime : timestamp;
     return _markInternal(stage, at: clamped, data: data);
   }
 

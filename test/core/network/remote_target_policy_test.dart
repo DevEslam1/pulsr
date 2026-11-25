@@ -22,8 +22,8 @@ void main() {
         'ftp://example.org/a.flac',
         'javascript:alert(1)',
       ]) {
-        expect(RemoteTargetPolicy.classify(url),
-            RemoteTargetVerdict.invalidScheme,
+        expect(
+            RemoteTargetPolicy.classify(url), RemoteTargetVerdict.invalidScheme,
             reason: url);
       }
     });
@@ -114,15 +114,17 @@ void main() {
       expect(RemoteTargetPolicy.hostMatchesAnySuffix('youtube.com', suffixes),
           isTrue);
       expect(
-          RemoteTargetPolicy.hostMatchesAnySuffix('music.youtube.com', suffixes),
+          RemoteTargetPolicy.hostMatchesAnySuffix(
+              'music.youtube.com', suffixes),
           isTrue);
-      expect(RemoteTargetPolicy.hostMatchesAnySuffix('evilyoutube.com', suffixes),
+      expect(
+          RemoteTargetPolicy.hostMatchesAnySuffix('evilyoutube.com', suffixes),
           isFalse);
       expect(
-          RemoteTargetPolicy.hostMatchesAnySuffix('youtube.com.evil.tld', suffixes),
+          RemoteTargetPolicy.hostMatchesAnySuffix(
+              'youtube.com.evil.tld', suffixes),
           isFalse);
-      expect(
-          RemoteTargetPolicy.hostMatchesAnySuffix('notgoogle.com', suffixes),
+      expect(RemoteTargetPolicy.hostMatchesAnySuffix('notgoogle.com', suffixes),
           isFalse);
     });
 
@@ -151,7 +153,9 @@ void main() {
       );
     });
 
-    test('enforceAllowlist returns notAllowlisted when host does not match suffixes', () {
+    test(
+        'enforceAllowlist returns notAllowlisted when host does not match suffixes',
+        () {
       const suffixes = {'youtube.com', 'google.com'};
       expect(
         RemoteTargetPolicy.classify(
@@ -270,7 +274,8 @@ void main() {
       expect(RadioStation.isHttpUrl('ytmusic://abc'), isFalse);
     });
 
-    test('blocks host:port local names and compressed IPv6 link-local/loopback forms',
+    test(
+        'blocks host:port local names and compressed IPv6 link-local/loopback forms',
         () {
       expect(RemoteTargetPolicy.isUnsafeHost('localhost:80'), isTrue);
       expect(RemoteTargetPolicy.isUnsafeHost('[::1]:8080'), isTrue);

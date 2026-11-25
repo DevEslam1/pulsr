@@ -39,8 +39,7 @@ http.Response _json(int status, Object body) => http.Response(
 
 _MockSecureStorage _setupSecureMock() {
   final secure = _MockSecureStorage();
-  when(() => secure.read(key: any(named: 'key')))
-      .thenAnswer((_) async => null);
+  when(() => secure.read(key: any(named: 'key'))).thenAnswer((_) async => null);
   when(() => secure.write(
         key: any(named: 'key'),
         value: any(named: 'value'),
@@ -367,7 +366,8 @@ void main() {
 
       resolveGate.complete({
         'videoId': 'vidEpoch1',
-        'url': 'https://rr1---sn.googlevideo.com/videoplayback?expire=1900000000',
+        'url':
+            'https://rr1---sn.googlevideo.com/videoplayback?expire=1900000000',
         'mimeType': 'audio/mp4',
         'container': 'm4a',
         'bitrateKbps': 128,
@@ -427,7 +427,8 @@ void main() {
       final browse = YtmBrowseService(mockYtm);
       await browse.getNewReleases();
 
-      verify(() => mockYtm.browseMusicSection('FEmusic_new_releases', limit: 15))
+      verify(() =>
+              mockYtm.browseMusicSection('FEmusic_new_releases', limit: 15))
           .called(1);
     });
   });

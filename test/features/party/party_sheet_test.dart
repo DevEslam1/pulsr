@@ -21,21 +21,17 @@ void main() {
     partyService = MockListenTogetherService();
     when(() => partyService.partySnapshot)
         .thenReturn(ValueNotifier<PartySnapshot?>(null));
-    when(() => partyService.connectionState)
-        .thenReturn(ValueNotifier<PartyConnectionState>(PartyConnectionState.offline));
+    when(() => partyService.connectionState).thenReturn(
+        ValueNotifier<PartyConnectionState>(PartyConnectionState.offline));
     when(() => partyService.currentMember)
         .thenReturn(ValueNotifier<PartyMember?>(null));
-    when(() => partyService.lastError)
-        .thenReturn(ValueNotifier<String?>(null));
-    when(() => partyService.clockSynced)
-        .thenReturn(ValueNotifier<bool>(false));
-    when(() => partyService.roundTripMs)
-        .thenReturn(ValueNotifier<int>(0));
+    when(() => partyService.lastError).thenReturn(ValueNotifier<String?>(null));
+    when(() => partyService.clockSynced).thenReturn(ValueNotifier<bool>(false));
+    when(() => partyService.roundTripMs).thenReturn(ValueNotifier<int>(0));
     when(() => partyService.inParty).thenReturn(false);
     when(() => partyService.getServerUrl())
         .thenAnswer((_) async => ListenTogetherService.defaultServerUrl);
-    when(() => partyService.setCustomServerUrl(any()))
-        .thenAnswer((_) async {});
+    when(() => partyService.setCustomServerUrl(any())).thenAnswer((_) async {});
     when(() => partyService.leaveParty()).thenAnswer((_) async {});
     getIt.registerSingleton<ListenTogetherService>(partyService);
   });
@@ -53,7 +49,8 @@ void main() {
     );
   }
 
-  testWidgets('validates server URL in settings view and surfaces inline error', (tester) async {
+  testWidgets('validates server URL in settings view and surfaces inline error',
+      (tester) async {
     await tester.pumpWidget(buildHost());
     await tester.pumpAndSettle();
 
@@ -77,8 +74,10 @@ void main() {
     await tester.pump();
 
     // Verify inline validation error is shown
-    expect(find.text('Enter a valid URL (http, https, ws, or wss)'), findsOneWidget);
-    verifyNever(() => partyService.setCustomServerUrl('ftp://invalid-party.server'));
+    expect(find.text('Enter a valid URL (http, https, ws, or wss)'),
+        findsOneWidget);
+    verifyNever(
+        () => partyService.setCustomServerUrl('ftp://invalid-party.server'));
 
     // Try entering an empty URL
     await tester.enterText(serverField, '   ');
@@ -93,7 +92,8 @@ void main() {
     await tester.tap(saveButton);
     await tester.pumpAndSettle();
 
-    verify(() => partyService.setCustomServerUrl('https://my-party.pulsr.app')).called(1);
+    verify(() => partyService.setCustomServerUrl('https://my-party.pulsr.app'))
+        .called(1);
   });
 
   testWidgets(
@@ -136,8 +136,8 @@ void main() {
         .thenReturn(ValueNotifier<PartySnapshot?>(snap));
     when(() => partyService.currentMember)
         .thenReturn(ValueNotifier<PartyMember?>(host));
-    when(() => partyService.connectionState)
-        .thenReturn(ValueNotifier<PartyConnectionState>(PartyConnectionState.live));
+    when(() => partyService.connectionState).thenReturn(
+        ValueNotifier<PartyConnectionState>(PartyConnectionState.live));
     when(() => partyService.clockSynced).thenReturn(ValueNotifier<bool>(true));
     when(() => partyService.roundTripMs).thenReturn(ValueNotifier<int>(24));
     when(() => partyService.sendKick(any())).thenReturn(null);
@@ -148,14 +148,17 @@ void main() {
     await tester.pumpAndSettle();
 
     // 1. Kick button appears for guest, not for host
-    expect(find.byKey(const ValueKey<String>('party_kick_m_guest')), findsOneWidget);
-    expect(find.byKey(const ValueKey<String>('party_kick_m_host')), findsNothing);
+    expect(find.byKey(const ValueKey<String>('party_kick_m_guest')),
+        findsOneWidget);
+    expect(
+        find.byKey(const ValueKey<String>('party_kick_m_host')), findsNothing);
     await tester.tap(find.byKey(const ValueKey<String>('party_kick_m_guest')));
     await tester.pump();
     verify(() => partyService.sendKick('m_guest')).called(1);
 
     // 2. Host-only control lock toggle wires to sendSetHostOnlyControl
-    final lockSwitch = find.byKey(const ValueKey<String>('party_host_only_switch'));
+    final lockSwitch =
+        find.byKey(const ValueKey<String>('party_host_only_switch'));
     expect(lockSwitch, findsOneWidget);
     await tester.tap(lockSwitch);
     await tester.pump();
@@ -163,14 +166,16 @@ void main() {
 
     // 3. Shared queue shows upcoming track and remove button wires to sendQueueRemove
     expect(find.text('Upcoming Track'), findsOneWidget);
-    final removeBtn = find.byKey(const ValueKey<String>('party_queue_remove_vid_next'));
+    final removeBtn =
+        find.byKey(const ValueKey<String>('party_queue_remove_vid_next'));
     expect(removeBtn, findsOneWidget);
     await tester.tap(removeBtn);
     await tester.pump();
     verify(() => partyService.sendQueueRemove('vid_next')).called(1);
   });
 
-  testWidgets('in-party guest view hides queue remove when hostOnlyControl is true',
+  testWidgets(
+      'in-party guest view hides queue remove when hostOnlyControl is true',
       (tester) async {
     const host = PartyMember(
       memberId: 'm_host',
@@ -203,19 +208,23 @@ void main() {
         .thenReturn(ValueNotifier<PartySnapshot?>(snap));
     when(() => partyService.currentMember)
         .thenReturn(ValueNotifier<PartyMember?>(guest));
-    when(() => partyService.connectionState)
-        .thenReturn(ValueNotifier<PartyConnectionState>(PartyConnectionState.live));
+    when(() => partyService.connectionState).thenReturn(
+        ValueNotifier<PartyConnectionState>(PartyConnectionState.live));
 
     await tester.pumpWidget(buildHost());
     await tester.pumpAndSettle();
 
     expect(find.text('Locked Upcoming Track'), findsOneWidget);
-    expect(find.byKey(const ValueKey<String>('party_host_only_switch')), findsNothing);
-    expect(find.byKey(const ValueKey<String>('party_kick_m_host')), findsNothing);
-    expect(find.byKey(const ValueKey<String>('party_queue_remove_vid_next')), findsNothing);
+    expect(find.byKey(const ValueKey<String>('party_host_only_switch')),
+        findsNothing);
+    expect(
+        find.byKey(const ValueKey<String>('party_kick_m_host')), findsNothing);
+    expect(find.byKey(const ValueKey<String>('party_queue_remove_vid_next')),
+        findsNothing);
   });
 
-  testWidgets('H-43: strips hyphens before capping 6-char party code and awaits reset default server URL',
+  testWidgets(
+      'H-43: strips hyphens before capping 6-char party code and awaits reset default server URL',
       (tester) async {
     when(() => partyService.joinParty(
           any(),

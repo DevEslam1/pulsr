@@ -6,6 +6,7 @@ import 'package:pulsr/features/shell/presentation/bottom_nav_bar.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 

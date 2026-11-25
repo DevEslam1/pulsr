@@ -10,6 +10,7 @@ import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../data/db/app_database.dart';
 
 import '../../../../core/utils/pulsr_haptics.dart';
+
 /// A smart playlist card matching the [PlaylistSuggestionCard] aesthetic for the
 /// horizontal rail on [PlaylistsScreen].
 class SmartPlaylistCard extends StatelessWidget {
@@ -232,4 +233,3 @@ class SmartPlaylistCard extends StatelessWidget {
     );
   }
 }
-

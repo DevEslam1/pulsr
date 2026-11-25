@@ -211,7 +211,9 @@ class _SurfaceOverlayPane extends StatelessWidget {
     final cubit = props.cubit;
     final song = state.currentSong;
     final bg = overlayBackgroundColor ??
-        (p.isDark ? p.bg.withValues(alpha: 0.94) : p.bg.withValues(alpha: 0.96));
+        (p.isDark
+            ? p.bg.withValues(alpha: 0.94)
+            : p.bg.withValues(alpha: 0.96));
 
     return ColoredBox(
       color: bg,

@@ -363,7 +363,8 @@ class _CanvasBackdropState extends State<CanvasBackdrop>
                         child: buildVideoBox(),
                       );
                     }
-                    final smallWidth = math.max(1.0, constraints.maxWidth / downscale);
+                    final smallWidth =
+                        math.max(1.0, constraints.maxWidth / downscale);
                     final smallHeight =
                         math.max(1.0, constraints.maxHeight / downscale);
                     final effectiveSigma =

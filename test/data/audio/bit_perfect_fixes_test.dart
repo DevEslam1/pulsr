@@ -107,13 +107,17 @@ void main() {
     );
   });
 
-  test('UsbExclusiveService.resetHardwareVolume calls reset and refreshes status',
+  test(
+      'UsbExclusiveService.resetHardwareVolume calls reset and refreshes status',
       () async {
     final calls = <String>[];
     _messenger.setMockMethodCallHandler(usbChannel, (call) async {
       calls.add(call.method);
       if (call.method == 'resetHardwareVolume') {
-        return <String, dynamic>{'hardwareVolumeApplied': false, 'volumeDb': 0.0};
+        return <String, dynamic>{
+          'hardwareVolumeApplied': false,
+          'volumeDb': 0.0
+        };
       }
       if (call.method == 'getStatus') {
         return <String, dynamic>{
@@ -128,10 +132,12 @@ void main() {
 
     final ok = await UsbExclusiveService().resetHardwareVolume();
     expect(ok, isTrue);
-    expect(calls, containsAllInOrder(<String>['resetHardwareVolume', 'getStatus']));
+    expect(calls,
+        containsAllInOrder(<String>['resetHardwareVolume', 'getStatus']));
   });
 
-  test('DsdDecoderHelper.probeDopCapabilities never implies nativeDsd from dsd512',
+  test(
+      'DsdDecoderHelper.probeDopCapabilities never implies nativeDsd from dsd512',
       () async {
     _messenger.setMockMethodCallHandler(hiresChannel, (call) async {
       if (call.method == 'getDopCapabilities') {
@@ -154,7 +160,8 @@ void main() {
     expect(caps.nativeDsd, isFalse);
   });
 
-  test('decodeForFormat & decodeDsdFile with updateGlobalState=false avoid global flag race',
+  test(
+      'decodeForFormat & decodeDsdFile with updateGlobalState=false avoid global flag race',
       () async {
     final tmpDir = Directory.systemTemp.createTempSync('pulsr_dsd_test_');
     addTearDown(() => tmpDir.deleteSync(recursive: true));
@@ -198,7 +205,8 @@ void main() {
     // must not clobber DsdDecoderHelper.dsdDopActive.
     DsdDecoderHelper.dsdDopActive = true;
     final decoder = FormatAwareDecoder(
-      resolveYtmStream: (song, tag) async => AudioSource.uri(Uri.parse('https://example.com/a.m4a'), tag: tag),
+      resolveYtmStream: (song, tag) async =>
+          AudioSource.uri(Uri.parse('https://example.com/a.m4a'), tag: tag),
     );
     bool? flacDop;
     bool? flacNative;
@@ -216,7 +224,8 @@ void main() {
     expect(DsdDecoderHelper.dsdDopActive, isTrue);
   });
 
-  test('PlayerDspController resumes suspended Direct USB on matching track rate even with followFormat OFF',
+  test(
+      'PlayerDspController resumes suspended Direct USB on matching track rate even with followFormat OFF',
       () async {
     var streamingActive = true;
     var streamingSampleRate = 48000;
@@ -306,7 +315,8 @@ void main() {
         )).called(1);
   });
 
-  test('SettingsCubit enables float output on bit-perfect and resets USB HW volume when disabled',
+  test(
+      'SettingsCubit enables float output on bit-perfect and resets USB HW volume when disabled',
       () async {
     stubSettingsChannels();
     addTearDown(clearSettingsChannels);

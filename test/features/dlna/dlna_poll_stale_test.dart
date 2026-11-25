@@ -30,7 +30,8 @@ class _FakeSsdpClient extends SsdpClient {
         const SsdpResponse(
           location: 'http://192.168.1.5:5555/description.xml',
           searchTarget: 'urn:schemas-upnp-org:device:MediaRenderer:1',
-          usn: 'uuid:mock-renderer::urn:schemas-upnp-org:device:MediaRenderer:1',
+          usn:
+              'uuid:mock-renderer::urn:schemas-upnp-org:device:MediaRenderer:1',
           server: 'Test/1.0 UPnP/1.1',
           sourceAddress: '192.168.1.5',
           maxAgeSeconds: 1800,
@@ -57,7 +58,8 @@ void main() {
   setUp(() async {
     tempDir = await Directory.systemTemp.createTemp('pulsr_dlna_stale_');
     mediaFile = File('${tempDir.path}${Platform.pathSeparator}song.mp3');
-    await mediaFile.writeAsBytes(List<int>.generate(1024, (index) => index % 251));
+    await mediaFile
+        .writeAsBytes(List<int>.generate(1024, (index) => index % 251));
     transportState = 'STOPPED';
     relTimeSeconds = 1;
     failPolls = false;

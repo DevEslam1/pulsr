@@ -11,6 +11,7 @@ import '../theme/aura_theme.dart';
 import '../utils/l10n_extensions.dart';
 
 import '../utils/pulsr_haptics.dart';
+
 /// {@category DesignSystem}
 class PulsrSearchField extends StatefulWidget {
   final TextEditingController? controller;

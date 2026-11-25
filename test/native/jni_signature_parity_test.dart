@@ -132,7 +132,8 @@ String _stripCommentsAndStrings(String source) {
     }
     if (c == '/' && next == '*') {
       i += 2;
-      while (i + 1 < source.length && !(source[i] == '*' && source[i + 1] == '/')) {
+      while (i + 1 < source.length &&
+          !(source[i] == '*' && source[i + 1] == '/')) {
         if (source[i] == '\n') out.write('\n');
         i++;
       }
@@ -166,10 +167,13 @@ String _stripCommentsAndStrings(String source) {
   return out.toString();
 }
 
-String? _enclosingTypeAtOffset(String clean, int offset, {required bool isKotlin}) {
+String? _enclosingTypeAtOffset(String clean, int offset,
+    {required bool isKotlin}) {
   final typeDeclPattern = isKotlin
-      ? RegExp(r'\b(?:companion\s+object|(?:(?:data|inner|enum|sealed|open|abstract|private|internal|public|final|annotation|value)\s+)*(?:class|object))\s*([A-Za-z_]\w*)?')
-      : RegExp(r'\b(?:(?:public|private|protected|static|final|abstract|strictfp)\s+)*(?:class|interface|enum)\s+([A-Za-z_]\w*)');
+      ? RegExp(
+          r'\b(?:companion\s+object|(?:(?:data|inner|enum|sealed|open|abstract|private|internal|public|final|annotation|value)\s+)*(?:class|object))\s*([A-Za-z_]\w*)?')
+      : RegExp(
+          r'\b(?:(?:public|private|protected|static|final|abstract|strictfp)\s+)*(?:class|interface|enum)\s+([A-Za-z_]\w*)');
 
   final events = <({int index, String kind, String? name})>[];
   for (final m in typeDeclPattern.allMatches(clean)) {
@@ -221,7 +225,8 @@ String? _enclosingTypeAtOffset(String clean, int offset, {required bool isKotlin
 
 List<_JniSignature> _parseKotlinNatives(File file) {
   final clean = _stripCommentsAndStrings(file.readAsStringSync());
-  final pkgMatch = RegExp(r'^\s*package\s+([A-Za-z0-9_.]+)', multiLine: true).firstMatch(clean);
+  final pkgMatch = RegExp(r'^\s*package\s+([A-Za-z0-9_.]+)', multiLine: true)
+      .firstMatch(clean);
   if (pkgMatch == null) return const [];
   final pkg = pkgMatch.group(1)!;
 
@@ -234,7 +239,8 @@ List<_JniSignature> _parseKotlinNatives(File file) {
   for (final m in declPattern.allMatches(clean)) {
     final className = _enclosingTypeAtOffset(clean, m.start, isKotlin: true);
     if (className == null) {
-      throw FormatException('No enclosing class for Kotlin external fun ${m.group(1)} in ${file.path}');
+      throw FormatException(
+          'No enclosing class for Kotlin external fun ${m.group(1)} in ${file.path}');
     }
     final method = m.group(1)!;
     final rawParams = m.group(2)!.trim();
@@ -270,7 +276,9 @@ List<_JniSignature> _parseKotlinNatives(File file) {
 
 List<_JniSignature> _parseJavaNatives(File file) {
   final clean = _stripCommentsAndStrings(file.readAsStringSync());
-  final pkgMatch = RegExp(r'^\s*package\s+([A-Za-z0-9_.]+)\s*;', multiLine: true).firstMatch(clean);
+  final pkgMatch =
+      RegExp(r'^\s*package\s+([A-Za-z0-9_.]+)\s*;', multiLine: true)
+          .firstMatch(clean);
   if (pkgMatch == null) return const [];
   final pkg = pkgMatch.group(1)!;
 
@@ -283,7 +291,8 @@ List<_JniSignature> _parseJavaNatives(File file) {
   for (final m in declPattern.allMatches(clean)) {
     final className = _enclosingTypeAtOffset(clean, m.start, isKotlin: false);
     if (className == null) {
-      throw FormatException('No enclosing class for Java native ${m.group(2)} in ${file.path}');
+      throw FormatException(
+          'No enclosing class for Java native ${m.group(2)} in ${file.path}');
     }
     final rawRet = m.group(1)!.trim();
     final method = m.group(2)!.trim();
@@ -299,7 +308,8 @@ List<_JniSignature> _parseJavaNatives(File file) {
           throw FormatException('Unparsed Java param "$param" in ${file.path}');
         }
         // Handle `final Type name`
-        final typeToken = tokens.first == 'final' ? tokens[1] : tokens[tokens.length - 2];
+        final typeToken =
+            tokens.first == 'final' ? tokens[1] : tokens[tokens.length - 2];
         paramTypes.add(_mapJavaTypeToJni(typeToken));
       }
     }
@@ -341,11 +351,13 @@ List<_JniSignature> _parseCppExports(File file) {
 
     // First two parameters of every JNI function are JNIEnv* and jobject/jclass.
     if (parts.length < 2 || !parts[0].contains('JNIEnv')) {
-      throw FormatException('Unexpected JNI prologue for $symbol in ${file.path}: $rawParams');
+      throw FormatException(
+          'Unexpected JNI prologue for $symbol in ${file.path}: $rawParams');
     }
     final userParams = <String>[];
     for (final param in parts.skip(2)) {
-      final typeMatch = RegExp(r'^\s*(?:const\s+)?([A-Za-z_]\w*)').firstMatch(param);
+      final typeMatch =
+          RegExp(r'^\s*(?:const\s+)?([A-Za-z_]\w*)').firstMatch(param);
       if (typeMatch == null) {
         throw FormatException('Unparsed C++ JNI param "$param" for $symbol');
       }
@@ -374,7 +386,9 @@ List<File> _collectFiles(String dirPath, String extension) {
 }
 
 void main() {
-  test('All C++ JNIEXPORT symbols match Java/Kotlin native declarations with exact signatures', () {
+  test(
+      'All C++ JNIEXPORT symbols match Java/Kotlin native declarations with exact signatures',
+      () {
     final cppFiles = _collectFiles('android/app/src/main/cpp', '.cpp');
     final ktFiles = _collectFiles('android/app/src/main/kotlin', '.kt');
     final javaFiles = [
@@ -396,7 +410,8 @@ void main() {
         cppMap[sig.symbol] = sig;
       }
     }
-    expect(duplicateCpp, isEmpty, reason: 'Duplicate C++ JNIEXPORT symbols found: $duplicateCpp');
+    expect(duplicateCpp, isEmpty,
+        reason: 'Duplicate C++ JNIEXPORT symbols found: $duplicateCpp');
 
     final managedMap = <String, _JniSignature>{};
     final duplicateManaged = <String>[];
@@ -419,22 +434,31 @@ void main() {
     expect(
       duplicateManaged,
       isEmpty,
-      reason: 'Duplicate or overloaded Java/Kotlin native declarations found: $duplicateManaged',
+      reason:
+          'Duplicate or overloaded Java/Kotlin native declarations found: $duplicateManaged',
     );
     expect(managedMap.length, greaterThan(50));
 
-    final orphanCpp = cppMap.keys.where((sym) => !managedMap.containsKey(sym)).toList()..sort();
-    final missingCpp = managedMap.keys.where((sym) => !cppMap.containsKey(sym)).toList()..sort();
+    final orphanCpp = cppMap.keys
+        .where((sym) => !managedMap.containsKey(sym))
+        .toList()
+      ..sort();
+    final missingCpp = managedMap.keys
+        .where((sym) => !cppMap.containsKey(sym))
+        .toList()
+      ..sort();
 
     expect(
       orphanCpp,
       isEmpty,
-      reason: 'Orphan C++ JNIEXPORT functions with no Kotlin/Java declaration: $orphanCpp',
+      reason:
+          'Orphan C++ JNIEXPORT functions with no Kotlin/Java declaration: $orphanCpp',
     );
     expect(
       missingCpp,
       isEmpty,
-      reason: 'Kotlin/Java native methods missing C++ JNIEXPORT implementation: $missingCpp',
+      reason:
+          'Kotlin/Java native methods missing C++ JNIEXPORT implementation: $missingCpp',
     );
 
     final mismatches = <String>[];
@@ -456,10 +480,13 @@ void main() {
         }
       }
     }
-    expect(mismatches, isEmpty, reason: 'JNI parameter/return type mismatches:\n${mismatches.join('\n')}');
+    expect(mismatches, isEmpty,
+        reason:
+            'JNI parameter/return type mismatches:\n${mismatches.join('\n')}');
 
     // Explicit H-02 & L-03 regression assertions.
-    final isUsbExclusive = cppMap['Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeIsUsbExclusive'];
+    final isUsbExclusive = cppMap[
+        'Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeIsUsbExclusive'];
     expect(isUsbExclusive, isNotNull);
     expect(isUsbExclusive!.returnType, 'jboolean');
     expect(isUsbExclusive.paramTypes, ['jlong']);
@@ -473,7 +500,8 @@ void main() {
       'Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeSetDirectUsbActive',
     ];
     for (final legacy in removedLegacyExports) {
-      expect(cppMap.containsKey(legacy), isFalse, reason: '$legacy should remain deleted');
+      expect(cppMap.containsKey(legacy), isFalse,
+          reason: '$legacy should remain deleted');
     }
   });
 }

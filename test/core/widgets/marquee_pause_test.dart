@@ -4,6 +4,7 @@ import 'package:pulsr/core/widgets/marquee_text.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 /// WCAG 2.2.2 (Pause, Stop, Hide): an auto-scrolling title must be stoppable by
 /// touch and by assistive technology, not only by mouse hover.
 void main() {

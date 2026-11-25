@@ -72,8 +72,10 @@ void main() {
         'bitPerfectAtArm': true,
         'bypassCompareAtArm': false,
         'truncated': false,
-        'inputSha256': '1111111111111111111111111111111111111111111111111111111111111111',
-        'outputSha256': '1111111111111111111111111111111111111111111111111111111111111111',
+        'inputSha256':
+            '1111111111111111111111111111111111111111111111111111111111111111',
+        'outputSha256':
+            '1111111111111111111111111111111111111111111111111111111111111111',
       };
 
   Map<String, dynamic> modifiedWindow() => const {
@@ -86,8 +88,10 @@ void main() {
         'bitPerfectAtArm': false,
         'bypassCompareAtArm': false,
         'truncated': false,
-        'inputSha256': '2222222222222222222222222222222222222222222222222222222222222222',
-        'outputSha256': '3333333333333333333333333333333333333333333333333333333333333333',
+        'inputSha256':
+            '2222222222222222222222222222222222222222222222222222222222222222',
+        'outputSha256':
+            '3333333333333333333333333333333333333333333333333333333333333333',
       };
 
   setUp(() {
@@ -102,15 +106,16 @@ void main() {
   });
 
   group('verifyChain', () {
-    test('records a measured bit-exact verdict from the window digests', () async {
+    test('records a measured bit-exact verdict from the window digests',
+        () async {
       // A bit-exact claim needs the engine to have observed the bypass: the
       // window's arming fact alone would let a preferred-but-unused mode pass.
       stubChannel(
         window: bitExactWindow(),
         engineReport: baseEngineReport(bitPerfectActive: true),
       );
-      final service = ChainOfCustodyService(
-          contentHasher: (path, size) async => 'a' * 64);
+      final service =
+          ChainOfCustodyService(contentHasher: (path, size) async => 'a' * 64);
 
       final report = await service.verifyChain(
         trackId: 't1',
@@ -131,7 +136,8 @@ void main() {
       expect(report.bufferSize, 512);
     });
 
-    test('identical digests on a chain not observed bit-perfect stay unverified',
+    test(
+        'identical digests on a chain not observed bit-perfect stay unverified',
         () async {
       stubChannel(
         window: {
@@ -186,7 +192,8 @@ void main() {
       expect(report.verificationBadge, isNot(contains('Bit-Exact')));
     });
 
-    test('a window whose halves differ cannot be reported as bit-exact', () async {
+    test('a window whose halves differ cannot be reported as bit-exact',
+        () async {
       stubChannel(window: modifiedWindow());
       final service = ChainOfCustodyService();
 
@@ -316,7 +323,8 @@ void main() {
       await directory.delete(recursive: true);
     });
 
-    test('JSON carries the certificate digest and it verifies against a re-read',
+    test(
+        'JSON carries the certificate digest and it verifies against a re-read',
         () async {
       stubChannel(window: modifiedWindow());
       final service = ChainOfCustodyService();
@@ -333,7 +341,8 @@ void main() {
       expect(decoded['verdict'], 'chainModifiedMeasured');
     });
 
-    test('concurrent verifyChain calls serialize cleanly without overlapping arm/collect',
+    test(
+        'concurrent verifyChain calls serialize cleanly without overlapping arm/collect',
         () async {
       final events = <String>[];
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
@@ -366,7 +375,8 @@ void main() {
       expect(secondArm, greaterThan(firstCollect));
     });
 
-    test('contentHashFailed limitation scrubs user path PII from exception text',
+    test(
+        'contentHashFailed limitation scrubs user path PII from exception text',
         () async {
       stubChannel(window: modifiedWindow());
       final directory = await Directory.systemTemp.createTemp('pulsr_custody');
@@ -374,8 +384,8 @@ void main() {
       await file.writeAsBytes(List<int>.filled(64, 3), flush: true);
 
       final service = ChainOfCustodyService(
-        contentHasher: (path, size) => throw StateError(
-            r'Cannot read C:\Users\alice\Private\broken.flac'),
+        contentHasher: (path, size) =>
+            throw StateError(r'Cannot read C:\Users\alice\Private\broken.flac'),
       );
       final report = await service.verifyChain(
         trackId: 't_pii',
@@ -383,10 +393,10 @@ void main() {
         filePath: file.path,
       );
 
-      expect(report.limitations,
+      expect(
+          report.limitations,
           anyElement(allOf(startsWith('contentHashFailed:'),
-              isNot(contains('alice')),
-              contains('[REDACTED_USER_PATH]'))));
+              isNot(contains('alice')), contains('[REDACTED_USER_PATH]'))));
       await directory.delete(recursive: true);
     });
   });

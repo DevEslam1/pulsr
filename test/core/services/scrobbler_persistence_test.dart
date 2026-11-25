@@ -17,7 +17,8 @@ void main() {
     mockClient = MockHttpClient();
     scrobblerService = ScrobblerService(mockClient);
     registerFallbackValue(Uri.parse('https://example.com'));
-    registerFallbackValue(http.Request('POST', Uri.parse('https://example.com')));
+    registerFallbackValue(
+        http.Request('POST', Uri.parse('https://example.com')));
   });
 
   group('Scrobbler Persistence & Session Recovery Tests', () {
@@ -55,7 +56,8 @@ void main() {
       });
 
       when(() => mockClient.send(any())).thenAnswer((invocation) async {
-        final request = invocation.positionalArguments.first as http.BaseRequest;
+        final request =
+            invocation.positionalArguments.first as http.BaseRequest;
         return http.StreamedResponse(
           Stream.value(utf8.encode('{"status":"ok"}')),
           200,
@@ -70,7 +72,8 @@ void main() {
 
       await scrobblerService.checkPendingScrobble();
 
-      verify(() => mockClient.send(any(that: isA<http.Request>().having(
+      verify(() => mockClient.send(any(
+              that: isA<http.Request>().having(
             (r) => r.url,
             'url',
             Uri.parse('https://webhook.site/scrobble'),

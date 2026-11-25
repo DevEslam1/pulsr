@@ -200,8 +200,7 @@ class _RemoteBrowserSheetState extends State<RemoteBrowserSheet> {
         sizeBytes: song.sizeBytes,
         artworkUri:
             provider.getCoverArtUrl(song.coverArt, size: 160)?.toString(),
-        artworkCacheKey:
-            provider.getCoverArtCacheKey(song.coverArt, size: 160),
+        artworkCacheKey: provider.getCoverArtCacheKey(song.coverArt, size: 160),
       ));
     }
     return entries;
@@ -441,7 +440,8 @@ class _RemoteBrowserSheetState extends State<RemoteBrowserSheet> {
                 ),
               )
             else ...[
-              _Breadcrumbs(crumbs: _crumbs, onNavigate: _loading ? null : _load),
+              _Breadcrumbs(
+                  crumbs: _crumbs, onNavigate: _loading ? null : _load),
               const Divider(height: 1),
             ],
             Expanded(
@@ -502,8 +502,7 @@ class _RemoteBrowserSheetState extends State<RemoteBrowserSheet> {
                   padding: const EdgeInsetsDirectional.all(12),
                   child: Center(
                     child: TextButton(
-                      onPressed:
-                          _searchLoadingMore ? null : _loadMoreSearch,
+                      onPressed: _searchLoadingMore ? null : _loadMoreSearch,
                       child: Text(_searchLoadingMore
                           ? RemoteSourcesStrings.testing
                           : RemoteSourcesStrings.loadMore),

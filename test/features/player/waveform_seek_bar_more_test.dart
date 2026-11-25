@@ -10,6 +10,7 @@ import 'package:pulsr/features/player/presentation/widgets/waveform_seek_bar.dar
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 

@@ -189,16 +189,17 @@ void main() {
       final header = _source(_dspParams);
 
       final eq = _block(header, _dspParams, 'struct EqParamSet {');
-      final dynamicEq = _block(header, _dspParams, 'struct DynamicEqParamSet {');
+      final dynamicEq =
+          _block(header, _dspParams, 'struct DynamicEqParamSet {');
       final multiband =
           _block(header, _dspParams, 'struct MultibandCompressorParamSet {');
 
-      final parametric =
-          _intIn(eq, _dspParams, r'MAX_BANDS\s*=\s*(\d+)', 'EqParamSet::MAX_BANDS');
-      final dynamicBands = _intIn(dynamicEq, _dspParams, r'MAX_BANDS\s*=\s*(\d+)',
-          'DynamicEqParamSet::MAX_BANDS');
-      final multibandBands = _intIn(multiband, _dspParams, r'NUM_BANDS\s*=\s*(\d+)',
-          'MultibandCompressorParamSet::NUM_BANDS');
+      final parametric = _intIn(
+          eq, _dspParams, r'MAX_BANDS\s*=\s*(\d+)', 'EqParamSet::MAX_BANDS');
+      final dynamicBands = _intIn(dynamicEq, _dspParams,
+          r'MAX_BANDS\s*=\s*(\d+)', 'DynamicEqParamSet::MAX_BANDS');
+      final multibandBands = _intIn(multiband, _dspParams,
+          r'NUM_BANDS\s*=\s*(\d+)', 'MultibandCompressorParamSet::NUM_BANDS');
       // The Kotlin plugin enforces the same EQ ceiling on the JNI boundary.
       final pluginBands = _intIn(_source(_kotlinPlugin), _kotlinPlugin,
           r'MAX_NATIVE_EQ_BANDS\s*=\s*(\d+)', 'MAX_NATIVE_EQ_BANDS');
@@ -207,8 +208,8 @@ void main() {
           parametric, _dspParams);
       _expectField('maxParametricEqBands', matrix.maxParametricEqBands,
           pluginBands, _kotlinPlugin);
-      _expectField(
-          'maxDynamicEqBands', matrix.maxDynamicEqBands, dynamicBands, _dspParams);
+      _expectField('maxDynamicEqBands', matrix.maxDynamicEqBands, dynamicBands,
+          _dspParams);
       _expectField('multibandCompressorBands', matrix.multibandCompressorBands,
           multibandBands, _dspParams);
     });
@@ -226,14 +227,16 @@ void main() {
       final maxSampleRate = _intIn(header, _channelHeader,
           r'MAX_SAMPLE_RATE\s*=\s*(\d+)', 'MAX_SAMPLE_RATE');
       // The lower bound is a literal inside the clamp, not a named constant.
-      final minChannels = _intIn(source, _channelSource,
+      final minChannels = _intIn(
+          source,
+          _channelSource,
           r'clamp\(params_\.channelCount,\s*(\d+),\s*MAX_CHANNELS\)',
           'channelCount lower clamp');
 
-      _expectField('minChannelManagerChannels', matrix.minChannelManagerChannels,
-          minChannels, _channelSource);
-      _expectField('maxChannelManagerChannels', matrix.maxChannelManagerChannels,
-          maxChannels, _channelHeader);
+      _expectField('minChannelManagerChannels',
+          matrix.minChannelManagerChannels, minChannels, _channelSource);
+      _expectField('maxChannelManagerChannels',
+          matrix.maxChannelManagerChannels, maxChannels, _channelHeader);
       _expectField('maxChannelManagerDelayMs', matrix.maxChannelManagerDelayMs,
           maxDelayMs, _channelHeader);
       _expectField('maxPcmSampleRate', matrix.maxPcmSampleRate, maxSampleRate,
@@ -251,8 +254,8 @@ void main() {
       final bounds = _source(_irBounds);
       final plugin = _source(_kotlinPlugin);
 
-      final maxSeconds = _intIn(bounds, _irBounds,
-          r'kMaxIrSeconds\s*=\s*(\d+)', 'kMaxIrSeconds');
+      final maxSeconds = _intIn(
+          bounds, _irBounds, r'kMaxIrSeconds\s*=\s*(\d+)', 'kMaxIrSeconds');
       final maxSamples = _productIn(plugin, _kotlinPlugin, 'MAX_IR_SAMPLES');
       final maxDsdBytes =
           _productIn(plugin, _kotlinPlugin, 'MAX_DSD_BUFFER_BYTES');
@@ -287,8 +290,8 @@ void main() {
       _expectField('dsdDecodeRates', matrix.dsdDecodeRates, rates, _dsdHeader);
       _expectField('dsdDefaultPcmSampleRate', matrix.dsdDefaultPcmSampleRate,
           defaultPcm, _dsdHeader);
-      _expectField('maxPcmSampleRate', matrix.maxPcmSampleRate, pcmCeiling,
-          _dsdSource);
+      _expectField(
+          'maxPcmSampleRate', matrix.maxPcmSampleRate, pcmCeiling, _dsdSource);
     });
 
     test('DoP carrier rates and markers match both framers', () {
@@ -316,18 +319,18 @@ void main() {
       final nativeCarriers = carriersIn(nativeBody, _dopHeader);
       final dartCarriers = carriersIn(dartBody, _dopEncoder);
 
-      _expectField(
-          'dopCarrierRates', matrix.dopCarrierRates, nativeCarriers, _dopHeader);
+      _expectField('dopCarrierRates', matrix.dopCarrierRates, nativeCarriers,
+          _dopHeader);
       _expectField(
           'dopCarrierRates', matrix.dopCarrierRates, dartCarriers, _dopEncoder);
       expect(nativeCarriers, dartCarriers,
           reason: 'DoP carrier rates diverge: $_dopHeader says $nativeCarriers '
               'while $_dopEncoder says $dartCarriers');
 
-      final nativeA = _hexIn(
-          header, _dopHeader, r'kDopMarkerA\s*=\s*(0x[0-9A-Fa-f]+)', 'marker A');
-      final nativeB = _hexIn(
-          header, _dopHeader, r'kDopMarkerB\s*=\s*(0x[0-9A-Fa-f]+)', 'marker B');
+      final nativeA = _hexIn(header, _dopHeader,
+          r'kDopMarkerA\s*=\s*(0x[0-9A-Fa-f]+)', 'marker A');
+      final nativeB = _hexIn(header, _dopHeader,
+          r'kDopMarkerB\s*=\s*(0x[0-9A-Fa-f]+)', 'marker B');
       final dartA = _hexIn(
           dart, _dopEncoder, r'dopMarkerA\s*=\s*(0x[0-9A-Fa-f]+)', 'marker A');
       final dartB = _hexIn(
@@ -345,8 +348,8 @@ void main() {
       // DoP v1.1 carries at most DSD256; DSD512 must not gain a carrier rate
       // without the matrix (and the encoder) saying so.
       final declaredDsdRates = matrix.dsdDecodeRates.toSet();
-      final missing = declaredDsdRates.difference(
-          {...matrix.dopCarrierRates.keys, 512});
+      final missing =
+          declaredDsdRates.difference({...matrix.dopCarrierRates.keys, 512});
       expect(missing, isEmpty,
           reason: 'AudioCapabilityMatrix.dsdDecodeRates $declaredDsdRates '
               'contains rates with no documented DoP story: $missing');
@@ -356,7 +359,8 @@ void main() {
   group('output formats', () {
     test('USB wire formats match SinkQuantizer.h IsPcmWireFormat', () {
       final header = _source(_sinkQuantizer);
-      final body = _block(header, _sinkQuantizer, 'inline bool IsPcmWireFormat(');
+      final body =
+          _block(header, _sinkQuantizer, 'inline bool IsPcmWireFormat(');
 
       final subslots = RegExp(
               r'bytesPerSample\s*>=\s*(\d+)\s*&&\s*bytesPerSample\s*<=\s*(\d+)')
@@ -394,10 +398,10 @@ void main() {
 
       _expectField('usbWireFormats', matrix.usbWireFormats, expectedFormats,
           _sinkQuantizer);
-      _expectField('usbSubslotBytes', matrix.usbSubslotBytes,
-          expectedSubslots, _sinkQuantizer);
-      _expectField(
-          'usbValidBitDepths', matrix.usbValidBitDepths, validBits, _sinkQuantizer);
+      _expectField('usbSubslotBytes', matrix.usbSubslotBytes, expectedSubslots,
+          _sinkQuantizer);
+      _expectField('usbValidBitDepths', matrix.usbValidBitDepths, validBits,
+          _sinkQuantizer);
       expect(matrix.usbWireFormats.length, matrix.usbSubslotBytes.length,
           reason: 'AudioCapabilityMatrix.usbWireFormats '
               '${matrix.usbWireFormats} and usbSubslotBytes '
@@ -406,7 +410,8 @@ void main() {
 
     test('AAudio encodings match AAudioSink.h', () {
       final header = _source(_aaudioHeader);
-      final body = _block(header, _aaudioHeader, 'enum class Encoding : int32_t {');
+      final body =
+          _block(header, _aaudioHeader, 'enum class Encoding : int32_t {');
 
       final names = <String>[];
       final ids = <String, int>{};
@@ -418,16 +423,17 @@ void main() {
       expect(names, isNotEmpty,
           reason: '$_aaudioHeader: AAudioSink::Encoding has no enumerators');
 
-      _expectField('aaudioEncodings', matrix.aaudioEncodings, names, _aaudioHeader);
+      _expectField(
+          'aaudioEncodings', matrix.aaudioEncodings, names, _aaudioHeader);
       _expectField(
           'aaudioEncodingIds', matrix.aaudioEncodingIds, ids, _aaudioHeader);
     });
 
     test('native DSD producer flag matches the playback-path gate', () {
       final helper = _source(_dsdHelper);
-      final match = RegExp(
-              r'const bool kNativeDsdProducerAvailable = (true|false);')
-          .firstMatch(helper);
+      final match =
+          RegExp(r'const bool kNativeDsdProducerAvailable = (true|false);')
+              .firstMatch(helper);
       if (match == null) {
         fail('$_dsdHelper: kNativeDsdProducerAvailable is missing or not a '
             'bool literal');

@@ -165,7 +165,8 @@ void main() {
       expect(find.text('Radio Recommendations'), findsNothing);
     });
 
-    test('Quran mode defaults to Tajweed (Mujawwad) and saves user choice as default',
+    test(
+        'Quran mode defaults to Tajweed (Mujawwad) and saves user choice as default',
         () async {
       final service = QuranModeService();
       // Default when no preference exists:
@@ -189,7 +190,8 @@ void main() {
       expect(await service.isAlwaysOnRadio(), isFalse);
     });
 
-    test('Ambient Sound Always on Radio auto-enables for radio and disables for local/online',
+    test(
+        'Ambient Sound Always on Radio auto-enables for radio and disables for local/online',
         () async {
       final ambient = AmbientSoundService();
       await ambient.init();
@@ -219,7 +221,8 @@ void main() {
       await ambient.setEnabled(false);
     });
 
-    test('Ambient Sound saves user choices and volume percentages across disable/enable',
+    test(
+        'Ambient Sound saves user choices and volume percentages across disable/enable',
         () async {
       final ambient = AmbientSoundService();
       await ambient.init();
@@ -233,7 +236,8 @@ void main() {
       // Disabling ambient sounds should not erase saved choices or percentage values
       await ambient.setEnabled(false);
       expect(ambient.isEnabled, isFalse);
-      expect(ambient.savedUserEffects.contains(AmbientSoundEffect.fire), isTrue);
+      expect(
+          ambient.savedUserEffects.contains(AmbientSoundEffect.fire), isTrue);
       expect(ambient.volumeFor(AmbientSoundEffect.fire), 0.75);
 
       // Re-enabling restores the saved effect and volume percentage

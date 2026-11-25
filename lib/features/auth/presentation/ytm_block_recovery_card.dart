@@ -119,8 +119,7 @@ extension _YtmBlockRecoveryCard on _YtmWebLoginSheetState {
       }
       // The generic heading only counts together with a companion phrase.
       if (text.contains(_YtmWebLoginSheetState._blockHeading) &&
-          _YtmWebLoginSheetState._blockHeadingCompanions
-              .any(text.contains)) {
+          _YtmWebLoginSheetState._blockHeadingCompanions.any(text.contains)) {
         return true;
       }
     } catch (e, st) {
@@ -434,7 +433,8 @@ extension _YtmBlockRecoveryCard on _YtmWebLoginSheetState {
             const SizedBox(height: AppSpacing.xs),
             // Collapsible advanced fallbacks
             Theme(
-              data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+              data:
+                  Theme.of(context).copyWith(dividerColor: Colors.transparent),
               child: ExpansionTile(
                 shape: const Border(),
                 collapsedShape: const Border(),
@@ -512,8 +512,8 @@ extension _YtmBlockRecoveryCard on _YtmWebLoginSheetState {
             Text(
               context.l10n.googleBlockTip,
               textAlign: TextAlign.center,
-              style:
-                  TextStyle(color: p.textTertiary, fontSize: AppFontSize.caption),
+              style: TextStyle(
+                  color: p.textTertiary, fontSize: AppFontSize.caption),
             ),
           ],
         ),

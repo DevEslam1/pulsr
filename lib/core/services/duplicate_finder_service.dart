@@ -86,8 +86,7 @@ class DuplicateFinderService {
         final durationBucket = (song.durationMs / 1000).round();
         final sizeBucket = (song.fileSize! / 10000).round();
         byDurationSize
-            .putIfAbsent((durationBucket, sizeBucket), () => [])
-            .add(song);
+            .putIfAbsent((durationBucket, sizeBucket), () => []).add(song);
       }
     }
 
@@ -142,7 +141,8 @@ class DuplicateFinderService {
         }
       }
       if (candidates.length <= 1) continue;
-      final sortedIds = (candidates.map((s) => s.id).toList()..sort()).join(',');
+      final sortedIds =
+          (candidates.map((s) => s.id).toList()..sort()).join(',');
       if (!seenCandidateSets.add(sortedIds)) continue;
       final clusters = await _verifyWithChecksum(candidates);
       for (final cluster in clusters) {

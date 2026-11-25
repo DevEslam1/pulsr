@@ -260,7 +260,9 @@ void main() {
       expect(recent.first.playCount, equals(1));
     });
 
-    test('recordPlayHistory records negative-ID CUE virtual tracks and YTM tracks, ignores 0', () async {
+    test(
+        'recordPlayHistory records negative-ID CUE virtual tracks and YTM tracks, ignores 0',
+        () async {
       // Negative ID CUE virtual track
       await db.into(db.songsTable).insert(
             SongsTableCompanion.insert(
@@ -297,11 +299,15 @@ void main() {
       expect(resZero.isRight(), isTrue);
 
       // Verify DB updates
-      final cueSong = await (db.select(db.songsTable)..where((t) => t.id.equals(-1))).getSingle();
+      final cueSong = await (db.select(db.songsTable)
+            ..where((t) => t.id.equals(-1)))
+          .getSingle();
       expect(cueSong.playCount, equals(1));
       expect(cueSong.lastPlayed, isNotNull);
 
-      final ytmSong = await (db.select(db.songsTable)..where((t) => t.id.equals(-7))).getSingle();
+      final ytmSong = await (db.select(db.songsTable)
+            ..where((t) => t.id.equals(-7)))
+          .getSingle();
       expect(ytmSong.playCount, equals(1));
       expect(ytmSong.lastPlayed, isNotNull);
 

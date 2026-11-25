@@ -83,7 +83,8 @@ bool chainSamplesModified({
     silenceSkip ||
     crossfade ||
     duckOrSleepFade ||
-    (!rawUsb && (!effectiveGain.isFinite || (effectiveGain - 1.0).abs() > 1e-9));
+    (!rawUsb &&
+        (!effectiveGain.isFinite || (effectiveGain - 1.0).abs() > 1e-9));
 
 class BitPerfectChainAssessment {
   final BitPerfectChainVerdict verdict;

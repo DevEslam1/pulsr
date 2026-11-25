@@ -164,17 +164,14 @@ class ErgonomicsState {
       deviceLabel: deviceLabel ?? this.deviceLabel,
       deviceVid: deviceVid ?? this.deviceVid,
       devicePid: devicePid ?? this.devicePid,
-      deviceId: identical(deviceId, _unset)
-          ? this.deviceId
-          : deviceId as int?,
+      deviceId: identical(deviceId, _unset) ? this.deviceId : deviceId as int?,
       quirk: identical(quirk, _unset) ? this.quirk : quirk as UsbQuirkProfile?,
       busSpeedMbps: identical(busSpeedMbps, _unset)
           ? this.busSpeedMbps
           : busSpeedMbps as double?,
       hid: hid ?? this.hid,
-      lastError: identical(lastError, _unset)
-          ? this.lastError
-          : lastError as String?,
+      lastError:
+          identical(lastError, _unset) ? this.lastError : lastError as String?,
     );
   }
 
@@ -310,8 +307,7 @@ class UsbErgonomicsService extends ChangeNotifier {
   /// device that is not the one currently attached only persists the entry (so
   /// the list refreshes); it must not replace [ErgonomicsState.quirk] or reach
   /// the native side, which would apply another DAC's settings to this one.
-  Future<bool> saveQuirk(UsbQuirkProfile profile) =>
-      _opMutex.protect(() async {
+  Future<bool> saveQuirk(UsbQuirkProfile profile) => _opMutex.protect(() async {
         final stored = await _store.put(profile);
         if (!stored) {
           _emit(_state.copyWith(lastError: UsbErgonomicsStrings.saveFailed));

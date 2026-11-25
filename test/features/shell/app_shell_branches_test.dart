@@ -28,6 +28,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pulsr/core/errors/app_error.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 class _MockPlayerCubit extends Mock implements PlayerCubit {}
 
 class _MockSettingsCubit extends Mock implements SettingsCubit {}
@@ -365,7 +366,8 @@ void main() {
     verify(() => player.toggleFavorite()).called(greaterThanOrEqualTo(1));
   });
 
-  testWidgets('H-50 tablet SafeArea mirrors left/right cutout protection in RTL',
+  testWidgets(
+      'H-50 tablet SafeArea mirrors left/right cutout protection in RTL',
       (tester) async {
     await tester.binding.setSurfaceSize(const Size(1280, 900));
     addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -440,13 +442,15 @@ void main() {
                       child: ListView.builder(
                         controller: hiddenController,
                         itemCount: 50,
-                        itemBuilder: (_, i) => SizedBox(height: 60, child: Text('Hidden $i')),
+                        itemBuilder: (_, i) =>
+                            SizedBox(height: 60, child: Text('Hidden $i')),
                       ),
                     ),
                     ListView.builder(
                       controller: activeController,
                       itemCount: 50,
-                      itemBuilder: (_, i) => SizedBox(height: 60, child: Text('Visible $i')),
+                      itemBuilder: (_, i) =>
+                          SizedBox(height: 60, child: Text('Visible $i')),
                     ),
                   ],
                 ),

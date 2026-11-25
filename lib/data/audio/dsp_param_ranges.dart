@@ -190,8 +190,7 @@ abstract final class DspParamRanges {
       DspRange(40.0, 200.0, defaultValue: 80.0);
   static const DspRange lfeLowPassHz =
       DspRange(60.0, 250.0, defaultValue: 120.0);
-  static const DspRange lfeGainDb =
-      DspRange(-12.0, 12.0, defaultValue: 0.0);
+  static const DspRange lfeGainDb = DspRange(-12.0, 12.0, defaultValue: 0.0);
   static const DspRange channelManagerTrimDb =
       DspRange(-30.0, 12.0, defaultValue: 0.0);
   static const DspRange channelManagerDelayMs =
@@ -259,7 +258,8 @@ abstract final class DspParamRanges {
   /// not compression) — a genuine stage limit, so the contract follows it.
   static const DspRange multibandReleaseMs =
       DspRange(5.0, 1000.0, defaultValue: 100.0);
-  static const DspRange multibandKneeDb = DspRange(0.0, 12.0, defaultValue: 3.0);
+  static const DspRange multibandKneeDb =
+      DspRange(0.0, 12.0, defaultValue: 3.0);
 
   /// Deliberately non-negative: applying a *negative* makeup is the EQ preamp's
   /// job, and the old Kotlin -24..24 range was silently clamped to >= 0 here.

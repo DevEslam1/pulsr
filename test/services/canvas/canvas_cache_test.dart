@@ -101,7 +101,8 @@ void main() {
     });
 
     test('blocks canvas downloads when offlineOnlyMode is active', () async {
-      SharedPreferences.setMockInitialValues({'setting_offline_only_mode': true});
+      SharedPreferences.setMockInitialValues(
+          {'setting_offline_only_mode': true});
       var networkCalls = 0;
       final mockClient = MockClient((request) async {
         networkCalls++;

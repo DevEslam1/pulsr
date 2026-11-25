@@ -111,6 +111,7 @@ class AbxReport {
   final String? trackArtist;
   final int? sourceSampleRate;
   final int? sourceBitDepth;
+
   /// How the two conditions were level-matched. `auto_native_loudness` means
   /// the native engine measured the dry/wet loudness delta; `none` means the
   /// listener could be comparing different levels.
@@ -140,7 +141,8 @@ class AbxReport {
     required this.sourceBitDepth,
     this.levelMatch = 'none',
     required this.trials,
-  }) : twoSidedPValue = twoSidedPValue ?? ((pValue * 2.0) > 1.0 ? 1.0 : (pValue * 2.0));
+  }) : twoSidedPValue =
+            twoSidedPValue ?? ((pValue * 2.0) > 1.0 ? 1.0 : (pValue * 2.0));
 
   /// Builds an export report from a completed [AbxSession].
   ///
@@ -174,9 +176,12 @@ class AbxReport {
             : sourceSampleRate);
 
     final cleanTitle = scrubPii ? AbxRedactor.redact(trackTitle) : trackTitle;
-    final cleanArtist = scrubPii ? AbxRedactor.redact(trackArtist) : trackArtist;
-    final cleanCondA = scrubPii ? (AbxRedactor.redact(conditionA) ?? conditionA) : conditionA;
-    final cleanCondB = scrubPii ? (AbxRedactor.redact(conditionB) ?? conditionB) : conditionB;
+    final cleanArtist =
+        scrubPii ? AbxRedactor.redact(trackArtist) : trackArtist;
+    final cleanCondA =
+        scrubPii ? (AbxRedactor.redact(conditionA) ?? conditionA) : conditionA;
+    final cleanCondB =
+        scrubPii ? (AbxRedactor.redact(conditionB) ?? conditionB) : conditionB;
     final cleanDevice = scrubPii
         ? AbxOutputDeviceInfo(
             name: AbxRedactor.redact(outputDevice.name) ?? outputDevice.name,

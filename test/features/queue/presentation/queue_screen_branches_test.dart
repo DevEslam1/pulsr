@@ -266,9 +266,7 @@ void main() {
         of: find.widgetWithText(ListTile, 'Alpha'),
         matching: find.byWidgetPredicate(
           (w) =>
-              w is Icon &&
-              w.icon == Icons.graphic_eq_rounded &&
-              w.size == 20.0,
+              w is Icon && w.icon == Icons.graphic_eq_rounded && w.size == 20.0,
         ),
       ),
       findsOneWidget,
@@ -278,9 +276,7 @@ void main() {
         of: find.widgetWithText(ListTile, 'Online'),
         matching: find.byWidgetPredicate(
           (w) =>
-              w is Icon &&
-              w.icon == Icons.graphic_eq_rounded &&
-              w.size == 20.0,
+              w is Icon && w.icon == Icons.graphic_eq_rounded && w.size == 20.0,
         ),
       ),
       findsNothing,

@@ -72,6 +72,5 @@ void main() {
       final OutputVerdict verdict = resolveLiveOutputVerdict(obs);
       expect(verdict.isBitPerfect, isFalse);
     });
-
   });
 }

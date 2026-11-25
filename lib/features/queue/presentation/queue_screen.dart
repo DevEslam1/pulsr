@@ -342,352 +342,371 @@ class QueueScreen extends StatelessWidget {
                 Divider(height: 1, color: p.hairline),
                 Expanded(
                   child: Align(
-              alignment: Alignment.topCenter,
-              child: ConstrainedBox(
-                constraints: Adaptive.contentConstraints(context),
-                child: ReorderableListView.builder(
-                  header: state.queueHistory.isEmpty
-                      ? null
-                      : Padding(
-                          padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                          child: ExpansionTile(
-                            tilePadding: EdgeInsets.zero,
-                            leading: Icon(Icons.history_rounded,
-                                color: p.accent, size: 20),
-                            title: Text(
-                              context.l10n.queueRecentlyPlayed(
-                                  state.queueHistory.length),
-                              style: TextStyle(
-                                color: p.textPrimary,
-                                fontWeight: FontWeight.w600,
-                                fontSize: AppFontSize.body,
+                    alignment: Alignment.topCenter,
+                    child: ConstrainedBox(
+                      constraints: Adaptive.contentConstraints(context),
+                      child: ReorderableListView.builder(
+                        header: state.queueHistory.isEmpty
+                            ? null
+                            : Padding(
+                                padding: const EdgeInsets.only(
+                                    bottom: AppSpacing.sm),
+                                child: ExpansionTile(
+                                  tilePadding: EdgeInsets.zero,
+                                  leading: Icon(Icons.history_rounded,
+                                      color: p.accent, size: 20),
+                                  title: Text(
+                                    context.l10n.queueRecentlyPlayed(
+                                        state.queueHistory.length),
+                                    style: TextStyle(
+                                      color: p.textPrimary,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: AppFontSize.body,
+                                    ),
+                                  ),
+                                  children: state.queueHistory
+                                      .take(10)
+                                      .map((histSong) {
+                                    return ListTile(
+                                      dense: true,
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                              horizontal: AppSpacing.xs),
+                                      leading: CachedArtwork(
+                                        id: histSong.id,
+                                        remoteUrl: histSong.remoteArtworkUrl,
+                                        type: ArtworkType.AUDIO,
+                                        size: 36,
+                                        borderRadius: 8,
+                                      ),
+                                      title: Text(
+                                        histSong.title,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          color: p.textPrimary,
+                                          fontSize: AppFontSize.label,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                      subtitle: Text(
+                                        histSong.artist,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          color: p.textSecondary,
+                                          fontSize: AppFontSize.caption,
+                                        ),
+                                      ),
+                                      trailing: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          IconButton(
+                                            icon: Icon(
+                                                Icons.playlist_add_rounded,
+                                                color: p.accent,
+                                                size: 20),
+                                            tooltip: context.l10n.addToQueue,
+                                            onPressed: () {
+                                              PulsrHaptics.confirm();
+                                              context
+                                                  .read<PlayerCubit>()
+                                                  .addToQueue(histSong);
+                                            },
+                                          ),
+                                          IconButton(
+                                            icon: Icon(Icons.play_arrow_rounded,
+                                                color: p.accent, size: 22),
+                                            tooltip: context.l10n.play,
+                                            onPressed: () {
+                                              PulsrHaptics.tap();
+                                              final player =
+                                                  context.read<PlayerCubit>();
+                                              final currentQueue =
+                                                  player.state.queue;
+                                              player.playSong(
+                                                histSong,
+                                                queue: currentQueue.isEmpty
+                                                    ? null
+                                                    : currentQueue,
+                                              );
+                                            },
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  }).toList(),
+                                ),
                               ),
-                            ),
-                            children:
-                                state.queueHistory.take(10).map((histSong) {
-                              return ListTile(
-                                dense: true,
-                                contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: AppSpacing.xs),
-                                leading: CachedArtwork(
-                                  id: histSong.id,
-                                  remoteUrl: histSong.remoteArtworkUrl,
-                                  type: ArtworkType.AUDIO,
-                                  size: 36,
-                                  borderRadius: 8,
-                                ),
-                                title: Text(
-                                  histSong.title,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    color: p.textPrimary,
-                                    fontSize: AppFontSize.label,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                                subtitle: Text(
-                                  histSong.artist,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    color: p.textSecondary,
-                                    fontSize: AppFontSize.caption,
-                                  ),
-                                ),
-                                trailing: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    IconButton(
-                                      icon: Icon(Icons.playlist_add_rounded,
-                                          color: p.accent, size: 20),
-                                      tooltip: context.l10n.addToQueue,
-                                      onPressed: () {
-                                        PulsrHaptics.confirm();
-                                        context
-                                            .read<PlayerCubit>()
-                                            .addToQueue(histSong);
-                                      },
-                                    ),
-                                    IconButton(
-                                      icon: Icon(Icons.play_arrow_rounded,
-                                          color: p.accent, size: 22),
-                                      tooltip: context.l10n.play,
-                                      onPressed: () {
-                                        PulsrHaptics.tap();
-                                        final player =
-                                            context.read<PlayerCubit>();
-                                        final currentQueue = player.state.queue;
-                                        player.playSong(
-                                          histSong,
-                                          queue: currentQueue.isEmpty
-                                              ? null
-                                              : currentQueue,
-                                        );
-                                      },
-                                    ),
-                                  ],
+                        padding: EdgeInsets.symmetric(
+                          horizontal: context.pagePadding,
+                          vertical: AppSpacing.xs,
+                        ).copyWith(
+                            bottom: PulsrLayoutMetrics.scrollBottom(context)),
+                        itemCount: queue.length,
+                        onReorderStart: (index) {
+                          PulsrHaptics.mediumImpact();
+                        },
+                        proxyDecorator: (child, index, animation) {
+                          return AnimatedBuilder(
+                            animation: animation,
+                            builder: (context, child) {
+                              final animValue =
+                                  Curves.easeInOut.transform(animation.value);
+                              final elevation = lerpDouble(0, 10, animValue)!;
+                              final scale = lerpDouble(1.0, 1.025, animValue)!;
+                              return Transform.scale(
+                                scale: scale,
+                                child: Material(
+                                  elevation: elevation,
+                                  color: Colors.transparent,
+                                  shadowColor: p.accent.withValues(alpha: 0.35),
+                                  borderRadius: AppRadii.cardRadius,
+                                  child: child,
                                 ),
                               );
-                            }).toList(),
-                          ),
-                        ),
-                  padding: EdgeInsets.symmetric(
-                    horizontal: context.pagePadding,
-                    vertical: AppSpacing.xs,
-                  ).copyWith(bottom: PulsrLayoutMetrics.scrollBottom(context)),
-                  itemCount: queue.length,
-                  onReorderStart: (index) {
-                    PulsrHaptics.mediumImpact();
-                  },
-                  proxyDecorator: (child, index, animation) {
-                    return AnimatedBuilder(
-                      animation: animation,
-                      builder: (context, child) {
-                        final animValue =
-                            Curves.easeInOut.transform(animation.value);
-                        final elevation = lerpDouble(0, 10, animValue)!;
-                        final scale = lerpDouble(1.0, 1.025, animValue)!;
-                        return Transform.scale(
-                          scale: scale,
-                          child: Material(
-                            elevation: elevation,
-                            color: Colors.transparent,
-                            shadowColor: p.accent.withValues(alpha: 0.35),
-                            borderRadius: AppRadii.cardRadius,
+                            },
                             child: child,
-                          ),
-                        );
-                      },
-                      child: child,
-                    );
-                  },
-                  onReorderItem: (oldIdx, newIdx) {
-                    if (oldIdx == newIdx) return;
-                    // Capture the cubit and messenger before the snackbar is
-                    // shown: the snackbar outlives this screen on the root
-                    // messenger, so its undo action must not touch `context`.
-                    final cubit = context.read<PlayerCubit>();
-                    final messenger = ScaffoldMessenger.of(context);
-                    cubit.reorderQueue(oldIdx, newIdx);
-                    messenger.clearSnackBars();
-                    messenger.showSnackBar(
-                      SnackBar(
-                        content: Text(context.l10n.queueReordered),
-                        duration: const Duration(seconds: 4),
-                        action: SnackBarAction(
-                          label: context.l10n.undo,
-                          onPressed: () => cubit.reorderQueue(newIdx, oldIdx),
-                        ),
-                      ),
-                    );
-                  },
-                  itemBuilder: (context, index) {
-                    final song = queue[index];
-                    final isCurrent = state.currentIndex == index;
-
-                    final isHighContrast = p.isHighContrast ||
-                        (MediaQuery.maybeHighContrastOf(context) ?? false);
-                    return Container(
-                      key: slotKeys[index],
-                      margin:
-                          const EdgeInsets.symmetric(vertical: AppSpacing.xxs),
-                      decoration: BoxDecoration(
-                        borderRadius: AppRadii.cardRadius,
-                        boxShadow: p.isCalmDensity || isHighContrast
-                            ? null
-                            : [
-                                BoxShadow(
-                                  color: AppColors.scrimAt(
-                                      p.isDark ? 0.12 : 0.04),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                      ),
-                      child: Material(
-                        clipBehavior: Clip.antiAlias,
-                        color:
-                            isCurrent ? p.accentContainer : p.surfaceContainer,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: AppRadii.cardRadius,
-                          side: BorderSide(
-                            color: isCurrent
-                                ? p.accent
-                                : (isHighContrast
-                                    ? p.borderStrong
-                                    : p.hairline),
-                            width: isCurrent || isHighContrast ? 1.25 : 1,
-                          ),
-                        ),
-                        child: Semantics(
-                          button: true,
-                          label: context.l10n
-                              .songByArtist(song.title, song.artist),
-                          child: ListTile(
-                            leading: Stack(
-                              clipBehavior: Clip.none,
-                              children: [
-                                CachedArtwork(
-                                  id: song.id,
-                                  remoteUrl: song.remoteArtworkUrl,
-                                  type: ArtworkType.AUDIO,
-                                  size: 44,
-                                  borderRadius: 10,
-                                ),
-                                if (song.remoteId != null &&
-                                    song.remoteId!.isNotEmpty)
-                                  PositionedDirectional(
-                                    end: -2,
-                                    bottom: -2,
-                                    child: Container(
-                                      padding: const EdgeInsets.all(2),
-                                      decoration: BoxDecoration(
-                                        color: p.surface,
-                                        shape: BoxShape.circle,
-                                        border: Border.all(
-                                            color: p.accent, width: 1),
-                                      ),
-                                      child: Icon(Icons.cloud_rounded,
-                                          size: 10, color: p.accent),
-                                    ),
-                                  ),
-                              ],
-                            ),
-                            title: Text(
-                              song.title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: isCurrent ? p.accent : p.textPrimary,
-                                fontWeight: isCurrent
-                                    ? FontWeight.w700
-                                    : FontWeight.w500,
-                                fontSize: AppFontSize.body,
+                          );
+                        },
+                        onReorderItem: (oldIdx, newIdx) {
+                          if (oldIdx == newIdx) return;
+                          // Capture the cubit and messenger before the snackbar is
+                          // shown: the snackbar outlives this screen on the root
+                          // messenger, so its undo action must not touch `context`.
+                          final cubit = context.read<PlayerCubit>();
+                          final messenger = ScaffoldMessenger.of(context);
+                          cubit.reorderQueue(oldIdx, newIdx);
+                          messenger.clearSnackBars();
+                          messenger.showSnackBar(
+                            SnackBar(
+                              content: Text(context.l10n.queueReordered),
+                              duration: const Duration(seconds: 4),
+                              action: SnackBarAction(
+                                label: context.l10n.undo,
+                                onPressed: () =>
+                                    cubit.reorderQueue(newIdx, oldIdx),
                               ),
                             ),
-                            subtitle: Row(
-                              children: [
-                                if (song.remoteId != null &&
-                                    song.remoteId!.isNotEmpty) ...[
-                                  Icon(
-                                    Icons.cloud_outlined,
-                                    size: 13,
-                                    color: p.accent.withValues(alpha: 0.8),
-                                  ),
-                                  const SizedBox(width: AppSpacing.xxs),
-                                ],
-                                if (song.isAutoplay ||
-                                    state.trackTiers[song.id] ==
-                                        QueueTier.autoplay) ...[
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 4, vertical: 1),
-                                    decoration: BoxDecoration(
-                                      color: p.accent.withValues(alpha: 0.15),
-                                      borderRadius: AppRadii.circular(4),
-                                    ),
-                                    child: Text(
-                                      context.l10n.autoplayBadgeLabel,
-                                      style: TextStyle(
-                                        color: p.accent,
-                                        fontSize: AppFontSize.caption,
-                                        fontWeight: FontWeight.w700,
-                                        letterSpacing: 0.5,
+                          );
+                        },
+                        itemBuilder: (context, index) {
+                          final song = queue[index];
+                          final isCurrent = state.currentIndex == index;
+
+                          final isHighContrast = p.isHighContrast ||
+                              (MediaQuery.maybeHighContrastOf(context) ??
+                                  false);
+                          return Container(
+                            key: slotKeys[index],
+                            margin: const EdgeInsets.symmetric(
+                                vertical: AppSpacing.xxs),
+                            decoration: BoxDecoration(
+                              borderRadius: AppRadii.cardRadius,
+                              boxShadow: p.isCalmDensity || isHighContrast
+                                  ? null
+                                  : [
+                                      BoxShadow(
+                                        color: AppColors.scrimAt(
+                                            p.isDark ? 0.12 : 0.04),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 2),
                                       ),
-                                    ),
+                                    ],
+                            ),
+                            child: Material(
+                              clipBehavior: Clip.antiAlias,
+                              color: isCurrent
+                                  ? p.accentContainer
+                                  : p.surfaceContainer,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: AppRadii.cardRadius,
+                                side: BorderSide(
+                                  color: isCurrent
+                                      ? p.accent
+                                      : (isHighContrast
+                                          ? p.borderStrong
+                                          : p.hairline),
+                                  width: isCurrent || isHighContrast ? 1.25 : 1,
+                                ),
+                              ),
+                              child: Semantics(
+                                button: true,
+                                label: context.l10n
+                                    .songByArtist(song.title, song.artist),
+                                child: ListTile(
+                                  leading: Stack(
+                                    clipBehavior: Clip.none,
+                                    children: [
+                                      CachedArtwork(
+                                        id: song.id,
+                                        remoteUrl: song.remoteArtworkUrl,
+                                        type: ArtworkType.AUDIO,
+                                        size: 44,
+                                        borderRadius: 10,
+                                      ),
+                                      if (song.remoteId != null &&
+                                          song.remoteId!.isNotEmpty)
+                                        PositionedDirectional(
+                                          end: -2,
+                                          bottom: -2,
+                                          child: Container(
+                                            padding: const EdgeInsets.all(2),
+                                            decoration: BoxDecoration(
+                                              color: p.surface,
+                                              shape: BoxShape.circle,
+                                              border: Border.all(
+                                                  color: p.accent, width: 1),
+                                            ),
+                                            child: Icon(Icons.cloud_rounded,
+                                                size: 10, color: p.accent),
+                                          ),
+                                        ),
+                                    ],
                                   ),
-                                  const SizedBox(width: AppSpacing.xxs),
-                                ],
-                                Expanded(
-                                  child: Text(
-                                    '${song.artist} • ${Formatters.formatDuration(Duration(milliseconds: song.durationMs))}',
+                                  title: Text(
+                                    song.title,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
-                                      color: p.textSecondary,
-                                      fontSize: AppFontSize.label,
+                                      color:
+                                          isCurrent ? p.accent : p.textPrimary,
+                                      fontWeight: isCurrent
+                                          ? FontWeight.w700
+                                          : FontWeight.w500,
+                                      fontSize: AppFontSize.body,
                                     ),
                                   ),
-                                ),
-                              ],
-                            ),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                if (isCurrent) ...[
-                                  Icon(
-                                    Icons.graphic_eq_rounded,
-                                    color: p.accent,
-                                    size: 20,
+                                  subtitle: Row(
+                                    children: [
+                                      if (song.remoteId != null &&
+                                          song.remoteId!.isNotEmpty) ...[
+                                        Icon(
+                                          Icons.cloud_outlined,
+                                          size: 13,
+                                          color:
+                                              p.accent.withValues(alpha: 0.8),
+                                        ),
+                                        const SizedBox(width: AppSpacing.xxs),
+                                      ],
+                                      if (song.isAutoplay ||
+                                          state.trackTiers[song.id] ==
+                                              QueueTier.autoplay) ...[
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 4, vertical: 1),
+                                          decoration: BoxDecoration(
+                                            color: p.accent
+                                                .withValues(alpha: 0.15),
+                                            borderRadius: AppRadii.circular(4),
+                                          ),
+                                          child: Text(
+                                            context.l10n.autoplayBadgeLabel,
+                                            style: TextStyle(
+                                              color: p.accent,
+                                              fontSize: AppFontSize.caption,
+                                              fontWeight: FontWeight.w700,
+                                              letterSpacing: 0.5,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: AppSpacing.xxs),
+                                      ],
+                                      Expanded(
+                                        child: Text(
+                                          '${song.artist} • ${Formatters.formatDuration(Duration(milliseconds: song.durationMs))}',
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            color: p.textSecondary,
+                                            fontSize: AppFontSize.label,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                  const SizedBox(width: AppSpacing.xxs),
-                                ],
-                                IconButton(
-                                  icon: Icon(Icons.close_rounded,
-                                      color: p.textTertiary, size: 20),
-                                  tooltip: context.l10n.delete,
-                                  constraints: const BoxConstraints(
-                                    minWidth: AppSpacing.minTouchTarget,
-                                    minHeight: AppSpacing.minTouchTarget,
+                                  trailing: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      if (isCurrent) ...[
+                                        Icon(
+                                          Icons.graphic_eq_rounded,
+                                          color: p.accent,
+                                          size: 20,
+                                        ),
+                                        const SizedBox(width: AppSpacing.xxs),
+                                      ],
+                                      IconButton(
+                                        icon: Icon(Icons.close_rounded,
+                                            color: p.textTertiary, size: 20),
+                                        tooltip: context.l10n.delete,
+                                        constraints: const BoxConstraints(
+                                          minWidth: AppSpacing.minTouchTarget,
+                                          minHeight: AppSpacing.minTouchTarget,
+                                        ),
+                                        onPressed: () {
+                                          PulsrHaptics.destructive();
+                                          SoundFeedbackService.playWarning();
+                                          final cubit =
+                                              context.read<PlayerCubit>();
+                                          final prevQueue =
+                                              List<SongsTableData>.from(queue);
+                                          final prevIndex = state.currentIndex;
+                                          final prevPosition = state.position;
+                                          cubit.removeQueueItem(index);
+                                          PulsrToast.show(
+                                            context,
+                                            message: song.title,
+                                            actionLabel: context.l10n.undo,
+                                            onActionPressed: () =>
+                                                cubit.restoreQueue(
+                                                    prevQueue, prevIndex,
+                                                    initialPosition:
+                                                        prevPosition),
+                                          );
+                                        },
+                                      ),
+                                      ReorderableDragStartListener(
+                                        index: index,
+                                        child: Semantics(
+                                          label: context.l10n
+                                              .queueReorderSemantics(song.title,
+                                                  index + 1, queue.length),
+                                          child: Container(
+                                            padding: const EdgeInsets.all(
+                                                AppSpacing.xs),
+                                            constraints: const BoxConstraints(
+                                              minWidth:
+                                                  AppSpacing.minTouchTarget,
+                                              minHeight:
+                                                  AppSpacing.minTouchTarget,
+                                            ),
+                                            alignment: Alignment.center,
+                                            child: Icon(
+                                              Icons.drag_handle_rounded,
+                                              color: p.textTertiary
+                                                  .withValues(alpha: 0.5),
+                                              size: 20,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                  onPressed: () {
-                                    PulsrHaptics.destructive();
-                                    SoundFeedbackService.playWarning();
-                                    final cubit = context.read<PlayerCubit>();
-                                    final prevQueue =
-                                        List<SongsTableData>.from(queue);
-                                    final prevIndex = state.currentIndex;
-                                    final prevPosition = state.position;
-                                    cubit.removeQueueItem(index);
-                                    PulsrToast.show(
-                                      context,
-                                      message: song.title,
-                                      actionLabel: context.l10n.undo,
-                                      onActionPressed: () => cubit.restoreQueue(
-                                          prevQueue, prevIndex,
-                                          initialPosition: prevPosition),
-                                    );
+                                  onTap: () {
+                                    context
+                                        .read<PlayerCubit>()
+                                        .skipToQueueItem(index);
                                   },
                                 ),
-                                ReorderableDragStartListener(
-                                  index: index,
-                                  child: Semantics(
-                                    label: context.l10n.queueReorderSemantics(
-                                        song.title, index + 1, queue.length),
-                                    child: Container(
-                                      padding:
-                                          const EdgeInsets.all(AppSpacing.xs),
-                                      constraints: const BoxConstraints(
-                                        minWidth: AppSpacing.minTouchTarget,
-                                        minHeight: AppSpacing.minTouchTarget,
-                                      ),
-                                      alignment: Alignment.center,
-                                      child: Icon(
-                                        Icons.drag_handle_rounded,
-                                        color: p.textTertiary
-                                            .withValues(alpha: 0.5),
-                                        size: 20,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
+                              ),
                             ),
-                    onTap: () {
-                              context
-                                  .read<PlayerCubit>()
-                                  .skipToQueueItem(index);
-                            },
-                          ),
-                        ),
+                          );
+                        },
                       ),
-                    );
-                  },
+                    ),
+                  ),
                 ),
-              ),
-            ),
-            ),
               ],
             );
           },

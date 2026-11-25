@@ -8,6 +8,7 @@ import 'package:pulsr/features/player/presentation/widgets/waveform_seek_bar.dar
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 class _BoundsRecordingCanvas extends Fake implements Canvas {
   final List<Rect> drawnBounds = <Rect>[];
   Rect? activeClip;

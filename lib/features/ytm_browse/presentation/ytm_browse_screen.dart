@@ -677,10 +677,10 @@ class _BrowseTrackCard extends StatelessWidget {
     final p = palette;
     final cardWidth = Adaptive.isTablet(context) ? 180.0 : 142.0;
     final imgHeight = (cardWidth * 0.92).roundToDouble();
-    final safeArtwork =
-        item.artworkUrl != null && RemoteTargetPolicy.isHttpUrl(item.artworkUrl!)
-            ? item.artworkUrl
-            : null;
+    final safeArtwork = item.artworkUrl != null &&
+            RemoteTargetPolicy.isHttpUrl(item.artworkUrl!)
+        ? item.artworkUrl
+        : null;
     return Semantics(
       button: true,
       selected: isActive,
@@ -743,8 +743,8 @@ class _BrowseTrackCard extends StatelessWidget {
                         fit: BoxFit.cover,
                         cacheWidth: (cardWidth * 2).round(),
                         cacheHeight: (imgHeight * 2).round(),
-                        frameBuilder: (context, child, frame,
-                            wasSynchronouslyLoaded) {
+                        frameBuilder:
+                            (context, child, frame, wasSynchronouslyLoaded) {
                           if (wasSynchronouslyLoaded) return child;
                           return AnimatedOpacity(
                             opacity: frame == null ? 0.0 : 1.0,

@@ -721,8 +721,7 @@ class YtDownloadService {
       }
 
       if (!bodyCommitted) {
-        final verifiedLen =
-            await temp.exists() ? await temp.length() : null;
+        final verifiedLen = await temp.exists() ? await temp.length() : null;
         await YtDownloadArtifactStore.markCommitted(
           temp,
           videoId,
@@ -1043,7 +1042,8 @@ class YtDownloadService {
             // Egress/bot block with no rate-limiter window: back off briefly so
             // the re-resolve below doesn't slam straight into the fail-fast.
             await Future.delayed(Duration(
-                milliseconds: (1000 * (1 << (attempts - 1))).clamp(1000, 8000)));
+                milliseconds:
+                    (1000 * (1 << (attempts - 1))).clamp(1000, 8000)));
             if (task.isCanceled) {
               rethrow;
             }
@@ -1080,8 +1080,7 @@ class YtDownloadService {
     var rangesSupported = false;
 
     try {
-      final probeReq =
-          await _http.openUrl('GET', uri).timeout(_stallTimeout);
+      final probeReq = await _http.openUrl('GET', uri).timeout(_stallTimeout);
       _trackRequest(task.runId, probeReq);
       try {
         YtDownloadTransferPolicy.applyHeaders(probeReq, userAgent,
@@ -1101,7 +1100,8 @@ class YtDownloadService {
           total = probeResp.contentLength;
         }
 
-        if (status == HttpStatus.forbidden || status == HttpStatus.unauthorized) {
+        if (status == HttpStatus.forbidden ||
+            status == HttpStatus.unauthorized) {
           await YtDownloadHttpSupport.drainSmall(probeResp);
           throw YtmException(
               'YTM_STREAM_EXPIRED', 'HTTP $status on stream probe');
@@ -1593,8 +1593,8 @@ class YtDownloadService {
       if (!await lyricsDir.exists()) {
         await lyricsDir.create();
       }
-      final alt = File(
-          p.join(lyricsDir.path, '${p.basenameWithoutExtension(finalPath)}.lrc'));
+      final alt = File(p.join(
+          lyricsDir.path, '${p.basenameWithoutExtension(finalPath)}.lrc'));
       await alt.writeAsString(lrcText);
     } catch (_) {
       // Best-effort: local app cache remains available via LyricsRepository.

@@ -214,7 +214,8 @@ void main() {
       expect(current, SourceScope.local);
     });
 
-    testWidgets('output pill and scope switcher scale cleanly at 200% text scale',
+    testWidgets(
+        'output pill and scope switcher scale cleanly at 200% text scale',
         (tester) async {
       await tester.pumpWidget(
         MaterialApp(
@@ -292,8 +293,8 @@ void main() {
       expect(tester.takeException(), isNull);
       expect(find.byKey(const ValueKey('compact_source_scope_switcher')),
           findsOneWidget);
-      final switcherSize = tester.getSize(
-          find.byKey(const ValueKey('compact_source_scope_switcher')));
+      final switcherSize = tester
+          .getSize(find.byKey(const ValueKey('compact_source_scope_switcher')));
       expect(switcherSize.width, closeTo(320.0, 0.5));
       expect(switcherSize.height, greaterThanOrEqualTo(48.0));
     });
@@ -328,8 +329,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      final trackRect = tester.getRect(
-          find.byKey(const ValueKey('compact_source_scope_switcher')));
+      final trackRect = tester
+          .getRect(find.byKey(const ValueKey('compact_source_scope_switcher')));
       final localRect =
           tester.getRect(find.byKey(const ValueKey('scope_segment_local')));
       final onlineRect =
@@ -342,8 +343,7 @@ void main() {
       expect(onlineRect.height, greaterThanOrEqualTo(48.0));
     });
 
-    testWidgets(
-        'constrains cleanly to maxWidth 400 on tablet/wide viewports',
+    testWidgets('constrains cleanly to maxWidth 400 on tablet/wide viewports',
         (tester) async {
       tester.view.physicalSize = const Size(900, 1200);
       tester.view.devicePixelRatio = 1.0;
@@ -372,8 +372,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      final trackSize = tester.getSize(
-          find.byKey(const ValueKey('compact_source_scope_switcher')));
+      final trackSize = tester
+          .getSize(find.byKey(const ValueKey('compact_source_scope_switcher')));
       expect(trackSize.width, closeTo(400.0, 0.5));
       expect(trackSize.height, greaterThanOrEqualTo(48.0));
     });

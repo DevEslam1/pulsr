@@ -30,6 +30,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'player_sheet_test_support.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 

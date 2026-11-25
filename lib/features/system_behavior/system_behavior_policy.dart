@@ -90,19 +90,20 @@ enum SystemAction {
 /// Focus-loss / focus-gain bookkeeping itself lives in
 /// `PlaybackInterruptionManager`; this table only decides how the pause is
 /// delivered once that manager says playback should pause.
-SystemAction decide(SystemEvent event, SystemBehaviorSettingsSnapshot settings) {
+SystemAction decide(
+    SystemEvent event, SystemBehaviorSettingsSnapshot settings) {
   switch (event) {
     case SystemEvent.audioFocusLossPermanent:
       return _pauseActionFor(
         settings,
-        releaseUsb: settings.usbReleaseOnFocusLoss !=
-            UsbReleaseOnFocusLoss.never,
+        releaseUsb:
+            settings.usbReleaseOnFocusLoss != UsbReleaseOnFocusLoss.never,
       );
     case SystemEvent.audioFocusLossTransient:
       return _pauseActionFor(
         settings,
-        releaseUsb: settings.usbReleaseOnFocusLoss ==
-            UsbReleaseOnFocusLoss.transient,
+        releaseUsb:
+            settings.usbReleaseOnFocusLoss == UsbReleaseOnFocusLoss.transient,
       );
     case SystemEvent.audioFocusGain:
       // Resume is owned by the interruption manager and the audio handler; a

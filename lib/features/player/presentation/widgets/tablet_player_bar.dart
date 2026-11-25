@@ -228,7 +228,8 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                     final totalWidth = barConstraints.maxWidth;
                                     final isCompactBar = totalWidth < 600;
                                     final leftMaxWidth = isShortHeight
-                                        ? (totalWidth * 0.38).clamp(140.0, 240.0)
+                                        ? (totalWidth * 0.38)
+                                            .clamp(140.0, 240.0)
                                         : (isCompactBar
                                             ? (totalWidth * 0.28)
                                                 .clamp(60.0, 160.0)
@@ -244,12 +245,14 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                     final showVolumeSlider = !isShortHeight &&
                                         totalWidth >= 680 &&
                                         rightMaxWidth >= 160;
-                                    final showSecondaryBadges = !isShortHeight &&
-                                        totalWidth >= 600 &&
-                                        leftMaxWidth >= 140;
+                                    final showSecondaryBadges =
+                                        !isShortHeight &&
+                                            totalWidth >= 600 &&
+                                            leftMaxWidth >= 140;
                                     final showFavoriteButton = isShortHeight
                                         ? leftMaxWidth >= 140
-                                        : (!isCompactBar && leftMaxWidth >= 130);
+                                        : (!isCompactBar &&
+                                            leftMaxWidth >= 130);
 
                                     return Row(
                                       children: [
@@ -265,7 +268,8 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                           isCompactBar: isCompactBar,
                                           showSecondaryBadges:
                                               showSecondaryBadges,
-                                          showFavoriteButton: showFavoriteButton,
+                                          showFavoriteButton:
+                                              showFavoriteButton,
                                         ),
                                         SizedBox(
                                           width: isCompactBar

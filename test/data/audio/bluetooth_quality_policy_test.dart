@@ -149,7 +149,8 @@ void main() {
   });
 
   group('bit depth alignment & dynamic buffer recommendation', () {
-    test('aligns 16-bit codec depth to 24-bit for 24-bit tracks when supported', () {
+    test('aligns 16-bit codec depth to 24-bit for 24-bit tracks when supported',
+        () {
       final p = run(
         codec: 'LDAC',
         codecDepth: 16,
@@ -159,7 +160,9 @@ void main() {
       expect(p.alignCodecBitDepthTo, 24);
     });
 
-    test('attempts 24-bit alignment for high-tier codecs with empty selectable list', () {
+    test(
+        'attempts 24-bit alignment for high-tier codecs with empty selectable list',
+        () {
       final p = run(
         codec: 'LHDC V5',
         codecDepth: 16,

@@ -140,8 +140,10 @@ class AutoEqParametricProfile {
   List<String> get warnings => List<String>.unmodifiable(_warnings);
 
   /// Bands that are enabled, in file order.
-  List<AutoEqBand> get enabledBands =>
-      [for (final band in bands) if (band.enabled) band];
+  List<AutoEqBand> get enabledBands => [
+        for (final band in bands)
+          if (band.enabled) band
+      ];
 
   void _addWarning(String warning) {
     if (!_warnings.contains(warning)) _warnings.add(warning);
@@ -322,7 +324,8 @@ abstract final class AutoEqParametricParser {
         final value = double.tryParse(match.group(3)!);
         if (value == null) continue;
         final unit = (match.group(2) ?? match.group(4))?.trim().toLowerCase();
-        parameters[match.group(1)!.toLowerCase()] = _ParsedParameter(value, unit);
+        parameters[match.group(1)!.toLowerCase()] =
+            _ParsedParameter(value, unit);
       }
 
       final fc = parameters['fc'];
@@ -576,7 +579,9 @@ abstract final class AutoEqParametricParser {
     List<String> warnings,
   ) {
     final qParameter = parameters['q'];
-    if (qParameter != null && qParameter.value.isFinite && qParameter.value > 0) {
+    if (qParameter != null &&
+        qParameter.value.isFinite &&
+        qParameter.value > 0) {
       return qParameter.value;
     }
     final bwParameter = parameters['bw'];

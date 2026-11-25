@@ -410,8 +410,7 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
                               children: [
                                 // Tab 0: Quran Mushaf View (when Quran track/mode) or Lyrics View
                                 if (isQuran)
-                                  BlocSelector<PlayerCubit, PlayerState,
-                                      int?>(
+                                  BlocSelector<PlayerCubit, PlayerState, int?>(
                                     selector: (s) =>
                                         _quranMetadata?.ayahAt(s.position),
                                     builder: (context, activeAyah) =>
@@ -1061,9 +1060,7 @@ class _SignalStageChip extends StatelessWidget {
       decoration: BoxDecoration(
         color: isActive
             ? activeColor.withValues(alpha: 0.18)
-            : (p.isDark
-                ? AppColors.specularAt(0.05)
-                : p.surfaceContainerHigh),
+            : (p.isDark ? AppColors.specularAt(0.05) : p.surfaceContainerHigh),
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
           color: isActive ? activeColor.withValues(alpha: 0.50) : p.hairline,

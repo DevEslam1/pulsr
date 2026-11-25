@@ -41,10 +41,9 @@ extension YtmServiceDartResolve on YtmService {
       ErrorLogger.log('Non-critical YTM operation failed',
           error: e, stackTrace: st, category: 'YTM');
     }
-    final effectivePoToken =
-        (playerPoToken != null && playerPoToken.isNotEmpty)
-            ? playerPoToken
-            : guestPoToken;
+    final effectivePoToken = (playerPoToken != null && playerPoToken.isNotEmpty)
+        ? playerPoToken
+        : guestPoToken;
 
     final effectiveAndroidVersion =
         androidVersion == '19.44.38' ? '21.26.364' : androidVersion;
@@ -237,12 +236,10 @@ extension YtmServiceDartResolve on YtmService {
           .where(
               (f) => ((f.format['mimeType'] as String?) ?? '').contains('mp4'))
           .toList();
-      final opus = audioFormats
-          .where((f) {
-            final mime = ((f.format['mimeType'] as String?) ?? '').toLowerCase();
-            return mime.contains('webm') || mime.contains('opus');
-          })
-          .toList();
+      final opus = audioFormats.where((f) {
+        final mime = ((f.format['mimeType'] as String?) ?? '').toLowerCase();
+        return mime.contains('webm') || mime.contains('opus');
+      }).toList();
       final pool = preferM4a
           ? (m4a.isNotEmpty ? m4a : audioFormats)
           : (opus.isNotEmpty ? opus : (m4a.isNotEmpty ? m4a : audioFormats));

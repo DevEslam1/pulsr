@@ -430,8 +430,7 @@ class PlayerBottomActionDock extends StatelessWidget {
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color:
-                        AppColors.scrimAt(p.isDark ? 0.28 : 0.06),
+                    color: AppColors.scrimAt(p.isDark ? 0.28 : 0.06),
                     blurRadius: 12,
                     offset: const Offset(0, 4),
                   ),

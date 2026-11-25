@@ -147,11 +147,15 @@ class PlaylistExportUseCase {
     } catch (_) {
       tempDir = Directory.systemTemp;
     }
-    var sanitizedName = playlistName.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_').trim();
-    if (sanitizedName.isEmpty || sanitizedName == '.' || sanitizedName == '..') {
+    var sanitizedName =
+        playlistName.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_').trim();
+    if (sanitizedName.isEmpty ||
+        sanitizedName == '.' ||
+        sanitizedName == '..') {
       sanitizedName = 'playlist';
     }
-    final targetPath = p.normalize(p.join(tempDir.path, '$sanitizedName.${format.extension}'));
+    final targetPath =
+        p.normalize(p.join(tempDir.path, '$sanitizedName.${format.extension}'));
     if (!p.isWithin(tempDir.path, targetPath)) {
       throw ArgumentError('Invalid playlist file destination: $targetPath');
     }
@@ -475,7 +479,9 @@ class PlaylistImportUseCase {
           }
           // Never fall back to exactMap/normalizedMap/filenameMap when targetCueStartMs != null
         } else {
-          matchedSong = exactMap[path] ?? normalizedMap[normPath] ?? filenameMap[filename];
+          matchedSong = exactMap[path] ??
+              normalizedMap[normPath] ??
+              filenameMap[filename];
         }
 
         if (matchedSong != null) {
@@ -491,8 +497,8 @@ class PlaylistImportUseCase {
         (failure) async => Left(failure),
         (playlistId) async {
           if (matchedSongIds.isNotEmpty) {
-            final addRes =
-                await _repository.addSongsToPlaylist(playlistId, matchedSongIds);
+            final addRes = await _repository.addSongsToPlaylist(
+                playlistId, matchedSongIds);
             final failure = addRes.fold((f) => f, (_) => null);
             if (failure != null) {
               return Left(failure);

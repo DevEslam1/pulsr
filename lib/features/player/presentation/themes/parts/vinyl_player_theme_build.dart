@@ -48,16 +48,17 @@ class _VinylStudioPalette {
     final isHighContrast =
         p.isHighContrast || MediaQuery.highContrastOf(context);
     final amber = Color.lerp(AppColors.amberDeep, activeColor, 0.32)!;
-    final brassHi = Color.lerp(AppColors.giltGold, AppColors.onGiltLight, 0.34)!;
+    final brassHi =
+        Color.lerp(AppColors.giltGold, AppColors.onGiltLight, 0.34)!;
     final brassLo = Color.lerp(AppColors.giltGold, AppColors.onGiltDark, 0.45)!;
 
     if (isDark) {
-      final walnutTop =
-          Color.lerp(PlayerMaterialColors.deckGradStart, AppColors.onGiltDark, 0.42)!;
-      final walnutMid =
-          Color.lerp(PlayerMaterialColors.plinthSurface, AppColors.onGiltDark, 0.36)!;
-      final walnutBottom =
-          Color.lerp(PlayerMaterialColors.immersiveBackdrop, AppColors.onGiltDark, 0.25)!;
+      final walnutTop = Color.lerp(
+          PlayerMaterialColors.deckGradStart, AppColors.onGiltDark, 0.42)!;
+      final walnutMid = Color.lerp(
+          PlayerMaterialColors.plinthSurface, AppColors.onGiltDark, 0.36)!;
+      final walnutBottom = Color.lerp(
+          PlayerMaterialColors.immersiveBackdrop, AppColors.onGiltDark, 0.25)!;
 
       return _VinylStudioPalette(
         isDark: true,
@@ -98,7 +99,8 @@ class _VinylStudioPalette {
     // Light mode: brushed champagne-aluminum Braun/Marantz studio receiver
     final silverTop = Color.lerp(p.bg, AppColors.onGiltLight, 0.55)!;
     final silverMid = Color.lerp(p.surface, AppColors.onGiltLight, 0.38)!;
-    final silverBottom = Color.lerp(p.surfaceContainer, AppColors.giltGold, 0.14)!;
+    final silverBottom =
+        Color.lerp(p.surfaceContainer, AppColors.giltGold, 0.14)!;
     final warmDarkAmber = Color.lerp(AppColors.onGiltDark, amber, 0.62)!;
 
     return _VinylStudioPalette(
@@ -180,7 +182,8 @@ extension _VinylPlayerThemeBuild on _VinylPlayerThemeState {
       ),
       topBarBuilder: (context, metrics) => PlayerCompactTopBar(
         foregroundColor: vinylPalette.primaryInk,
-        buttonSurfaceColor: vinylPalette.hardwareSurface.withValues(alpha: 0.72),
+        buttonSurfaceColor:
+            vinylPalette.hardwareSurface.withValues(alpha: 0.72),
         buttonBorderColor: vinylPalette.hardwareBorder,
         center: _VinylStudioTelemetryBadge(
           palette: vinylPalette,
@@ -231,8 +234,7 @@ extension _VinylPlayerThemeBuild on _VinylPlayerThemeState {
               final double visualizerSpace =
                   showVisualizer ? visualizerH + AppSpacing.xs : 0.0;
               final double capH = forcedMaxHeight ?? stageConstraints.maxHeight;
-              final double availableH =
-                  math.max(0.0, capH - visualizerSpace);
+              final double availableH = math.max(0.0, capH - visualizerSpace);
 
               return Column(
                 mainAxisAlignment: MainAxisAlignment.center,

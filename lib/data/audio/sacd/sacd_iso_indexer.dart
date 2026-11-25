@@ -54,12 +54,10 @@ class SacdIsoIndex {
   }
 
   /// Stereo tracks of the image, or an empty list when it has none.
-  List<SacdTrack> get stereoTracks =>
-      stereoToc?.tracks ?? const <SacdTrack>[];
+  List<SacdTrack> get stereoTracks => stereoToc?.tracks ?? const <SacdTrack>[];
 
   /// True when the image parsed but has no area the decoder can play.
-  bool get hasOnlyMultichannel =>
-      areas.isNotEmpty && stereoToc == null;
+  bool get hasOnlyMultichannel => areas.isNotEmpty && stereoToc == null;
 
   /// Tracks of [preferred], or an empty list when no area parsed.
   List<SacdTrack> get tracks => preferred?.tracks ?? const <SacdTrack>[];

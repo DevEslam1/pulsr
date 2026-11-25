@@ -1791,7 +1791,8 @@ void runTests() {
     await player.dispose();
   });
 
-  test('_proxyHandlerForSource completes cleanly on client disconnect', () async {
+  test('_proxyHandlerForSource completes cleanly on client disconnect',
+      () async {
     final player = AudioPlayer();
     await player.setAudioSource(_EndlessStreamAudioSource());
     final proxyUri = Uri.parse(player.icyMetadata!.info!.url!);

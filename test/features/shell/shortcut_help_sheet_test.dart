@@ -10,6 +10,7 @@ import 'package:pulsr/features/shell/presentation/widgets/shortcut_help_sheet.da
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 Widget host(Widget child) => MaterialApp(
       theme: AuraTheme.darkTheme,
       localizationsDelegates: appLocalizationsDelegates,

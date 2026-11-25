@@ -22,6 +22,8 @@ import (
 )
 
 func setupTestServer() *httptest.Server {
+	hubInst.CloseAll()
+	wsWG.Wait()
 	store = party.NewPartyStore()
 	hubInst = hub.NewHub()
 	createLimiter = newIPRateLimiter(time.Minute, 100, 100)

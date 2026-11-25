@@ -120,7 +120,8 @@ class UsbStreamModeSelector extends StatelessWidget {
           const SizedBox(height: AppSpacing.xxs),
           Text(
             UsbStreamModeStrings.subtitle,
-            style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.caption),
+            style: TextStyle(
+                color: p.textSecondary, fontSize: AppFontSize.caption),
           ),
           const SizedBox(height: AppSpacing.sm),
           KeyedSubtree(
@@ -156,7 +157,8 @@ class UsbStreamModeSelector extends StatelessWidget {
           const SizedBox(height: AppSpacing.xs),
           Text(
             _hint(selected),
-            style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.caption),
+            style: TextStyle(
+                color: p.textSecondary, fontSize: AppFontSize.caption),
           ),
           if (streamingActive) ...<Widget>[
             const SizedBox(height: AppSpacing.xs),
@@ -179,10 +181,8 @@ class UsbStreamModeSelector extends StatelessWidget {
       };
 
   static String _hint(UsbStreamMode mode) => switch (mode) {
-        UsbStreamMode.bitPerfectPull =>
-          UsbStreamModeStrings.bitPerfectPullHint,
-        UsbStreamMode.clockSyncAsrc =>
-          UsbStreamModeStrings.clockSyncAsrcHint,
+        UsbStreamMode.bitPerfectPull => UsbStreamModeStrings.bitPerfectPullHint,
+        UsbStreamMode.clockSyncAsrc => UsbStreamModeStrings.clockSyncAsrcHint,
         UsbStreamMode.bestEffort => UsbStreamModeStrings.bestEffortHint,
       };
 }
@@ -232,14 +232,17 @@ class _Evidence extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    final style = TextStyle(color: p.textSecondary, fontSize: AppFontSize.caption);
+    final style =
+        TextStyle(color: p.textSecondary, fontSize: AppFontSize.caption);
     final rows = <String>[
       if (!status.streamingActive) UsbStreamModeStrings.unknownDomain,
       if (status.streamingActive) ...<String>[
         'Session ${status.sessionState}',
         'Drift ${status.clockDriftPpm} ppm',
         'Buffer ${status.ringFillMs} ms',
-        status.feedbackPresent ? 'Feedback endpoint present' : 'No feedback endpoint',
+        status.feedbackPresent
+            ? 'Feedback endpoint present'
+            : 'No feedback endpoint',
         'Underruns ${status.underrunCount} · Overruns ${status.overrunCount}',
         if (status.quirkApplied.isNotEmpty)
           'Quirks ${status.quirkApplied.join(", ")}',
@@ -260,7 +263,8 @@ class _Evidence extends StatelessWidget {
           Text(
             'Bit-perfect limited: '
             '${status.quirkBitPerfectReason ?? "device quirk"}',
-            style: style.copyWith(color: p.warning, fontWeight: FontWeight.w600),
+            style:
+                style.copyWith(color: p.warning, fontWeight: FontWeight.w600),
           ),
       ],
     );

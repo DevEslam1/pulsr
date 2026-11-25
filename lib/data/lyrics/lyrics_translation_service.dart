@@ -365,8 +365,8 @@ class LyricsTranslationService {
 
       if (response.statusCode != 200) return null;
 
-      final dynamic data = jsonDecode(
-          utf8.decode(response.bodyBytes, allowMalformed: true));
+      final dynamic data =
+          jsonDecode(utf8.decode(response.bodyBytes, allowMalformed: true));
       if (data is! List || data.isEmpty) return null;
 
       final segments = data[0];
@@ -429,8 +429,8 @@ class LyricsTranslationService {
 
       if (response.statusCode != 200) return null;
 
-      final dynamic data = jsonDecode(
-          utf8.decode(response.bodyBytes, allowMalformed: true));
+      final dynamic data =
+          jsonDecode(utf8.decode(response.bodyBytes, allowMalformed: true));
       if (data is! List || data.isEmpty) return null;
 
       final segments = data[0];
@@ -491,14 +491,17 @@ class LyricsTranslationService {
 
       if (response.statusCode != 200) return null;
 
-      final dynamic data = jsonDecode(
-          utf8.decode(response.bodyBytes, allowMalformed: true));
+      final dynamic data =
+          jsonDecode(utf8.decode(response.bodyBytes, allowMalformed: true));
       if (data is! List || data.isEmpty || data[0] != 'SUCCESS') return null;
 
       String resultObj = '';
       if (data.length > 1 && data[1] is List && (data[1] as List).isNotEmpty) {
         final d10 = (data[1] as List)[0];
-        if (d10 is List && d10.length > 1 && d10[1] is List && (d10[1] as List).isNotEmpty) {
+        if (d10 is List &&
+            d10.length > 1 &&
+            d10[1] is List &&
+            (d10[1] as List).isNotEmpty) {
           resultObj = (d10[1] as List)[0]?.toString() ?? '';
         }
       }
@@ -663,7 +666,8 @@ class LyricsTranslationService {
     _diskIndexChain = _diskIndexChain.whenComplete(() async {
       try {
         final prefs = await SharedPreferences.getInstance();
-        final keys = prefs.getKeys().where((k) => k.startsWith(_cachePrefix)).toList();
+        final keys =
+            prefs.getKeys().where((k) => k.startsWith(_cachePrefix)).toList();
         for (final k in keys) {
           await prefs.remove(k);
         }

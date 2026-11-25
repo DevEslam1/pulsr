@@ -86,9 +86,7 @@ class PulsrElevation {
       // wide blurred shadows; keep only a tight grounding key shadow.
       return [
         BoxShadow(
-          color: isDark
-              ? AppColors.scrimAt(0.40)
-              : AppColors.inkSlateAt(0.14),
+          color: isDark ? AppColors.scrimAt(0.40) : AppColors.inkSlateAt(0.14),
           blurRadius: keyBlur,
           offset: Offset(0, keyDy),
         ),

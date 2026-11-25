@@ -233,8 +233,7 @@ class SpotifyImporterService {
         if (oembedResp.statusCode == 200) {
           final oembedBody =
               utf8.decode(oembedResp.bodyBytes, allowMalformed: true);
-          final oembedData =
-              jsonDecode(oembedBody) as Map<String, dynamic>;
+          final oembedData = jsonDecode(oembedBody) as Map<String, dynamic>;
           playlistTitle = oembedData['title'] as String?;
         }
       } catch (_) {}
@@ -497,17 +496,15 @@ class SpotifyImporterService {
     }
 
     // 3. Fallback only when significant token overlap exists
-    final targetTitleTokens = targetTitle
-        .split(RegExp(r'\s+'))
-        .where((t) => t.length >= 3)
-        .toSet();
+    final targetTitleTokens =
+        targetTitle.split(RegExp(r'\s+')).where((t) => t.length >= 3).toSet();
 
     if (targetArtist.isNotEmpty) {
       for (final c in candidates) {
         final cTitle = c.title.toLowerCase();
         final cArtist = c.artist.toLowerCase();
-        final titleOverlaps = targetTitleTokens.isEmpty ||
-            targetTitleTokens.any(cTitle.contains);
+        final titleOverlaps =
+            targetTitleTokens.isEmpty || targetTitleTokens.any(cTitle.contains);
         if (titleOverlaps && artistMatches(cArtist)) {
           return c;
         }

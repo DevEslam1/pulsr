@@ -42,8 +42,7 @@ void main() {
 
     await expectLater(
       decoder.decodeForFormat(
-        _song(
-            path: '/music/track.m4a', codec: 'ALAC', sampleRate: 96000),
+        _song(path: '/music/track.m4a', codec: 'ALAC', sampleRate: 96000),
         const MediaItem(id: '1', title: 'Track'),
       ),
       throwsA(isA<PlayerException>()

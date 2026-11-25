@@ -44,8 +44,7 @@ class UpnpDiscovery {
         _ownsClient = client == null,
         _searchTimeout = searchTimeout,
         _descriptionTimeout = descriptionTimeout,
-        _descriptionCache =
-            descriptionCache ?? UpnpDeviceDescriptionCache() {
+        _descriptionCache = descriptionCache ?? UpnpDeviceDescriptionCache() {
     final ssdpClient = ssdp ?? SsdpClient();
     _search = search ?? (timeout) => ssdpClient.search(timeout: timeout);
   }

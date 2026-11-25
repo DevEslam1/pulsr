@@ -425,15 +425,21 @@ mixin PulsrAudioDspBridge on BaseAudioHandler {
 
   // Multichannel Channel Manager
   bool get isChannelManagerEnabled => _equalizerManager.isChannelManagerEnabled;
-  int get channelManagerChannelCount => _equalizerManager.channelManagerChannelCount;
-  List<double> get channelManagerTrimDb => _equalizerManager.channelManagerTrimDb;
-  List<double> get channelManagerDelayMs => _equalizerManager.channelManagerDelayMs;
+  int get channelManagerChannelCount =>
+      _equalizerManager.channelManagerChannelCount;
+  List<double> get channelManagerTrimDb =>
+      _equalizerManager.channelManagerTrimDb;
+  List<double> get channelManagerDelayMs =>
+      _equalizerManager.channelManagerDelayMs;
 
   Future<void> setChannelManagerEnabled(bool enabled, {int? channelCount}) =>
-      _equalizerManager.setChannelManagerEnabled(enabled, channelCount: channelCount);
+      _equalizerManager.setChannelManagerEnabled(enabled,
+          channelCount: channelCount);
 
-  Future<void> setChannelManagerChannel(int channel, {double? trimDb, double? delayMs}) =>
-      _equalizerManager.setChannelManagerChannel(channel, trimDb: trimDb, delayMs: delayMs);
+  Future<void> setChannelManagerChannel(int channel,
+          {double? trimDb, double? delayMs}) =>
+      _equalizerManager.setChannelManagerChannel(channel,
+          trimDb: trimDb, delayMs: delayMs);
 
   // Multichannel LFE Crossover
   bool get isLfeCrossoverEnabled => _equalizerManager.isLfeCrossoverEnabled;

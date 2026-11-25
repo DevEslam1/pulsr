@@ -66,9 +66,8 @@ class ActiveAudioOutputPill extends StatelessWidget {
         rateSuffix = ' · ${formatted}kHz';
       }
       final rawLabel = info.usbDacLabel?.trim();
-      final dacName = (rawLabel != null && rawLabel.isNotEmpty)
-          ? rawLabel
-          : 'USB DAC';
+      final dacName =
+          (rawLabel != null && rawLabel.isNotEmpty) ? rawLabel : 'USB DAC';
       return (
         icon: Icons.album_rounded,
         label: '$dacName$rateSuffix',
@@ -357,9 +356,8 @@ class CompactSourceScopeSwitcher extends StatelessWidget {
     final trackDecoration = BoxDecoration(
       color: p.isDark ? p.surfaceContainer : p.surfaceContainerHigh,
       borderRadius: AppRadii.full,
-      boxShadow: (p.isCalmDensity || isHighContrast)
-          ? null
-          : PulsrElevation.level1(p),
+      boxShadow:
+          (p.isCalmDensity || isHighContrast) ? null : PulsrElevation.level1(p),
     );
     final trackBorder = BoxDecoration(
       borderRadius: AppRadii.full,
@@ -642,7 +640,8 @@ class QuickDiscoveryHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    final effectiveScope = scope ?? (online ? SourceScope.online : SourceScope.local);
+    final effectiveScope =
+        scope ?? (online ? SourceScope.online : SourceScope.local);
 
     final items = <({IconData icon, String label, VoidCallback onTap})>[
       if (online) ...[
@@ -755,8 +754,8 @@ class QuickDiscoveryHeader extends StatelessWidget {
                 if (offlineOnly)
                   Flexible(
                     child: Padding(
-                      padding: const EdgeInsetsDirectional.only(
-                          end: AppSpacing.xs),
+                      padding:
+                          const EdgeInsetsDirectional.only(end: AppSpacing.xs),
                       child: Chip(
                         avatar: Icon(Icons.wifi_off_rounded,
                             size: 14, color: p.accent),

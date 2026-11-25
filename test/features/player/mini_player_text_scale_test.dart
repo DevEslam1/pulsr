@@ -14,6 +14,7 @@ import '../../helpers/screen_harness.dart';
 import '../../helpers/test_song_factory.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 class _MockSettings extends Mock implements SettingsCubit {}
 
 /// WCAG 1.4.4: the mini player used to clamp text at 1.3×, so a 200 % OS setting

@@ -47,8 +47,7 @@ class UsbQuirkStore {
     final snapshot = _read();
     final profiles = snapshot.devices.values.toList()
       ..sort((a, b) {
-        final byLabel =
-            a.label.toLowerCase().compareTo(b.label.toLowerCase());
+        final byLabel = a.label.toLowerCase().compareTo(b.label.toLowerCase());
         return byLabel != 0 ? byLabel : a.key.compareTo(b.key);
       });
     return List<UsbQuirkProfile>.unmodifiable(profiles);
@@ -177,8 +176,7 @@ class UsbQuirkStore {
   }) async {
     final payload = <String, Object?>{
       devicesField: <String, Object?>{
-        for (final entry in devices.entries)
-          entry.key: entry.value.toJson(),
+        for (final entry in devices.entries) entry.key: entry.value.toJson(),
       },
       globalDefaultsField: defaults?.toJson(),
     };

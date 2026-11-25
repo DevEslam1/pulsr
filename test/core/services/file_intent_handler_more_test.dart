@@ -18,6 +18,7 @@ import 'package:pulsr/features/player/cubit/player_cubit.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 class MockMusicRepository extends Mock implements IMusicRepository {}
 
 class MockPlayerCubit extends Mock implements PlayerCubit {}

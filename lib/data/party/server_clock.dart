@@ -61,7 +61,8 @@ class ServerClock {
   }
 
   /// True if [sentAtLocalMs] is currently in the in-flight ping set.
-  bool hasPendingPing(int sentAtLocalMs) => _pendingPings.contains(sentAtLocalMs);
+  bool hasPendingPing(int sentAtLocalMs) =>
+      _pendingPings.contains(sentAtLocalMs);
 
   /// Records a ping/pong round trip.
   ///

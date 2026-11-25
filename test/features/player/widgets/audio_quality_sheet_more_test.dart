@@ -30,6 +30,7 @@ import 'package:pulsr/l10n/generated/app_localizations.dart';
 import 'player_sheet_test_support.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 class _MockAudioHandler extends Mock implements PulsrAudioHandler {}
 
 void _registerUnityTransport() {

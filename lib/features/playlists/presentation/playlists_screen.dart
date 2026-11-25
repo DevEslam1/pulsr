@@ -1024,8 +1024,8 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
               return FadeTransition(
                 opacity: animation,
                 child: ScaleTransition(
-                  scale: Tween<double>(begin: 0.96, end: 1.0)
-                      .animate(animation),
+                  scale:
+                      Tween<double>(begin: 0.96, end: 1.0).animate(animation),
                   child: child,
                 ),
               );
@@ -1092,7 +1092,8 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                                         ? null
                                         : 'playlist_${pl.id}',
                                     name: pl.name,
-                                    subtitle: context.l10n.browseOfflinePlaylist,
+                                    subtitle:
+                                        context.l10n.browseOfflinePlaylist,
                                     icon: Icons.queue_music_rounded,
                                     gradient: [
                                       p.surfaceContainerHigh,
@@ -1849,4 +1850,3 @@ class _OnlinePlaylistsContent extends StatelessWidget {
     );
   }
 }
-

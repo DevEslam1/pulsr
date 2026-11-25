@@ -200,8 +200,7 @@ class RemoteSource {
 
   /// `host:port`, handy for list subtitles and error messages. IPv6 literals
   /// are bracketed so the result is unambiguous.
-  String get authority =>
-      isIpv6Literal(host) ? '[$host]:$port' : '$host:$port';
+  String get authority => isIpv6Literal(host) ? '[$host]:$port' : '$host:$port';
 
   /// Whether [host] is a syntactic IPv6 literal (no brackets).
   static bool isIpv6Literal(String host) {
@@ -417,7 +416,8 @@ class RemoteEntry {
         'name': name,
         'isDirectory': isDirectory,
         if (sizeBytes != null) 'sizeBytes': sizeBytes,
-        if (modifiedAt != null) 'modifiedAt': modifiedAt!.millisecondsSinceEpoch,
+        if (modifiedAt != null)
+          'modifiedAt': modifiedAt!.millisecondsSinceEpoch,
         if (etag != null) 'etag': etag,
         if (artworkUri != null) 'artworkUri': artworkUri,
         if (artworkCacheKey != null) 'artworkCacheKey': artworkCacheKey,
@@ -430,8 +430,7 @@ class RemoteEntry {
   }
 
   @override
-  String toString() =>
-      'RemoteEntry($path, dir=$isDirectory, size=$sizeBytes)';
+  String toString() => 'RemoteEntry($path, dir=$isDirectory, size=$sizeBytes)';
 
   static String _stripLeadingSlash(String value) {
     var path = value.trim().replaceAll('\\', '/');

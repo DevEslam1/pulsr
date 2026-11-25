@@ -83,7 +83,8 @@ class AudioSignalPath {
   /// Decodes Android `AudioFormat.ENCODING_PCM_*` integer constants into readable names.
   /// Falls back gracefully to inferring PCM bit depth from [fallbackBitDepth] (e.g. 'PCM 24-bit')
   /// when [encoding] is 0 (unprobed).
-  static String pcmEncodingName(int encoding, [int fallbackBitDepth = 0]) => switch (encoding) {
+  static String pcmEncodingName(int encoding, [int fallbackBitDepth = 0]) =>
+      switch (encoding) {
         2 => 'PCM 16-bit',
         3 => 'PCM 8-bit',
         4 => 'PCM Float 32',
@@ -91,7 +92,9 @@ class AudioSignalPath {
         22 => 'PCM 32-bit',
         _ => encoding > 0
             ? 'PCM (enc $encoding)'
-            : (fallbackBitDepth > 0 ? 'PCM $fallbackBitDepth-bit' : 'PCM Unprobed'),
+            : (fallbackBitDepth > 0
+                ? 'PCM $fallbackBitDepth-bit'
+                : 'PCM Unprobed'),
       };
 
   /// Builds the four-stage trace from the live output facts.
@@ -165,9 +168,10 @@ class AudioSignalPath {
               : 'Bluetooth ($codec)')
           : 'Bluetooth Audio';
     } else if (isUsb) {
-      routeCat = hasTypeCHint && !uac2DirectActive && (output?.usbAudioClass ?? 0) == 0
-          ? 'type_c'
-          : 'usb';
+      routeCat =
+          hasTypeCHint && !uac2DirectActive && (output?.usbAudioClass ?? 0) == 0
+              ? 'type_c'
+              : 'usb';
       final uac = switch (output?.usbAudioClass ?? 0) {
         1 => 'UAC1',
         2 => 'UAC2',
@@ -186,8 +190,13 @@ class AudioSignalPath {
 
     final routeText = '$routeTitle • $devName';
 
-    final hwRate = (isBt ? (output?.btSampleRateHz ?? output?.sampleRate) : output?.sampleRate) ?? 0;
-    final hwDepth = (isBt ? (output?.btBitDepth ?? output?.bitDepth) : output?.bitDepth) ?? 0;
+    final hwRate = (isBt
+            ? (output?.btSampleRateHz ?? output?.sampleRate)
+            : output?.sampleRate) ??
+        0;
+    final hwDepth =
+        (isBt ? (output?.btBitDepth ?? output?.bitDepth) : output?.bitDepth) ??
+            0;
     final isDspEngaged = dspActive ||
         dspProcessing ||
         dspEffectsActive ||
@@ -198,7 +207,8 @@ class AudioSignalPath {
     // engaged, samples are altered in the DSP pipeline (EQ, Limiter, etc.),
     // so the claim must never be Bit-Perfect.
     final bitPerfect = !isDspEngaged && (bitPerfectState?.isVerified ?? false);
-    final direct = output?.isDirectSupported == true || aaudioEnabled || uac2DirectActive;
+    final direct =
+        output?.isDirectSupported == true || aaudioEnabled || uac2DirectActive;
 
     final String driver;
     if (uac2DirectActive) {
@@ -231,7 +241,9 @@ class AudioSignalPath {
             desc.toLowerCase().contains('float dsp')) {
           statusTag = desc;
         } else {
-          final clean = desc.replaceAll(RegExp(r'\s+Active$', caseSensitive: false), '').trim();
+          final clean = desc
+              .replaceAll(RegExp(r'\s+Active$', caseSensitive: false), '')
+              .trim();
           statusTag = '32-bit Float DSP ($clean Active)';
         }
       } else {

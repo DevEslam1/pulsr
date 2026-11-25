@@ -138,7 +138,8 @@ void main() {
       expect(same.hashCode, equals(dark.hashCode));
 
       final mid = dark.lerp(light, 0.5);
-      expect(mid.scrimStart, Color.lerp(dark.scrimStart, light.scrimStart, 0.5));
+      expect(
+          mid.scrimStart, Color.lerp(dark.scrimStart, light.scrimStart, 0.5));
       expect(mid.scrimEnd, Color.lerp(dark.scrimEnd, light.scrimEnd, 0.5));
       expect(dark.lerp(null, 0.5), equals(dark));
     });

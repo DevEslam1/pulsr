@@ -558,8 +558,7 @@ class DeviceAdaptiveOutputSection extends StatelessWidget {
               // Reconstruction character + even-order tail. Owns its own state
               // through DacVoicingService, so it stays out of settings codegen.
               const Padding(
-                padding:
-                    EdgeInsets.symmetric(vertical: AppSpacing.xxs),
+                padding: EdgeInsets.symmetric(vertical: AppSpacing.xxs),
                 child: _DacVoicingSelector(),
               ),
               if (isAndroid &&

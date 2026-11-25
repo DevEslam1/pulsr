@@ -235,8 +235,7 @@ class SettingsCubit extends PulsrCubit<SettingsState>
     autoSub(UsbExclusiveService().statusStream, (status) {
       if (isClosed) return;
       _usbStatusRefreshDebounce?.cancel();
-      _usbStatusRefreshDebounce =
-          Timer(const Duration(milliseconds: 200), () {
+      _usbStatusRefreshDebounce = Timer(const Duration(milliseconds: 200), () {
         if (!isClosed) unawaited(refreshOutputDevice());
       });
     });
@@ -277,8 +276,8 @@ class SettingsCubit extends PulsrCubit<SettingsState>
         // back, and a boot without one must not look like a user veto.
         // Serialize through _audioModeMutex so a route event cannot interleave
         // with an in-flight user toggle or format switch.
-        unawaited(_audioModeMutex.protect(
-            () => _setBitPerfectOutput(false, keepPreferenceWhenDisabling: true)));
+        unawaited(_audioModeMutex.protect(() =>
+            _setBitPerfectOutput(false, keepPreferenceWhenDisabling: true)));
       }
       if (gainedBitPerfect) unawaited(_rearmBitPerfectPreference());
     });
@@ -502,8 +501,7 @@ class SettingsCubit extends PulsrCubit<SettingsState>
           prefs.getBool(PrefsKeys.hapticsEnabled) ?? current.hapticsEnabled,
       liquidGlassTint:
           prefs.getDouble(_keyLiquidGlassTint) ?? current.liquidGlassTint,
-      disableBlur:
-          prefs.getBool(PrefsKeys.disableBlur) ?? current.disableBlur,
+      disableBlur: prefs.getBool(PrefsKeys.disableBlur) ?? current.disableBlur,
       languageCode: prefs.getString(_keyLanguageCode) ?? current.languageCode,
       customAccentColorValue: customAccentValue,
       customThemeRadius:
@@ -1026,8 +1024,7 @@ class SettingsCubit extends PulsrCubit<SettingsState>
               loadedState.copyWith(liquidGlassTint: previous.liquidGlassTint);
         }
         if (reconciledDirty.contains('disableBlur')) {
-          loadedState =
-              loadedState.copyWith(disableBlur: previous.disableBlur);
+          loadedState = loadedState.copyWith(disableBlur: previous.disableBlur);
         }
         AppBlur.setDisabled(loadedState.disableBlur);
         if (reconciledDirty.contains('languageCode')) {
@@ -1305,8 +1302,7 @@ class SettingsCubit extends PulsrCubit<SettingsState>
               ),
               isRadio: song?.source == SongSource.radio,
               integer32DirectUsbEligible: _integer32DirectUsbEligible,
-              requireConfirmedCodec:
-                  requestedStrictBitPerfect && song != null,
+              requireConfirmedCodec: requestedStrictBitPerfect && song != null,
             );
             final effectiveRate = effectiveSourceSampleRate(
               tagged: song?.sampleRate ?? 0,
@@ -1384,7 +1380,8 @@ class SettingsCubit extends PulsrCubit<SettingsState>
             expectedUsbRoute: state.currentOutputDevice?.isUsbDac == true ||
                 _bitPerfectViaDirectStream,
           );
-          if (state.bitPerfectOutput && getIt.isRegistered<PulsrAudioHandler>()) {
+          if (state.bitPerfectOutput &&
+              getIt.isRegistered<PulsrAudioHandler>()) {
             await getIt<PulsrAudioHandler>().reconfigurePlaybackSink();
           }
         } catch (e, st) {

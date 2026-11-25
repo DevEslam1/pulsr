@@ -339,10 +339,10 @@ void main() {
       // Different source prefix still prunes immediately.
       final audioB = File('${tempRoot.path}/throttle_b.bin')
         ..writeAsBytesSync(List<int>.filled(1000, 7));
-      final staleB = File(
-          '${tempRoot.path}/waveforms/${_fnv(audioB.path)}_1_1_22.json')
-        ..createSync(recursive: true)
-        ..writeAsStringSync('[0.5]');
+      final staleB =
+          File('${tempRoot.path}/waveforms/${_fnv(audioB.path)}_1_1_22.json')
+            ..createSync(recursive: true)
+            ..writeAsStringSync('[0.5]');
       await service.getWaveform(songId: 9121, filePath: audioB.path, count: 22);
       expect(staleB.existsSync(), isFalse,
           reason: 'another source prefix should prune independently');

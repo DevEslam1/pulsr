@@ -27,6 +27,7 @@ import '../../../helpers/screen_harness.dart';
 import '../../../helpers/test_song_factory.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 class _Playlists extends Mock implements PlaylistUseCases {}
 
 class _Export extends Mock implements PlaylistExportUseCase {}

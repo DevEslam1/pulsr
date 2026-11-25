@@ -161,8 +161,9 @@ BitPerfectState resolveBitPerfectOutput(BitPerfectOutputFacts facts) {
   // integer container depth, so it can never agree its way to `verified`.
   final sinkSampleRate =
       direct ? facts.directStreamSampleRate : facts.sinkSampleRate;
-  final sinkBitDepth =
-      direct ? facts.directStreamBitDepth : (floatCarrier ? 0 : facts.sinkBitDepth);
+  final sinkBitDepth = direct
+      ? facts.directStreamBitDepth
+      : (floatCarrier ? 0 : facts.sinkBitDepth);
 
   final gain = trustedSoftwareGain(facts.softwareGain);
 

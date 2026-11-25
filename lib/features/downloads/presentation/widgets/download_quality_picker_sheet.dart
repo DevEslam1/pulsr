@@ -12,6 +12,7 @@ import '../../../../data/db/app_database.dart';
 import '../../../../domain/models/ytm_audio_quality.dart';
 
 import '../../../../core/utils/pulsr_haptics.dart';
+
 /// Modal bottom sheet allowing users to select download quality with live
 /// file size estimates before starting a download.
 class DownloadQualityPickerSheet extends StatefulWidget {

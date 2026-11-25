@@ -3,8 +3,10 @@ import 'package:pulsr/core/services/ytm_cookie_codec.dart';
 
 void main() {
   group('YtmCookieCodec', () {
-    test('normalizeCookieHeader removes attribute names and normalizes spacing', () {
-      const raw = 'SID=abc123; Path=/; Domain=.youtube.com; HSID=def456; Secure; HttpOnly';
+    test('normalizeCookieHeader removes attribute names and normalizes spacing',
+        () {
+      const raw =
+          'SID=abc123; Path=/; Domain=.youtube.com; HSID=def456; Secure; HttpOnly';
       final normalized = YtmCookieCodec.normalizeCookieHeader(raw);
       expect(normalized, contains('SID=abc123'));
       expect(normalized, contains('HSID=def456'));
@@ -21,7 +23,9 @@ void main() {
       expect(scoped, isNot(contains('__Host-GAPS=')));
     });
 
-    test('splitSetCookies properly splits multiple cookies even with commas in expires', () {
+    test(
+        'splitSetCookies properly splits multiple cookies even with commas in expires',
+        () {
       const header =
           'PREF=tz=UTC; Expires=Fri, 01 Jan 2038 00:00:00 GMT; Path=/, '
           'VISITOR_INFO1_LIVE=xyz; Max-Age=31536000; Path=/; Domain=.youtube.com';
@@ -40,10 +44,11 @@ void main() {
       expect(merged, contains('SSID=new_ssid'));
     });
 
-    test('mergeSetCookieInto deletes expired cookies via Max-Age=0 or past Expires', () {
+    test(
+        'mergeSetCookieInto deletes expired cookies via Max-Age=0 or past Expires',
+        () {
       const jar = 'SID=my_sid; TO_DELETE=val; EXPIRED_DATE=val2';
-      const setCookie =
-          'TO_DELETE=deleted; Max-Age=0; Path=/, '
+      const setCookie = 'TO_DELETE=deleted; Max-Age=0; Path=/, '
           'EXPIRED_DATE=deleted; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Path=/';
       final merged = YtmCookieCodec.mergeSetCookieInto(jar, setCookie);
       expect(merged, contains('SID=my_sid'));
@@ -51,14 +56,17 @@ void main() {
       expect(merged, isNot(contains('EXPIRED_DATE')));
     });
 
-    test('looksLikeSignedInCookies detects valid Google session combinations', () {
+    test('looksLikeSignedInCookies detects valid Google session combinations',
+        () {
       // Must have at least one SAPISID family and at least one PSID family
       expect(
-        YtmCookieCodec.looksLikeSignedInCookies('SAPISID=123; __Secure-3PSID=456'),
+        YtmCookieCodec.looksLikeSignedInCookies(
+            'SAPISID=123; __Secure-3PSID=456'),
         isTrue,
       );
       expect(
-        YtmCookieCodec.looksLikeSignedInCookies('__Secure-1PAPISID=123; __Secure-1PSID=456'),
+        YtmCookieCodec.looksLikeSignedInCookies(
+            '__Secure-1PAPISID=123; __Secure-1PSID=456'),
         isTrue,
       );
       // Missing PSID
@@ -68,7 +76,8 @@ void main() {
       );
       // Missing SAPISID
       expect(
-        YtmCookieCodec.looksLikeSignedInCookies('__Secure-3PSID=456; OTHER=123'),
+        YtmCookieCodec.looksLikeSignedInCookies(
+            '__Secure-3PSID=456; OTHER=123'),
         isFalse,
       );
       // Empty string

@@ -704,8 +704,7 @@ class _LyricsShareSheetState extends State<LyricsShareSheet> {
                             height: 18,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              color:
-                                  AppColors.textOnAccent(widget.activeColor),
+                              color: AppColors.textOnAccent(widget.activeColor),
                             ),
                           )
                         : const Icon(Icons.share_rounded, size: 20),

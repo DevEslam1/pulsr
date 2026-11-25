@@ -81,7 +81,8 @@ void main() {
     return settings;
   }
 
-  testWidgets('turning suggestions off clears the native cache', (tester) async {
+  testWidgets('turning suggestions off clears the native cache',
+      (tester) async {
     final settings = await enabledSettings();
     final sync = _RecordingSync();
 
@@ -120,7 +121,8 @@ void main() {
     expect(reported.single.error, isStateError);
   });
 
-  testWidgets('turning suggestions on pushes recent suggestions', (tester) async {
+  testWidgets('turning suggestions on pushes recent suggestions',
+      (tester) async {
     final settings = await AssistantSettings.load();
     addTearDown(settings.dispose);
     settings.setSuggestionsEnabled(false);
@@ -138,7 +140,8 @@ void main() {
     expect(sync.pushed, isTrue);
   });
 
-  testWidgets('H-45/L-02 resolves suggestionSync fallback from getIt and ellipsizes AppBar',
+  testWidgets(
+      'H-45/L-02 resolves suggestionSync fallback from getIt and ellipsizes AppBar',
       (tester) async {
     final settings = await enabledSettings();
     final sync = _RecordingSync();

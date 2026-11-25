@@ -684,9 +684,8 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
                       if (nonKeptTargets.isNotEmpty) ...[
                         const SizedBox(width: AppSpacing.xs),
                         FilledButton.icon(
-                          onPressed: _isBulkDeleting
-                              ? null
-                              : _deleteNonKeptDuplicates,
+                          onPressed:
+                              _isBulkDeleting ? null : _deleteNonKeptDuplicates,
                           icon: const Icon(
                             Icons.delete_sweep_rounded,
                             size: 18,
@@ -821,9 +820,8 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
             ? p.accent.withValues(alpha: 0.06)
             : AppColors.fadeStopTransparent,
         borderRadius: AppRadii.r12All,
-        border: isKept
-            ? Border.all(color: p.accent.withValues(alpha: 0.3))
-            : null,
+        border:
+            isKept ? Border.all(color: p.accent.withValues(alpha: 0.3)) : null,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

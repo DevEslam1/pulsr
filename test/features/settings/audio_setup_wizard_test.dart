@@ -11,6 +11,7 @@ import 'package:pulsr/features/settings/presentation/widgets/audio_setup_wizard.
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 class MockSettingsCubit extends MockCubit<SettingsState>
     implements SettingsCubit {}
 

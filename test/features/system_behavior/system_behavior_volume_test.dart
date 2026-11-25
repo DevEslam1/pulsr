@@ -8,8 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/features/system_behavior/system_behavior_policy.dart';
 import 'package:pulsr/features/system_behavior/system_behavior_settings.dart';
 
-const SystemBehaviorSettingsSnapshot _linear =
-    SystemBehaviorSettingsSnapshot(
+const SystemBehaviorSettingsSnapshot _linear = SystemBehaviorSettingsSnapshot(
   softwareVolumeCurve: SoftwareVolumeCurve.linear,
   volumeStepPercent: 5,
 );
@@ -106,7 +105,8 @@ void main() {
 
     test('the rails are exact', () {
       expect(nextVolume(current: 1, direction: 1, settings: _logarithmic), 1.0);
-      expect(nextVolume(current: 0, direction: -1, settings: _logarithmic), 0.0);
+      expect(
+          nextVolume(current: 0, direction: -1, settings: _logarithmic), 0.0);
       expect(
         nextVolume(current: 0.999, direction: 1, settings: _logarithmic),
         1.0,
@@ -123,7 +123,8 @@ void main() {
       }
     });
 
-    test('the taper keeps gain steps small at low levels and large at high ones',
+    test(
+        'the taper keeps gain steps small at low levels and large at high ones',
         () {
       const double top = 0.8;
       final double logTop =

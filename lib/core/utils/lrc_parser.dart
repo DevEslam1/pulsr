@@ -834,8 +834,7 @@ class LrcParser {
     // Cache the result (cache negative null only when online lookup ran)
     final onlineAttempted =
         lrclibService != null && trackTitle != null && trackTitle.isNotEmpty;
-    if (startGen == _cacheGeneration &&
-        (resolved != null || onlineAttempted)) {
+    if (startGen == _cacheGeneration && (resolved != null || onlineAttempted)) {
       // Proactively sweep expired negative entries so the map can't grow
       // across a long session of misses.
       if (_negativeCacheTimes.length > _maxCacheSize) {

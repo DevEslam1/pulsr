@@ -184,8 +184,8 @@ extension _EqParametricTab on _EqualizerSheetState {
                     final isSelected = state.selectedHeadphoneProfile == null &&
                         preset.name == presetItem.name;
                     return Padding(
-                      padding: const EdgeInsetsDirectional.only(
-                          end: AppSpacing.xs),
+                      padding:
+                          const EdgeInsetsDirectional.only(end: AppSpacing.xs),
                       child: ChoiceChip(
                         label: Text(presetItem.name),
                         selected: isSelected,
@@ -229,8 +229,8 @@ extension _EqParametricTab on _EqualizerSheetState {
                 onPressed: dspBlocked != null
                     ? null
                     : () => _showSaveCustomPresetDialog(cubit, state),
-                icon: Icon(Icons.bookmark_add_rounded,
-                    size: 18, color: p.accent),
+                icon:
+                    Icon(Icons.bookmark_add_rounded, size: 18, color: p.accent),
                 padding: const EdgeInsets.all(AppSpacing.xxs),
                 constraints: const BoxConstraints(
                     minWidth: AppSpacing.minTouchTarget,
@@ -241,16 +241,16 @@ extension _EqParametricTab on _EqualizerSheetState {
                 onPressed: dspBlocked != null
                     ? null
                     : () => _showSaveCustomPresetDialog(cubit, state),
-                icon: Icon(Icons.bookmark_add_rounded,
-                    size: 16, color: p.accent),
+                icon:
+                    Icon(Icons.bookmark_add_rounded, size: 16, color: p.accent),
                 label: Text(context.l10n.save,
                     style: TextStyle(
                         fontSize: AppFontSize.caption,
                         color: p.accent,
                         fontWeight: FontWeight.w700)),
                 style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.xs),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
                 ),
               ),
           ],
@@ -707,5 +707,4 @@ extension _EqParametricTab on _EqualizerSheetState {
       ),
     );
   }
-
 }

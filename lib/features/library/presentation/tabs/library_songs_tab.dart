@@ -65,7 +65,9 @@ mixin LibrarySongsTab on State<LibraryScreen> {
     if (textScale <= 1.0) return 72.0;
     final scaledTextHeight =
         (AppFontSize.body + AppFontSize.label) * textScale * 1.45;
-    return (scaledTextHeight + 28.0).ceilToDouble().clamp(72.0, double.infinity);
+    return (scaledTextHeight + 28.0)
+        .ceilToDouble()
+        .clamp(72.0, double.infinity);
   }
 
   // ================= SONGS =================
@@ -313,8 +315,7 @@ mixin LibrarySongsTab on State<LibraryScreen> {
                                             style: const TextStyle(
                                               fontSize: AppFontSize.caption,
                                               fontWeight: FontWeight.w800,
-                                              color:
-                                                  AppColors.qualityBadgeCyan,
+                                              color: AppColors.qualityBadgeCyan,
                                             ),
                                           ),
                                         ),

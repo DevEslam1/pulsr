@@ -129,8 +129,8 @@ void main() {
     test('preview() scale sets layout dimensions as well as visual size', () {
       const targetScale = 0.35;
       final preview = ThemeRegistry.preview(
-          PlayerThemeMode.waveform, dummyProps,
-          scale: targetScale) as IgnorePointer;
+              PlayerThemeMode.waveform, dummyProps, scale: targetScale)
+          as IgnorePointer;
       final bounds = preview.child! as SizedBox;
       expect(bounds.width, closeTo(360 * targetScale, 0.001));
       expect(bounds.height, closeTo(640 * targetScale, 0.001));

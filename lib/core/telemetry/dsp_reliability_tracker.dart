@@ -164,6 +164,7 @@ class DspReliabilityTracker {
     }
     return _streamController.stream;
   }
+
   bool get isInitialized => _initialized;
 
   bool _initialized = false;

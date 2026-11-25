@@ -9,7 +9,8 @@ void main() {
   final service = DuplicateFinderService();
 
   group('DuplicateFinderService Clustering & Verification', () {
-    test('remix vs original are NOT merged into the same duplicate cluster', () async {
+    test('remix vs original are NOT merged into the same duplicate cluster',
+        () async {
       final original = createTestSong(
         id: 1,
         title: 'Midnight City',
@@ -51,7 +52,9 @@ void main() {
       expect(clusterIds, isNot(contains(3)));
     });
 
-    test('tightened duration tolerance (±2s) is enforced when version tags differ', () async {
+    test(
+        'tightened duration tolerance (±2s) is enforced when version tags differ',
+        () async {
       final songA = createTestSong(
         id: 1,
         title: 'Intro Song (Radio Edit)',
@@ -63,7 +66,8 @@ void main() {
         id: 2,
         title: 'Intro Song (Extended Version)',
         artist: 'Artist',
-        durationMs: 123500, // 3.5s difference: exceeds the ±2s tolerance for differing versions
+        durationMs:
+            123500, // 3.5s difference: exceeds the ±2s tolerance for differing versions
         path: '/dummy/intro_extended.mp3',
       );
 
@@ -75,7 +79,9 @@ void main() {
       expect(duplicates, isEmpty);
     });
 
-    test('identical recordings with bracketed promotional labels cluster properly', () async {
+    test(
+        'identical recordings with bracketed promotional labels cluster properly',
+        () async {
       final songA = createTestSong(
         id: 1,
         title: 'Shape of You [Official Audio]',
@@ -100,7 +106,9 @@ void main() {
       expect(duplicates.first.songs.length, equals(2));
     });
 
-    test('partial hash collision resolved by full hash during checksum verification', () async {
+    test(
+        'partial hash collision resolved by full hash during checksum verification',
+        () async {
       final tempDir = await Directory.systemTemp.createTemp('pulsr_dup_test_');
       try {
         final fileA = File('${tempDir.path}/trackA.bin');
@@ -109,8 +117,10 @@ void main() {
         // Create two files that share identical first 64KB (partial hash match),
         // but have different trailing content (full SHA-256 mismatch).
         final header = List<int>.filled(65536, 42);
-        final contentA = List<int>.from(header)..addAll(List<int>.filled(1024, 1));
-        final contentB = List<int>.from(header)..addAll(List<int>.filled(1024, 2));
+        final contentA = List<int>.from(header)
+          ..addAll(List<int>.filled(1024, 1));
+        final contentB = List<int>.from(header)
+          ..addAll(List<int>.filled(1024, 2));
 
         await fileA.writeAsBytes(contentA);
         await fileB.writeAsBytes(contentB);

@@ -20,8 +20,8 @@ extension _ReentrantMutex on Mutex {
 
 extension PlayerDspProfilesExtension on PlayerDspController {
   Future<void> onOutputDeviceChanged(AudioOutputInfo device) async {
-    return _deviceChangeMutex
-        .protectReentrant(_deviceChangeOrProfileZoneKey, () async {
+    return _deviceChangeMutex.protectReentrant(_deviceChangeOrProfileZoneKey,
+        () async {
       if (_isClosed()) return;
       final song = _getState().currentSong;
       if (song != null) {
@@ -275,8 +275,8 @@ extension PlayerDspProfilesExtension on PlayerDspController {
 
   Future<bool> applyProfile(SettingsProfile profile,
       {bool manual = false}) async {
-    return _deviceChangeMutex
-        .protectReentrant(_deviceChangeOrProfileZoneKey, () async {
+    return _deviceChangeMutex.protectReentrant(_deviceChangeOrProfileZoneKey,
+        () async {
       // Transactional snapshot of the full pre-apply state (DSP slice + the two
       // transport settings this method touches). A failure at ANY step rolls the
       // whole profile back in a single reconciliation pass via [_rollbackProfile]
@@ -413,7 +413,10 @@ extension PlayerDspProfilesExtension on PlayerDspController {
       ),
       ('eqPreset', () => _audioHandler.applyPreset(dsp.eqPreset)),
       ('preamp', () => _audioHandler.setPreamp(dsp.preampDb)),
-      ('volumeBoost', () => _audioHandler.setVolumeBoost(dsp.effectiveVolumeBoost)),
+      (
+        'volumeBoost',
+        () => _audioHandler.setVolumeBoost(dsp.effectiveVolumeBoost)
+      ),
       ('bassBoost', () => _audioHandler.setBassBoost(dsp.effectiveBassBoost)),
       (
         'saturation',

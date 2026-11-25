@@ -105,7 +105,8 @@ void main() {
     }
 
     expect(colorOf('Second'), activeColor,
-        reason: 'the 6 s line is the one sounding at 7 s and must be highlighted');
+        reason:
+            'the 6 s line is the one sounding at 7 s and must be highlighted');
     expect(colorOf('First'), isNot(activeColor),
         reason: 'the 2 s line has already been sung and must be dimmed');
     expect(colorOf('Third'), isNot(activeColor),

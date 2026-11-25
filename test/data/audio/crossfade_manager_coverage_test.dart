@@ -119,7 +119,8 @@ void main() {
           const Duration(seconds: 8));
     });
 
-    test('effectiveTransitionDuration uses 8s Automix fallback when duration is zero',
+    test(
+        'effectiveTransitionDuration uses 8s Automix fallback when duration is zero',
         () {
       manager.duration = Duration.zero;
       manager.automixEnabled = false;
@@ -132,8 +133,7 @@ void main() {
       );
 
       final decision = CrossfadeManager.arbitrateTransition(
-        configuredCrossfade:
-            manager.effectiveTransitionDuration(trackId: 't1'),
+        configuredCrossfade: manager.effectiveTransitionDuration(trackId: 't1'),
         remainingTrackDuration: const Duration(seconds: 20),
         isSameDecoderConfig: true,
         isRepeatOne: false,
@@ -357,7 +357,8 @@ void main() {
       verify(() => playerB.setVolume(0.5)).called(1);
     });
 
-    test('cancel still stops inactive player and restores volume when native curve clear returns false',
+    test(
+        'cancel still stops inactive player and restores volume when native curve clear returns false',
         () async {
       when(() => playerA.dspSetGainCurve(any(),
           segmentMs: any(named: 'segmentMs'))).thenAnswer((_) async => true);

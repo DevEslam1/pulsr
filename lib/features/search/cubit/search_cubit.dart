@@ -786,7 +786,8 @@ class SearchCubit extends PulsrCubit<SearchState> {
     }
 
     final anchors = _fuzzyAnchorsFor(normalizedQ);
-    if (anchors.isEmpty || (anchors.length == 1 && anchors.first == normalizedQ)) {
+    if (anchors.isEmpty ||
+        (anchors.length == 1 && anchors.first == normalizedQ)) {
       return const [];
     }
     final merged = <int, SongsTableData>{};
@@ -923,9 +924,8 @@ class SearchCubit extends PulsrCubit<SearchState> {
     // move the large ones off the UI isolate. `SongsTableData` and the query
     // arguments are plain values, so the closure is sendable — capture the
     // limit locally so the closure does not reference `this`.
-    final effectiveSongs = filter == 'Lossless'
-        ? songs.where(_isExtraLossless).toList()
-        : songs;
+    final effectiveSongs =
+        filter == 'Lossless' ? songs.where(_isExtraLossless).toList() : songs;
     final effectiveFilter = filter == 'Lossless' ? 'All' : filter;
     final limit = _resultLimit;
     if (effectiveSongs.length < 250) {

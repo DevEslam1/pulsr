@@ -11,6 +11,7 @@ import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/cached_artwork.dart';
 
 import '../../../../core/utils/pulsr_haptics.dart';
+
 /// One AI/heuristic playlist suggestion shown in the horizontal rail.
 ///
 /// Extracted from `playlists_screen.dart` to keep that screen under the

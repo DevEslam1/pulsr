@@ -95,7 +95,7 @@ class QuranModeService {
   }
 
   Future<void> setStyleTuning(
-      QuranReciterStyle style, QuranStyleTuning tuning) =>
+          QuranReciterStyle style, QuranStyleTuning tuning) =>
       _tuningMutex.protect(() async {
         final prefs = await SharedPreferences.getInstance();
         final raw = prefs.getString(_keyStyleTunings);
@@ -103,7 +103,8 @@ class QuranModeService {
         if (raw != null && raw.isNotEmpty) {
           try {
             final decoded = jsonDecode(raw);
-            if (decoded is Map) values.addAll(Map<String, dynamic>.from(decoded));
+            if (decoded is Map)
+              values.addAll(Map<String, dynamic>.from(decoded));
           } on FormatException {
             // Corrupt optional tuning must not block Quran Mode.
           }

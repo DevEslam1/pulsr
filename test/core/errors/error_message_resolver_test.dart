@@ -7,6 +7,7 @@ import 'package:pulsr/core/errors/error_message_resolver.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 void main() {
   testWidgets('resolveUiErrorMessage maps known errors', (tester) async {
     final results = <String, String>{};

@@ -19,12 +19,15 @@ void main() {
         .thenAnswer((_) => Stream.value(const Right(<PlaylistsTableData>[])));
   });
 
-  test('0.10 _checkSeeding failure leaves seeded flag false and retries next launch', () async {
+  test(
+      '0.10 _checkSeeding failure leaves seeded flag false and retries next launch',
+      () async {
     final prefs = await SharedPreferences.getInstance();
 
     // 1. First launch: seedDefaultSmartPlaylists fails / throws
     var attemptCount = 0;
-    when(() => mockPlaylistUseCases.seedDefaultSmartPlaylists()).thenAnswer((_) async {
+    when(() => mockPlaylistUseCases.seedDefaultSmartPlaylists())
+        .thenAnswer((_) async {
       attemptCount++;
       throw Exception('Database locked / seeding failure');
     });
@@ -38,7 +41,8 @@ void main() {
     await cubit1.close();
 
     // 2. Next launch: retry seeding, this time it succeeds
-    when(() => mockPlaylistUseCases.seedDefaultSmartPlaylists()).thenAnswer((_) async {
+    when(() => mockPlaylistUseCases.seedDefaultSmartPlaylists())
+        .thenAnswer((_) async {
       attemptCount++;
     });
 

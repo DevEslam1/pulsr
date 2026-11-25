@@ -14,6 +14,7 @@ import 'package:pulsr/l10n/generated/app_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 class MockPlayerCubit extends Mock implements PlayerCubit {}
 
 Widget _buildTestApp(
@@ -187,7 +188,6 @@ void main() {
     expect(find.text('Import .m3u'), findsNothing);
   });
 
-
   testWidgets(
       'long-pressing a radio card opens station actions sheet with sorting options',
       (tester) async {
@@ -339,18 +339,21 @@ void main() {
         .toList();
 
     var names = listNames();
-    expect(names.indexOf('Older Station'), lessThan(names.indexOf('Newer Station')));
+    expect(names.indexOf('Older Station'),
+        lessThan(names.indexOf('Newer Station')));
     expect(names.last, 'Never Played Station');
 
     await RadioStationStore.setRadioSort(sortBy: 'recent', ascending: false);
     await tester.pumpAndSettle();
 
     names = listNames();
-    expect(names.indexOf('Newer Station'), lessThan(names.indexOf('Older Station')));
+    expect(names.indexOf('Newer Station'),
+        lessThan(names.indexOf('Older Station')));
     expect(names.last, 'Never Played Station');
   });
 
-  testWidgets('editing a curated station preserves its id and rejects empty name',
+  testWidgets(
+      'editing a curated station preserves its id and rejects empty name',
       (tester) async {
     final curated = RadioStation(
       id: 'cur-quran-cairo',
@@ -385,12 +388,10 @@ void main() {
     await tester.tap(find.widgetWithText(FilledButton, 'Save'));
     await tester.pumpAndSettle();
 
-    final saved = RadioStationStore()
-        .list
-        .firstWhere((s) => s.id == 'cur-quran-cairo');
+    final saved =
+        RadioStationStore().list.firstWhere((s) => s.id == 'cur-quran-cairo');
     expect(saved.id, 'cur-quran-cairo');
     expect(saved.name, 'Cairo Quran Updated');
     expect(saved.lastPlayed, 123456);
   });
 }
-

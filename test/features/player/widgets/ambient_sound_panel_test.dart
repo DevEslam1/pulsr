@@ -11,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../support/fake_audio_player.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 Widget _wrap(Widget child) {
   return MaterialApp(
     localizationsDelegates: appLocalizationsDelegates,

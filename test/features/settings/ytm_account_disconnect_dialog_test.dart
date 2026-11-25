@@ -12,6 +12,7 @@ import 'package:pulsr/features/settings/presentation/widgets/ytm_account_disconn
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 class MockYtmAccountService extends Mock implements YtmAccountService {}
 
 void main() {

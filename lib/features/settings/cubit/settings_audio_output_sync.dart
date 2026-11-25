@@ -86,8 +86,7 @@ extension SettingsAudioOutputSync on SettingsAudioActions {
       // Bit-Perfect toggle plays at 100% while the device is lower.
       if (handler != null) {
         handler.seedVolumeOnNextRebuild = seedVolumeAfterRebuild;
-        handler.expectedUsbRouteForVolumeSeed =
-            expectedUsbRouteAfterRebuild;
+        handler.expectedUsbRouteForVolumeSeed = expectedUsbRouteAfterRebuild;
         try {
           // Future.sync also covers a test double whose unstubbed method
           // returns null instead of a Future; a volume re-apply must never

@@ -5,6 +5,7 @@ import 'package:pulsr/core/widgets/pulsr_slider.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 /// The DSP surface must announce real units: an EQ gain of +6 dB was previously
 /// announced as "50 %" because every slider hard-coded a percentage.
 void main() {

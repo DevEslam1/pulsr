@@ -247,14 +247,15 @@ void main() {
       when(() => ytm.isWifiConnected()).thenAnswer((_) async => true);
       when(() => ytm.isBotCoolingDown).thenReturn(false);
       when(() => ytm.resolveStream(
-            any(),
-            quality: any(named: 'quality'),
-            forceRefresh: any(named: 'forceRefresh'),
-            preferM4a: any(named: 'preferM4a'),
-            title: any(named: 'title'),
-            artist: any(named: 'artist'),
-          )).thenAnswer((inv) async =>
-          _stream(videoId: inv.positionalArguments.first as String));
+                any(),
+                quality: any(named: 'quality'),
+                forceRefresh: any(named: 'forceRefresh'),
+                preferM4a: any(named: 'preferM4a'),
+                title: any(named: 'title'),
+                artist: any(named: 'artist'),
+              ))
+          .thenAnswer((inv) async =>
+              _stream(videoId: inv.positionalArguments.first as String));
       final repo = _MockMusicRepo();
       when(() => repo.reconcileDownloadedSong(
             oldId: any(named: 'oldId'),
@@ -262,8 +263,7 @@ void main() {
             fallbackSong: any(named: 'fallbackSong'),
           )).thenAnswer((_) async => const Right<AppFailure, int?>(1));
 
-      final service =
-          YtDownloadService(client, ytm, _MockMediaScanner(), repo);
+      final service = YtDownloadService(client, ytm, _MockMediaScanner(), repo);
       addTearDown(service.dispose);
       service.setMaxConcurrentDownloads(1);
 
@@ -286,7 +286,8 @@ void main() {
       final second = service.download(
         _song(videoId: 'vidQueue002'),
         onProgress: (prog) {
-          if (prog.stage == YtDownloadStage.queued && !secondQueued.isCompleted) {
+          if (prog.stage == YtDownloadStage.queued &&
+              !secondQueued.isCompleted) {
             secondQueued.complete();
           }
         },
@@ -434,8 +435,7 @@ void main() {
             fallbackSong: any(named: 'fallbackSong'),
           )).thenAnswer((_) async => const Right<AppFailure, int?>(9));
 
-      final service =
-          YtDownloadService(client, ytm, _MockMediaScanner(), repo);
+      final service = YtDownloadService(client, ytm, _MockMediaScanner(), repo);
       addTearDown(service.dispose);
       final res = await service.download(_song());
       expect(res.isRight(), isTrue);

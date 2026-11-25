@@ -423,9 +423,8 @@ extension _TabletPlayerBarSections on _TabletPlayerBarState {
                     ),
                   ],
                   border: Border.all(
-                    color: p.isDark
-                        ? AppColors.specularAt(0.30)
-                        : p.borderSubtle,
+                    color:
+                        p.isDark ? AppColors.specularAt(0.30) : p.borderSubtle,
                     width: 1.2,
                   ),
                 ),
@@ -591,8 +590,7 @@ extension _TabletPlayerBarSections on _TabletPlayerBarState {
                       builder: (context, dragVolume, _) {
                         final effectiveVolume =
                             (dragVolume ?? cubitVolume).clamp(0.0, 1.0);
-                        final isMuted =
-                            cubit.isMuted || effectiveVolume <= 0.0;
+                        final isMuted = cubit.isMuted || effectiveVolume <= 0.0;
                         return Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [

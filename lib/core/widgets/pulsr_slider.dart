@@ -2,13 +2,15 @@
 import 'dart:math';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
-import '../../features/settings/cubit/settings_state.dart' show PlayerSliderStyle;
+import '../../features/settings/cubit/settings_state.dart'
+    show PlayerSliderStyle;
 import '../constants/app_colors.dart';
 import '../constants/app_radii.dart';
 import '../motion/pulsr_motion.dart';
 import '../theme/aura_theme.dart';
 
 import '../utils/pulsr_haptics.dart';
+
 /// {@category DesignSystem}
 /// A premium, interactive custom-painted slider with an organic wavy track.
 class PulsrSlider extends StatefulWidget {

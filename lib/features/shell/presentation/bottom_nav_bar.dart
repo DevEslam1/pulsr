@@ -165,9 +165,8 @@ class _PulsrBottomNavBarState extends State<PulsrBottomNavBar> {
                     // dock could never catch up (constant ~120ms lag) and the
                     // backdrop filter re-rasterised on every frame. Once the
                     // drag ends the reset animates normally.
-                    duration: isDraggingDock
-                        ? Duration.zero
-                        : context.motionMs(120),
+                    duration:
+                        isDraggingDock ? Duration.zero : context.motionMs(120),
                     curve: context.motionCurve(Curves.easeOutCubic),
                     transform: Matrix4.translationValues(0, visualDy, 0),
                     height: barHeight,
@@ -241,9 +240,8 @@ class _PulsrBottomNavBarState extends State<PulsrBottomNavBar> {
                                     : (isHighContrast
                                         ? p.borderStrong
                                         : p.hairline),
-                                width: isHighContrast
-                                    ? 1.5
-                                    : AppStrokes.hairline,
+                                width:
+                                    isHighContrast ? 1.5 : AppStrokes.hairline,
                               ),
                             ),
                             child: Stack(
@@ -305,9 +303,8 @@ class _PulsrBottomNavBarState extends State<PulsrBottomNavBar> {
                                           child: _NavTabItem(
                                             item: item,
                                             index: item.index,
-                                            isSelected:
-                                                widget.currentIndex ==
-                                                    item.index,
+                                            isSelected: widget.currentIndex ==
+                                                item.index,
                                             p: p,
                                             isTablet: isTablet,
                                             iconOnly: widget.iconOnly,

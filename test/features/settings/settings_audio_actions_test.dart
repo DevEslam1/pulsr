@@ -49,8 +49,8 @@ void main() {
     /// answers `null`, i.e. refused).
     void acceptBitPerfect() {
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(
-              const MethodChannel(PulsrChannels.hiresDac), (call) async {
+          .setMockMethodCallHandler(const MethodChannel(PulsrChannels.hiresDac),
+              (call) async {
         if (call.method == 'setBitPerfectModeDetailed') {
           return <String, dynamic>{'success': true};
         }

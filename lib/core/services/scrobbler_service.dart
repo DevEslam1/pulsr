@@ -1098,7 +1098,8 @@ class ScrobblerService {
             final latestDecoded = jsonDecode(latestRaw);
             if (latestDecoded is List) {
               final tailCount = delta.clamp(0, latestDecoded.length);
-              final tail = latestDecoded.sublist(latestDecoded.length - tailCount);
+              final tail =
+                  latestDecoded.sublist(latestDecoded.length - tailCount);
               for (final item in tail) {
                 if (item is Map<String, dynamic>) {
                   merged.add(item);
@@ -1109,9 +1110,8 @@ class ScrobblerService {
             }
           }
         }
-        final trimmed = merged.length > 200
-            ? merged.sublist(merged.length - 200)
-            : merged;
+        final trimmed =
+            merged.length > 200 ? merged.sublist(merged.length - 200) : merged;
         if (trimmed.isEmpty) {
           await prefs.remove(_keyOfflineQueue);
         } else {

@@ -34,8 +34,7 @@ class HomeCategoryState {
           error == other.error;
 
   @override
-  int get hashCode =>
-      Object.hash(status, Object.hashAll(tracks), error);
+  int get hashCode => Object.hash(status, Object.hashAll(tracks), error);
 }
 
 /// Minimal state: [loginEpoch] bumps whenever the account login state flips so
@@ -394,7 +393,8 @@ class HomeCubit extends PulsrCubit<HomeState> {
     _categoryFetchTimestamps.remove(category);
     if (!isClosed) {
       final next = Map<String, HomeCategoryState>.of(state.categories);
-      next[category] = const HomeCategoryState(status: HomeCategoryStatus.loading);
+      next[category] =
+          const HomeCategoryState(status: HomeCategoryStatus.loading);
       safeEmit(state.copyWith(
         refreshEpoch: state.refreshEpoch + 1,
         categories: Map.unmodifiable(next),

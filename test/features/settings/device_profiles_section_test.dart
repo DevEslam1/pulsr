@@ -24,6 +24,7 @@ import '../../support/fake_hi_res_audio_service.dart';
 import 'support/settings_section_harness.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   final l10n = lookupAppLocalizations(const Locale('en'));

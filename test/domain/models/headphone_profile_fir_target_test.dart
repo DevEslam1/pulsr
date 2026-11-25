@@ -69,8 +69,8 @@ void main() {
       sampleRate: 48000.0,
       preampDb: preamp,
     ));
-    expect(parsed.gains.reduce((a, b) => a > b ? a : b),
-        lessThanOrEqualTo(0.011));
+    expect(
+        parsed.gains.reduce((a, b) => a > b ? a : b), lessThanOrEqualTo(0.011));
     expect(parsed.gains.reduce((a, b) => a < b ? a : b),
         greaterThanOrEqualTo(-30.0));
   });
@@ -105,7 +105,9 @@ void main() {
   });
 
   group('HeadphoneProfile mathematical edge-case guards', () {
-    test('toGraphicEqString guards gains.isEmpty, gains.length == 1, numPoints <= 1 and non-finite gains', () {
+    test(
+        'toGraphicEqString guards gains.isEmpty, gains.length == 1, numPoints <= 1 and non-finite gains',
+        () {
       const emptyProfile = HeadphoneProfile(
         id: 'empty',
         name: 'Empty',
@@ -157,7 +159,9 @@ void main() {
       expect(numPoints0, 'GraphicEq: 20.0 0.00; 20000.0 0.00');
     });
 
-    test('computeFirPreamp guards gains.isEmpty, gains.length == 1, points <= 1 and non-finite gains', () {
+    test(
+        'computeFirPreamp guards gains.isEmpty, gains.length == 1, points <= 1 and non-finite gains',
+        () {
       const emptyProfile = HeadphoneProfile(
         id: 'empty',
         name: 'Empty',

@@ -37,9 +37,7 @@ class QuickTile extends StatelessWidget {
     final isCalm = p.isCalmDensity || isHighContrast;
     final washStart = Color.alphaBlend(
       color.withValues(
-        alpha: p.isDark
-            ? (isCalm ? 0.08 : 0.14)
-            : (isCalm ? 0.05 : 0.09),
+        alpha: p.isDark ? (isCalm ? 0.08 : 0.14) : (isCalm ? 0.05 : 0.09),
       ),
       p.surfaceContainer,
     );

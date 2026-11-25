@@ -229,7 +229,9 @@ void main() {
     await cubit.close();
   });
 
-  test('playCondition handles switch failure without unhandled exception and rolls back active condition', () async {
+  test(
+      'playCondition handles switch failure without unhandled exception and rolls back active condition',
+      () async {
     var shouldThrow = false;
     final cubit = AbxCubit(
       switchCondition: (bypass) async {

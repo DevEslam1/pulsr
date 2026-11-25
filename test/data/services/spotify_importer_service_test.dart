@@ -290,7 +290,8 @@ void main() {
         duration: Duration(seconds: 300),
       );
 
-      when(() => mockYtmService.search('Hello Adele', limit: any(named: 'limit')))
+      when(() =>
+              mockYtmService.search('Hello Adele', limit: any(named: 'limit')))
           .thenAnswer((_) async => [lionel, adele]);
 
       final resolved = await service.resolveTracks([
@@ -301,8 +302,8 @@ void main() {
       expect(resolved.resolved.first.videoId, 'v_adele');
       expect(resolved.unmatched.length, 0);
 
-      when(() => mockYtmService.search('Hello SomeoneElse', limit: any(named: 'limit')))
-          .thenAnswer((_) async => [lionel]);
+      when(() => mockYtmService.search('Hello SomeoneElse',
+          limit: any(named: 'limit'))).thenAnswer((_) async => [lionel]);
 
       final unmatched = await service.resolveTracks([
         const SpotifyImportTrack(title: 'Hello', artist: 'SomeoneElse'),
@@ -312,7 +313,8 @@ void main() {
       expect(unmatched.unmatched.length, 1);
     });
 
-    test('resolveTracks stops and marks remaining as unmatched on cancellation', () async {
+    test('resolveTracks stops and marks remaining as unmatched on cancellation',
+        () async {
       final mockYtmService = MockYtmService();
       final service = SpotifyImporterService(ytmService: mockYtmService);
 

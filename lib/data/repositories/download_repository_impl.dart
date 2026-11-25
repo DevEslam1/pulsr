@@ -386,7 +386,8 @@ class DownloadRepositoryImpl implements IDownloadRepository {
       return const Left(DownloadFailure('Task not found'));
     }
     // Prevent spawning a duplicate writer while pause cancellation is in flight.
-    if (_pausingVideoIds.contains(videoId) || _activeVideoIds.contains(videoId)) {
+    if (_pausingVideoIds.contains(videoId) ||
+        _activeVideoIds.contains(videoId)) {
       return const Right(unit);
     }
     // Resume is only meaningful for a paused task. A duplicate tap, a stale
@@ -681,9 +682,8 @@ class DownloadRepositoryImpl implements IDownloadRepository {
             error: e, stackTrace: st, category: 'Download');
       }
 
-      final total = (realTotalBytes != null && realTotalBytes > 0)
-          ? realTotalBytes
-          : 0;
+      final total =
+          (realTotalBytes != null && realTotalBytes > 0) ? realTotalBytes : 0;
       final stats = StorageStats(
         usedBytes: totalUsedBytes,
         freeBytes: freeBytes,
@@ -759,10 +759,10 @@ class DownloadRepositoryImpl implements IDownloadRepository {
       // chunks (no main-thread existsSync/lengthSync blocking).
       await _reconcileCompletedFiles();
       await _reconcileInterruptedSaves(interruptedSaves);
-      _pausedVideoIds.removeWhere(
-          (id) => _tasks[id]?.status != DownloadStatus.paused);
-      _autoPausedVideoIds.removeWhere(
-          (id) => _tasks[id]?.status != DownloadStatus.paused);
+      _pausedVideoIds
+          .removeWhere((id) => _tasks[id]?.status != DownloadStatus.paused);
+      _autoPausedVideoIds
+          .removeWhere((id) => _tasks[id]?.status != DownloadStatus.paused);
       if (bootMutated) {
         _schedulePersist(immediateOnTerminal: true);
       }

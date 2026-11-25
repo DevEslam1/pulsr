@@ -71,8 +71,8 @@ void main() {
     await tester.pumpWidget(buildPanel(const Locale('es')));
     await tester.pump(const Duration(milliseconds: 50));
     expect(find.text('Consumo de energía DSP'), findsOneWidget);
-    expect(
-        find.text('Todas las etapas DSP inactivas (~0.0 mAh/h).'), findsOneWidget);
+    expect(find.text('Todas las etapas DSP inactivas (~0.0 mAh/h).'),
+        findsOneWidget);
     expect(find.text('Graves'), findsOneWidget);
   });
 }

@@ -113,7 +113,8 @@ void main() {
       expect(results.map((s) => s.id), [9]);
     });
 
-    test('surfaces exact-title match positioned after limit within ranking window',
+    test(
+        'surfaces exact-title match positioned after limit within ranking window',
         () {
       final pool = [
         for (var i = 0; i < 6; i++)

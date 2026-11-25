@@ -52,6 +52,7 @@ class YtmCookieCodec {
     }
     return ordered.entries.map((e) => '${e.key}=${e.value}').join('; ');
   }
+
   /// Drops from [raw] the cookies a browser would never send to a YouTube host.
   static String scopeCookiesForYouTube(String raw) {
     final kept = <String>[];
@@ -94,6 +95,7 @@ class YtmCookieCodec {
     }
     return results.where((s) => s.isNotEmpty).toList();
   }
+
   /// Pure cookie-jar merge: applies a raw Set-Cookie header (possibly several
   /// comma-merged cookies) on top of a `k=v; k2=v2` jar. Static so it can be
   /// unit-tested without DI/network.
@@ -154,6 +156,7 @@ class YtmCookieCodec {
 
     return map.entries.map((e) => '${e.key}=${e.value}').join('; ');
   }
+
   /// Exact-name session-cookie validation: requires an SAPISID-family cookie
   static bool looksLikeSignedInCookies(String rawCookies) {
     String? valueOf(String name) {

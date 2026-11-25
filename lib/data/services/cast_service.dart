@@ -95,8 +95,10 @@ class CastSessionStatus {
 
   static const CastSessionStatus unavailable = CastSessionStatus();
 
-  Duration get position => Duration(milliseconds: positionMs < 0 ? 0 : positionMs);
-  Duration get duration => Duration(milliseconds: durationMs < 0 ? 0 : durationMs);
+  Duration get position =>
+      Duration(milliseconds: positionMs < 0 ? 0 : positionMs);
+  Duration get duration =>
+      Duration(milliseconds: durationMs < 0 ? 0 : durationMs);
 
   factory CastSessionStatus.fromMap(Map<dynamic, dynamic> map) =>
       CastSessionStatus(
@@ -281,9 +283,8 @@ class CastService {
   Future<bool> connect(String routeId) async {
     if (!_isAndroid || routeId.trim().isEmpty) return false;
     try {
-      return await _sessionChannel
-              .invokeMethod<bool>('connect', {'routeId': routeId})
-              .timeout(const Duration(seconds: 8)) ??
+      return await _sessionChannel.invokeMethod<bool>('connect',
+              {'routeId': routeId}).timeout(const Duration(seconds: 8)) ??
           false;
     } catch (e, st) {
       ErrorLogger.log('Cast connect failed',
@@ -438,8 +439,7 @@ class CastService {
   }
 
   Future<bool> setPlaybackState(String action, {int? positionMs}) async {
-    final result =
-        await setPlaybackStateResult(action, positionMs: positionMs);
+    final result = await setPlaybackStateResult(action, positionMs: positionMs);
     return result.success;
   }
 

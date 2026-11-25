@@ -467,9 +467,8 @@ class _ThemePickerSheetContentState extends State<_ThemePickerSheetContent> {
                                     : cardColor,
                                 borderRadius: AppRadii.r16All,
                                 border: Border.all(
-                                  color: isSelected
-                                      ? primaryColor
-                                      : outlineColor,
+                                  color:
+                                      isSelected ? primaryColor : outlineColor,
                                   width: isSelected ? 2 : 1,
                                 ),
                               ),

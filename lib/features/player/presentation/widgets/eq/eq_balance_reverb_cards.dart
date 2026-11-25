@@ -1,4 +1,4 @@
-﻿part of '../equalizer_sheet.dart';
+part of '../equalizer_sheet.dart';
 
 /// Stereo Balance/Mono and Convolution Reverb cards for Pro Rack Tab 2.
 extension _EqBalanceReverbCards on _EqualizerSheetState {
@@ -62,8 +62,7 @@ extension _EqBalanceReverbCards on _EqualizerSheetState {
                                     conflictReason: dspBlocked ??
                                         (_nativePcmEffectsAvailable
                                             ? null
-                                            : context
-                                                .l10n.dspRequiresPcmPath)),
+                                            : context.l10n.dspRequiresPcmPath)),
                               ),
                             ],
                           ),
@@ -94,7 +93,8 @@ extension _EqBalanceReverbCards on _EqualizerSheetState {
                     value: available && state.monoMix,
                     activeTrackColor: p.accent,
                     activeThumbColor: p.onAccent,
-                    onChanged: !available ? null : (val) => cubit.setMonoMix(val),
+                    onChanged:
+                        !available ? null : (val) => cubit.setMonoMix(val),
                   ),
                 ],
               ),

@@ -4,6 +4,7 @@ import '../theme/aura_theme.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 
 import '../utils/pulsr_haptics.dart';
+
 /// {@category DesignSystem}
 /// A unified back button widget that safely navigates to the previous route,
 /// falling back to the Home page ('/') if no routes can be popped.

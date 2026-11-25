@@ -143,8 +143,7 @@ extension EqualizerRestoreOps on EqualizerManager {
       comparisonSlots[ComparisonSlot.slotA] = currentPreset;
       preampDb = DspParamRanges.preampDb
           .clamp(prefs.getDouble(PrefsKeys.eqPreamp) ?? 0.0);
-      autoPreampEnabled =
-          prefs.getBool(PrefsKeys.eqAutoPreampEnabled) ?? false;
+      autoPreampEnabled = prefs.getBool(PrefsKeys.eqAutoPreampEnabled) ?? false;
 
       isVirtualizerEnabled =
           prefs.getBool(PrefsKeys.eqVirtualizerEnabled) ?? false;
@@ -290,8 +289,7 @@ extension EqualizerRestoreOps on EqualizerManager {
       isChannelManagerEnabled =
           prefs.getBool(PrefsKeys.channelManagerEnabled) ?? false;
       channelManagerChannelCount =
-          (prefs.getInt(PrefsKeys.channelManagerChannelCount) ?? 2)
-              .clamp(2, 8);
+          (prefs.getInt(PrefsKeys.channelManagerChannelCount) ?? 2).clamp(2, 8);
       List<double> normalizeEight(List<dynamic> raw) {
         final out = List<double>.filled(8, 0.0);
         final n = raw.length < 8 ? raw.length : 8;
@@ -694,7 +692,8 @@ extension EqualizerRestoreOps on EqualizerManager {
           await _effectsChannel.setMultibandCompressorEnabled(true);
         }());
       } else {
-        pendingFutures.add(_effectsChannel.setMultibandCompressorEnabled(false));
+        pendingFutures
+            .add(_effectsChannel.setMultibandCompressorEnabled(false));
       }
 
       pendingFutures.add(

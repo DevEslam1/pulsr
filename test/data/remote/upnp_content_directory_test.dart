@@ -514,15 +514,23 @@ void main() {
       );
     });
 
-    test('rejects loopback and link-local even when trustRequestHost is true', () async {
-      final fake = _FakeHttpClient((_) async => _xmlResponse(_browseResponse(didl: _libraryDidl)));
-      final trusted = UpnpContentDirectory(client: fake, trustRequestHost: true);
+    test('rejects loopback and link-local even when trustRequestHost is true',
+        () async {
+      final fake = _FakeHttpClient(
+          (_) async => _xmlResponse(_browseResponse(didl: _libraryDidl)));
+      final trusted =
+          UpnpContentDirectory(client: fake, trustRequestHost: true);
 
-      for (final badHost in ['127.0.0.1', 'localhost', '169.254.169.254', '[::1]']) {
+      for (final badHost in [
+        '127.0.0.1',
+        'localhost',
+        '169.254.169.254',
+        '[::1]'
+      ]) {
         await expectLater(
           trusted.browse(controlUrl: Uri.parse('http://$badHost:8200/control')),
-          throwsA(isA<UpnpBrowseError>().having(
-              (error) => error.code, 'code', 'UPNP_CONTROL_URL_PRIVATENETWORK')),
+          throwsA(isA<UpnpBrowseError>().having((error) => error.code, 'code',
+              'UPNP_CONTROL_URL_PRIVATENETWORK')),
           reason: 'Failed for $badHost',
         );
       }
@@ -539,7 +547,8 @@ void main() {
       final directory = UpnpContentDirectory(client: fake);
 
       await expectLater(
-        directory.browse(controlUrl: Uri.parse('http://192.168.1.50:8200/control')),
+        directory.browse(
+            controlUrl: Uri.parse('http://192.168.1.50:8200/control')),
         throwsA(isA<UpnpBrowseError>()),
       );
 

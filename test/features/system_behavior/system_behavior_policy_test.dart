@@ -135,8 +135,7 @@ void main() {
     test('every event under every combination is total, pure and stable', () {
       final List<SystemBehaviorSettingsSnapshot> combinations =
           <SystemBehaviorSettingsSnapshot>[];
-      for (final UsbReleaseOnFocusLoss usb
-          in UsbReleaseOnFocusLoss.values) {
+      for (final UsbReleaseOnFocusLoss usb in UsbReleaseOnFocusLoss.values) {
         for (final bool pauseOnNotificationSound in <bool>[true, false]) {
           for (final bool stopWhenTaskRemoved in <bool>[true, false]) {
             for (final bool volumeRockerTrackSwitch in <bool>[true, false]) {
@@ -201,8 +200,7 @@ void main() {
             case SystemEvent.audioFocusLossPermanent:
               expect(
                 action,
-                settings.usbReleaseOnFocusLoss !=
-                        UsbReleaseOnFocusLoss.never
+                settings.usbReleaseOnFocusLoss != UsbReleaseOnFocusLoss.never
                     ? SystemAction.pauseAndReleaseUsb
                     : (settings.fadeOutOnPauseMs > 0
                         ? SystemAction.fadeOutPause
@@ -277,8 +275,8 @@ void main() {
       final SystemBehaviorSettingsSnapshot negative =
           SystemBehaviorSettingsSnapshot.normalized(fadeOutOnPauseMs: -50);
       expect(negative.fadeOutOnPauseMs, 0);
-      expect(fadeDurationFor(SystemAction.fadeOutPause, negative),
-          Duration.zero);
+      expect(
+          fadeDurationFor(SystemAction.fadeOutPause, negative), Duration.zero);
     });
   });
 }

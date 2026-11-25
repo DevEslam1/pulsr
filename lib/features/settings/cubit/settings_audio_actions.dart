@@ -175,7 +175,8 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
       // streamable USB DAC to proceed.
       final routeIsBt = state.currentOutputDevice?.isBluetooth == true;
       final routeIsUsb = state.currentOutputDevice?.isUsbDac == true;
-      if (routeIsBt || (!routeIsUsb && (!status.attached || !status.streamingSupported))) {
+      if (routeIsBt ||
+          (!routeIsUsb && (!status.attached || !status.streamingSupported))) {
         _lastDirectUsbFailure = 'The current output is not a USB DAC.';
         return false;
       }
@@ -233,8 +234,10 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
         _lastDirectUsbFailure = sourceBlock;
         return false;
       }
-      final isKnownMp3 = AudioConflicts.isMp3(path: song?.path, codec: song?.codec);
-      final effectiveSourceDepth = (sourceDepth <= 0 && isKnownMp3) ? 16 : sourceDepth;
+      final isKnownMp3 =
+          AudioConflicts.isMp3(path: song?.path, codec: song?.codec);
+      final effectiveSourceDepth =
+          (sourceDepth <= 0 && isKnownMp3) ? 16 : sourceDepth;
       final dacSupportedDepths = status.advertisedFormats
           .map((f) =>
               (f['bitResolution'] as num?)?.toInt() ??
@@ -272,7 +275,8 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
           dacSupportedDepths.contains(24)) {
         trackDepth = 24;
       }
-      if (dacSupportedDepths.isNotEmpty && !dacSupportedDepths.contains(trackDepth)) {
+      if (dacSupportedDepths.isNotEmpty &&
+          !dacSupportedDepths.contains(trackDepth)) {
         if (trackDepth > 24 && dacSupportedDepths.contains(24)) {
           trackDepth = 24;
         } else if (dacSupportedDepths.contains(16)) {
@@ -280,7 +284,8 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
         }
       }
       final codecState = song != null
-          ? AudioConflicts.classifySourceCodec(path: song.path, codec: song.codec)
+          ? AudioConflicts.classifySourceCodec(
+              path: song.path, codec: song.codec)
           : AudioSourceCodecState.unknown;
       if (song != null &&
           (trackRate == null ||
@@ -309,8 +314,8 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
           effectiveProducerChannels = 2;
         }
       }
-      final effectiveChannels =
-          channels ?? (effectiveProducerChannels > 0 ? effectiveProducerChannels : 2);
+      final effectiveChannels = channels ??
+          (effectiveProducerChannels > 0 ? effectiveProducerChannels : 2);
       // Retain ownership even after a failed start until teardown is confirmed.
       _bitPerfectViaDirectStream = true;
       final res = await usb.startStreaming(
@@ -586,8 +591,8 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
           effectiveProducerChannels = 2;
         }
       }
-      final int effectiveChannels =
-          channels ?? (effectiveProducerChannels > 0 ? effectiveProducerChannels : 2);
+      final int effectiveChannels = channels ??
+          (effectiveProducerChannels > 0 ? effectiveProducerChannels : 2);
       final dacSupportedDepths = status.advertisedFormats
           .map((f) =>
               (f['bitResolution'] as num?)?.toInt() ??
@@ -605,8 +610,10 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
                   ?.maxBitDepth ??
               state.currentOutputDevice?.bitDepth ??
               0);
-      final isKnownMp3 = AudioConflicts.isMp3(path: song?.path, codec: song?.codec);
-      final effectiveSourceDepth = (sourceDepth <= 0 && isKnownMp3) ? 16 : sourceDepth;
+      final isKnownMp3 =
+          AudioConflicts.isMp3(path: song?.path, codec: song?.codec);
+      final effectiveSourceDepth =
+          (sourceDepth <= 0 && isKnownMp3) ? 16 : sourceDepth;
       var trackDepth = resolveFollowBitDepth(
         trackBitDepth: effectiveSourceDepth,
         streamingBitDepth: status.streamingBitDepth,
@@ -620,7 +627,8 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
           dacSupportedDepths.contains(24)) {
         trackDepth = 24;
       }
-      if (dacSupportedDepths.isNotEmpty && !dacSupportedDepths.contains(trackDepth)) {
+      if (dacSupportedDepths.isNotEmpty &&
+          !dacSupportedDepths.contains(trackDepth)) {
         if (trackDepth > 24 && dacSupportedDepths.contains(24)) {
           trackDepth = 24;
         } else if (dacSupportedDepths.contains(16)) {
@@ -654,8 +662,7 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
     }
     final detail = _lastDirectUsbFailure;
     final reportedDepth = sourceDepth > 0 ? sourceDepth : bitDepth;
-    final message =
-        'This output refused $sampleRate Hz / $reportedDepth-bit'
+    final message = 'This output refused $sampleRate Hz / $reportedDepth-bit'
         '${detail == null ? '' : ': $detail'}';
     if (state.strictBitPerfect) {
       // Strict promised this track unchanged; the same rule for direct and
@@ -805,9 +812,7 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
   /// same-rate, too-shallow stream is corrected.
   Future<void> _alignDirectUsbAfterEnable() async {
     await Future<void>.delayed(const Duration(milliseconds: 500));
-    if (isClosed ||
-        !state.bitPerfectOutput ||
-        !_bitPerfectViaDirectStream) {
+    if (isClosed || !state.bitPerfectOutput || !_bitPerfectViaDirectStream) {
       return;
     }
     await refreshOutputDevice();
@@ -1081,7 +1086,8 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
     }
     if (state.bitPerfectOutput) {
       try {
-        await _pushBitPerfectBypass(enabled, expectedUsbRoute: _expectedUsbRoute);
+        await _pushBitPerfectBypass(enabled,
+            expectedUsbRoute: _expectedUsbRoute);
       } catch (_) {
         safeEmit(state.copyWith(error: uiError(_bypassUpdateFailedMessage())));
         return;

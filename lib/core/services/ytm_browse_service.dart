@@ -148,7 +148,8 @@ class YtmBrowseService {
         ),
         YtmBrowseSection(
           id: YtmBrowseSection.newReleasesId,
-          title: L10nHolder.current?.ytmBrowseNewReleasesTitle ?? 'New Releases',
+          title:
+              L10nHolder.current?.ytmBrowseNewReleasesTitle ?? 'New Releases',
           subtitle: L10nHolder.current?.ytmBrowseNewReleasesSubtitle ??
               'Fresh albums & singles',
           items: newReleases,

@@ -40,7 +40,9 @@ void main() {
   });
 
   group('PositionCrashGuard', () {
-    test('timestamp comparison prefers crash guard when snapshot is newer than DB timestamp', () async {
+    test(
+        'timestamp comparison prefers crash guard when snapshot is newer than DB timestamp',
+        () async {
       await PositionCrashGuard.writeSnapshot(
         songId: 10,
         queueIndex: 0,
@@ -53,19 +55,24 @@ void main() {
       final snapshotTs = snapshot!.timestamp;
 
       // 1. Snapshot newer than older DB timestamp -> prefer crash guard
-      final preferWhenOlderDb = await PositionCrashGuard.shouldPreferCrashGuard(snapshotTs - 5000);
+      final preferWhenOlderDb =
+          await PositionCrashGuard.shouldPreferCrashGuard(snapshotTs - 5000);
       expect(preferWhenOlderDb, isTrue);
 
       // 2. DB timestamp newer than snapshot -> prefer DB (do NOT prefer crash guard)
-      final preferWhenNewerDb = await PositionCrashGuard.shouldPreferCrashGuard(snapshotTs + 5000);
+      final preferWhenNewerDb =
+          await PositionCrashGuard.shouldPreferCrashGuard(snapshotTs + 5000);
       expect(preferWhenNewerDb, isFalse);
 
       // 3. DB timestamp equal to snapshot -> prefer DB
-      final preferWhenEqualDb = await PositionCrashGuard.shouldPreferCrashGuard(snapshotTs);
+      final preferWhenEqualDb =
+          await PositionCrashGuard.shouldPreferCrashGuard(snapshotTs);
       expect(preferWhenEqualDb, isFalse);
     });
 
-    test('timestamp comparison falls back to clean shutdown timestamp when dbTimestampMs is null', () async {
+    test(
+        'timestamp comparison falls back to clean shutdown timestamp when dbTimestampMs is null',
+        () async {
       await PositionCrashGuard.writeSnapshot(
         songId: 20,
         queueIndex: 1,
@@ -79,11 +86,13 @@ void main() {
 
       // Clean shutdown timestamp older than snapshot -> prefer crash guard
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setInt(PositionCrashGuard.keyLastCleanShutdownTs, snapshotTs - 10000);
+      await prefs.setInt(
+          PositionCrashGuard.keyLastCleanShutdownTs, snapshotTs - 10000);
       expect(await PositionCrashGuard.shouldPreferCrashGuard(), isTrue);
 
       // Clean shutdown timestamp newer than snapshot -> prefer clean state
-      await prefs.setInt(PositionCrashGuard.keyLastCleanShutdownTs, snapshotTs + 10000);
+      await prefs.setInt(
+          PositionCrashGuard.keyLastCleanShutdownTs, snapshotTs + 10000);
       expect(await PositionCrashGuard.shouldPreferCrashGuard(), isFalse);
     });
 

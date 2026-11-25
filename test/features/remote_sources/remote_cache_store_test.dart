@@ -111,7 +111,8 @@ void main() {
     expect(await store.contains('src', 'huge.flac'), isFalse);
     expect(await store.currentBytes(), 0);
     expect(
-      fileNames().where((name) => name.endsWith(RemoteCacheStore.partialSuffix)),
+      fileNames()
+          .where((name) => name.endsWith(RemoteCacheStore.partialSuffix)),
       isEmpty,
     );
   });

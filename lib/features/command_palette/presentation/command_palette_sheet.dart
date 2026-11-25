@@ -356,7 +356,15 @@ class _CommandPaletteSheetState extends State<CommandPaletteSheet> {
         title: l10n.navLibrary,
         icon: Icons.library_music_rounded,
         section: CommandPaletteSection.navigation,
-        keywords: ['songs', 'tracks', 'albums', 'artists', 'folders', 'genres', 'years'],
+        keywords: [
+          'songs',
+          'tracks',
+          'albums',
+          'artists',
+          'folders',
+          'genres',
+          'years'
+        ],
         onSelect: (ctx) => ctx.go('/library'),
       ),
       CommandPaletteItem(
@@ -540,7 +548,8 @@ class _CommandPaletteSheetState extends State<CommandPaletteSheet> {
         id: 'action_favorite',
         title: l10n.shortcutFavorite,
         subtitle: l10n.shortcutFavoriteDesc,
-        icon: isFavorite ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+        icon:
+            isFavorite ? Icons.favorite_rounded : Icons.favorite_border_rounded,
         section: CommandPaletteSection.actions,
         shortcut: 'F',
         keywords: ['like', 'heart', 'favorite', 'love'],
@@ -684,7 +693,14 @@ class _CommandPaletteSheetState extends State<CommandPaletteSheet> {
         subtitle: l10n.settingsCategoryAppearanceSubtitle,
         icon: Icons.palette_rounded,
         section: CommandPaletteSection.settings,
-        keywords: ['theme', 'accent', 'visual density', 'calm', 'amoled', 'dark'],
+        keywords: [
+          'theme',
+          'accent',
+          'visual density',
+          'calm',
+          'amoled',
+          'dark'
+        ],
         onSelect: (ctx) => ctx.go('/settings?category=look'),
       ),
       CommandPaletteItem(
@@ -792,8 +808,7 @@ class _CommandPaletteSheetState extends State<CommandPaletteSheet> {
       return KeyEventResult.handled;
     } else if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
       setState(() {
-        _selectedIndex =
-            (_selectedIndex - 1 + entries.length) % entries.length;
+        _selectedIndex = (_selectedIndex - 1 + entries.length) % entries.length;
       });
       _scrollToSelected();
       return KeyEventResult.handled;
@@ -842,268 +857,262 @@ class _CommandPaletteSheetState extends State<CommandPaletteSheet> {
       child: ConstrainedBox(
         constraints: BoxConstraints(maxHeight: maxH),
         child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Search Input Header
-              Padding(
-                padding: const EdgeInsetsDirectional.fromSTEB(
-                  AppSpacing.md,
-                  AppSpacing.sm,
-                  AppSpacing.md,
-                  AppSpacing.xs,
-                ),
-                child: Semantics(
-                  textField: true,
-                  label: l10n.commandPaletteHint,
-                  child: PulsrSearchField(
-                    controller: _searchController,
-                    focusNode: _focusNode,
-                    hintText: l10n.commandPaletteHint,
-                    autofocus: true,
-                    onSubmitted: (_) {
-                      if (entries.isNotEmpty &&
-                          _selectedIndex >= 0 &&
-                          _selectedIndex < entries.length) {
-                        _handleSelect(entries[_selectedIndex].item);
-                      }
-                    },
-                  ),
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Search Input Header
+            Padding(
+              padding: const EdgeInsetsDirectional.fromSTEB(
+                AppSpacing.md,
+                AppSpacing.sm,
+                AppSpacing.md,
+                AppSpacing.xs,
+              ),
+              child: Semantics(
+                textField: true,
+                label: l10n.commandPaletteHint,
+                child: PulsrSearchField(
+                  controller: _searchController,
+                  focusNode: _focusNode,
+                  hintText: l10n.commandPaletteHint,
+                  autofocus: true,
+                  onSubmitted: (_) {
+                    if (entries.isNotEmpty &&
+                        _selectedIndex >= 0 &&
+                        _selectedIndex < entries.length) {
+                      _handleSelect(entries[_selectedIndex].item);
+                    }
+                  },
                 ),
               ),
-              const SizedBox(height: AppSpacing.xxs),
-              Divider(color: p.hairline, height: 1),
+            ),
+            const SizedBox(height: AppSpacing.xxs),
+            Divider(color: p.hairline, height: 1),
 
-              // Filtered Items List
-              Expanded(
-                child: entries.isEmpty
-                    ? Semantics(
-                        liveRegion: true,
-                        child: Center(
-                          child: Padding(
-                            padding: const EdgeInsets.all(AppSpacing.xl),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                ExcludeSemantics(
-                                  child: Icon(
-                                    Icons.search_off_rounded,
-                                    size: 36,
-                                    color: p.textTertiary,
-                                  ),
+            // Filtered Items List
+            Expanded(
+              child: entries.isEmpty
+                  ? Semantics(
+                      liveRegion: true,
+                      child: Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(AppSpacing.xl),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              ExcludeSemantics(
+                                child: Icon(
+                                  Icons.search_off_rounded,
+                                  size: 36,
+                                  color: p.textTertiary,
                                 ),
-                                const SizedBox(height: AppSpacing.sm),
-                                Text(
-                                  l10n.commandPaletteNoResults,
-                                  style: TextStyle(
-                                    color: p.textSecondary,
-                                    fontSize: AppFontSize.body,
-                                    fontWeight: FontWeight.w600,
-                                  ),
+                              ),
+                              const SizedBox(height: AppSpacing.sm),
+                              Text(
+                                l10n.commandPaletteNoResults,
+                                style: TextStyle(
+                                  color: p.textSecondary,
+                                  fontSize: AppFontSize.body,
+                                  fontWeight: FontWeight.w600,
                                 ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
                         ),
-                      )
-                    : ListView.builder(
-                        padding: const EdgeInsets.symmetric(
-                          vertical: AppSpacing.xs,
-                          horizontal: AppSpacing.sm,
-                        ),
-                        itemCount: entries.length,
-                        itemBuilder: (context, index) {
-                          final entry = entries[index];
-                          final item = entry.item;
-                          final isHighlighted = index == _selectedIndex;
+                      ),
+                    )
+                  : ListView.builder(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: AppSpacing.xs,
+                        horizontal: AppSpacing.sm,
+                      ),
+                      itemCount: entries.length,
+                      itemBuilder: (context, index) {
+                        final entry = entries[index];
+                        final item = entry.item;
+                        final isHighlighted = index == _selectedIndex;
 
-                          // Insert section separator if first item or section changes
-                          final showSectionHeader = index == 0 ||
-                              entries[index - 1].displaySection !=
-                                  entry.displaySection;
-                          final sectionTitle =
-                              _sectionTitle(context, entry.displaySection);
-                          final semanticLabel = item.shortcut != null
-                              ? '${item.title}, ${item.shortcut}'
-                              : item.title;
+                        // Insert section separator if first item or section changes
+                        final showSectionHeader = index == 0 ||
+                            entries[index - 1].displaySection !=
+                                entry.displaySection;
+                        final sectionTitle =
+                            _sectionTitle(context, entry.displaySection);
+                        final semanticLabel = item.shortcut != null
+                            ? '${item.title}, ${item.shortcut}'
+                            : item.title;
 
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              if (showSectionHeader) ...[
-                                Semantics(
-                                  header: true,
-                                  child: Padding(
-                                    padding:
-                                        const EdgeInsetsDirectional.fromSTEB(
-                                      AppSpacing.sm,
-                                      AppSpacing.s8,
-                                      AppSpacing.sm,
-                                      AppSpacing.s4,
-                                    ),
-                                    child: Text(
-                                      sectionTitle,
-                                      style: TextStyle(
-                                        color: p.textTertiary,
-                                        fontSize: AppFontSize.label,
-                                        fontWeight: FontWeight.w700,
-                                        letterSpacing: AppTracking.label,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (showSectionHeader) ...[
                               Semantics(
-                                button: true,
-                                selected: isHighlighted,
-                                label: semanticLabel,
-                                hint: item.subtitle,
-                                excludeSemantics: true,
-                                child: AnimatedContainer(
-                                  key: _itemKeys.putIfAbsent(
-                                    index,
-                                    GlobalKey.new,
+                                header: true,
+                                child: Padding(
+                                  padding: const EdgeInsetsDirectional.fromSTEB(
+                                    AppSpacing.sm,
+                                    AppSpacing.s8,
+                                    AppSpacing.sm,
+                                    AppSpacing.s4,
                                   ),
-                                  duration: shouldAnimate
-                                      ? context.motion(PulsrDurations.tap)
-                                      : Duration.zero,
-                                  curve:
-                                      context.motionCurve(PulsrMotion.enter),
-                                  margin: const EdgeInsets.symmetric(
-                                    vertical: 1.5,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: isHighlighted
-                                        ? p.accent.withValues(alpha: 0.14)
-                                        : Colors.transparent,
-                                    borderRadius: AppRadii.r12All,
-                                    border: Border.all(
-                                      color: isHighlighted
-                                          ? p.accent.withValues(alpha: 0.35)
-                                          : Colors.transparent,
-                                    ),
-                                  ),
-                                  child: PulsrPressable(
-                                    pressedScale: 0.985,
-                                    onTap: () => _handleSelect(item),
-                                    child: ConstrainedBox(
-                                      constraints: const BoxConstraints(
-                                        minWidth: AppSpacing.minTouchTarget,
-                                        minHeight: AppSpacing.minTouchTarget,
-                                      ),
-                                      child: Padding(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: AppSpacing.sm,
-                                          vertical: AppSpacing.xs,
-                                        ),
-                                        child: Row(
-                                          children: [
-                                            Container(
-                                              width: 32,
-                                              height: 32,
-                                              decoration: BoxDecoration(
-                                                color: isHighlighted
-                                                    ? p.accent
-                                                    : p.surfaceContainerHigh,
-                                                shape: BoxShape.circle,
-                                              ),
-                                              alignment: Alignment.center,
-                                              child: Icon(
-                                                item.icon,
-                                                size: 17,
-                                                color: isHighlighted
-                                                    ? p.onAccent
-                                                    : p.textSecondary,
-                                              ),
-                                            ),
-                                            const SizedBox(
-                                              width: AppSpacing.sm,
-                                            ),
-                                            Expanded(
-                                              child: Column(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.start,
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  PulsrHighlightedText(
-                                                    text: item.title,
-                                                    query: _query,
-                                                    baseStyle: TextStyle(
-                                                      color: p.textPrimary,
-                                                      fontSize:
-                                                          AppFontSize.body,
-                                                      fontWeight: isHighlighted
-                                                          ? FontWeight.w700
-                                                          : FontWeight.w600,
-                                                    ),
-                                                    matchStyle: TextStyle(
-                                                      color: p.accent,
-                                                      fontSize:
-                                                          AppFontSize.body,
-                                                      fontWeight:
-                                                          FontWeight.w800,
-                                                    ),
-                                                  ),
-                                                  if (item.subtitle !=
-                                                      null) ...[
-                                                    const SizedBox(height: 2),
-                                                    PulsrHighlightedText(
-                                                      text: item.subtitle!,
-                                                      query: _query,
-                                                      baseStyle: TextStyle(
-                                                        color: p.textSecondary,
-                                                        fontSize:
-                                                            AppFontSize.caption,
-                                                      ),
-                                                      matchStyle: TextStyle(
-                                                        color: p.accent,
-                                                        fontSize:
-                                                            AppFontSize.caption,
-                                                        fontWeight:
-                                                            FontWeight.w700,
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ],
-                                              ),
-                                            ),
-                                            if (item.shortcut != null) ...[
-                                              const SizedBox(
-                                                width: AppSpacing.xs,
-                                              ),
-                                              _ShortcutKeyBadge(
-                                                label: item.shortcut!,
-                                                isHighlighted: isHighlighted,
-                                                palette: p,
-                                              ),
-                                            ],
-                                            const SizedBox(
-                                              width: AppSpacing.xxs,
-                                            ),
-                                            Icon(
-                                              Directionality.of(context) ==
-                                                      TextDirection.rtl
-                                                  ? Icons.chevron_left_rounded
-                                                  : Icons.chevron_right_rounded,
-                                              size: 16,
-                                              color: isHighlighted
-                                                  ? p.accent
-                                                  : p.textTertiary
-                                                      .withValues(alpha: 0.5),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
+                                  child: Text(
+                                    sectionTitle,
+                                    style: TextStyle(
+                                      color: p.textTertiary,
+                                      fontSize: AppFontSize.label,
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: AppTracking.label,
                                     ),
                                   ),
                                 ),
                               ),
                             ],
-                          );
-                        },
-                      ),
-              ),
-            ],
+                            Semantics(
+                              button: true,
+                              selected: isHighlighted,
+                              label: semanticLabel,
+                              hint: item.subtitle,
+                              excludeSemantics: true,
+                              child: AnimatedContainer(
+                                key: _itemKeys.putIfAbsent(
+                                  index,
+                                  GlobalKey.new,
+                                ),
+                                duration: shouldAnimate
+                                    ? context.motion(PulsrDurations.tap)
+                                    : Duration.zero,
+                                curve: context.motionCurve(PulsrMotion.enter),
+                                margin: const EdgeInsets.symmetric(
+                                  vertical: 1.5,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: isHighlighted
+                                      ? p.accent.withValues(alpha: 0.14)
+                                      : Colors.transparent,
+                                  borderRadius: AppRadii.r12All,
+                                  border: Border.all(
+                                    color: isHighlighted
+                                        ? p.accent.withValues(alpha: 0.35)
+                                        : Colors.transparent,
+                                  ),
+                                ),
+                                child: PulsrPressable(
+                                  pressedScale: 0.985,
+                                  onTap: () => _handleSelect(item),
+                                  child: ConstrainedBox(
+                                    constraints: const BoxConstraints(
+                                      minWidth: AppSpacing.minTouchTarget,
+                                      minHeight: AppSpacing.minTouchTarget,
+                                    ),
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: AppSpacing.sm,
+                                        vertical: AppSpacing.xs,
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Container(
+                                            width: 32,
+                                            height: 32,
+                                            decoration: BoxDecoration(
+                                              color: isHighlighted
+                                                  ? p.accent
+                                                  : p.surfaceContainerHigh,
+                                              shape: BoxShape.circle,
+                                            ),
+                                            alignment: Alignment.center,
+                                            child: Icon(
+                                              item.icon,
+                                              size: 17,
+                                              color: isHighlighted
+                                                  ? p.onAccent
+                                                  : p.textSecondary,
+                                            ),
+                                          ),
+                                          const SizedBox(
+                                            width: AppSpacing.sm,
+                                          ),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                PulsrHighlightedText(
+                                                  text: item.title,
+                                                  query: _query,
+                                                  baseStyle: TextStyle(
+                                                    color: p.textPrimary,
+                                                    fontSize: AppFontSize.body,
+                                                    fontWeight: isHighlighted
+                                                        ? FontWeight.w700
+                                                        : FontWeight.w600,
+                                                  ),
+                                                  matchStyle: TextStyle(
+                                                    color: p.accent,
+                                                    fontSize: AppFontSize.body,
+                                                    fontWeight: FontWeight.w800,
+                                                  ),
+                                                ),
+                                                if (item.subtitle != null) ...[
+                                                  const SizedBox(height: 2),
+                                                  PulsrHighlightedText(
+                                                    text: item.subtitle!,
+                                                    query: _query,
+                                                    baseStyle: TextStyle(
+                                                      color: p.textSecondary,
+                                                      fontSize:
+                                                          AppFontSize.caption,
+                                                    ),
+                                                    matchStyle: TextStyle(
+                                                      color: p.accent,
+                                                      fontSize:
+                                                          AppFontSize.caption,
+                                                      fontWeight:
+                                                          FontWeight.w700,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ],
+                                            ),
+                                          ),
+                                          if (item.shortcut != null) ...[
+                                            const SizedBox(
+                                              width: AppSpacing.xs,
+                                            ),
+                                            _ShortcutKeyBadge(
+                                              label: item.shortcut!,
+                                              isHighlighted: isHighlighted,
+                                              palette: p,
+                                            ),
+                                          ],
+                                          const SizedBox(
+                                            width: AppSpacing.xxs,
+                                          ),
+                                          Icon(
+                                            Directionality.of(context) ==
+                                                    TextDirection.rtl
+                                                ? Icons.chevron_left_rounded
+                                                : Icons.chevron_right_rounded,
+                                            size: 16,
+                                            color: isHighlighted
+                                                ? p.accent
+                                                : p.textTertiary
+                                                    .withValues(alpha: 0.5),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+            ),
+          ],
         ),
       ),
     );

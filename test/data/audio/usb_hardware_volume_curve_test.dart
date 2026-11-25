@@ -20,7 +20,8 @@ void main() {
       prev = d;
     }
   });
-  test('non-finite input is treated as full volume', () => expect(db(double.nan), 0.0));
+  test('non-finite input is treated as full volume',
+      () => expect(db(double.nan), 0.0));
   test('respects a DAC whose range is narrower than the audible range', () {
     expect(
       UsbHardwareVolumeCurve.dbFor(0.001, minDb: -40, maxDb: -10),

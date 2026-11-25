@@ -191,9 +191,8 @@ class _DockStyleOption extends StatelessWidget {
                     : (selected ? p.accentContainer : p.surfaceContainer),
                 borderRadius: AppRadii.r16All,
                 border: Border.all(
-                  color: selected
-                      ? p.accent.withValues(alpha: 0.65)
-                      : p.hairline,
+                  color:
+                      selected ? p.accent.withValues(alpha: 0.65) : p.hairline,
                   width: selected ? 1.5 : 1.0,
                 ),
                 boxShadow: selected && !p.isCalmDensity
@@ -433,8 +432,8 @@ class _HeroDockStage extends StatelessWidget {
               border: Border.all(
                 color: elevated
                     ? p.accent
-                    : p.hairline
-                        .withValues(alpha: (p.hairline.a * opacity).clamp(0, 1)),
+                    : p.hairline.withValues(
+                        alpha: (p.hairline.a * opacity).clamp(0, 1)),
                 width: elevated ? 1.2 : 1,
               ),
               boxShadow: elevated
@@ -490,8 +489,8 @@ class _HeroDockStage extends StatelessWidget {
               border: Border.all(
                 color: elevated
                     ? p.accent
-                    : p.hairline
-                        .withValues(alpha: (p.hairline.a * opacity).clamp(0, 1)),
+                    : p.hairline.withValues(
+                        alpha: (p.hairline.a * opacity).clamp(0, 1)),
                 width: elevated ? 1.2 : 1,
               ),
               boxShadow: elevated
@@ -593,8 +592,8 @@ class _DockMicroMockup extends StatelessWidget {
             border: Border.all(
               color: selected
                   ? borderColor.withValues(alpha: opacity)
-                  : borderColor
-                      .withValues(alpha: (borderColor.a * opacity).clamp(0, 1)),
+                  : borderColor.withValues(
+                      alpha: (borderColor.a * opacity).clamp(0, 1)),
               width: 0.8,
             ),
           ),

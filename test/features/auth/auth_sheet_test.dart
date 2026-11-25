@@ -17,6 +17,7 @@ import 'package:pulsr/features/auth/presentation/auth_sheet.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 class MockAuthService extends Mock implements AuthService {}
 
 class MockCloudSyncService extends Mock implements CloudSyncService {}
@@ -186,7 +187,6 @@ void main() {
 
     expect(find.text('Sign-in was cancelled.'), findsOneWidget);
 
-
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
@@ -258,7 +258,8 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
-  testWidgets('does not pop behind a pushed overlay route or re-pop on sync updates',
+  testWidgets(
+      'does not pop behind a pushed overlay route or re-pop on sync updates',
       (tester) async {
     final user = MockUser();
     when(() => user.email).thenReturn('a@b.com');

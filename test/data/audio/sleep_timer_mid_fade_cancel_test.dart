@@ -29,9 +29,12 @@ void main() {
   });
 
   group('SleepTimerManager mid-fade cancel', () {
-    test('native gain curve mid-fade cancel clears gain curve and invalidates token', () async {
+    test(
+        'native gain curve mid-fade cancel clears gain curve and invalidates token',
+        () async {
       final completer = Completer<bool>();
-      when(() => mockPlayer.dspSetGainCurve(any(), segmentMs: any(named: 'segmentMs')))
+      when(() => mockPlayer.dspSetGainCurve(any(),
+              segmentMs: any(named: 'segmentMs')))
           .thenAnswer((_) => completer.future);
 
       // Trigger native fade-out while remaining <= 15s
@@ -45,10 +48,12 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 20));
 
       // dspClearGainCurve must have been called
-      verify(() => mockPlayer.dspClearGainCurve()).called(greaterThanOrEqualTo(1));
+      verify(() => mockPlayer.dspClearGainCurve())
+          .called(greaterThanOrEqualTo(1));
     });
 
-    test('startEndOfTrackTimer mid-fade cancel aborts expiration callback', () async {
+    test('startEndOfTrackTimer mid-fade cancel aborts expiration callback',
+        () async {
       bool expired = false;
 
       sleepTimerManager.startEndOfTrackTimer(
@@ -73,7 +78,8 @@ void main() {
 
       // Callback must NEVER have been called
       expect(expired, isFalse,
-          reason: 'Expiration callback must be aborted when timer is cancelled mid-fade');
+          reason:
+              'Expiration callback must be aborted when timer is cancelled mid-fade');
     });
   });
 }

@@ -28,7 +28,9 @@ SongsTableData song(
 
 void main() {
   group('QueueSlotCodec', () {
-    test('encodeDocument preserves slot structure, active slot, and track tiers', () {
+    test(
+        'encodeDocument preserves slot structure, active slot, and track tiers',
+        () {
       final doc = QueueSlotCodec.encodeDocument(
         {
           0: (
@@ -86,8 +88,8 @@ void main() {
       final s0 = doc['0'] as Map<String, dynamic>;
       final online = s0['onlineSongs'] as List;
       expect(online.length, 1);
-      expect((online.first as Map<String, dynamic>)['source'],
-          SongSource.remote);
+      expect(
+          (online.first as Map<String, dynamic>)['source'], SongSource.remote);
     });
 
     test('decodeDocument rejects non-maps and oversized documents', () {
@@ -166,7 +168,9 @@ void main() {
 
       final migrated1 = QueueSlotCodec.migrateDocument({
         'schemaVersion': 1,
-        '0': {'songIds': [10, 20]},
+        '0': {
+          'songIds': [10, 20]
+        },
       });
       expect(migrated1['schemaVersion'], QueueSlotCodec.currentSchemaVersion);
       final s0 = migrated1['0'] as Map<String, dynamic>;
@@ -203,7 +207,9 @@ void main() {
       expect(QueueSlotCodec.decodeSlot({}, 500), isNull);
     });
 
-    test('decodeSlot restores track tiers and defaults missing tiers to context', () {
+    test(
+        'decodeSlot restores track tiers and defaults missing tiers to context',
+        () {
       final decodedWithTiers = QueueSlotCodec.decodeSlot({
         'songIds': [1, 2],
         'trackTiers': {'1': 'context', '2': 'userQueue'},

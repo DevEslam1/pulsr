@@ -178,7 +178,8 @@ void main() {
           SoundDoseTrackerService.minBudget);
     });
 
-    test('applyPersistedState leaves protection off when never chosen', () async {
+    test('applyPersistedState leaves protection off when never chosen',
+        () async {
       final tracker = SoundDoseTrackerService();
       await tracker.applyPersistedState();
 

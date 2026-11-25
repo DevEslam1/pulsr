@@ -378,7 +378,8 @@ class AudioSessionLog {
       if (sourceCodec != null) active.sourceCodec = sourceCodec;
       if (sourceSampleRate != null) active.sourceSampleRate = sourceSampleRate;
       if (sourceBitDepth != null) active.sourceBitDepth = sourceBitDepth;
-      if (decoderSampleRate != null) active.decoderSampleRate = decoderSampleRate;
+      if (decoderSampleRate != null)
+        active.decoderSampleRate = decoderSampleRate;
       if (decoderBitDepth != null) active.decoderBitDepth = decoderBitDepth;
       if (decoderEncoding != null) active.decoderEncoding = decoderEncoding;
       if (driverPath != null) active.driverPath = driverPath;
@@ -478,8 +479,8 @@ class AudioSessionLog {
       try {
         final decoded = jsonDecode(line);
         if (decoded is Map) {
-          records.add(AudioSessionRecord.fromJson(
-              Map<String, dynamic>.from(decoded)));
+          records.add(
+              AudioSessionRecord.fromJson(Map<String, dynamic>.from(decoded)));
         }
       } catch (_) {
         // Skip a corrupt line rather than failing the whole export.
@@ -511,8 +512,10 @@ class AudioSessionLog {
           if (dir == null) return null;
           final file = File('${dir.path}${Platform.pathSeparator}$fileName');
           final records = await _readRecords(file);
-          final stamp =
-              _clock().toUtc().toIso8601String().replaceAll(RegExp(r'[:.]'), '-');
+          final stamp = _clock()
+              .toUtc()
+              .toIso8601String()
+              .replaceAll(RegExp(r'[:.]'), '-');
           final exportFile = File(
               '${dir.path}${Platform.pathSeparator}pulsr_audio_session_logs_$stamp.jsonl');
           final buffer = StringBuffer();

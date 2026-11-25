@@ -428,7 +428,8 @@ void main() {
       final messenger =
           TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
       const audioSessionChannel = MethodChannel('com.ryanheise.audio_session');
-      messenger.setMockMethodCallHandler(audioSessionChannel, (_) async => null);
+      messenger.setMockMethodCallHandler(
+          audioSessionChannel, (_) async => null);
       PathProviderPlatform.instance = _FailingPathProvider();
       JustAudioPlatform.instance = _StubJustAudioPlatform();
       addTearDown(() {

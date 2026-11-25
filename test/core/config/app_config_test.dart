@@ -47,7 +47,8 @@ void main() {
       }
     });
 
-    test('dev/ytm flavor with ENV=prod never escalates to prod environment', () {
+    test('dev/ytm flavor with ENV=prod never escalates to prod environment',
+        () {
       expect(
         AppConfig.resolveEnvironment(flavorValue: 'dev', envValue: 'prod'),
         AppEnvironment.dev,

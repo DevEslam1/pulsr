@@ -10,6 +10,7 @@ import 'package:pulsr/features/player/cubit/player_state.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 class MockPlayerCubit extends Mock implements PlayerCubit {}
 
 /// A PlayerCubit stub that always reports [state] and yields no state events.

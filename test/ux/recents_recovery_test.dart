@@ -14,6 +14,7 @@ import 'package:pulsr/features/library/presentation/recents_screen.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 class MockSongs extends Mock implements GetSongsUseCase {}
 
 class MockPlayer extends Mock implements PlayerCubit {}

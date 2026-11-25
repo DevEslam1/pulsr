@@ -165,8 +165,8 @@ void main() {
       await controller.maybeFollowTrackSampleRate(song);
 
       // Must NOT re-invoke setBitPerfectTrackFormat mid-playback.
-      verifyNever(() => settings.setBitPerfectTrackFormat(
-          sampleRate: 48000, bitDepth: 24));
+      verifyNever(() =>
+          settings.setBitPerfectTrackFormat(sampleRate: 48000, bitDepth: 24));
     });
     test('Bluetooth follow off dispatches nothing; unconfirmed requests retry',
         () async {

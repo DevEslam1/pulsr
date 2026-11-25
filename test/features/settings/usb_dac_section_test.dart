@@ -21,6 +21,7 @@ import 'support/settings_section_harness.dart';
 import 'package:pulsr/core/errors/app_error.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 class MockPlayerCubit extends Mock implements PlayerCubit {}
 
 class MockSettingsCubit extends Mock implements SettingsCubit {}

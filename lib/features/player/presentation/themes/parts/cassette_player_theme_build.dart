@@ -71,7 +71,8 @@ class _CassetteDeckPalette {
     if (isDark) {
       return _CassetteDeckPalette(
         isDark: true,
-        chassisTop: isHighContrast ? p.bg : PlayerMaterialColors.cassetteBodyTop,
+        chassisTop:
+            isHighContrast ? p.bg : PlayerMaterialColors.cassetteBodyTop,
         chassisMid:
             isHighContrast ? p.surface : PlayerMaterialColors.cassetteBodyMid,
         chassisBottom:
@@ -133,7 +134,8 @@ class _CassetteDeckPalette {
           ? p.borderStrong
           : AppColors.discSteel.withValues(alpha: 0.28),
       keyFaceTop: AppColors.surfaceGreyLight,
-      keyFaceBottom: Color.lerp(AppColors.discSilver, p.surfaceContainer, 0.45)!,
+      keyFaceBottom:
+          Color.lerp(AppColors.discSilver, p.surfaceContainer, 0.45)!,
       keyDepressedTop: Color.lerp(AppColors.discAluminum, p.surface, 0.35)!,
       keyDepressedBottom: AppColors.discSilver,
       keyBorder: isHighContrast
@@ -207,7 +209,8 @@ extension _CassettePlayerThemeBuild on _CassettePlayerThemeState {
             seamShadow: deckPalette.seamShadow,
             screwColor: deckPalette.screwColor,
             glowColor: customGlow
-                ? activeColor.withValues(alpha: deckPalette.isDark ? 0.22 : 0.12)
+                ? activeColor.withValues(
+                    alpha: deckPalette.isDark ? 0.22 : 0.12)
                 : deckPalette.ledAmber
                     .withValues(alpha: deckPalette.isDark ? 0.08 : 0.04),
           ),
@@ -869,10 +872,10 @@ class _DeckSegmentedLedVuPainter extends CustomPainter {
       rightPeak = 0.72;
     } else {
       final t = controller.value * 2 * math.pi;
-      final base = math.sin(t).abs() * 0.42 +
-          math.sin(t * 2.0 + 0.6).abs() * 0.22;
-      final harmonicL = math.sin(t * 3.0 + 0.3).abs() * 0.20 +
-          math.cos(t * 7.0).abs() * 0.10;
+      final base =
+          math.sin(t).abs() * 0.42 + math.sin(t * 2.0 + 0.6).abs() * 0.22;
+      final harmonicL =
+          math.sin(t * 3.0 + 0.3).abs() * 0.20 + math.cos(t * 7.0).abs() * 0.10;
       final harmonicR = math.cos(t * 5.0 - 0.4).abs() * 0.20 +
           math.sin(t * 11.0).abs() * 0.10;
       leftLevel = (0.14 + base + harmonicL).clamp(0.06, 0.96);
@@ -1279,7 +1282,8 @@ class _CassetteMagneticTapeScrubberState
                             fontFamily: 'monospace',
                             fontSize: AppFontSize.caption,
                             fontWeight: FontWeight.w700,
-                            color: AppColors.onGiltLight.withValues(alpha: 0.78),
+                            color:
+                                AppColors.onGiltLight.withValues(alpha: 0.78),
                             fontFeatures: const [FontFeature.tabularFigures()],
                           ),
                         ),

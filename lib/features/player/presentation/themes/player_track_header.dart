@@ -289,9 +289,8 @@ class PlayerTrackHeader extends StatelessWidget {
                           ? AppColors.specularAt(0.07)
                           : p.surfaceContainer),
                   border: Border.all(
-                    color: isFav
-                        ? p.favorite.withValues(alpha: 0.45)
-                        : p.hairline,
+                    color:
+                        isFav ? p.favorite.withValues(alpha: 0.45) : p.hairline,
                     width: 1.0,
                   ),
                   boxShadow: isFav

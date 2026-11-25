@@ -59,8 +59,7 @@ void main() {
     when(() => settingsCubit.state).thenReturn(const SettingsState());
     when(() => settingsCubit.stream)
         .thenAnswer((_) => settingsController.stream);
-    when(() => settingsCubit.setExperienceMode(any()))
-        .thenAnswer((_) async {});
+    when(() => settingsCubit.setExperienceMode(any())).thenAnswer((_) async {});
     when(() => settingsCubit.setPlayerThemeMode(any()))
         .thenAnswer((_) async {});
   });

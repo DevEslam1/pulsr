@@ -554,7 +554,8 @@ class MiniPlayerCompactCard extends StatelessWidget {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              color: isCurrent ? p.textPrimary : p.textSecondary,
+                              color:
+                                  isCurrent ? p.textPrimary : p.textSecondary,
                               fontWeight: FontWeight.w700,
                               fontSize: AppFontSize.body,
                               letterSpacing: -0.2,
@@ -592,7 +593,8 @@ class MiniPlayerCompactCard extends StatelessWidget {
                       end: 0,
                       child: MiniPlayerSwipeActionBadge(
                         icon: swipeLeftIcon!,
-                        progress: (horizontalDragDx.abs() / 40.0).clamp(0.0, 1.0),
+                        progress:
+                            (horizontalDragDx.abs() / 40.0).clamp(0.0, 1.0),
                         thresholdCrossed: swipeThresholdCrossed,
                         accentColor: activeAccent,
                       ),
@@ -602,7 +604,8 @@ class MiniPlayerCompactCard extends StatelessWidget {
                       start: 0,
                       child: MiniPlayerSwipeActionBadge(
                         icon: swipeRightIcon!,
-                        progress: (horizontalDragDx.abs() / 40.0).clamp(0.0, 1.0),
+                        progress:
+                            (horizontalDragDx.abs() / 40.0).clamp(0.0, 1.0),
                         thresholdCrossed: swipeThresholdCrossed,
                         accentColor: activeAccent,
                       ),

@@ -187,9 +187,10 @@ class YtDownloadArtifactStore {
     try {
       final resolvedSize =
           sizeBytes ?? (await temp.exists() ? await temp.length() : 0);
-      final stampValue = (quality != null || container != null || sizeBytes != null)
-          ? '$videoId|${quality ?? ''}|${container ?? ''}|$resolvedSize'
-          : videoId;
+      final stampValue =
+          (quality != null || container != null || sizeBytes != null)
+              ? '$videoId|${quality ?? ''}|${container ?? ''}|$resolvedSize'
+              : videoId;
       await File('${temp.path}.committed.stamp').writeAsString(stampValue);
     } catch (_) {
       // Best-effort: failure intentionally ignored on this non-critical path.

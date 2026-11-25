@@ -74,8 +74,9 @@ String formatSongTechSpecs(SongsTableData song) {
     final khz = (song.sampleRate! / 1000).toStringAsFixed(
       song.sampleRate! % 1000 == 0 ? 0 : 1,
     );
-    final depth =
-        song.bitDepth != null && song.bitDepth! > 0 ? '${song.bitDepth}-bit/' : '';
+    final depth = song.bitDepth != null && song.bitDepth! > 0
+        ? '${song.bitDepth}-bit/'
+        : '';
     parts.add('$depth${khz}kHz');
   } else if (song.bitrateKbps != null && song.bitrateKbps! > 0) {
     parts.add('${song.bitrateKbps} kbps');

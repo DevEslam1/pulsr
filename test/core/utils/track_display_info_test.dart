@@ -32,7 +32,9 @@ void main() {
       expect(info.artist, 'Mohamed Hamaki');
     });
 
-    test('parses "Artist - Title" when artist is "unknown artist" (case-insensitive)', () {
+    test(
+        'parses "Artist - Title" when artist is "unknown artist" (case-insensitive)',
+        () {
       final info = TrackDisplayInfo.resolve(
         rawTitle: 'Pink Floyd - Comfortably Numb',
         rawArtist: 'unknown artist',
@@ -93,7 +95,8 @@ void main() {
       expect(trailingDash.artist, 'Unknown Artist');
     });
 
-    test('resolves from SongsTableData entity via fromSong without mutating it', () {
+    test('resolves from SongsTableData entity via fromSong without mutating it',
+        () {
       final song = createTestSong(
         id: 42,
         title: 'Mohamed Hamaki - Bahareya',

@@ -71,8 +71,7 @@ class DsdTransportPlan {
   bool get isFallback => transport != requested;
 
   @override
-  String toString() =>
-      'DsdTransportPlan(requested: ${requested.name}, '
+  String toString() => 'DsdTransportPlan(requested: ${requested.name}, '
       'transport: ${transport.name}, reason: ${reason.name})';
 }
 

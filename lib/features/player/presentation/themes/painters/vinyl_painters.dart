@@ -200,7 +200,8 @@ class _RotaryDialKnurlPainter extends CustomPainter {
     final pipPaint = Paint()
       ..color = indicatorColor
       ..style = PaintingStyle.fill;
-    canvas.drawCircle(Offset(center.dx, center.dy - outerR + 1.4), 1.6, pipPaint);
+    canvas.drawCircle(
+        Offset(center.dx, center.dy - outerR + 1.4), 1.6, pipPaint);
   }
 
   @override

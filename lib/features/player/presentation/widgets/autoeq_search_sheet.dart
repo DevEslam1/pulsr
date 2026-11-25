@@ -145,9 +145,7 @@ class _AutoEqSearchSheetState extends State<AutoEqSearchSheet> {
           duration: Duration(seconds: warnings.isEmpty ? 2 : 5));
     } on AutoEqParametricParseFailure catch (e, st) {
       ErrorLogger.log('AutoEQ parametric import failed',
-          error: e,
-          stackTrace: st,
-          category: 'AutoEqSearchSheet');
+          error: e, stackTrace: st, category: 'AutoEqSearchSheet');
       if (!mounted) return;
       _showMessage(
           messenger, '${l10n.autoeqParametricImportFailed}\n${e.message}',
@@ -337,9 +335,11 @@ class _AutoEqSearchSheetState extends State<AutoEqSearchSheet> {
                 children: [
                   _buildModeChoice('PEQ (IIR)', AutoEqCorrectionMode.peq, p),
                   const SizedBox(width: AppSpacing.xs),
-                  _buildModeChoice('FIR Min-Phase', AutoEqCorrectionMode.firMinPhase, p),
+                  _buildModeChoice(
+                      'FIR Min-Phase', AutoEqCorrectionMode.firMinPhase, p),
                   const SizedBox(width: AppSpacing.xs),
-                  _buildModeChoice('FIR Linear-Phase', AutoEqCorrectionMode.firLinear, p),
+                  _buildModeChoice(
+                      'FIR Linear-Phase', AutoEqCorrectionMode.firLinear, p),
                 ],
               ),
             ),

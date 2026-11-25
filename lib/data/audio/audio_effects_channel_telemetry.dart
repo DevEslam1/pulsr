@@ -156,9 +156,7 @@ mixin _AudioEffectsChannelTelemetryMixin {
     double doseThreshold = 1.0,
     double safetyCeilingDb = -6.0,
   }) async {
-    if (!_isAndroid ||
-        !doseThreshold.isFinite ||
-        !safetyCeilingDb.isFinite) {
+    if (!_isAndroid || !doseThreshold.isFinite || !safetyCeilingDb.isFinite) {
       return;
     }
     try {
@@ -265,7 +263,8 @@ mixin _AudioEffectsChannelTelemetryMixin {
   }) async {
     if (!_isAndroid) return false;
     try {
-      final bool? ok = await AudioEffectsChannel._channel.invokeMethod<bool>('loadViperDdc', {
+      final bool? ok = await AudioEffectsChannel._channel
+          .invokeMethod<bool>('loadViperDdc', {
         'ddcContent': ddcContent,
         'profileName': profileName,
       }).timeout(const Duration(seconds: 10)); // large payload
@@ -304,7 +303,8 @@ mixin _AudioEffectsChannelTelemetryMixin {
   }) async {
     if (!_isAndroid) return false;
     try {
-      final bool? ok = await AudioEffectsChannel._channel.invokeMethod<bool>('loadArbitraryEq', {
+      final bool? ok = await AudioEffectsChannel._channel
+          .invokeMethod<bool>('loadArbitraryEq', {
         'eqString': eqString,
         'linearPhase': linearPhase,
       }).timeout(const Duration(seconds: 10)); // large payload
@@ -340,7 +340,8 @@ mixin _AudioEffectsChannelTelemetryMixin {
   Future<String> loadLiveProgCode(String code) async {
     if (!_isAndroid) return 'Unsupported platform';
     try {
-      final String? status = await AudioEffectsChannel._channel.invokeMethod<String>(
+      final String? status =
+          await AudioEffectsChannel._channel.invokeMethod<String>(
         'loadLiveProgCode',
         {'code': code},
       ).timeout(const Duration(seconds: 10)); // large payload / EEL compile
@@ -539,7 +540,9 @@ mixin _AudioEffectsChannelTelemetryMixin {
   Future<void> cancelCustodyWindow() async {
     if (!_isAndroid) return;
     try {
-      await AudioEffectsChannel._channel.invokeMethod<void>('cancelCustodyWindow').timeout(
+      await AudioEffectsChannel._channel
+          .invokeMethod<void>('cancelCustodyWindow')
+          .timeout(
             const Duration(seconds: 2),
           );
     } catch (e, st) {
@@ -575,7 +578,8 @@ mixin _AudioEffectsChannelTelemetryMixin {
   Future<bool> sendWarmupBuffer({int durationMs = 100}) async {
     if (!_isAndroid) return false;
     try {
-      final res = await AudioEffectsChannel._channel.invokeMethod<bool>('sendWarmupBuffer',
+      final res = await AudioEffectsChannel._channel.invokeMethod<bool>(
+          'sendWarmupBuffer',
           {'durationMs': durationMs}).timeout(const Duration(seconds: 2));
       return res ?? true;
     } catch (e, st) {
@@ -608,9 +612,9 @@ mixin _AudioEffectsChannelTelemetryMixin {
   Future<String> setMultiOutputRoute(String mode) async {
     if (!_isAndroid) return 'unsupported';
     try {
-      final res = await AudioEffectsChannel._channel
-          .invokeMethod<String>('setMultiOutputRoute', {'mode': mode})
-          .timeout(const Duration(seconds: 3));
+      final res = await AudioEffectsChannel._channel.invokeMethod<String>(
+          'setMultiOutputRoute',
+          {'mode': mode}).timeout(const Duration(seconds: 3));
       return res ?? 'unsupported';
     } catch (e, st) {
       ErrorLogger.log(

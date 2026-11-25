@@ -298,8 +298,7 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
                       ),
                       child: Row(
                         children: [
-                          Icon(Icons.star_rounded,
-                              size: 16, color: p.warning),
+                          Icon(Icons.star_rounded, size: 16, color: p.warning),
                           const SizedBox(width: AppSpacing.xxs),
                           Text(
                             '$avgScore',
@@ -324,10 +323,11 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
                     },
                     builder: (context, progressPct) {
                       return Container(
-                        margin:
-                            const EdgeInsetsDirectional.only(end: AppSpacing.md),
+                        margin: const EdgeInsetsDirectional.only(
+                            end: AppSpacing.md),
                         padding: const EdgeInsets.symmetric(
-                            horizontal: AppSpacing.s10, vertical: AppSpacing.xxs),
+                            horizontal: AppSpacing.s10,
+                            vertical: AppSpacing.xxs),
                         decoration: BoxDecoration(
                           color: p.primary.withValues(alpha: 0.2),
                           borderRadius: AppRadii.r10All,
@@ -450,8 +450,7 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
                                         .seek(activeLine.timestamp);
                                   },
                                   borderRadius: AppRadii.r16All,
-                                  splashColor:
-                                      p.primary.withValues(alpha: 0.2),
+                                  splashColor: p.primary.withValues(alpha: 0.2),
                                   child: Padding(
                                     padding: const EdgeInsets.symmetric(
                                         vertical: AppSpacing.xs,
@@ -483,19 +482,21 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
                                                         i < highlightedCount
                                                             ? FontWeight.w900
                                                             : FontWeight.w700,
-                                                    shadows: (i <
-                                                                highlightedCount &&
-                                                            !p.isCalmDensity)
-                                                        ? [
-                                                            Shadow(
-                                                              color: p.primary
-                                                                  .withValues(
-                                                                      alpha:
-                                                                          0.8),
-                                                              blurRadius: 10,
-                                                            ),
-                                                          ]
-                                                        : null,
+                                                    shadows:
+                                                        (i < highlightedCount &&
+                                                                !p.isCalmDensity)
+                                                            ? [
+                                                                Shadow(
+                                                                  color: p
+                                                                      .primary
+                                                                      .withValues(
+                                                                          alpha:
+                                                                              0.8),
+                                                                  blurRadius:
+                                                                      10,
+                                                                ),
+                                                              ]
+                                                            : null,
                                                   ),
                                                 ),
                                               ],
@@ -564,8 +565,7 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
                                         fontSize: math.max(
                                             13.0,
                                             (isLandscape
-                                                    ? math.min(
-                                                        _fontSize, 22.0)
+                                                    ? math.min(_fontSize, 22.0)
                                                     : _fontSize) *
                                                 0.65),
                                         fontWeight: FontWeight.w600,
@@ -775,8 +775,7 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
                         ({Duration pos, int activeIdx})>(
                       selector: (s) {
                         final rawPos = s.position - audibleOffset;
-                        final pPos =
-                            rawPos.isNegative ? Duration.zero : rawPos;
+                        final pPos = rawPos.isNegative ? Duration.zero : rawPos;
                         int activeIdx = -1;
                         for (int i = 0; i < effectiveLyrics.length; i++) {
                           if (pPos >= effectiveLyrics[i].timestamp) {

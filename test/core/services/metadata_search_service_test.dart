@@ -67,7 +67,8 @@ void main() {
       expect(results, isEmpty);
     });
 
-    test('searchMetadata escapes Lucene special characters in MusicBrainz query',
+    test(
+        'searchMetadata escapes Lucene special characters in MusicBrainz query',
         () async {
       TestWidgetsFlutterBinding.ensureInitialized();
       SharedPreferences.setMockInitialValues({});
@@ -75,7 +76,8 @@ void main() {
 
       final mockClient = MockClient((request) async {
         if (request.url.host == 'itunes.apple.com') {
-          return http.Response(jsonEncode({'resultCount': 0, 'results': []}), 200);
+          return http.Response(
+              jsonEncode({'resultCount': 0, 'results': []}), 200);
         }
         if (request.url.host == 'musicbrainz.org') {
           capturedQuery = request.url.queryParameters['query'];
@@ -163,7 +165,8 @@ void main() {
 
       final mockClient = MockClient((request) async {
         if (request.url.host == 'itunes.apple.com') {
-          return http.Response(jsonEncode({'resultCount': 0, 'results': []}), 200);
+          return http.Response(
+              jsonEncode({'resultCount': 0, 'results': []}), 200);
         }
         if (request.url.host == 'musicbrainz.org') {
           capturedUserAgent = request.headers['User-Agent'];
@@ -204,8 +207,7 @@ void main() {
       expect(result, isNull);
     });
 
-    test('downloadArtworkToTemp follows safe redirect up to 3 hops',
-        () async {
+    test('downloadArtworkToTemp follows safe redirect up to 3 hops', () async {
       TestWidgetsFlutterBinding.ensureInitialized();
       SharedPreferences.setMockInitialValues({});
       final tempDir = Directory.systemTemp.createTempSync('ms_art_redir');

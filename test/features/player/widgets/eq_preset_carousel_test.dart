@@ -81,8 +81,9 @@ void main() {
         cornerHz: any(named: 'cornerHz'),
         gain: any(named: 'gain'))).thenAnswer((_) async {});
     when(() => cubit.setDynamicEq(any())).thenAnswer((_) async {});
-    when(() => cubit.setLoudnessContour(any(),
-        intensity: any(named: 'intensity'))).thenAnswer((_) async {});
+    when(() =>
+            cubit.setLoudnessContour(any(), intensity: any(named: 'intensity')))
+        .thenAnswer((_) async {});
     when(() => cubit.setDynamicBass(any(),
         strength: any(named: 'strength'),
         preset: any(named: 'preset'))).thenAnswer((_) async {});

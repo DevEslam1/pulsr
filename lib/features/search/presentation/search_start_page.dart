@@ -54,64 +54,64 @@ class _SuggestionsCard extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 for (var i = 0; i < suggestions.length; i++) ...[
-              if (i > 0) Divider(color: p.hairline, height: 1),
-              Semantics(
-                button: true,
-                label: suggestions[i],
-                child: InkWell(
-                  onTap: () => onSelect(suggestions[i]),
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(
-                      minHeight: AppSpacing.minTouchTarget,
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsetsDirectional.only(
-                        start: AppSpacing.sm,
-                        end: AppSpacing.xxs,
-                        top: AppSpacing.xxs,
-                        bottom: AppSpacing.xxs,
-                      ),
-                      child: Row(
-                        children: [
-                          ExcludeSemantics(
-                            child: Icon(
-                              Icons.search_rounded,
-                              color: p.textTertiary,
-                              size: 18,
-                            ),
+                  if (i > 0) Divider(color: p.hairline, height: 1),
+                  Semantics(
+                    button: true,
+                    label: suggestions[i],
+                    child: InkWell(
+                      onTap: () => onSelect(suggestions[i]),
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(
+                          minHeight: AppSpacing.minTouchTarget,
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsetsDirectional.only(
+                            start: AppSpacing.sm,
+                            end: AppSpacing.xxs,
+                            top: AppSpacing.xxs,
+                            bottom: AppSpacing.xxs,
                           ),
-                          const SizedBox(width: AppSpacing.sm),
-                          Expanded(
-                            child: PulsrHighlightedText(
-                              text: suggestions[i],
-                              query: query,
-                              baseStyle: baseStyle,
-                              matchStyle: matchStyle,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
+                          child: Row(
+                            children: [
+                              ExcludeSemantics(
+                                child: Icon(
+                                  Icons.search_rounded,
+                                  color: p.textTertiary,
+                                  size: 18,
+                                ),
+                              ),
+                              const SizedBox(width: AppSpacing.sm),
+                              Expanded(
+                                child: PulsrHighlightedText(
+                                  text: suggestions[i],
+                                  query: query,
+                                  baseStyle: baseStyle,
+                                  matchStyle: matchStyle,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              IconButton(
+                                constraints: const BoxConstraints(
+                                  minWidth: AppSpacing.minTouchTarget,
+                                  minHeight: AppSpacing.minTouchTarget,
+                                ),
+                                tooltip: context.l10n.search,
+                                icon: Icon(
+                                  Icons.north_west_rounded,
+                                  size: 17,
+                                  color: p.textTertiary,
+                                ),
+                                onPressed: () => onFill(suggestions[i]),
+                              ),
+                            ],
                           ),
-                          IconButton(
-                            constraints: const BoxConstraints(
-                              minWidth: AppSpacing.minTouchTarget,
-                              minHeight: AppSpacing.minTouchTarget,
-                            ),
-                            tooltip: context.l10n.search,
-                            icon: Icon(
-                              Icons.north_west_rounded,
-                              size: 17,
-                              color: p.textTertiary,
-                            ),
-                            onPressed: () => onFill(suggestions[i]),
-                          ),
-                        ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ),
-            ],
-            ],
+                ],
+              ],
             ),
           ),
         ),
@@ -573,7 +573,8 @@ class _SearchPlayedSongTile extends StatelessWidget {
       selected: isCurrent,
       label: context.l10n.songByArtist(song.title, song.artist),
       child: Material(
-        color: isCurrent ? p.accent.withValues(alpha: 0.10) : Colors.transparent,
+        color:
+            isCurrent ? p.accent.withValues(alpha: 0.10) : Colors.transparent,
         child: InkWell(
           onTap: onTap,
           onLongPress: () => SongOptionsSheet.show(context, song: song),

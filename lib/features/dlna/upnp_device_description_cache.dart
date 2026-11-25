@@ -26,8 +26,7 @@ class _CacheEntry<T> {
 
   const _CacheEntry(this.value, this.cachedAt, this.seq);
 
-  bool isFresh(Duration ttl, DateTime now) =>
-      now.difference(cachedAt) < ttl;
+  bool isFresh(Duration ttl, DateTime now) => now.difference(cachedAt) < ttl;
 }
 
 /// Cache for UPnP device description documents and parsed descriptions.
@@ -42,8 +41,7 @@ class UpnpDeviceDescriptionCache {
   static const int defaultMaxEntries = 100;
 
   /// Global shared instance.
-  static final UpnpDeviceDescriptionCache shared =
-      UpnpDeviceDescriptionCache();
+  static final UpnpDeviceDescriptionCache shared = UpnpDeviceDescriptionCache();
 
   final Duration ttl;
   final int maxEntries;
@@ -71,7 +69,8 @@ class UpnpDeviceDescriptionCache {
     final cached = _xmlCache[location];
     if (cached != null && cached.isFresh(ttl, now)) {
       // True LRU: update recency sequence on hit (§8.5)
-      _xmlCache[location] = _CacheEntry(cached.value, cached.cachedAt, ++_sequence);
+      _xmlCache[location] =
+          _CacheEntry(cached.value, cached.cachedAt, ++_sequence);
       return cached.value;
     }
 
@@ -103,7 +102,8 @@ class UpnpDeviceDescriptionCache {
     final now = _clock();
     final cached = _deviceCache[location];
     if (cached != null && cached.isFresh(ttl, now)) {
-      _deviceCache[location] = _CacheEntry(cached.value, cached.cachedAt, ++_sequence);
+      _deviceCache[location] =
+          _CacheEntry(cached.value, cached.cachedAt, ++_sequence);
       return cached.value;
     }
 
@@ -142,7 +142,8 @@ class UpnpDeviceDescriptionCache {
     final now = _clock();
     final cached = _serverCache[location];
     if (cached != null && cached.isFresh(ttl, now)) {
-      _serverCache[location] = _CacheEntry(cached.value, cached.cachedAt, ++_sequence);
+      _serverCache[location] =
+          _CacheEntry(cached.value, cached.cachedAt, ++_sequence);
       return cached.value;
     }
 
@@ -272,9 +273,8 @@ class UpnpDeviceDescriptionCache {
 
   void _evictOldestIfNeeded<T>(Map<Uri, _CacheEntry<T>> map) {
     if (map.length >= maxEntries) {
-      final oldestKey = map.entries
-          .reduce((a, b) => a.value.seq < b.value.seq ? a : b)
-          .key;
+      final oldestKey =
+          map.entries.reduce((a, b) => a.value.seq < b.value.seq ? a : b).key;
       map.remove(oldestKey);
     }
   }

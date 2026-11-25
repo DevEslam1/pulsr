@@ -238,8 +238,8 @@ class YtmResolvingSource extends StreamAudioSource {
       // exists for became a minute of silence.
       final inner = await _raceCancel(_ensureInner());
       try {
-        return await _raceCancel(_withPathLockIfUncached(
-            () => _requestOnce(inner, start, end)));
+        return await _raceCancel(
+            _withPathLockIfUncached(() => _requestOnce(inner, start, end)));
       } catch (byteErr) {
         if (_cancelled || byteErr is _YtmSourceCancelledException) {
           throw const _YtmSourceCancelledException();
@@ -413,11 +413,8 @@ class YtmResolvingSource extends StreamAudioSource {
       } catch (e, st) {
         // Stale failed future: fall through and create a fresh one instead
         // of handing every waiter the same cached failure (thundering herd).
-        ErrorLogger.log(
-            'Pending inner creation failed, clearing stale pending',
-            error: e,
-            stackTrace: st,
-            category: 'YtmResolvingSource');
+        ErrorLogger.log('Pending inner creation failed, clearing stale pending',
+            error: e, stackTrace: st, category: 'YtmResolvingSource');
         _pending = null;
       }
     }
@@ -559,8 +556,8 @@ class YtmResolvingSource extends StreamAudioSource {
 
     final resolvedUrl = url;
     final cacheFile = await _cacheFileFor(videoId, resolvedUrl, quality);
-    final headers =
-        _playbackHeaders(resolvedUrl, ua: effectiveUa, cookieJar: effectiveCookies);
+    final headers = _playbackHeaders(resolvedUrl,
+        ua: effectiveUa, cookieJar: effectiveCookies);
 
     // Serialize per cache path so two sources for the same videoId never
     // initialize or write the same cache file simultaneously.
@@ -691,8 +688,7 @@ class YtmResolvingSource extends StreamAudioSource {
   /// file — the only way to keep the byte request local — so it pins the
   /// guard's answer instead of reproducing the on-disk layout.
   @visibleForTesting
-  static Future<bool> Function(String videoId)?
-      debugCompleteByteCacheOverride;
+  static Future<bool> Function(String videoId)? debugCompleteByteCacheOverride;
 
   /// Whether a completed byte-cache file already exists for this track.
   ///
@@ -740,9 +736,7 @@ class YtmResolvingSource extends StreamAudioSource {
       // in the URL instead. Attaching it here leaked the live Google session
       // (SAPISID/SID/HSID) to every googlevideo edge node and made the fetch
       // look unlike the web player it claims to be.
-      if (cookieJar != null &&
-          cookieJar.isNotEmpty &&
-          _cookiesBelongOn(url))
+      if (cookieJar != null && cookieJar.isNotEmpty && _cookiesBelongOn(url))
         'Cookie': cookieJar,
       // Native clients (e.g. ANDROID_VR, IOS_MUSIC) stream from googlevideo CDN
       // without a web Referer. Sending 'https://music.youtube.com/' with a native

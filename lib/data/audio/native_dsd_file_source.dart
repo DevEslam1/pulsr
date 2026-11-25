@@ -52,8 +52,7 @@ class NativeDsdFileSource {
   Duration get totalDuration {
     if (_bytesPerSecondPerChannel <= 0) return Duration.zero;
     return Duration(
-      microseconds:
-          (totalBytes / _bytesPerSecondPerChannel * 1000000).round(),
+      microseconds: (totalBytes / _bytesPerSecondPerChannel * 1000000).round(),
     );
   }
 
@@ -180,7 +179,8 @@ class NativeDsdFileSource {
             await raf.setPosition(sub + 12);
             final fs = await raf.read(4);
             if (fs.length == 4) {
-              dsdRate = ByteData.sublistView(fs).getUint32(0, Endian.big) ~/ 44100;
+              dsdRate =
+                  ByteData.sublistView(fs).getUint32(0, Endian.big) ~/ 44100;
             }
           } else if (subId == 'CHNL' && subSize >= 2 && sub + 14 <= end) {
             await raf.setPosition(sub + 12);
@@ -208,7 +208,8 @@ class NativeDsdFileSource {
           await raf.setPosition(pos + 12);
           final fs = await raf.read(4);
           if (fs.length == 4) {
-            dsdRate = ByteData.sublistView(fs).getUint32(0, Endian.big) ~/ 44100;
+            dsdRate =
+                ByteData.sublistView(fs).getUint32(0, Endian.big) ~/ 44100;
           }
         }
       } else if (id == 'DSD ') {

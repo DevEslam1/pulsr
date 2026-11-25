@@ -107,9 +107,11 @@ class AuthService {
     if (!AppConfig.isCloudSyncAllowed) return;
     if (!_googleSignInInitialized) {
       try {
-        await _google.initialize(
-          serverClientId: serverClientId.isNotEmpty ? serverClientId : null,
-        ).timeout(_operationTimeout);
+        await _google
+            .initialize(
+              serverClientId: serverClientId.isNotEmpty ? serverClientId : null,
+            )
+            .timeout(_operationTimeout);
         _googleSignInInitialized = true;
       } catch (e, st) {
         ErrorLogger.log('GoogleSignIn init failed',
@@ -139,9 +141,11 @@ class AuthService {
       }
 
       if (!_googleSignInInitialized) {
-        await _google.initialize(
-          serverClientId: serverClientId.isNotEmpty ? serverClientId : null,
-        ).timeout(_operationTimeout);
+        await _google
+            .initialize(
+              serverClientId: serverClientId.isNotEmpty ? serverClientId : null,
+            )
+            .timeout(_operationTimeout);
         _googleSignInInitialized = true;
       }
 

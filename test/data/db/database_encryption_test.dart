@@ -60,7 +60,8 @@ void main() {
       expect(File('${plain.path}.enc.tmp').existsSync(), isFalse);
     });
 
-    test('plaintext migration preserves schema version, data, indexes and triggers',
+    test(
+        'plaintext migration preserves schema version, data, indexes and triggers',
         () {
       final dir = Directory.systemTemp.createTempSync('pulsr_db_migrate_');
       addTearDown(() => dir.deleteSync(recursive: true));
@@ -106,7 +107,9 @@ void main() {
           1);
     });
 
-    test('recovers interrupted migration and cleans leftover plain.bak when live verifies', () async {
+    test(
+        'recovers interrupted migration and cleans leftover plain.bak when live verifies',
+        () async {
       final dir = Directory.systemTemp.createTempSync('pulsr_db_recover_');
       addTearDown(() => dir.deleteSync(recursive: true));
       final live = File('${dir.path}/pulsr_music_db.sqlite');
@@ -145,7 +148,9 @@ void main() {
       expect(backup.existsSync(), isFalse);
     });
 
-    test('returns missingKeyForEncryptedDb when encrypted DB exists without valid key', () async {
+    test(
+        'returns missingKeyForEncryptedDb when encrypted DB exists without valid key',
+        () async {
       final dir = Directory.systemTemp.createTempSync('pulsr_db_missing_key_');
       addTearDown(() => dir.deleteSync(recursive: true));
       final live = File('${dir.path}/pulsr_music_db.sqlite');

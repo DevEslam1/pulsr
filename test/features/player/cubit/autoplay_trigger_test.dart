@@ -54,9 +54,13 @@ void main() {
     );
   }
 
-  test('0.8 checkAndTriggerAutoplay treats local / downloaded as local queue and does not trigger', () async {
-    final localTrack = buildSong(1, source: SongSource.local, path: '/local/song.mp3', isDownloaded: false);
-    final downloadedTrack = buildSong(2, source: SongSource.youtube, path: 'ytmusic://vid2', isDownloaded: true);
+  test(
+      '0.8 checkAndTriggerAutoplay treats local / downloaded as local queue and does not trigger',
+      () async {
+    final localTrack = buildSong(1,
+        source: SongSource.local, path: '/local/song.mp3', isDownloaded: false);
+    final downloadedTrack = buildSong(2,
+        source: SongSource.youtube, path: 'ytmusic://vid2', isDownloaded: true);
 
     var state = PlayerState(
       playback: PlaybackSlice(
@@ -77,10 +81,13 @@ void main() {
     await controller.checkAndTriggerAutoplay();
 
     // Must not call getRadioTracks because it is a local/downloaded queue
-    verifyNever(() => ytmService.getRadioTracks(any(), limit: any(named: 'limit')));
+    verifyNever(
+        () => ytmService.getRadioTracks(any(), limit: any(named: 'limit')));
   });
 
-  test('0.8 checkAndTriggerAutoplay recognizes https stream, radio, and ytmusic as online queues', () async {
+  test(
+      '0.8 checkAndTriggerAutoplay recognizes https stream, radio, and ytmusic as online queues',
+      () async {
     // 1. https stream track
     final httpsTrack = buildSong(
       10,
@@ -139,7 +146,8 @@ void main() {
       await controller.checkAndTriggerAutoplay();
 
       // Should recognize as online queue (NOT local queue) and invoke recommendations
-      verify(() => ytmService.getRadioTracks(track.remoteId!, limit: any(named: 'limit'))).called(1);
+      verify(() => ytmService.getRadioTracks(track.remoteId!,
+          limit: any(named: 'limit'))).called(1);
     }
   });
 }

@@ -150,7 +150,8 @@ void main() {
   });
 
   group('Phase 4: PulsrSlider Style Gating', () {
-    testWidgets('PlayerSliderStyle.normal selects straight track even if isWavy is true',
+    testWidgets(
+        'PlayerSliderStyle.normal selects straight track even if isWavy is true',
         (tester) async {
       await tester.pumpWidget(
         MaterialApp(
@@ -206,7 +207,8 @@ void main() {
   });
 
   group('Phase 4: PulsrDialog', () {
-    testWidgets('showConfirmDialog pops correctly with custom navigator context',
+    testWidgets(
+        'showConfirmDialog pops correctly with custom navigator context',
         (tester) async {
       await tester.pumpWidget(
         MaterialApp(
@@ -262,7 +264,8 @@ void main() {
 
       expect(find.text('Something went wrong'), findsOneWidget);
       expect(
-        find.text('An unexpected error occurred while displaying this content.'),
+        find.text(
+            'An unexpected error occurred while displaying this content.'),
         findsOneWidget,
       );
       expect(find.text('Try again'), findsOneWidget);
@@ -306,7 +309,8 @@ void main() {
   });
 
   group('Phase 4: CachedArtwork Policy', () {
-    test('RemoteTargetPolicy classifies unsafe localhost fallback as blocked', () {
+    test('RemoteTargetPolicy classifies unsafe localhost fallback as blocked',
+        () {
       expect(
         RemoteTargetPolicy.isAllowed('http://127.0.0.1/evil.jpg'),
         isFalse,

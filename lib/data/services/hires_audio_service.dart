@@ -303,9 +303,8 @@ class HiResAudioService {
             'Bit-perfect rejected by device (${reason ?? 'unknown'}) — falling back to DSP path',
             category: 'HiResAudio');
         try {
-          await _methodChannel
-              .invokeMethod<dynamic>('setBitPerfectMode', {'enabled': false})
-              .timeout(const Duration(seconds: 5));
+          await _methodChannel.invokeMethod<dynamic>('setBitPerfectMode',
+              {'enabled': false}).timeout(const Duration(seconds: 5));
         } catch (e, st) {
           ErrorLogger.log('Failed to rollback bit-perfect mode',
               error: e, stackTrace: st, category: 'HiResAudio');

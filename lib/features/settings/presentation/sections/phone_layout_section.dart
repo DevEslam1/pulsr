@@ -226,8 +226,8 @@ mixin PhoneLayoutSection
                   decoration: BoxDecoration(
                     color: p.goldAccent.withValues(alpha: 0.14),
                     borderRadius: AppRadii.full,
-                    border: Border.all(
-                        color: p.goldAccent.withValues(alpha: 0.45)),
+                    border:
+                        Border.all(color: p.goldAccent.withValues(alpha: 0.45)),
                   ),
                   child: Text(
                     context.l10n.badgeExclusive,

@@ -83,7 +83,8 @@ void main() {
         requestPath: 'Music',
       );
 
-      expect(entries.map((e) => e.name), ['Albums', '01 Intro.mp3', 'one & two.flac']);
+      expect(entries.map((e) => e.name),
+          ['Albums', '01 Intro.mp3', 'one & two.flac']);
       final album = entries.first;
       expect(album.isDirectory, isTrue);
       expect(album.path, 'Music/Albums');
@@ -346,7 +347,8 @@ void main() {
     }
   });
 
-  test('skips 404/403 propstat responses, rejects .. hrefs, and decodes numeric XML entities',
+  test(
+      'skips 404/403 propstat responses, rejects .. hrefs, and decodes numeric XML entities',
       () async {
     const xml = '''<?xml version="1.0"?>
 <d:multistatus xmlns:d="DAV:">

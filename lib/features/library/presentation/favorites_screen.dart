@@ -258,9 +258,8 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
             final onlineFavorites =
                 allFavorites.where((s) => _isOnlineFavorite(s)).toList();
 
-            final currentTabFavorites = _scope == SourceScope.local
-                ? localFavorites
-                : onlineFavorites;
+            final currentTabFavorites =
+                _scope == SourceScope.local ? localFavorites : onlineFavorites;
             final songs = _filterSongs(currentTabFavorites);
 
             return Center(

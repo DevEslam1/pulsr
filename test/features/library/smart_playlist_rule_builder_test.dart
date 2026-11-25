@@ -176,8 +176,7 @@ void main() {
       expect(find.text('1970'), findsOneWidget);
 
       // Delete rule 1
-      final deleteButtons =
-          find.byIcon(Icons.remove_circle_outline_rounded);
+      final deleteButtons = find.byIcon(Icons.remove_circle_outline_rounded);
       expect(deleteButtons, findsNWidgets(2));
       await tester.tap(deleteButtons.first);
       await tester.pump();

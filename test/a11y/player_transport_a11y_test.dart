@@ -7,6 +7,7 @@ import 'package:pulsr/features/player/presentation/widgets/quran_mode_badge.dart
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 Widget _harness(Widget child, {double textScale = 1.0}) {
   return MaterialApp(
     theme: ThemeData.dark().copyWith(extensions: [AuraTheme.defaultDark]),

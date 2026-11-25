@@ -4,12 +4,15 @@ import 'package:pulsr/data/audio/audio_handler.dart';
 import 'package:pulsr/features/settings/cubit/settings_state.dart';
 
 void main() {
-  test('aaudioTargetBufferMs defaults to 120 ms to prevent exclusive XRuns', () {
+  test('aaudioTargetBufferMs defaults to 120 ms to prevent exclusive XRuns',
+      () {
     const state = SettingsState();
     expect(state.aaudioTargetBufferMs, 120);
   });
 
-  test('shouldForwardSystemVolumeToOutput forwards only when OS mixer is bypassed', () {
+  test(
+      'shouldForwardSystemVolumeToOutput forwards only when OS mixer is bypassed',
+      () {
     // Normal shared AudioTrack: OS STREAM_MUSIC already scales hardware output.
     expect(
       PulsrAudioHandler.shouldForwardSystemVolumeToOutput(
@@ -136,7 +139,9 @@ void main() {
   });
 
   group('shouldSeedSystemVolume', () {
-    test('skips when not on Android, when DVC owns gain, or when OS mixer owns output', () {
+    test(
+        'skips when not on Android, when DVC owns gain, or when OS mixer owns output',
+        () {
       expect(
         PulsrAudioHandler.shouldSeedSystemVolume(
           isAndroid: false,
@@ -166,7 +171,9 @@ void main() {
       );
     });
 
-    test('seeds on Android when output bypasses OS mixer and DAC hardware volume does not own gain', () {
+    test(
+        'seeds on Android when output bypasses OS mixer and DAC hardware volume does not own gain',
+        () {
       expect(
         PulsrAudioHandler.shouldSeedSystemVolume(
           isAndroid: true,
@@ -178,7 +185,9 @@ void main() {
       );
     });
 
-    test('preserves external USB hardware slider across normal loads, but seeds fresh stream startup', () {
+    test(
+        'preserves external USB hardware slider across normal loads, but seeds fresh stream startup',
+        () {
       expect(
         PulsrAudioHandler.shouldSeedSystemVolume(
           isAndroid: true,

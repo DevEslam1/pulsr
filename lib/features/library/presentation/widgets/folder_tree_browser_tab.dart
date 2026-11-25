@@ -241,12 +241,12 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
           ..sort((a, b) {
             int cmp;
             if (widget.sortBy == 'songCount') {
-              final ca = representatives[p_path.posix
-                          .normalize(a.replaceAll('\\', '/'))]
+              final ca = representatives[
+                          p_path.posix.normalize(a.replaceAll('\\', '/'))]
                       ?.songCount ??
                   0;
-              final cb = representatives[p_path.posix
-                          .normalize(b.replaceAll('\\', '/'))]
+              final cb = representatives[
+                          p_path.posix.normalize(b.replaceAll('\\', '/'))]
                       ?.songCount ??
                   0;
               cmp = ca.compareTo(cb);
@@ -346,14 +346,16 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
                                     Icon(
                                       Icons.folder_open_rounded,
                                       size: 13,
-                                      color: isLast ? p.accent : p.textSecondary,
+                                      color:
+                                          isLast ? p.accent : p.textSecondary,
                                     ),
                                     const SizedBox(width: AppSpacing.s4),
                                   ],
                                   Text(
                                     breadcrumbs[index],
                                     style: TextStyle(
-                                      color: isLast ? p.accent : p.textSecondary,
+                                      color:
+                                          isLast ? p.accent : p.textSecondary,
                                       fontWeight: isLast
                                           ? FontWeight.w700
                                           : FontWeight.w600,
@@ -454,8 +456,7 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
                                 (remoteUrl != null && remoteUrl.isNotEmpty);
 
                             return Container(
-                              margin:
-                                  const EdgeInsets.symmetric(vertical: 3),
+                              margin: const EdgeInsets.symmetric(vertical: 3),
                               child: Material(
                                 color: p.surfaceContainer,
                                 shape: RoundedRectangleBorder(
@@ -523,8 +524,7 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
                                           tooltip: context
                                               .l10n.browseOpenFolderDetails,
                                           constraints: const BoxConstraints(
-                                            minWidth:
-                                                AppSpacing.minTouchTarget,
+                                            minWidth: AppSpacing.minTouchTarget,
                                             minHeight:
                                                 AppSpacing.minTouchTarget,
                                           ),
@@ -569,8 +569,8 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
                                 .read<PlayerCubit>()
                                 .playSong(childSongs[i], queue: childSongs);
                           },
-                          onMorePressed: () =>
-                              SongOptionsSheet.show(context, song: childSongs[i]),
+                          onMorePressed: () => SongOptionsSheet.show(context,
+                              song: childSongs[i]),
                         ),
                       ),
 

@@ -9,6 +9,7 @@ import 'package:pulsr/features/player/presentation/widgets/exclusive_usb_chip.da
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 class _MockUsbExclusiveService extends Mock implements UsbExclusiveService {}
 
 void main() {

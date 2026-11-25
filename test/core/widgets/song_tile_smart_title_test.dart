@@ -61,7 +61,8 @@ void main() {
       expect(find.text('Mohamed Hamaki - Bahareya'), findsNothing);
     });
 
-    testWidgets('preserves original title and artist when artist is already known',
+    testWidgets(
+        'preserves original title and artist when artist is already known',
         (tester) async {
       await pumpSongTile(
         tester,

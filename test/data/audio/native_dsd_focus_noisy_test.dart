@@ -22,7 +22,8 @@ class _MockUsbExclusiveService extends UsbExclusiveService {
       );
 
   @override
-  Future<bool> startDsdStreaming(DsdAltSettingTuple tuple, {bool strict = true}) async {
+  Future<bool> startDsdStreaming(DsdAltSettingTuple tuple,
+      {bool strict = true}) async {
     isStreamingStarted = true;
     return true;
   }
@@ -35,7 +36,8 @@ class _MockUsbExclusiveService extends UsbExclusiveService {
   }
 
   @override
-  Future<bool> writeDsd(Uint8List left, Uint8List right, {int producerId = 0}) async {
+  Future<bool> writeDsd(Uint8List left, Uint8List right,
+      {int producerId = 0}) async {
     writtenLeft.add(left);
     writtenRight.add(right);
     return true;
@@ -161,14 +163,18 @@ void main() {
       await sub.cancel();
     });
 
-    test('InterruptionStateMachine accurately tracks interruption with effectivelyPlaying DSD', () {
+    test(
+        'InterruptionStateMachine accurately tracks interruption with effectivelyPlaying DSD',
+        () {
       final machine = InterruptionStateMachine();
 
       // Native DSD is active & playing -> isEffectivelyPlaying is true
       const nativeDsdActive = true;
       const nativeDsdPlaying = true;
-      const activePlayerPlaying = false; // standard player is idle because DSD bypasses it
-      final isEffectivelyPlaying = activePlayerPlaying || (nativeDsdActive && nativeDsdPlaying);
+      const activePlayerPlaying =
+          false; // standard player is idle because DSD bypasses it
+      final isEffectivelyPlaying =
+          activePlayerPlaying || (nativeDsdActive && nativeDsdPlaying);
       expect(isEffectivelyPlaying, isTrue);
 
       // 1. Audio focus interruption begins (phone call / pause interruption)
@@ -176,7 +182,8 @@ void main() {
 
       expect(machine.isActive, isTrue);
       expect(machine.wasPlayingBeforeInterruption, isTrue,
-          reason: 'Must capture that Native DSD was actively playing before interruption');
+          reason:
+              'Must capture that Native DSD was actively playing before interruption');
 
       // 2. Interruption ends -> resume is approved
       final shouldResume = machine.end(InterruptionKind.pause);
@@ -184,13 +191,16 @@ void main() {
       expect(machine.isActive, isFalse);
     });
 
-    test('Audio focus loss / pause does not approve resume if effectivelyPlaying was false', () {
+    test(
+        'Audio focus loss / pause does not approve resume if effectivelyPlaying was false',
+        () {
       final machine = InterruptionStateMachine();
 
       const nativeDsdActive = true;
       const nativeDsdPlaying = false; // DSD already paused
       const activePlayerPlaying = false;
-      final isEffectivelyPlaying = activePlayerPlaying || (nativeDsdActive && nativeDsdPlaying);
+      final isEffectivelyPlaying =
+          activePlayerPlaying || (nativeDsdActive && nativeDsdPlaying);
       expect(isEffectivelyPlaying, isFalse);
 
       machine.begin(InterruptionKind.pause, playing: isEffectivelyPlaying);

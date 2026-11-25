@@ -391,7 +391,8 @@ void main() {
     });
   });
 
-  group('All 8 themes Mobile, Short Landscape, Tablet Split, Theme Studio & Theme Picker',
+  group(
+      'All 8 themes Mobile, Short Landscape, Tablet Split, Theme Studio & Theme Picker',
       () {
     late _MockPlayerCubit playerCubit;
     late _MockSettingsCubit settingsCubit;
@@ -428,7 +429,8 @@ void main() {
       lyricsSlice: const LyricsSlice(
         lyrics: [
           LyricsLine(timestamp: Duration(seconds: 10), text: 'Opening verse'),
-          LyricsLine(timestamp: Duration(seconds: 40), text: 'Active chorus line'),
+          LyricsLine(
+              timestamp: Duration(seconds: 40), text: 'Active chorus line'),
           LyricsLine(timestamp: Duration(seconds: 80), text: 'Closing refrain'),
         ],
       ),
@@ -518,7 +520,8 @@ void main() {
             expect(
               tester.takeException(),
               isNull,
-              reason: '${mode.name} overflowed or threw at $size (split=$useSplit)',
+              reason:
+                  '${mode.name} overflowed or threw at $size (split=$useSplit)',
             );
             expect(find.byType(PlayerSurfaceShell), findsOneWidget);
           }

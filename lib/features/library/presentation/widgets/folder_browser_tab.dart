@@ -26,6 +26,7 @@ import '../../cubit/library_cubit.dart';
 import '../../cubit/library_state.dart';
 
 import '../../../../core/utils/pulsr_haptics.dart';
+
 enum _FolderSort { name, count }
 
 class FolderBrowserTab extends StatefulWidget {
@@ -884,9 +885,7 @@ class _FolderBrowserTabState extends State<FolderBrowserTab> {
                         ? Icons.download_done_rounded
                         : Icons.folder_rounded,
                 size: 11,
-                color: folder.isExcluded
-                    ? p.error
-                    : p.accent,
+                color: folder.isExcluded ? p.error : p.accent,
               ),
             ),
           ),

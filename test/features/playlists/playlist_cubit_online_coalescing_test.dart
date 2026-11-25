@@ -138,7 +138,8 @@ void main() {
     await cubit.close();
   });
 
-  test('syncUpdatedPlaylistFromDetail updates liked, custom, and account playlists',
+  test(
+      'syncUpdatedPlaylistFromDetail updates liked, custom, and account playlists',
       () async {
     when(() => account.fetchAccountPlaylists()).thenAnswer((_) async => const [
           YtmAccountPlaylist(
@@ -185,7 +186,8 @@ void main() {
       artworkUrl: 'https://art/new.jpg',
       tracks: const [_track],
     );
-    expect(cubit.onlineState.accountPlaylists.single.title, 'New Account Title');
+    expect(
+        cubit.onlineState.accountPlaylists.single.title, 'New Account Title');
     expect(
       cubit.onlineState.accountPlaylists.single.artworkUrl,
       'https://art/new.jpg',

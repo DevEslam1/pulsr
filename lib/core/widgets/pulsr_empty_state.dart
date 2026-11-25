@@ -49,9 +49,8 @@ class PulsrEmptyState extends StatelessWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final double minH = constraints.maxHeight.isFinite
-            ? constraints.maxHeight * 0.6
-            : 0.0;
+        final double minH =
+            constraints.maxHeight.isFinite ? constraints.maxHeight * 0.6 : 0.0;
         final double subtitleMaxW = constraints.maxWidth >= 600 ? 360.0 : 280.0;
         return Center(
           child: ConstrainedBox(

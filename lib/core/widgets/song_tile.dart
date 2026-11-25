@@ -118,9 +118,8 @@ class _SongTileState extends State<SongTile> {
                               : (p.isDark ? 0.28 : 0.22),
                         )
                       : (_hovered ? p.borderSubtle : Colors.transparent)),
-              width: (widget.selected || isActive) && p.isHighContrast
-                  ? 1.5
-                  : 1.0,
+              width:
+                  (widget.selected || isActive) && p.isHighContrast ? 1.5 : 1.0,
             ),
             boxShadow: isPlaying && p.chromeGlowScale > 0
                 ? [
@@ -137,362 +136,360 @@ class _SongTileState extends State<SongTile> {
           ),
           clipBehavior: Clip.antiAlias,
           child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final availableWidth = constraints.maxWidth.isFinite
-                      ? constraints.maxWidth
-                      : double.infinity;
-                  final isTileNarrow = availableWidth < 280;
-                  final isTileUltraNarrow = availableWidth < 180;
-                  final isTileMicro = availableWidth < 120;
-                  final padH = isTileMicro
-                      ? AppSpacing.xxs
-                      : (isTileUltraNarrow ? AppSpacing.s6 : AppSpacing.s10);
+            builder: (context, constraints) {
+              final availableWidth = constraints.maxWidth.isFinite
+                  ? constraints.maxWidth
+                  : double.infinity;
+              final isTileNarrow = availableWidth < 280;
+              final isTileUltraNarrow = availableWidth < 180;
+              final isTileMicro = availableWidth < 120;
+              final padH = isTileMicro
+                  ? AppSpacing.xxs
+                  : (isTileUltraNarrow ? AppSpacing.s6 : AppSpacing.s10);
 
-                  final showIndex = !isTileUltraNarrow && widget.index != null;
-                  final showArtworkInTile = widget.showArtwork &&
-                      (!isTileMicro || availableWidth >= 70);
-                  final showDurationInTile =
-                      !isTileNarrow && song.durationMs > 0;
-                  final showTrailingInTile = !isTileUltraNarrow &&
-                      (widget.trailing != null || widget.onMorePressed != null);
+              final showIndex = !isTileUltraNarrow && widget.index != null;
+              final showArtworkInTile =
+                  widget.showArtwork && (!isTileMicro || availableWidth >= 70);
+              final showDurationInTile = !isTileNarrow && song.durationMs > 0;
+              final showTrailingInTile = !isTileUltraNarrow &&
+                  (widget.trailing != null || widget.onMorePressed != null);
 
-                  final double effectiveArtwork = isTileMicro
-                      ? 32.0
-                      : (isTileUltraNarrow
-                          ? 36.0
-                          : (isTileNarrow
-                              ? (baseArtwork * 0.85).clamp(36.0, 44.0)
-                              : effectiveArtworkSize));
-                  final double spacingArtwork = isTileMicro
-                      ? 4.0
-                      : (isTileUltraNarrow ? 6.0 : (isCompact ? 8.0 : 12.0));
-                  final double artRadius = effectiveArtwork > 36 ? 12.0 : 8.0;
+              final double effectiveArtwork = isTileMicro
+                  ? 32.0
+                  : (isTileUltraNarrow
+                      ? 36.0
+                      : (isTileNarrow
+                          ? (baseArtwork * 0.85).clamp(36.0, 44.0)
+                          : effectiveArtworkSize));
+              final double spacingArtwork = isTileMicro
+                  ? 4.0
+                  : (isTileUltraNarrow ? 6.0 : (isCompact ? 8.0 : 12.0));
+              final double artRadius = effectiveArtwork > 36 ? 12.0 : 8.0;
 
-                  final vPad = widget.dense ? AppSpacing.s2 : AppSpacing.s6;
-                  return Container(
-                    constraints: BoxConstraints(
-                        minHeight: widget.dense
-                            ? AppSpacing.minTouchTarget
-                            : (isTileNarrow ? 50 : 58)),
-                    padding: EdgeInsetsDirectional.fromSTEB(
-                      padH,
-                      vPad,
-                      showTrailingInTile ? AppSpacing.xxs : padH,
-                      vPad,
-                    ),
-                    child: ClipRect(
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Semantics(
-                              label: context.l10n
-                                  .songByArtist(displayInfo.title, displayInfo.artist),
-                              selected: isActive || widget.selected,
-                              button: true,
-                              excludeSemantics: true,
-                              child: PulsrPressable(
-                                pressedScale: 0.985,
-                                focusBorderRadius: AppRadii.r16All,
-                                onTap: widget.onTap,
-                                onLongPress: widget.onLongPress,
-                                child: Row(
-                                  children: [
-                                    // Active playback vertical pill indicator (when no artwork is shown or in indexed lists)
-                                    if (isActive &&
-                                        !showArtworkInTile &&
-                                        !isTileMicro) ...[
-                                      Container(
-                                        width: 3.5,
-                                        height: 22,
-                                        margin: const EdgeInsetsDirectional.only(
-                                            end: AppSpacing.xs),
-                                        decoration: BoxDecoration(
-                                          color: p.accent,
-                                          borderRadius: AppRadii.full,
-                                        ),
-                                      ),
-                                    ],
-                                    if (showIndex)
-                                      SizedBox(
-                                        width: isCompact ? 24 : 32,
-                                        child: Center(
-                                          child: isActive && !showArtworkInTile
-                                              ? NowPlayingIndicator(
-                                                  color: p.accent,
-                                                  isPlaying: isPlaying)
-                                              : Text(
-                                                  '${widget.index! + 1}',
-                                                  style: TextStyle(
-                                                    color: isActive
-                                                        ? p.accent
-                                                        : p.textTertiary,
-                                                    fontWeight: isActive
-                                                        ? FontWeight.w800
-                                                        : FontWeight.w700,
-                                                    fontSize: isCompact
-                                                        ? AppFontSize.label
-                                                        : AppFontSize.bodySmall,
-                                                    fontFeatures: const [
-                                                      FontFeature.tabularFigures()
-                                                    ],
-                                                  ),
-                                                ),
-                                        ),
-                                      ),
-                                    if (showArtworkInTile) ...[
-                                      SizedBox(
-                                        width: effectiveArtwork,
-                                        height: effectiveArtwork,
-                                        child: widget.selected
-                                            ? Container(
-                                                decoration: BoxDecoration(
-                                                  color: p.accent,
-                                                  borderRadius:
-                                                      AppRadii.circular(artRadius),
-                                                ),
-                                                child: Icon(
-                                                  Icons.check_rounded,
-                                                  color: p.onAccent,
-                                                  size: effectiveArtwork > 36 ? 22 : 18,
-                                                ),
-                                              )
-                                            : DecoratedBox(
-                                                position: DecorationPosition.foreground,
-                                                decoration: BoxDecoration(
-                                                  borderRadius:
-                                                      AppRadii.circular(artRadius),
-                                                  border: Border.all(
-                                                    color: isActive
-                                                        ? p.accent.withValues(
-                                                            alpha: p.isHighContrast
-                                                                ? 0.90
-                                                                : 0.65,
-                                                          )
-                                                        : (p.isDark
-                                                            ? AppColors
-                                                                .specularAt(
-                                                                p.isAmoled
-                                                                    ? 0.14
-                                                                    : 0.10,
-                                                              )
-                                                            : p.hairline),
-                                                    width: isActive ? 1.4 : 0.8,
-                                                  ),
-                                                ),
-                                                child: Stack(
-                                                  fit: StackFit.expand,
-                                                  children: [
-                                                    CachedArtwork(
-                                                      id: song.id,
-                                                      remoteUrl: song.remoteArtworkUrl ??
-                                                          song.artworkUri,
-                                                      albumId: song.albumId,
-                                                      type: ArtworkType.AUDIO,
-                                                      size: effectiveArtwork,
-                                                      borderRadius: artRadius,
-                                                      title: displayInfo.title,
-                                                      artist: displayInfo.artist,
-                                                    ),
-                                                    if (isActive)
-                                                      Container(
-                                                        decoration: BoxDecoration(
-                                                          color: AppColors.scrimAt(0.56),
-                                                          borderRadius: AppRadii.circular(
-                                                              artRadius),
-                                                        ),
-                                                        child: Center(
-                                                          child: NowPlayingIndicator(
-                                                            color: p.isDark
-                                                                ? p.accent
-                                                                : Colors.white,
-                                                            isPlaying: isPlaying,
-                                                          ),
-                                                        ),
-                                                      ),
-                                                  ],
-                                                ),
+              final vPad = widget.dense ? AppSpacing.s2 : AppSpacing.s6;
+              return Container(
+                constraints: BoxConstraints(
+                    minHeight: widget.dense
+                        ? AppSpacing.minTouchTarget
+                        : (isTileNarrow ? 50 : 58)),
+                padding: EdgeInsetsDirectional.fromSTEB(
+                  padH,
+                  vPad,
+                  showTrailingInTile ? AppSpacing.xxs : padH,
+                  vPad,
+                ),
+                child: ClipRect(
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Semantics(
+                          label: context.l10n.songByArtist(
+                              displayInfo.title, displayInfo.artist),
+                          selected: isActive || widget.selected,
+                          button: true,
+                          excludeSemantics: true,
+                          child: PulsrPressable(
+                            pressedScale: 0.985,
+                            focusBorderRadius: AppRadii.r16All,
+                            onTap: widget.onTap,
+                            onLongPress: widget.onLongPress,
+                            child: Row(
+                              children: [
+                                // Active playback vertical pill indicator (when no artwork is shown or in indexed lists)
+                                if (isActive &&
+                                    !showArtworkInTile &&
+                                    !isTileMicro) ...[
+                                  Container(
+                                    width: 3.5,
+                                    height: 22,
+                                    margin: const EdgeInsetsDirectional.only(
+                                        end: AppSpacing.xs),
+                                    decoration: BoxDecoration(
+                                      color: p.accent,
+                                      borderRadius: AppRadii.full,
+                                    ),
+                                  ),
+                                ],
+                                if (showIndex)
+                                  SizedBox(
+                                    width: isCompact ? 24 : 32,
+                                    child: Center(
+                                      child: isActive && !showArtworkInTile
+                                          ? NowPlayingIndicator(
+                                              color: p.accent,
+                                              isPlaying: isPlaying)
+                                          : Text(
+                                              '${widget.index! + 1}',
+                                              style: TextStyle(
+                                                color: isActive
+                                                    ? p.accent
+                                                    : p.textTertiary,
+                                                fontWeight: isActive
+                                                    ? FontWeight.w800
+                                                    : FontWeight.w700,
+                                                fontSize: isCompact
+                                                    ? AppFontSize.label
+                                                    : AppFontSize.bodySmall,
+                                                fontFeatures: const [
+                                                  FontFeature.tabularFigures()
+                                                ],
                                               ),
-                                      ),
-                                      SizedBox(width: spacingArtwork),
-                                    ],
-                                    Expanded(
-                                      child: LayoutBuilder(
-                                        builder: (context, textConstraints) {
-                                          final textScale =
-                                              MediaQuery.textScalerOf(context)
-                                                  .scale(1.0);
-                                          final titleFontSize =
-                                              isCompact || isTileNarrow
-                                                  ? AppFontSize.bodySmall
-                                                  : AppFontSize.body;
-                                          final content = SizedBox(
-                                            width: textConstraints.maxWidth,
-                                            child: Column(
-                                              mainAxisSize: MainAxisSize.min,
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
+                                            ),
+                                    ),
+                                  ),
+                                if (showArtworkInTile) ...[
+                                  SizedBox(
+                                    width: effectiveArtwork,
+                                    height: effectiveArtwork,
+                                    child: widget.selected
+                                        ? Container(
+                                            decoration: BoxDecoration(
+                                              color: p.accent,
+                                              borderRadius:
+                                                  AppRadii.circular(artRadius),
+                                            ),
+                                            child: Icon(
+                                              Icons.check_rounded,
+                                              color: p.onAccent,
+                                              size: effectiveArtwork > 36
+                                                  ? 22
+                                                  : 18,
+                                            ),
+                                          )
+                                        : DecoratedBox(
+                                            position:
+                                                DecorationPosition.foreground,
+                                            decoration: BoxDecoration(
+                                              borderRadius:
+                                                  AppRadii.circular(artRadius),
+                                              border: Border.all(
+                                                color: isActive
+                                                    ? p.accent.withValues(
+                                                        alpha: p.isHighContrast
+                                                            ? 0.90
+                                                            : 0.65,
+                                                      )
+                                                    : (p.isDark
+                                                        ? AppColors.specularAt(
+                                                            p.isAmoled
+                                                                ? 0.14
+                                                                : 0.10,
+                                                          )
+                                                        : p.hairline),
+                                                width: isActive ? 1.4 : 0.8,
+                                              ),
+                                            ),
+                                            child: Stack(
+                                              fit: StackFit.expand,
                                               children: [
-                                                Text(
-                                                  displayInfo.title,
-                                                  maxLines: 1,
-                                                  overflow: TextOverflow.ellipsis,
-                                                  style: TextStyle(
-                                                    color: isActive
-                                                        ? p.accent
-                                                        : p.textPrimary,
-                                                    fontWeight: isActive
-                                                        ? FontWeight.w800
-                                                        : FontWeight.w600,
-                                                    letterSpacing:
-                                                        AppTracking.title,
-                                                    fontSize: titleFontSize,
-                                                    height: 1.25,
-                                                  ),
+                                                CachedArtwork(
+                                                  id: song.id,
+                                                  remoteUrl:
+                                                      song.remoteArtworkUrl ??
+                                                          song.artworkUri,
+                                                  albumId: song.albumId,
+                                                  type: ArtworkType.AUDIO,
+                                                  size: effectiveArtwork,
+                                                  borderRadius: artRadius,
+                                                  title: displayInfo.title,
+                                                  artist: displayInfo.artist,
                                                 ),
-                                                const SizedBox(
-                                                    height: AppSpacing.s2),
-                                                Row(
-                                                  crossAxisAlignment:
-                                                      CrossAxisAlignment.center,
-                                                  children: [
-                                                    if (isDownloadedTrack) ...[
-                                                      Container(
-                                                        width:
-                                                            isCompact ? 14 : 15,
-                                                        height:
-                                                            isCompact ? 14 : 15,
-                                                        decoration:
-                                                            BoxDecoration(
-                                                          color: p.accent
-                                                              .withValues(
-                                                            alpha: p.isDark
-                                                                ? 0.16
-                                                                : 0.14,
-                                                          ),
-                                                          shape:
-                                                              BoxShape.circle,
-                                                        ),
-                                                        child: Icon(
-                                                          Icons
-                                                              .arrow_downward_rounded,
-                                                          size: isCompact
-                                                              ? 9.5
-                                                              : 10.5,
-                                                          color: p.accent,
-                                                        ),
-                                                      ),
-                                                      const SizedBox(
-                                                          width: AppSpacing.s6),
-                                                    ],
-                                                    Expanded(
-                                                      child: Text(
-                                                        widget.subtitleOverride ??
-                                                            displayInfo.artist,
-                                                        maxLines: 1,
-                                                        overflow: TextOverflow
-                                                            .ellipsis,
-                                                        style: TextStyle(
-                                                          color: isActive
-                                                              ? (p.isHighContrast
-                                                                  ? p.textPrimary
-                                                                  : p.textPrimary
-                                                                      .withValues(
-                                                                          alpha:
-                                                                              0.80))
-                                                              : p.textSecondary,
-                                                          fontWeight:
-                                                              FontWeight.w500,
-                                                          fontSize:
-                                                              AppFontSize.label,
-                                                          height: 1.25,
-                                                        ),
+                                                if (isActive)
+                                                  Container(
+                                                    decoration: BoxDecoration(
+                                                      color: AppColors.scrimAt(
+                                                          0.56),
+                                                      borderRadius:
+                                                          AppRadii.circular(
+                                                              artRadius),
+                                                    ),
+                                                    child: Center(
+                                                      child:
+                                                          NowPlayingIndicator(
+                                                        color: p.isDark
+                                                            ? p.accent
+                                                            : Colors.white,
+                                                        isPlaying: isPlaying,
                                                       ),
                                                     ),
-                                                  ],
+                                                  ),
+                                              ],
+                                            ),
+                                          ),
+                                  ),
+                                  SizedBox(width: spacingArtwork),
+                                ],
+                                Expanded(
+                                  child: LayoutBuilder(
+                                    builder: (context, textConstraints) {
+                                      final textScale =
+                                          MediaQuery.textScalerOf(context)
+                                              .scale(1.0);
+                                      final titleFontSize =
+                                          isCompact || isTileNarrow
+                                              ? AppFontSize.bodySmall
+                                              : AppFontSize.body;
+                                      final content = SizedBox(
+                                        width: textConstraints.maxWidth,
+                                        child: Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              displayInfo.title,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(
+                                                color: isActive
+                                                    ? p.accent
+                                                    : p.textPrimary,
+                                                fontWeight: isActive
+                                                    ? FontWeight.w800
+                                                    : FontWeight.w600,
+                                                letterSpacing:
+                                                    AppTracking.title,
+                                                fontSize: titleFontSize,
+                                                height: 1.25,
+                                              ),
+                                            ),
+                                            const SizedBox(
+                                                height: AppSpacing.s2),
+                                            Row(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.center,
+                                              children: [
+                                                if (isDownloadedTrack) ...[
+                                                  Container(
+                                                    width: isCompact ? 14 : 15,
+                                                    height: isCompact ? 14 : 15,
+                                                    decoration: BoxDecoration(
+                                                      color:
+                                                          p.accent.withValues(
+                                                        alpha: p.isDark
+                                                            ? 0.16
+                                                            : 0.14,
+                                                      ),
+                                                      shape: BoxShape.circle,
+                                                    ),
+                                                    child: Icon(
+                                                      Icons
+                                                          .arrow_downward_rounded,
+                                                      size: isCompact
+                                                          ? 9.5
+                                                          : 10.5,
+                                                      color: p.accent,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(
+                                                      width: AppSpacing.s6),
+                                                ],
+                                                Expanded(
+                                                  child: Text(
+                                                    widget.subtitleOverride ??
+                                                        displayInfo.artist,
+                                                    maxLines: 1,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                    style: TextStyle(
+                                                      color: isActive
+                                                          ? (p.isHighContrast
+                                                              ? p.textPrimary
+                                                              : p.textPrimary
+                                                                  .withValues(
+                                                                      alpha:
+                                                                          0.80))
+                                                          : p.textSecondary,
+                                                      fontWeight:
+                                                          FontWeight.w500,
+                                                      fontSize:
+                                                          AppFontSize.label,
+                                                      height: 1.25,
+                                                    ),
+                                                  ),
                                                 ),
                                               ],
                                             ),
-                                          );
-                                          // FittedBox cancels the user's text-size
-                                          // setting by shrinking the row back down.
-                                          // Above 1.3x let text lay out at its real
-                                          // size unless a fixed-height parent
-                                          // constrains height tighter than the text.
-                                          final estimatedHeight =
-                                              (titleFontSize +
-                                                          AppFontSize.label) *
-                                                      textScale *
-                                                      1.35 +
-                                                  AppSpacing.s2;
-                                          final overflowsBound =
-                                              textConstraints.hasBoundedHeight &&
-                                                  textConstraints.maxHeight >
-                                                      0 &&
-                                                  estimatedHeight >
-                                                      textConstraints.maxHeight;
-                                          return textScale > 1.3 &&
-                                                  !overflowsBound
-                                              ? content
-                                              : FittedBox(
-                                                  fit: BoxFit.scaleDown,
-                                                  alignment:
-                                                      AlignmentDirectional
-                                                          .centerStart,
-                                                  child: content,
-                                                );
-                                        },
-                                      ),
-                                    ),
-                                    if (showDurationInTile) ...[
-                                      const SizedBox(width: AppSpacing.xs),
-                                      Text(
-                                        Formatters.formatDurationMs(song.durationMs),
-                                        style: TextStyle(
-                                          color: isActive
-                                              ? p.accent.withValues(alpha: 0.85)
-                                              : p.textTertiary,
-                                          fontSize: isCompact
-                                              ? AppFontSize.caption
-                                              : AppFontSize.label,
-                                          fontWeight: FontWeight.w600,
-                                          fontFeatures: const [
-                                            FontFeature.tabularFigures()
                                           ],
                                         ),
-                                      ),
-                                    ],
-                                  ],
+                                      );
+                                      // FittedBox cancels the user's text-size
+                                      // setting by shrinking the row back down.
+                                      // Above 1.3x let text lay out at its real
+                                      // size unless a fixed-height parent
+                                      // constrains height tighter than the text.
+                                      final estimatedHeight =
+                                          (titleFontSize + AppFontSize.label) *
+                                                  textScale *
+                                                  1.35 +
+                                              AppSpacing.s2;
+                                      final overflowsBound =
+                                          textConstraints.hasBoundedHeight &&
+                                              textConstraints.maxHeight > 0 &&
+                                              estimatedHeight >
+                                                  textConstraints.maxHeight;
+                                      return textScale > 1.3 && !overflowsBound
+                                          ? content
+                                          : FittedBox(
+                                              fit: BoxFit.scaleDown,
+                                              alignment: AlignmentDirectional
+                                                  .centerStart,
+                                              child: content,
+                                            );
+                                    },
+                                  ),
                                 ),
-                              ),
+                                if (showDurationInTile) ...[
+                                  const SizedBox(width: AppSpacing.xs),
+                                  Text(
+                                    Formatters.formatDurationMs(
+                                        song.durationMs),
+                                    style: TextStyle(
+                                      color: isActive
+                                          ? p.accent.withValues(alpha: 0.85)
+                                          : p.textTertiary,
+                                      fontSize: isCompact
+                                          ? AppFontSize.caption
+                                          : AppFontSize.label,
+                                      fontWeight: FontWeight.w600,
+                                      fontFeatures: const [
+                                        FontFeature.tabularFigures()
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ],
                             ),
                           ),
-                          if (showTrailingInTile) ...[
-                            if (widget.trailing != null)
-                              RepaintBoundary(child: widget.trailing!),
-                            if (widget.onMorePressed != null)
-                              RepaintBoundary(
-                                child: IconButton(
-                                  constraints: const BoxConstraints(
-                                    minWidth: AppSpacing.minTouchTarget,
-                                    minHeight: AppSpacing.minTouchTarget,
-                                  ),
-                                  icon: Icon(
-                                    Icons.more_vert_rounded,
-                                    size: 20,
-                                    color: p.textTertiary,
-                                  ),
-                                  tooltip: MaterialLocalizations.of(context)
-                                      .moreButtonTooltip,
-                                  onPressed: widget.onMorePressed,
-                                ),
-                              ),
-                          ],
-                        ],
+                        ),
                       ),
-                    ),
-                  );
-                },
-              ),
+                      if (showTrailingInTile) ...[
+                        if (widget.trailing != null)
+                          RepaintBoundary(child: widget.trailing!),
+                        if (widget.onMorePressed != null)
+                          RepaintBoundary(
+                            child: IconButton(
+                              constraints: const BoxConstraints(
+                                minWidth: AppSpacing.minTouchTarget,
+                                minHeight: AppSpacing.minTouchTarget,
+                              ),
+                              icon: Icon(
+                                Icons.more_vert_rounded,
+                                size: 20,
+                                color: p.textTertiary,
+                              ),
+                              tooltip: MaterialLocalizations.of(context)
+                                  .moreButtonTooltip,
+                              onPressed: widget.onMorePressed,
+                            ),
+                          ),
+                      ],
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
         );
 
         final tile = MouseRegion(

@@ -462,7 +462,9 @@ void main() {
       );
     });
 
-    test('SafeModeController concurrent recordFailure calls preserving exact count', () async {
+    test(
+        'SafeModeController concurrent recordFailure calls preserving exact count',
+        () async {
       final futures = <Future<void>>[];
       for (var i = 0; i < 10; i++) {
         futures.add(controller.recordFailure('Pixel 8', 'failure-$i'));

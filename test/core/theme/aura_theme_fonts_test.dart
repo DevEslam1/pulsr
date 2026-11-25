@@ -102,7 +102,8 @@ void main() {
         deepShade: Colors.black,
       );
       expect(customPalette.accentMedium, equals(green.withValues(alpha: 0.25)));
-      expect(customPalette.accentMedium, isNot(equals(const Color(0x409B9EF5))));
+      expect(
+          customPalette.accentMedium, isNot(equals(const Color(0x409B9EF5))));
     });
 
     test('switch and slider thumbs use palette tokens instead of raw white',

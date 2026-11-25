@@ -57,10 +57,8 @@ class MeshGradientPlaceholder extends StatelessWidget {
     final cleanTitle = clean(title ?? '');
     final cleanArtist = clean(artist ?? '');
 
-    final titleWords = cleanTitle
-        .split(RegExp(r'\s+'))
-        .where((w) => w.isNotEmpty)
-        .toList();
+    final titleWords =
+        cleanTitle.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
 
     if (titleWords.isEmpty) {
       if (cleanArtist.isNotEmpty) {
@@ -293,8 +291,7 @@ class MeshGradientPlaceholder extends StatelessWidget {
             ),
           );
         } else {
-          final glyph =
-              _categoryGlyphs[effectiveSeed % _categoryGlyphs.length];
+          final glyph = _categoryGlyphs[effectiveSeed % _categoryGlyphs.length];
           centerContent = Icon(
             glyph,
             color: AppColors.specularAt(0.90),

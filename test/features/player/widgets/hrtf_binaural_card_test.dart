@@ -52,12 +52,14 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('HRTF 3D Binaural Spatializer'), findsOneWidget);
-    expect(find.text('Partitioned SOFA/HRIR convolution for 3D realism'), findsOneWidget);
+    expect(find.text('Partitioned SOFA/HRIR convolution for 3D realism'),
+        findsOneWidget);
     expect(find.byType(Switch), findsOneWidget);
     expect(find.text('Virtual Speaker Azimuth'), findsNothing);
   });
 
-  testWidgets('Toggling HRTF on reveals Azimuth and Elevation controls', (tester) async {
+  testWidgets('Toggling HRTF on reveals Azimuth and Elevation controls',
+      (tester) async {
     when(() => mockCubit.setHrtfBinaural(
           any(),
           azimuth: any(named: 'azimuth'),
@@ -83,14 +85,20 @@ void main() {
         )).called(1);
   });
 
-  testWidgets('Shows blocked by bit-perfect message when blockedReason is provided', (tester) async {
-    await tester.pumpWidget(buildCard(blockedReason: 'Bit-perfect direct stream active'));
+  testWidgets(
+      'Shows blocked by bit-perfect message when blockedReason is provided',
+      (tester) async {
+    await tester.pumpWidget(
+        buildCard(blockedReason: 'Bit-perfect direct stream active'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Blocked by Bit-Perfect (Bit-perfect direct stream active)'), findsOneWidget);
+    expect(
+        find.text('Blocked by Bit-Perfect (Bit-perfect direct stream active)'),
+        findsOneWidget);
   });
 
-  testWidgets('Warns about mutual exclusivity when Crossfeed is active', (tester) async {
+  testWidgets('Warns about mutual exclusivity when Crossfeed is active',
+      (tester) async {
     when(() => mockCubit.state).thenReturn(
       const PlayerState(
         dsp: DspSlice(
@@ -111,6 +119,9 @@ void main() {
     await tester.tap(find.byType(Switch));
     await tester.pumpAndSettle();
 
-    expect(find.text('Mutually exclusive: Engaging HRTF disables Headphone Crossfeed.'), findsOneWidget);
+    expect(
+        find.text(
+            'Mutually exclusive: Engaging HRTF disables Headphone Crossfeed.'),
+        findsOneWidget);
   });
 }

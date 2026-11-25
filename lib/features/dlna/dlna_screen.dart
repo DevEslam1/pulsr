@@ -305,8 +305,7 @@ class _DlnaScreenState extends State<DlnaScreen> {
           enabled: !busy && selected != null,
           label: DlnaStrings.castFileSemantics,
           child: OutlinedButton.icon(
-            onPressed:
-                busy || selected == null ? null : _pickAndCast,
+            onPressed: busy || selected == null ? null : _pickAndCast,
             icon: const Icon(Icons.audio_file_rounded),
             label: Text(DlnaStrings.castFile),
             style: OutlinedButton.styleFrom(
@@ -710,14 +709,10 @@ class _NowPlayingCard extends StatelessWidget {
                 button: true,
                 label: paused ? DlnaStrings.resume : DlnaStrings.pause,
                 child: IconButton(
-                  onPressed: canPause
-                      ? (paused ? onResume : onPause)
-                      : null,
+                  onPressed: canPause ? (paused ? onResume : onPause) : null,
                   tooltip: paused ? DlnaStrings.resume : DlnaStrings.pause,
                   icon: Icon(
-                    paused
-                        ? Icons.play_arrow_rounded
-                        : Icons.pause_rounded,
+                    paused ? Icons.play_arrow_rounded : Icons.pause_rounded,
                   ),
                   style: IconButton.styleFrom(
                     backgroundColor: palette.accentContainer,

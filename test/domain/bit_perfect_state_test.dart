@@ -157,7 +157,8 @@ void main() {
     });
 
     test('a serious format finding outranks an unreadable gain', () {
-      final state = _resolve(softwareGainUnknown: true, sourceSampleRate: 44100);
+      final state =
+          _resolve(softwareGainUnknown: true, sourceSampleRate: 44100);
       expect(state.assessment.verdict, BitPerfectChainVerdict.resampled);
       expect(state.reasonCode, 'rate_mismatch');
     });
@@ -243,8 +244,8 @@ void main() {
 
   group('BitPerfectState keeps the explanation it has', () {
     test('an armed state preserves the platform failure text', () {
-      final state =
-          _resolve(sinkActive: false, failureReason: 'mixer_attributes_rejected');
+      final state = _resolve(
+          sinkActive: false, failureReason: 'mixer_attributes_rejected');
       expect(state.tier, BitPerfectTier.armed);
       expect(state.reasonCode, 'mixer_attributes_rejected');
       expect(state.assessment.reasonCode, 'mixer_attributes_rejected');

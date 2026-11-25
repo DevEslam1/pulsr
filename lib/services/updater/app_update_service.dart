@@ -169,8 +169,7 @@ class UpdateInfo {
 class AppUpdateService {
   static final AppUpdateService instance = AppUpdateService._internal();
 
-  AppUpdateService._internal({http.Client? client})
-      : _injectedClient = client;
+  AppUpdateService._internal({http.Client? client}) : _injectedClient = client;
 
   factory AppUpdateService({http.Client? client}) {
     if (client != null) {
@@ -191,7 +190,8 @@ class AppUpdateService {
 
   final http.Client? _injectedClient;
   http.Client? _ownedClient;
-  http.Client get _client => _injectedClient ?? (_ownedClient ??= http.Client());
+  http.Client get _client =>
+      _injectedClient ?? (_ownedClient ??= http.Client());
 
   String _repo = defaultRepo;
   bool _isChecking = false;
@@ -374,7 +374,8 @@ class AppUpdateService {
       http.StreamedResponse? response;
       const maxRedirects = 5;
       for (var hop = 0; hop <= maxRedirects; hop++) {
-        final request = http.Request('GET', currentUri)..followRedirects = false;
+        final request = http.Request('GET', currentUri)
+          ..followRedirects = false;
         final candidate = await _client.send(request).timeout(requestTimeout);
         final status = candidate.statusCode;
 
@@ -402,7 +403,8 @@ class AppUpdateService {
       }
 
       if (response == null) {
-        throw const HttpException('No HTTP response received while fetching APK');
+        throw const HttpException(
+            'No HTTP response received while fetching APK');
       }
       if (response.statusCode != 200) {
         await response.stream.listen((_) {}, onError: (_) {}).cancel();

@@ -142,8 +142,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               behavior: SnackBarBehavior.floating,
               action: SnackBarAction(
                 label: context.l10n.skipAction,
-                onPressed:
-                    completeOnSuccess ? _completeOnboarding : _nextPage,
+                onPressed: completeOnSuccess ? _completeOnboarding : _nextPage,
               ),
             ),
           );
@@ -1056,9 +1055,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         _notificationsGranted
                             ? Icons.notifications_active_rounded
                             : Icons.notifications_none_rounded,
-                        color: _notificationsGranted
-                            ? p.success
-                            : p.textSecondary,
+                        color:
+                            _notificationsGranted ? p.success : p.textSecondary,
                         size: 20,
                       ),
                       const SizedBox(width: AppSpacing.xs),

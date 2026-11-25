@@ -7,6 +7,7 @@ import 'package:pulsr/features/player/presentation/widgets/player_controls.dart'
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 Widget host({
   required bool isPlaying,
   required bool isBuffering,

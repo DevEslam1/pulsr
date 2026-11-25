@@ -6,18 +6,28 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/utils/waveform_generator.dart';
 
-Uint8List _createValidWav({required int sampleCount, int sampleRate = 44100, int channels = 1}) {
+Uint8List _createValidWav(
+    {required int sampleCount, int sampleRate = 44100, int channels = 1}) {
   final dataSize = sampleCount * 2 * channels;
   final totalSize = 36 + dataSize;
   final b = ByteData(44 + dataSize);
 
   // 'RIFF'
-  b.setUint8(0, 0x52); b.setUint8(1, 0x49); b.setUint8(2, 0x46); b.setUint8(3, 0x46);
+  b.setUint8(0, 0x52);
+  b.setUint8(1, 0x49);
+  b.setUint8(2, 0x46);
+  b.setUint8(3, 0x46);
   b.setUint32(4, totalSize, Endian.little);
   // 'WAVE'
-  b.setUint8(8, 0x57); b.setUint8(9, 0x41); b.setUint8(10, 0x56); b.setUint8(11, 0x45);
+  b.setUint8(8, 0x57);
+  b.setUint8(9, 0x41);
+  b.setUint8(10, 0x56);
+  b.setUint8(11, 0x45);
   // 'fmt '
-  b.setUint8(12, 0x66); b.setUint8(13, 0x6d); b.setUint8(14, 0x74); b.setUint8(15, 0x20);
+  b.setUint8(12, 0x66);
+  b.setUint8(13, 0x6d);
+  b.setUint8(14, 0x74);
+  b.setUint8(15, 0x20);
   b.setUint32(16, 16, Endian.little); // chunk size
   b.setUint16(20, 1, Endian.little); // PCM format = 1
   b.setUint16(22, channels, Endian.little);
@@ -26,7 +36,10 @@ Uint8List _createValidWav({required int sampleCount, int sampleRate = 44100, int
   b.setUint16(32, channels * 2, Endian.little); // block align
   b.setUint16(34, 16, Endian.little); // bits per sample
   // 'data'
-  b.setUint8(36, 0x64); b.setUint8(37, 0x61); b.setUint8(38, 0x74); b.setUint8(39, 0x61);
+  b.setUint8(36, 0x64);
+  b.setUint8(37, 0x61);
+  b.setUint8(38, 0x74);
+  b.setUint8(39, 0x61);
   b.setUint32(40, dataSize, Endian.little);
 
   return b.buffer.asUint8List();
@@ -239,8 +252,11 @@ void main() {
       expect(samples.toSet().length, greaterThan(1));
     });
 
-    test('compressed file without RIFF/WAVE header falls back to deterministic waveform', () async {
-      final file = File('${tempDir.path}${Platform.pathSeparator}compressed.mp3');
+    test(
+        'compressed file without RIFF/WAVE header falls back to deterministic waveform',
+        () async {
+      final file =
+          File('${tempDir.path}${Platform.pathSeparator}compressed.mp3');
       // Simulated MP3 sync frame + random compressed payload
       final mp3Bytes = Uint8List(2048);
       mp3Bytes[0] = 0xFF;

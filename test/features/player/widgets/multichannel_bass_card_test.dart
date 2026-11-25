@@ -63,12 +63,18 @@ void main() {
     });
 
     test('stageDisplayName provides readable labels', () {
-      expect(DspBatteryEstimate.stageDisplayName('reverb'), 'Convolution Reverb');
-      expect(DspBatteryEstimate.stageDisplayName('saturation'), 'Harmonic Saturation');
-      expect(DspBatteryEstimate.stageDisplayName('lfeCrossover'), 'LFE Bass Management');
-      expect(DspBatteryEstimate.stageDisplayName('channelManager'), 'Channel Manager');
-      expect(DspBatteryEstimate.stageDisplayName('limiter'), 'True Peak Limiter');
-      expect(DspBatteryEstimate.stageDisplayName('unknown_custom'), 'unknown_custom');
+      expect(
+          DspBatteryEstimate.stageDisplayName('reverb'), 'Convolution Reverb');
+      expect(DspBatteryEstimate.stageDisplayName('saturation'),
+          'Harmonic Saturation');
+      expect(DspBatteryEstimate.stageDisplayName('lfeCrossover'),
+          'LFE Bass Management');
+      expect(DspBatteryEstimate.stageDisplayName('channelManager'),
+          'Channel Manager');
+      expect(
+          DspBatteryEstimate.stageDisplayName('limiter'), 'True Peak Limiter');
+      expect(DspBatteryEstimate.stageDisplayName('unknown_custom'),
+          'unknown_custom');
     });
   });
 
@@ -146,8 +152,10 @@ void main() {
       SharedPreferences.setMockInitialValues({
         PrefsKeys.channelManagerEnabled: true,
         PrefsKeys.channelManagerChannelCount: 6,
-        PrefsKeys.channelManagerTrims: json.encode([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]),
-        PrefsKeys.channelManagerDelays: json.encode([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]),
+        PrefsKeys.channelManagerTrims:
+            json.encode([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]),
+        PrefsKeys.channelManagerDelays:
+            json.encode([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]),
         PrefsKeys.lfeCrossoverEnabled: true,
         PrefsKeys.lfeCrossoverHz: 80.0,
         PrefsKeys.lfeLowPassHz: 120.0,
@@ -158,16 +166,19 @@ void main() {
       });
     });
 
-    testWidgets('hides when output is stereo and forceVisible is false', (tester) async {
+    testWidgets('hides when output is stereo and forceVisible is false',
+        (tester) async {
       await pumpCard(tester, settingsState: stereoState, forceVisible: false);
       expect(find.text('Multichannel Speaker Alignment'), findsNothing);
       expect(find.text('LFE Crossover & Bass Management'), findsNothing);
     });
 
-    testWidgets('renders when output is multichannel (>2 channels)', (tester) async {
+    testWidgets('renders when output is multichannel (>2 channels)',
+        (tester) async {
       await pumpCard(tester, settingsState: multichannelState);
       expect(find.text('Multichannel Speaker Alignment'), findsOneWidget);
-      expect(find.textContaining('AAudio is limited to 2 channels on Android'), findsOneWidget);
+      expect(find.textContaining('AAudio is limited to 2 channels on Android'),
+          findsOneWidget);
       expect(find.text('LFE Crossover & Bass Management'), findsOneWidget);
       expect(find.text('Speaker Layout'), findsOneWidget);
       expect(find.text('5.1 (6 channels)'), findsOneWidget);
@@ -179,13 +190,15 @@ void main() {
       expect(find.text('Redirect Satellite Bass'), findsOneWidget);
     });
 
-    testWidgets('renders when forceVisible is true even on stereo', (tester) async {
+    testWidgets('renders when forceVisible is true even on stereo',
+        (tester) async {
       await pumpCard(tester, settingsState: stereoState, forceVisible: true);
       expect(find.text('Multichannel Speaker Alignment'), findsOneWidget);
       expect(find.text('LFE Crossover & Bass Management'), findsOneWidget);
     });
 
-    testWidgets('switches layout count and selects speaker channels', (tester) async {
+    testWidgets('switches layout count and selects speaker channels',
+        (tester) async {
       await pumpCard(tester, settingsState: multichannelState);
       expect(find.text('7.1 (8 ch)'), findsOneWidget);
 

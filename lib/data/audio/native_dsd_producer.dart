@@ -243,10 +243,8 @@ class NativeDsdProducer {
             _state = NativeDsdProducerState.completed;
             break;
           }
-          chunkL =
-              _sourceMsbFirst ? reverseBits(chunk.left) : chunk.left;
-          chunkR =
-              _sourceMsbFirst ? reverseBits(chunk.right) : chunk.right;
+          chunkL = _sourceMsbFirst ? reverseBits(chunk.left) : chunk.left;
+          chunkR = _sourceMsbFirst ? reverseBits(chunk.right) : chunk.right;
         } else {
           final offset = _currentByteOffset;
           final remaining = _totalBytes - offset;
@@ -255,10 +253,10 @@ class NativeDsdProducer {
             break;
           }
           final currentChunk = math.min(_chunkSize, remaining);
-          chunkL = Uint8List.sublistView(
-              _dsdLeft!, offset, offset + currentChunk);
-          chunkR = Uint8List.sublistView(
-              _dsdRight!, offset, offset + currentChunk);
+          chunkL =
+              Uint8List.sublistView(_dsdLeft!, offset, offset + currentChunk);
+          chunkR =
+              Uint8List.sublistView(_dsdRight!, offset, offset + currentChunk);
         }
         final ok = await _writeWithRetry(chunkL, chunkR);
         if (!ok) break;

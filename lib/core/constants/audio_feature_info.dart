@@ -567,7 +567,8 @@ class AudioFeatureRegistry {
   static const arbitraryEq = AudioFeatureInfo(
     id: 'arbitraryEq',
     title: 'Arbitrary Response EQ (GraphicEq)',
-    subtitle: 'EqualizerAPO graphic response curve parser & 4096-tap FIR filter',
+    subtitle:
+        'EqualizerAPO graphic response curve parser & 4096-tap FIR filter',
     description:
         'Parses standard EqualizerAPO "GraphicEq: <freq> <gain>; ..." curve specifications. Computes log-frequency interpolated frequency response and synthesizes a 4096-tap windowed FIR impulse response at the engine sample rate for exact acoustic matching. Minimum-phase by default (zero extra delay); enable Linear-phase FIR for constant group delay and exact phase at the cost of pre-ringing. Disabled during Bit-Perfect.',
     conflictsWith: 'Bit-Perfect bypass',
@@ -597,7 +598,8 @@ class AudioFeatureRegistry {
   static const lfeCrossover = AudioFeatureInfo(
     id: 'lfeCrossover',
     title: 'LFE Crossover & Bass Management',
-    subtitle: 'Linkwitz-Riley satellite HPF & dedicated subwoofer LFE crossover',
+    subtitle:
+        'Linkwitz-Riley satellite HPF & dedicated subwoofer LFE crossover',
     description:
         'Applies 2nd/4th order Linkwitz-Riley high-pass filtering (40–200 Hz) to satellite channels, redirects low-frequency content into the dedicated LFE channel, and applies a low-pass filter (60–250 Hz) and gain trim (-12 to +12 dB) to the LFE subwoofer output. Disabled during Bit-Perfect.',
     conflictsWith: 'Bit-Perfect bypass',

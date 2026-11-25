@@ -140,7 +140,8 @@ class PlayerToolsSheet extends StatelessWidget {
       ),
     );
     if (action == null || !context.mounted) return;
-    final currentSong = playerCubit.state.currentSong ?? props.state.currentSong;
+    final currentSong =
+        playerCubit.state.currentSong ?? props.state.currentSong;
     switch (action) {
       case _PlayerToolAction.equalizer:
         await EqualizerSheet.show(context);
@@ -285,10 +286,10 @@ class PlayerToolsSheet extends StatelessWidget {
                     ? l10n.googleCast
                     : (outputDevice?.deviceName ?? l10n.audioQuality);
                 return _ToolActionTile(
-                  icon: isCast ? Icons.cast_connected_rounded : deviceOutputIcon,
-                  iconColor: isCast
-                      ? p.info
-                      : (isUsb ? p.goldAccent : activeColor),
+                  icon:
+                      isCast ? Icons.cast_connected_rounded : deviceOutputIcon,
+                  iconColor:
+                      isCast ? p.info : (isUsb ? p.goldAccent : activeColor),
                   title: isCast ? l10n.googleCast : l10n.audioOutputAndDac,
                   subtitle: outputLabel,
                   badgeText: isCast ? 'CAST' : (isUsb ? 'DAC' : null),
@@ -436,12 +437,10 @@ class _AbLoopSection extends StatelessWidget {
       builder: (context, ab) {
         final hasAnyPoint = ab.pointA != null || ab.pointB != null;
         final canToggle = ab.pointA != null && ab.pointB != null;
-        final labelA = ab.pointA != null
-            ? Formatters.formatDuration(ab.pointA!)
-            : '--:--';
-        final labelB = ab.pointB != null
-            ? Formatters.formatDuration(ab.pointB!)
-            : '--:--';
+        final labelA =
+            ab.pointA != null ? Formatters.formatDuration(ab.pointA!) : '--:--';
+        final labelB =
+            ab.pointB != null ? Formatters.formatDuration(ab.pointB!) : '--:--';
 
         return Container(
           padding: const EdgeInsets.all(AppSpacing.sm),

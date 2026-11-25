@@ -212,7 +212,8 @@ void main() {
     expect(find.byTooltip(DlnaStrings.pause), findsOneWidget);
   });
 
-  testWidgets('casts a picked local file and hides the current-track action '
+  testWidgets(
+      'casts a picked local file and hides the current-track action '
       'without a local handler path', (tester) async {
     // Real file IO must run outside the widget test's fake-async zone.
     final pickedPath = (await tester.runAsync(() async {
@@ -268,7 +269,8 @@ void main() {
     service.dispose();
   });
 
-  testWidgets('screen back navigation keeps shared singleton alive and shows controls during buffering or missing title',
+  testWidgets(
+      'screen back navigation keeps shared singleton alive and shows controls during buffering or missing title',
       (tester) async {
     DlnaRendererService.resetSharedForTest();
     addTearDown(DlnaRendererService.resetSharedForTest);
@@ -306,7 +308,8 @@ void main() {
     // Controls remain rendered when playing without a local title.
     final namelessPlaying = _NamelessPlayingStub();
     addTearDown(namelessPlaying.dispose);
-    await tester.pumpWidget(MaterialApp(home: DlnaScreen(service: namelessPlaying)));
+    await tester
+        .pumpWidget(MaterialApp(home: DlnaScreen(service: namelessPlaying)));
     expect(find.byTooltip(DlnaStrings.stop), findsOneWidget);
   });
 }

@@ -115,8 +115,8 @@ void main() {
         AnnouncementSettings.maxMaxLength,
       ),
     );
-    expect(tester.widget<PulsrSlider>(slider).value,
-        settings.maxLength.toDouble(),
+    expect(
+        tester.widget<PulsrSlider>(slider).value, settings.maxLength.toDouble(),
         reason: 'the row must show the persisted value, not a stale one');
     expect(find.text(AnnouncementStrings.maxLengthValue(320)), findsOneWidget);
   });
@@ -138,7 +138,9 @@ void main() {
     expect(settings.maxLength, AnnouncementSettings.minMaxLength);
     expect(tester.widget<PulsrSlider>(slider).value,
         AnnouncementSettings.minMaxLength.toDouble());
-    expect(settings.maxLength, lessThanOrEqualTo(AnnouncementSettings.maxMaxLength));
-    expect(settings.maxLength, greaterThanOrEqualTo(AnnouncementSettings.minMaxLength));
+    expect(settings.maxLength,
+        lessThanOrEqualTo(AnnouncementSettings.maxMaxLength));
+    expect(settings.maxLength,
+        greaterThanOrEqualTo(AnnouncementSettings.minMaxLength));
   });
 }

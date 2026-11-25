@@ -361,9 +361,7 @@ extension _OnboardingStepsPart on _OnboardingScreenState {
                 ),
               ),
               Icon(
-                isSelected
-                    ? Icons.check_circle_rounded
-                    : Icons.circle_outlined,
+                isSelected ? Icons.check_circle_rounded : Icons.circle_outlined,
                 size: 16,
                 color: isSelected ? p.accent : p.textTertiary,
               ),

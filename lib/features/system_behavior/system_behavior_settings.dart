@@ -321,18 +321,16 @@ class SystemBehaviorSettings extends ChangeNotifier {
         usbReleaseOnFocusLoss: UsbReleaseOnFocusLoss.parse(
           prefs.getString(SystemBehaviorPrefsKeys.usbReleaseOnFocusLoss),
         ),
-        closeUsbWhenBackgrounded:
-            prefs.getBool(SystemBehaviorPrefsKeys.closeUsbWhenBackgrounded) ??
-                SystemBehaviorSettingsSnapshot
-                    .defaults.closeUsbWhenBackgrounded,
+        closeUsbWhenBackgrounded: prefs
+                .getBool(SystemBehaviorPrefsKeys.closeUsbWhenBackgrounded) ??
+            SystemBehaviorSettingsSnapshot.defaults.closeUsbWhenBackgrounded,
         pauseOnNotificationSound: _pauseFromPrefs(prefs),
         stopWhenTaskRemoved:
             prefs.getBool(SystemBehaviorPrefsKeys.stopWhenTaskRemoved) ??
                 SystemBehaviorSettingsSnapshot.defaults.stopWhenTaskRemoved,
         volumeRockerTrackSwitch:
             prefs.getBool(SystemBehaviorPrefsKeys.volumeRockerTrackSwitch) ??
-                SystemBehaviorSettingsSnapshot
-                    .defaults.volumeRockerTrackSwitch,
+                SystemBehaviorSettingsSnapshot.defaults.volumeRockerTrackSwitch,
         fadeOutOnPauseMs:
             prefs.getInt(SystemBehaviorPrefsKeys.fadeOutOnPauseMs) ??
                 SystemBehaviorSettingsSnapshot.defaults.fadeOutOnPauseMs,
@@ -421,8 +419,8 @@ class SystemBehaviorSettings extends ChangeNotifier {
   Future<void> setVolumeRockerTrackSwitch(bool value) {
     return _apply(
       _snapshot.copyWith(volumeRockerTrackSwitch: value),
-      (SharedPreferences prefs) => prefs.setBool(
-          SystemBehaviorPrefsKeys.volumeRockerTrackSwitch, value),
+      (SharedPreferences prefs) =>
+          prefs.setBool(SystemBehaviorPrefsKeys.volumeRockerTrackSwitch, value),
     );
   }
 

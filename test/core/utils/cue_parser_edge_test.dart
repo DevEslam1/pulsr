@@ -451,7 +451,9 @@ FILE "album.flac" FLAC
       expect(chapters[1].start, const Duration(seconds: 2));
     });
 
-    test('embedded WAV cue chunk with sampleRate == 0 handles fallback gracefully without division by zero', () async {
+    test(
+        'embedded WAV cue chunk with sampleRate == 0 handles fallback gracefully without division by zero',
+        () async {
       final file = writeFile(
         'zerorate.wav',
         _wavBytes(

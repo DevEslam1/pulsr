@@ -6,6 +6,7 @@ import 'package:pulsr/core/utils/l10n_extensions.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 void main() {
   group('Localization Tests', () {
     test('Supports English, Spanish, and Arabic', () {

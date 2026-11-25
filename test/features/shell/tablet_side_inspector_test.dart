@@ -8,6 +8,7 @@ import 'package:pulsr/features/shell/presentation/widgets/tablet_side_inspector.
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 class MockPlayerCubit extends Mock implements PlayerCubit {}
 
 void main() {
@@ -181,7 +182,8 @@ void main() {
       expect(
         firstTabRect.overlaps(handleRect),
         isFalse,
-        reason: 'resize handle must not overlap header tabs in ${locale.languageCode}',
+        reason:
+            'resize handle must not overlap header tabs in ${locale.languageCode}',
       );
     }
   });

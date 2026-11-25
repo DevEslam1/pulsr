@@ -12,7 +12,8 @@ void main() {
   setUp(() {
     platformCalls.clear();
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(SystemChannels.platform, (MethodCall call) async {
+        .setMockMethodCallHandler(SystemChannels.platform,
+            (MethodCall call) async {
       if (call.method.startsWith('HapticFeedback.')) {
         platformCalls.add(call);
       }
@@ -47,7 +48,8 @@ void main() {
       );
     });
 
-    test('when disabled, ZERO haptic feedback invocations reach platform', () async {
+    test('when disabled, ZERO haptic feedback invocations reach platform',
+        () async {
       PulsrHaptics.setEnabled(false);
       expect(PulsrHaptics.enabled.value, isFalse);
 
@@ -70,7 +72,8 @@ void main() {
           reason: 'Toggle OFF must produce zero haptics app-wide');
     });
 
-    test('PrefsKeys.hapticsEnabled key exists and matches expected constant', () {
+    test('PrefsKeys.hapticsEnabled key exists and matches expected constant',
+        () {
       expect(PrefsKeys.hapticsEnabled, 'setting_haptics_enabled');
     });
   });

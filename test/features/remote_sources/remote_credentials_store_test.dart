@@ -32,10 +32,12 @@ void main() {
     final storage = _FakeStorage();
     final store = RemoteCredentialsStore(storage);
 
-    await store.save('src-1', const RemoteCredentials(
-      username: 'media',
-      password: 's3cret',
-    ));
+    await store.save(
+        'src-1',
+        const RemoteCredentials(
+          username: 'media',
+          password: 's3cret',
+        ));
 
     final restored = await store.read('src-1');
     expect(restored?.username, 'media');
@@ -54,8 +56,10 @@ void main() {
     final storage = _FakeStorage();
     final store = RemoteCredentialsStore(storage);
 
-    await store.save('a', const RemoteCredentials(username: 'a', password: '1'));
-    await store.save('b', const RemoteCredentials(username: 'b', password: '2'));
+    await store.save(
+        'a', const RemoteCredentials(username: 'a', password: '1'));
+    await store.save(
+        'b', const RemoteCredentials(username: 'b', password: '2'));
 
     expect((await store.read('a'))?.password, '1');
     expect((await store.read('b'))?.password, '2');
@@ -65,8 +69,10 @@ void main() {
     final storage = _FakeStorage();
     final store = RemoteCredentialsStore(storage);
 
-    await store.save('a', const RemoteCredentials(username: 'a', password: '1'));
-    await store.save('b', const RemoteCredentials(username: 'b', password: '2'));
+    await store.save(
+        'a', const RemoteCredentials(username: 'a', password: '1'));
+    await store.save(
+        'b', const RemoteCredentials(username: 'b', password: '2'));
     await store.delete('a');
 
     expect(await store.read('a'), isNull);
@@ -181,7 +187,8 @@ void main() {
     expect(storage.values, isEmpty);
   });
 
-  test('mergeAndSave clears password and removes empty entry when clearPassword is true',
+  test(
+      'mergeAndSave clears password and removes empty entry when clearPassword is true',
       () async {
     final storage = _FakeStorage();
     final store = RemoteCredentialsStore(storage);

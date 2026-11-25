@@ -225,7 +225,8 @@ class _RemoteSourcesScreenState extends State<RemoteSourcesScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(RemoteSourcesStrings.deleteConfirmTitle(source.displayName)),
+        title:
+            Text(RemoteSourcesStrings.deleteConfirmTitle(source.displayName)),
         content: Text(RemoteSourcesStrings.deleteBody),
         actions: [
           TextButton(
@@ -540,8 +541,7 @@ class _SourceCard extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: ListTile(
         onTap: onBrowse,
-        contentPadding:
-            const EdgeInsetsDirectional.fromSTEB(16, 8, 8, 8),
+        contentPadding: const EdgeInsetsDirectional.fromSTEB(16, 8, 8, 8),
         leading: Icon(_iconFor(source.kind), color: palette.accent),
         title: Text(
           source.displayName,
@@ -672,8 +672,7 @@ class _CacheCard extends StatelessWidget {
     final size = bytes;
     return Card(
       child: ListTile(
-        contentPadding:
-            const EdgeInsetsDirectional.fromSTEB(16, 8, 8, 8),
+        contentPadding: const EdgeInsetsDirectional.fromSTEB(16, 8, 8, 8),
         leading: Icon(Icons.sd_storage_outlined, color: palette.textSecondary),
         title: Text(RemoteSourcesStrings.cacheTitle),
         subtitle: Text(
@@ -744,8 +743,7 @@ class _UpnpCard extends StatelessWidget {
     final palette = context.palette;
     return Card(
       child: ListTile(
-        contentPadding:
-            const EdgeInsetsDirectional.fromSTEB(16, 8, 8, 8),
+        contentPadding: const EdgeInsetsDirectional.fromSTEB(16, 8, 8, 8),
         leading: Icon(Icons.lan_outlined, color: palette.accent),
         title: Text(RemoteSourcesStrings.upnpTitle),
         subtitle: Text(
@@ -787,10 +785,8 @@ class _InlineBanner extends StatelessWidget {
         Expanded(
           child: Text(
             message,
-            style: Theme.of(context)
-                .textTheme
-                .bodySmall
-                ?.copyWith(color: color),
+            style:
+                Theme.of(context).textTheme.bodySmall?.copyWith(color: color),
           ),
         ),
       ],

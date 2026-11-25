@@ -207,9 +207,8 @@ class DspChainValidator {
     stages['tube_saturation'] = StageHealth(
       stageName: 'Tube Amp / Saturation',
       isHealthy: satHealthy,
-      latencyMs: eqManager != null && eqManager.isSaturationEnabled
-          ? satLatency
-          : 0.0,
+      latencyMs:
+          eqManager != null && eqManager.isSaturationEnabled ? satLatency : 0.0,
       thdPercent: satThd,
       message: eqManager != null && eqManager.isSaturationEnabled
           ? 'Estimated THD ${satThd.toStringAsFixed(2)}% (synthetic check)'

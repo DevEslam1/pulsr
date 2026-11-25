@@ -120,7 +120,8 @@ void main() {
       expect(smallCache.get('c'), isNotNull);
     });
 
-    test('restore() caps disk file read at 2 MB and ignores larger/corrupt files',
+    test(
+        'restore() caps disk file read at 2 MB and ignores larger/corrupt files',
         () async {
       final tempDir =
           await Directory.systemTemp.createTemp('ytm_url_cache_restore_');
@@ -199,8 +200,8 @@ void main() {
 
       clock.advance(const Duration(seconds: 91));
       expect(cache.isVerified('vid1'), isFalse);
-      expect(cache.isVerified('vid1', maxAge: const Duration(minutes: 5)),
-          isTrue,
+      expect(
+          cache.isVerified('vid1', maxAge: const Duration(minutes: 5)), isTrue,
           reason: "the stamp is still there; only the caller's window moved");
     });
 

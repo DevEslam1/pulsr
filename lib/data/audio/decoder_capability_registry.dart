@@ -329,8 +329,10 @@ abstract final class DecoderCapabilityRegistry {
 
     final lastForward = value.lastIndexOf('/');
     final lastBackward = value.lastIndexOf(r'\');
-    final lastSeparator = lastForward > lastBackward ? lastForward : lastBackward;
-    final name = lastSeparator >= 0 ? value.substring(lastSeparator + 1) : value;
+    final lastSeparator =
+        lastForward > lastBackward ? lastForward : lastBackward;
+    final name =
+        lastSeparator >= 0 ? value.substring(lastSeparator + 1) : value;
     final dot = name.lastIndexOf('.');
     if (dot >= 0 && dot < name.length - 1) return name.substring(dot + 1);
     return name;

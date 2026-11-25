@@ -26,10 +26,12 @@ void main() {
 
       // Verify sequence is reset so Room B (starting at seq 0 or low seq) is not dropped
       expect(service.lastHandledSeq, equals(-1),
-          reason: 'lastHandledSeq must be reset to -1 so new room updates are not ignored');
+          reason:
+              'lastHandledSeq must be reset to -1 so new room updates are not ignored');
     });
 
-    test('BUG-P0-3: sendPing registers ping so pong sets clockSynced == true', () {
+    test('BUG-P0-3: sendPing registers ping so pong sets clockSynced == true',
+        () {
       final service = ListenTogetherService();
       addTearDown(() => service.dispose());
 
@@ -47,7 +49,8 @@ void main() {
         }
       }
       expect(registeredMs, isNotNull,
-          reason: '_sendPing must register outgoing ping timestamp in ServerClock');
+          reason:
+              '_sendPing must register outgoing ping timestamp in ServerClock');
 
       service.handleWebSocketMessageForTesting(jsonEncode({
         'type': 'pong',
@@ -60,7 +63,9 @@ void main() {
       expect(service.clock.serverNowMs(), isNotNull);
     });
 
-    test('BUG-P2-23: normalizeServerUrl and isValidServerUrl handle ws/wss and http rules', () async {
+    test(
+        'BUG-P2-23: normalizeServerUrl and isValidServerUrl handle ws/wss and http rules',
+        () async {
       expect(
         ListenTogetherService.normalizeServerUrl('wss://party.pulsr.app/'),
         equals('https://party.pulsr.app'),
@@ -93,7 +98,8 @@ void main() {
       );
     });
 
-    test('BUG-P1-16: tracks matched local song ID and clears on leaveParty', () async {
+    test('BUG-P1-16: tracks matched local song ID and clears on leaveParty',
+        () async {
       final service = ListenTogetherService();
       addTearDown(() => service.dispose());
 
@@ -109,7 +115,8 @@ void main() {
       expect(service.activePartyMatchedSongId, isNull);
     });
 
-    test('C-14: init() is idempotent across concurrent and repeated calls', () async {
+    test('C-14: init() is idempotent across concurrent and repeated calls',
+        () async {
       final service = ListenTogetherService();
       addTearDown(() => service.dispose());
 
@@ -123,18 +130,38 @@ void main() {
       expect(service.inParty, isFalse);
     });
 
-    test('H-43: isTerminalSessionFailure detects 401/403/404 and terminal WS close codes', () {
-      expect(ListenTogetherService.isTerminalSessionFailure('HTTP 401 Unauthorized', null), isTrue);
-      expect(ListenTogetherService.isTerminalSessionFailure('HTTP 403 Forbidden', null), isTrue);
-      expect(ListenTogetherService.isTerminalSessionFailure('HTTP 404 Not Found', null), isTrue);
-      expect(ListenTogetherService.isTerminalSessionFailure(null, 4001), isTrue);
-      expect(ListenTogetherService.isTerminalSessionFailure(null, 4003), isTrue);
-      expect(ListenTogetherService.isTerminalSessionFailure(null, 4004), isTrue);
-      expect(ListenTogetherService.isTerminalSessionFailure(null, 1008), isTrue);
-      expect(ListenTogetherService.isTerminalSessionFailure('SocketException: Network unreachable', 1006), isFalse);
+    test(
+        'H-43: isTerminalSessionFailure detects 401/403/404 and terminal WS close codes',
+        () {
+      expect(
+          ListenTogetherService.isTerminalSessionFailure(
+              'HTTP 401 Unauthorized', null),
+          isTrue);
+      expect(
+          ListenTogetherService.isTerminalSessionFailure(
+              'HTTP 403 Forbidden', null),
+          isTrue);
+      expect(
+          ListenTogetherService.isTerminalSessionFailure(
+              'HTTP 404 Not Found', null),
+          isTrue);
+      expect(
+          ListenTogetherService.isTerminalSessionFailure(null, 4001), isTrue);
+      expect(
+          ListenTogetherService.isTerminalSessionFailure(null, 4003), isTrue);
+      expect(
+          ListenTogetherService.isTerminalSessionFailure(null, 4004), isTrue);
+      expect(
+          ListenTogetherService.isTerminalSessionFailure(null, 1008), isTrue);
+      expect(
+          ListenTogetherService.isTerminalSessionFailure(
+              'SocketException: Network unreachable', 1006),
+          isFalse);
     });
 
-    test('H-43: welcome frame populates partySnapshot and currentMember, and bye clears session without network throw', () async {
+    test(
+        'H-43: welcome frame populates partySnapshot and currentMember, and bye clears session without network throw',
+        () async {
       final service = ListenTogetherService();
       addTearDown(() => service.dispose());
 
@@ -185,7 +212,8 @@ void main() {
 
       expect(service.lastError.value, equals('Host ended the party'));
       expect(service.partySnapshot.value, isNull);
-      expect(service.connectionState.value, equals(PartyConnectionState.offline));
+      expect(
+          service.connectionState.value, equals(PartyConnectionState.offline));
     });
   });
 }

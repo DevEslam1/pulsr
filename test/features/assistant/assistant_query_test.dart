@@ -233,7 +233,8 @@ void main() {
   });
 
   group('M-08 NLU multi-locale & favorites routing', () {
-    test('routes "play favorites" unshuffled and "shuffle favorites" shuffled', () {
+    test('routes "play favorites" unshuffled and "shuffle favorites" shuffled',
+        () {
       final playFav = parseAssistantText('play favorites');
       expect(playFav.kind, AssistantIntentKind.shuffleFavorites);
       expect(playFav.wantsShuffle, isFalse);

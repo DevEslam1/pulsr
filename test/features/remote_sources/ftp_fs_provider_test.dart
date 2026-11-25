@@ -9,7 +9,8 @@ import 'package:pulsr/domain/models/remote_source.dart';
 import 'package:pulsr/features/remote_sources/ftp_fs_provider.dart';
 import 'package:pulsr/features/remote_sources/ftp_protocol.dart';
 
-const String _unixListing = 'drwxr-xr-x    2 ftp      ftp          4096 Jan 02 03:04 Albums\r\n'
+const String _unixListing =
+    'drwxr-xr-x    2 ftp      ftp          4096 Jan 02 03:04 Albums\r\n'
     '-rw-r--r--    1 ftp      ftp             4 Jan 02 03:04 song.mp3\r\n';
 
 /// A deliberately tiny FTP server: enough of RFC 959/2428 to exercise the
@@ -404,8 +405,8 @@ void main() {
     });
 
     test('parses PASV and EPSV answers', () {
-      final passive =
-          FtpListingParser.parsePassiveReply('Entering Passive Mode (10,0,0,5,4,1)');
+      final passive = FtpListingParser.parsePassiveReply(
+          'Entering Passive Mode (10,0,0,5,4,1)');
       expect(passive?.host, '10.0.0.5');
       expect(passive?.port, 4 * 256 + 1);
       expect(FtpListingParser.parsePassiveReply('nonsense'), isNull);
@@ -455,7 +456,8 @@ void main() {
 
       final entries = await provider.list('');
 
-      expect(server.commands, containsAll(<String>['USER', 'PASS', 'TYPE', 'PASV', 'LIST']));
+      expect(server.commands,
+          containsAll(<String>['USER', 'PASS', 'TYPE', 'PASV', 'LIST']));
       expect(entries.map((e) => e.name), ['Albums', 'song.mp3']);
       expect(entries.first.isDirectory, isTrue);
       expect(entries.last.sizeBytes, 4);
@@ -585,7 +587,8 @@ void main() {
       expect(server.commands, contains('NLST'));
     });
 
-    test('a malformed control reply aborts the session; the next call reconnects',
+    test(
+        'a malformed control reply aborts the session; the next call reconnects',
         () async {
       await start(_FakeFtpServer(malformedControlReplyOnce: true));
 

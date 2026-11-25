@@ -242,8 +242,7 @@ class MusicRepository
     return '"$clean"';
   }
 
-  static String _articleInsensitiveSql(String col) =>
-      '(CASE '
+  static String _articleInsensitiveSql(String col) => '(CASE '
       "WHEN SUBSTR($col, 1, 1) IN ('\"', '''', '(', '[', '{', '\u201c', '\u2018') "
       "AND LOWER(SUBSTR($col, 2, 4)) = 'the ' THEN SUBSTR($col, 6) "
       "WHEN SUBSTR($col, 1, 1) IN ('\"', '''', '(', '[', '{', '\u201c', '\u2018') "
@@ -1174,10 +1173,7 @@ class MusicRepository
   @override
   Stream<Result<List<AlbumsTableData>>> watchAlbums() {
     try {
-      return _db
-          .select(_db.excludedFoldersTable)
-          .watch()
-          .switchMap((rows) {
+      return _db.select(_db.excludedFoldersTable).watch().switchMap((rows) {
         final excluded = rows.map((r) => r.folderPath).toList(growable: false);
         if (excluded.isEmpty) {
           return (_db.select(_db.albumsTable)
@@ -1207,7 +1203,7 @@ class MusicRepository
             .onResultError((e, st) => Left<AppFailure, List<AlbumsTableData>>(
                 DatabaseFailure('Failed to watch albums', e)));
       }).onResultError((e, st) => Left<AppFailure, List<AlbumsTableData>>(
-              DatabaseFailure('Failed to watch albums', e)));
+          DatabaseFailure('Failed to watch albums', e)));
     } catch (e) {
       return Stream.value(Left(DatabaseFailure('Failed to watch albums', e)));
     }
@@ -1216,10 +1212,7 @@ class MusicRepository
   @override
   Stream<Result<List<SongsTableData>>> watchAlbumSongs(int albumId) {
     try {
-      return _db
-          .select(_db.excludedFoldersTable)
-          .watch()
-          .switchMap((rows) {
+      return _db.select(_db.excludedFoldersTable).watch().switchMap((rows) {
         final excluded = rows.map((r) => r.folderPath).toList(growable: false);
         final query = _db.select(_db.songsTable)
           ..where((t) =>
@@ -1229,10 +1222,10 @@ class MusicRepository
               t.path.like('ytmusic://%').not() &
               (t.cueFile.isNull() | t.cueStartMs.isNotNull()))
           ..orderBy([
-            (t) => OrderingTerm(
-                expression: t.discNumber, mode: OrderingMode.asc),
-            (t) => OrderingTerm(
-                expression: t.trackNumber, mode: OrderingMode.asc),
+            (t) =>
+                OrderingTerm(expression: t.discNumber, mode: OrderingMode.asc),
+            (t) =>
+                OrderingTerm(expression: t.trackNumber, mode: OrderingMode.asc),
             (t) => OrderingTerm(expression: articleInsensitive(t.title)),
             (t) => OrderingTerm.asc(t.id),
           ]);
@@ -1243,7 +1236,7 @@ class MusicRepository
             .onResultError((e, st) => Left<AppFailure, List<SongsTableData>>(
                 DatabaseFailure('Failed to watch album songs', e)));
       }).onResultError((e, st) => Left<AppFailure, List<SongsTableData>>(
-              DatabaseFailure('Failed to watch album songs', e)));
+          DatabaseFailure('Failed to watch album songs', e)));
     } catch (e) {
       return Stream.value(
           Left(DatabaseFailure('Failed to watch album songs', e)));
@@ -1329,10 +1322,7 @@ class MusicRepository
   @override
   Stream<Result<List<SongsTableData>>> watchArtistSongs(int artistId) {
     try {
-      return _db
-          .select(_db.excludedFoldersTable)
-          .watch()
-          .switchMap((rows) {
+      return _db.select(_db.excludedFoldersTable).watch().switchMap((rows) {
         final excluded = rows.map((r) => r.folderPath).toList(growable: false);
         final query = _db.select(_db.songsTable)
           ..where((t) =>
@@ -1354,7 +1344,7 @@ class MusicRepository
             .onResultError((e, st) => Left<AppFailure, List<SongsTableData>>(
                 DatabaseFailure('Failed to watch artist songs', e)));
       }).onResultError((e, st) => Left<AppFailure, List<SongsTableData>>(
-              DatabaseFailure('Failed to watch artist songs', e)));
+          DatabaseFailure('Failed to watch artist songs', e)));
     } catch (e) {
       return Stream.value(
           Left(DatabaseFailure('Failed to watch artist songs', e)));
@@ -2602,8 +2592,7 @@ class MusicRepository
       }
     } else if (!_embeddedCueMisses.contains(container.path)) {
       embeddedCueProbeCount++;
-      final embedded =
-          await CueParser.extractEmbeddedCueSheet(container.path);
+      final embedded = await CueParser.extractEmbeddedCueSheet(container.path);
       if (embedded != null && embedded.isNotEmpty) {
         rawCueContent = embedded;
         effectiveCuePath = 'embedded://${container.path}';
@@ -3306,8 +3295,8 @@ class MusicRepository
         var newRow = await (_db.select(_db.songsTable)
               ..where((t) => t.path.lower().equals(newPath.toLowerCase()))
               ..orderBy([
-                (t) =>
-                    OrderingTerm(expression: t.dateAdded, mode: OrderingMode.desc)
+                (t) => OrderingTerm(
+                    expression: t.dateAdded, mode: OrderingMode.desc)
               ])
               ..limit(1))
             .getSingleOrNull();
@@ -3322,8 +3311,11 @@ class MusicRepository
                     t.path.equals('').not() &
                     t.path.like('ytmusic://%').not() &
                     t.title.lower().equals(matchMetadata.title.toLowerCase()) &
-                    t.artist.lower().equals(matchMetadata.artist.toLowerCase()) &
-                    t.durationMs.isBetweenValues(matchMetadata.durationMs - 5000,
+                    t.artist
+                        .lower()
+                        .equals(matchMetadata.artist.toLowerCase()) &
+                    t.durationMs.isBetweenValues(
+                        matchMetadata.durationMs - 5000,
                         matchMetadata.durationMs + 5000))
                 ..orderBy([
                   (t) => OrderingTerm(

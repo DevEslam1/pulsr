@@ -45,7 +45,8 @@ class AudioQualitySignalPathHeader extends StatelessWidget {
       dspValue = context.l10n.dspStatusBypassed;
       dspColor = AppColors.dacGold;
     } else if (dsp.activeDspStagesCount > 0) {
-      dspValue = '${dsp.activeDspStagesCount} ${context.l10n.dspStageStatusActive}';
+      dspValue =
+          '${dsp.activeDspStagesCount} ${context.l10n.dspStageStatusActive}';
       dspColor = activeColor;
     } else {
       dspValue = context.l10n.dspStageStatusOff;
@@ -103,8 +104,7 @@ class AudioQualitySignalPathHeader extends StatelessWidget {
             ? AppColors.accentCyan
             : (isUsb ? AppColors.dacGold : activeColor));
 
-    final summaryText =
-        '${context.l10n.dspSourceFile}: $sourceValue → '
+    final summaryText = '${context.l10n.dspSourceFile}: $sourceValue → '
         '${context.l10n.dspLabel}: $dspValue → '
         '${context.l10n.stageResampler}: $resamplerValue → '
         '$outputTitle: $outputValue';

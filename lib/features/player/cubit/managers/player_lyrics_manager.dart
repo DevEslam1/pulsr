@@ -93,7 +93,8 @@ class PlayerLyricsManager {
             trackName: song.title,
             artistName: song.artist,
             albumName: song.album,
-            durationSeconds: song.durationMs > 0 ? song.durationMs ~/ 1000 : null,
+            durationSeconds:
+                song.durationMs > 0 ? song.durationMs ~/ 1000 : null,
           );
           if (onlineResult != null && onlineResult.lines.isNotEmpty) {
             result = onlineResult;

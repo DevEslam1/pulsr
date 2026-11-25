@@ -87,10 +87,12 @@ class HiresDacBridge {
     if (!position.isFinite) return false;
     try {
       final res = await _channel.invokeMethod<dynamic>(
-          'setUac2HardwareVolume',
-          {'position': position.clamp(0.0, 1.0)}).timeout(
-          const Duration(seconds: 3));
-      return res != null && res != false && !(res is Map && res['error'] != null);
+          'setUac2HardwareVolume', {
+        'position': position.clamp(0.0, 1.0)
+      }).timeout(const Duration(seconds: 3));
+      return res != null &&
+          res != false &&
+          !(res is Map && res['error'] != null);
     } catch (_) {
       return false;
     }
@@ -114,9 +116,8 @@ class HiresDacBridge {
   Future<bool> setUac2HardwareMute(bool muted) async {
     if (!PlatformCapabilities.isAndroid) return false;
     try {
-      final res = await _channel.invokeMethod<dynamic>(
-          'setUac2HardwareMute', {'muted': muted}).timeout(
-          const Duration(seconds: 3));
+      final res = await _channel.invokeMethod<dynamic>('setUac2HardwareMute',
+          {'muted': muted}).timeout(const Duration(seconds: 3));
       return res == true;
     } catch (_) {
       return false;

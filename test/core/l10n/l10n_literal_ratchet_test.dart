@@ -42,7 +42,8 @@ void main() {
     const doubleQuoteBaseline = 2;
     const tooltipBaseline = 0;
     final dblPattern = RegExp(r'Text\(\s*"([^"$]*)"');
-    final tipPattern = RegExp(r'''Tooltip\([^)]*message:\s*['"]([^'"$]+)['"]''');
+    final tipPattern =
+        RegExp(r'''Tooltip\([^)]*message:\s*['"]([^'"$]+)['"]''');
     var dblCount = 0;
     var tipCount = 0;
     final dblOffenders = <String>[];

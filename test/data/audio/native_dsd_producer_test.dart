@@ -343,7 +343,8 @@ void main() {
       expect(service.writtenLeftChunks[0], [1, 2, 3, 4]);
     });
 
-    test('aborts when backpressure exceeds retry threshold and sink is dead', () async {
+    test('aborts when backpressure exceeds retry threshold and sink is dead',
+        () async {
       final left = Uint8List.fromList(List.filled(100, 1));
       final right = Uint8List.fromList(List.filled(100, 2));
       producer.prepare(left: left, right: right, dsdRate: 64);
@@ -401,7 +402,10 @@ void main() {
 
       // Pause immediately
       producer.pause();
-      expect(producer.state, NativeDsdProducerState.idle); // was idle, pause only affects streaming
+      expect(
+          producer.state,
+          NativeDsdProducerState
+              .idle); // was idle, pause only affects streaming
 
       // Start pumping in background
       final pumpFuture = producer.startPumping(chunkSize: 20);
@@ -437,5 +441,4 @@ void main() {
       expect(service.stopStreamingCalled, isTrue);
     });
   });
-
 }

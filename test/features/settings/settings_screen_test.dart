@@ -21,6 +21,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pulsr/core/errors/app_error.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 class MockMediaScannerService extends Mock implements MediaScannerService {}
 
 class MockPlayerCubit extends Mock implements PlayerCubit {}

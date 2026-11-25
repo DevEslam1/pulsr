@@ -129,10 +129,8 @@ void main() {
       controller.add(_status());
       await pumpEventQueue();
 
-      final args = fake
-          .named(UsbErgonomicsService.applyMethod)
-          .single
-          .arguments as Map<Object?, Object?>;
+      final args = fake.named(UsbErgonomicsService.applyMethod).single.arguments
+          as Map<Object?, Object?>;
       expect(args['hidEnabled'], isFalse);
       expect(service.state.quirk, isNull);
       service.dispose();
@@ -341,7 +339,8 @@ void main() {
   });
 
   group('failure handling', () {
-    test('a PlatformException is logged into lastError, never thrown', () async {
+    test('a PlatformException is logged into lastError, never thrown',
+        () async {
       final service = await build(await _storeWith(profile));
       fake.throwOnCall = PlatformException(
         code: 'usb_claim_failed',

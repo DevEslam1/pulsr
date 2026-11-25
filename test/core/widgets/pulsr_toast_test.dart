@@ -145,7 +145,8 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 100));
 
-      final textWidget = tester.widget<Text>(find.text('Line 1\nLine 2\nLine 3\nLine 4'));
+      final textWidget =
+          tester.widget<Text>(find.text('Line 1\nLine 2\nLine 3\nLine 4'));
       expect(textWidget.maxLines, 4);
     });
   });

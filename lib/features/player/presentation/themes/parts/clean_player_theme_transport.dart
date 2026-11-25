@@ -134,9 +134,8 @@ class _CleanTransportControls extends StatelessWidget {
                         ),
                       )
                     : AnimatedSwitcher(
-                        duration: isPreview
-                            ? Duration.zero
-                            : context.motionMs(200),
+                        duration:
+                            isPreview ? Duration.zero : context.motionMs(200),
                         transitionBuilder: (child, anim) => ScaleTransition(
                           scale: Tween<double>(begin: 0.82, end: 1.0)
                               .animate(anim),

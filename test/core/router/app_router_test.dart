@@ -479,8 +479,7 @@ void main() {
   });
 
   group('page builders', () {
-    testWidgets('shell tabs build tab pages with MaterialPage',
-        (tester) async {
+    testWidgets('shell tabs build tab pages with MaterialPage', (tester) async {
       await pumpContext(tester);
       for (final path in [
         '/',
@@ -499,7 +498,8 @@ void main() {
       routeFor('/search').pageBuilder!(context, stateFor('/search?q=beatles'));
     });
 
-    testWidgets('now-playing builds its route with PulsrNowPlayingPage', (tester) async {
+    testWidgets('now-playing builds its route with PulsrNowPlayingPage',
+        (tester) async {
       await pumpContext(tester);
       final page = routeFor('/now-playing').pageBuilder!(
           context, stateFor('/now-playing'));
@@ -508,7 +508,8 @@ void main() {
       expect(route, isA<Route<void>>());
     });
 
-    testWidgets('detail pages use MaterialPage with restorationId', (tester) async {
+    testWidgets('detail pages use MaterialPage with restorationId',
+        (tester) async {
       await pumpContext(tester);
       final page = routeFor('/album').pageBuilder!(
           context, stateFor('/album', extra: _album()));
@@ -557,8 +558,8 @@ void main() {
       ) as MaterialPage<void>;
       expect(byId.child, isA<EntityByIdLoader<ArtistsTableData>>());
 
-      final notFound = builder(context, stateFor('/artist'))
-          as MaterialPage<void>;
+      final notFound =
+          builder(context, stateFor('/artist')) as MaterialPage<void>;
       expect(notFound.child, isA<Scaffold>());
     });
 
@@ -621,12 +622,13 @@ void main() {
       ) as MaterialPage<void>;
       expect(byId.child, isA<EntityByIdLoader<PlaylistsTableData>>());
 
-      final notFound = builder(context, stateFor('/playlist'))
-          as MaterialPage<void>;
+      final notFound =
+          builder(context, stateFor('/playlist')) as MaterialPage<void>;
       expect(notFound.child, isA<Scaffold>());
     });
 
-    testWidgets('/party/:code passes code and server query param to PartyScreen',
+    testWidgets(
+        '/party/:code passes code and server query param to PartyScreen',
         (tester) async {
       await pumpContext(tester);
       final route = routeFor('/party/:code');
@@ -682,8 +684,8 @@ void main() {
     });
 
     test('matches /sdcard/ and /storage/ prefixes', () {
-      expect(isExternalAudioLocation(Uri.parse('/sdcard/Music/test.wav')),
-          isTrue);
+      expect(
+          isExternalAudioLocation(Uri.parse('/sdcard/Music/test.wav')), isTrue);
       expect(
           isExternalAudioLocation(
               Uri.parse('/storage/emulated/0/Download/song.flac')),

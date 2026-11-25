@@ -416,5 +416,7 @@ final RegExp _lastAlbumPattern = RegExp(
   r'|(?:آخر|اخر)\s+(?:ألبوم|البوم)|(?:الألبوم|الالبوم)\s+(?:الأخير|الاخير))$',
   caseSensitive: false,
 );
-final RegExp _radioSuffix = RegExp(r'\s+(?:radio|راديو|إذاعة)$', caseSensitive: false);
-final RegExp _radioPrefix = RegExp(r'^(?:radio(?:\s+de)?|راديو|إذاعة)\s+', caseSensitive: false);
+final RegExp _radioSuffix =
+    RegExp(r'\s+(?:radio|راديو|إذاعة)$', caseSensitive: false);
+final RegExp _radioPrefix =
+    RegExp(r'^(?:radio(?:\s+de)?|راديو|إذاعة)\s+', caseSensitive: false);

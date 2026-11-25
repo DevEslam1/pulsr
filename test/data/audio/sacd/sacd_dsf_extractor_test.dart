@@ -166,7 +166,8 @@ void main() {
       expect(bytes.sublist(92), equals(expected));
     });
 
-    test('bit order round-trips through the probe and the DSF parser', () async {
+    test('bit order round-trips through the probe and the DSF parser',
+        () async {
       final fixture = SacdIsoFixture();
       final iso = await writeIso(fixture, 'roundtrip.iso');
       final track = firstTrack(fixture);
@@ -273,10 +274,10 @@ void main() {
             blockSizePerChannel: SacdDsfExtractor.maxBlockSize + 1),
         throwsArgumentError,
       );
-      expect(() => SacdDsfExtractor(sectorHeaderBytes: 2048),
-          throwsArgumentError);
-      expect(() => SacdDsfExtractor(sectorHeaderBytes: -1),
-          throwsArgumentError);
+      expect(
+          () => SacdDsfExtractor(sectorHeaderBytes: 2048), throwsArgumentError);
+      expect(
+          () => SacdDsfExtractor(sectorHeaderBytes: -1), throwsArgumentError);
       expect(() => SacdDsfExtractor(maxOutputBytes: 0), throwsArgumentError);
     });
 

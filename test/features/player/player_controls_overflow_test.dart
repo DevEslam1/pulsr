@@ -12,6 +12,7 @@ import 'package:pulsr/features/settings/cubit/settings_state.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 class MockPlayerCubit extends Mock implements PlayerCubit {}
 
 class MockSettingsCubit extends Mock implements SettingsCubit {}
@@ -142,9 +143,8 @@ void main() {
       find.text('B'),
       find.byIcon(Icons.repeat_rounded),
     ];
-    final centers = finders
-        .map((f) => tester.getRect(f).center.dy)
-        .toList(growable: false);
+    final centers =
+        finders.map((f) => tester.getRect(f).center.dy).toList(growable: false);
     // Icons and A/B labels have slightly different intrinsic heights, so
     // compare row placement (a wrapped row would differ by a full control).
     expect(

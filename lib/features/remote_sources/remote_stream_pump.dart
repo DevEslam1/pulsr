@@ -138,7 +138,8 @@ class RemoteStreamPump {
     var wrote = false;
     var bytesRead = 0;
     try {
-      await for (final chunk in provider.openRead(path, start: start, end: end)) {
+      await for (final chunk
+          in provider.openRead(path, start: start, end: end)) {
         bytesRead += chunk.length;
         sink?.add(chunk);
         try {

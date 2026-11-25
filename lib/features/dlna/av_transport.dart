@@ -456,9 +456,8 @@ class AvTransportClient {
     Duration? duration,
     String itemId = '0',
   }) {
-    final type = (mimeType == null || mimeType.isEmpty)
-        ? 'audio/mpeg'
-        : mimeType;
+    final type =
+        (mimeType == null || mimeType.isEmpty) ? 'audio/mpeg' : mimeType;
     final buffer = StringBuffer()
       ..write('<DIDL-Lite xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/"')
       ..write(' xmlns:dc="http://purl.org/dc/elements/1.1/"')

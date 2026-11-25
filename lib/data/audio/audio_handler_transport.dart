@@ -355,8 +355,7 @@ mixin PulsrAudioTransport on BaseAudioHandler {
         restoreVolume: _volume);
     if (_gaplessMode && _gaplessLoaded) {
       _playGeneration++;
-      if (!isDoubleTap &&
-          _activePlayer.position > const Duration(seconds: 3)) {
+      if (!isDoubleTap && _activePlayer.position > const Duration(seconds: 3)) {
         await _activePlayer.seek(Duration.zero);
         if (wasPlaying) {
           unawaited(_activePlayer.play());

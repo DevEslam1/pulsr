@@ -26,6 +26,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'support/settings_section_harness.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 class MockPlayerCubit extends Mock implements PlayerCubit {}
 
 class MockAudioHandler extends Mock implements PulsrAudioHandler {}

@@ -118,6 +118,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
   StreamSubscription? _librarySub;
 
   static const Duration _quickActionCacheTtl = Duration(seconds: 60);
+
   /// Focus Flow: a broad top-played window (200 rows) so playback is not
   /// confined to the first 50 titles, same rationale as Daily Drive.
   static const int _focusFlowLimit = 200;
@@ -350,8 +351,10 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
     final isPureBlack = p.isDark && p.bg.computeLuminance() < 0.001;
     final isHighContrast =
         p.isHighContrast || (MediaQuery.maybeHighContrastOf(context) ?? false);
-    final showAmbientGlow =
-        !isPureBlack && !p.isCalmDensity && !isHighContrast && !GpuBudget.isEnabled;
+    final showAmbientGlow = !isPureBlack &&
+        !p.isCalmDensity &&
+        !isHighContrast &&
+        !GpuBudget.isEnabled;
     // Sections already apply [basePad] horizontally, so only add the delta
     // needed to clear a physical display cutout without double-padding.
     final cutoutLeft = safePadding.left > 0
@@ -396,8 +399,10 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                             center: const AlignmentDirectional(-0.55, -1.0),
                             radius: 1.35,
                             colors: [
-                              p.accent.withValues(alpha: p.isDark ? 0.14 : 0.075),
-                              p.accent.withValues(alpha: p.isDark ? 0.045 : 0.025),
+                              p.accent
+                                  .withValues(alpha: p.isDark ? 0.14 : 0.075),
+                              p.accent
+                                  .withValues(alpha: p.isDark ? 0.045 : 0.025),
                               p.accent.withValues(alpha: 0.0),
                             ],
                             stops: const [0.0, 0.48, 1.0],
@@ -458,7 +463,8 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                             key: const PageStorageKey('home_screen_scroll'),
                             physics: const AlwaysScrollableScrollPhysics(
                                 parent: BouncingScrollPhysics()),
-                            padding: EdgeInsetsDirectional.only(bottom: bottomPad),
+                            padding:
+                                EdgeInsetsDirectional.only(bottom: bottomPad),
                             children: [
                               // ---------- Header ----------
                               Padding(
@@ -543,8 +549,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                                         size: 22,
                                       ),
                                       tooltip: context.l10n.settings,
-                                      onPressed: () =>
-                                          context.go('/settings'),
+                                      onPressed: () => context.go('/settings'),
                                     ),
                                   ],
                                 ),
@@ -579,8 +584,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                                         const SizedBox(width: AppSpacing.sm),
                                         Expanded(
                                           child: Text(
-                                            context
-                                                .l10n.playbackStopsScreenOff,
+                                            context.l10n.playbackStopsScreenOff,
                                             style: TextStyle(
                                               color: p.textSecondary,
                                               fontSize: AppFontSize.caption,
@@ -603,8 +607,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                                               minHeight:
                                                   AppSpacing.minTouchTarget),
                                           icon: Icon(Icons.close,
-                                              size: 16,
-                                              color: p.textSecondary),
+                                              size: 16, color: p.textSecondary),
                                           tooltip: context.l10n.close,
                                           onPressed: () {
                                             if (mounted) {
@@ -632,8 +635,8 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                                     onChanged: (next) {
                                       setState(() => _scope = next);
                                       if (next == SourceScope.online) {
-                                        unawaited(_homeCubit
-                                            .loadCategory(_selectedOnlineCategory));
+                                        unawaited(_homeCubit.loadCategory(
+                                            _selectedOnlineCategory));
                                       }
                                     },
                                   ),
@@ -674,20 +677,20 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                                   child: (showOnlineTab && !_scopeLoaded)
                                       ? const SizedBox.shrink()
                                       : currentTab == 0
-                                      ? _buildLocalView(
-                                          context,
-                                          p,
-                                          getSongsUseCase,
-                                          playerCubit,
-                                          isTablet)
-                                      : (showOnlineTab
-                                          ? _buildOnlineView(
+                                          ? _buildLocalView(
                                               context,
                                               p,
+                                              getSongsUseCase,
                                               playerCubit,
-                                              homeState,
                                               isTablet)
-                                          : const SizedBox.shrink()),
+                                          : (showOnlineTab
+                                              ? _buildOnlineView(
+                                                  context,
+                                                  p,
+                                                  playerCubit,
+                                                  homeState,
+                                                  isTablet)
+                                              : const SizedBox.shrink()),
                                 ),
                               ),
                             ],

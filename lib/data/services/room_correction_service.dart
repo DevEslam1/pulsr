@@ -547,9 +547,8 @@ class RoomCorrectionService {
             ErrorLogger.log('Room-correction capture stream error',
                 error: e, category: 'RoomCorrection');
           });
-          final ok = await _method
-              .invokeMethod<bool>('startCapture', {'sampleRate': sampleRate})
-              .timeout(const Duration(seconds: 5));
+          final ok = await _method.invokeMethod<bool>('startCapture',
+              {'sampleRate': sampleRate}).timeout(const Duration(seconds: 5));
           if (ok != true) {
             await _captureSub?.cancel();
             _captureSub = null;
@@ -584,7 +583,8 @@ class RoomCorrectionService {
         final bytes = _pcmBuffer.takeBytes();
         // Align to whole samples (16-bit).
         final sampleBytes = bytes.length - (bytes.length % 2);
-        return Int16List.view(bytes.buffer, bytes.offsetInBytes, sampleBytes ~/ 2);
+        return Int16List.view(
+            bytes.buffer, bytes.offsetInBytes, sampleBytes ~/ 2);
       });
 
   void dispose() {

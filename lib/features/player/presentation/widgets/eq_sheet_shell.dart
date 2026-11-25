@@ -144,8 +144,7 @@ extension _EqSheetShell on _EqualizerSheetState {
         bypassDspOnBitPerfect,
         device,
         aaudioEnabled,
-      ) = context.select<SettingsCubit,
-          (bool, bool, AudioOutputInfo?, bool)>(
+      ) = context.select<SettingsCubit, (bool, bool, AudioOutputInfo?, bool)>(
         (c) => (
           c.state.bitPerfectOutput,
           c.state.bypassDspOnBitPerfect,

@@ -103,9 +103,8 @@ void main() {
     await tester.pumpAndSettle();
 
     for (var i = 0; i < capturedPlan.length; i++) {
-      final answerText = capturedPlan[i] == AbxStimulus.a
-          ? l10n.abxAnswerA
-          : l10n.abxAnswerB;
+      final answerText =
+          capturedPlan[i] == AbxStimulus.a ? l10n.abxAnswerA : l10n.abxAnswerB;
       await tester.tap(find.text(answerText));
       await tester.pumpAndSettle();
     }
@@ -220,9 +219,11 @@ void main() {
     expect(find.text(l10n.exportFailed), findsOneWidget);
     expect(logged, isNotEmpty);
     expect(
-      tester.widget<OutlinedButton>(
-        find.widgetWithText(OutlinedButton, l10n.save),
-      ).onPressed,
+      tester
+          .widget<OutlinedButton>(
+            find.widgetWithText(OutlinedButton, l10n.save),
+          )
+          .onPressed,
       isNotNull,
     );
   });

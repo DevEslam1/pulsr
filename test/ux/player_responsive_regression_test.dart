@@ -21,6 +21,7 @@ import 'package:pulsr/features/settings/cubit/settings_state.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 class MockPlayerCubit extends Mock implements PlayerCubit {}
 
 class MockSettingsCubit extends Mock implements SettingsCubit {}
@@ -56,7 +57,8 @@ class MockPulsrAudioHandler extends BaseAudioHandler
 /// Flutter's test binding.
 Future<void> _loadFonts() async {
   await (FontLoader('Manrope')
-        ..addFont(rootBundle.load('assets/fonts/Manrope-VariableFont_wght.ttf')))
+        ..addFont(
+            rootBundle.load('assets/fonts/Manrope-VariableFont_wght.ttf')))
       .load();
   await (FontLoader('MaterialIcons')
         ..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf')))
@@ -151,8 +153,7 @@ void main() {
                           data: MediaQuery.of(context).copyWith(
                               textScaler: TextScaler.linear(textScale)),
                           child: child!),
-                      localizationsDelegates:
-                          appLocalizationsDelegates,
+                      localizationsDelegates: appLocalizationsDelegates,
                       supportedLocales: AppLocalizations.supportedLocales,
                       home: Scaffold(
                           body: ResponsivePlayerLayout(

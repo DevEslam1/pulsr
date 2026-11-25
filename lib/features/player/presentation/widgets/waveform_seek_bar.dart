@@ -324,7 +324,8 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                             PulsrHaptics.selectionClick();
                             _dragFrozenWindow = _visibleWindow(totalCount);
                             final ratio = _ratioForDx(details.localPosition.dx,
-                                trackWidth, totalCount, isRtl: isRtl);
+                                trackWidth, totalCount,
+                                isRtl: isRtl);
                             final seekVal =
                                 (ratio * maxDuration).clamp(0.0, maxDuration);
                             _dragStartValue = seekVal;
@@ -338,7 +339,8 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                           if (!widget.enabled) return;
                           if (trackWidth > 0 && maxDuration > 0) {
                             final ratio = _ratioForDx(details.localPosition.dx,
-                                trackWidth, totalCount, isRtl: isRtl);
+                                trackWidth, totalCount,
+                                isRtl: isRtl);
                             final seekVal =
                                 (ratio * maxDuration).clamp(0.0, maxDuration);
                             if (_lastHapticCheckMs != null) {
@@ -394,7 +396,8 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                           if (trackWidth > 0 && maxDuration > 0) {
                             PulsrHaptics.selectionClick();
                             final ratio = _ratioForDx(details.localPosition.dx,
-                                trackWidth, totalCount, isRtl: isRtl);
+                                trackWidth, totalCount,
+                                isRtl: isRtl);
                             final seekMs = ratio * maxDuration;
                             widget
                                 .onSeek(Duration(milliseconds: seekMs.round()));
@@ -444,13 +447,13 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                                   final deltaStr = deltaMs == 0
                                       ? '±0:00'
                                       : '${deltaMs > 0 ? '+' : '-'}${Formatters.formatDuration(Duration(milliseconds: deltaMs.abs()))}';
-                                  final visibleProgress = totalCount > 0 &&
-                                          window.visibleCount > 0
-                                      ? ((progressPercent * totalCount -
-                                                  window.startIndex) /
-                                              window.visibleCount)
-                                          .clamp(0.0, 1.0)
-                                      : progressPercent;
+                                  final visibleProgress =
+                                      totalCount > 0 && window.visibleCount > 0
+                                          ? ((progressPercent * totalCount -
+                                                      window.startIndex) /
+                                                  window.visibleCount)
+                                              .clamp(0.0, 1.0)
+                                          : progressPercent;
 
                                   return PositionedDirectional(
                                     top: -34,

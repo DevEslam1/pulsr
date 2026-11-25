@@ -110,12 +110,14 @@ void main() {
     // Every dock tab must meet the 48dp minimum touch target and expose button semantics.
     for (final label in ['Home', 'Library', 'Search', 'Playlists']) {
       final tabSemantics = tester.getSemantics(
-        find.ancestor(
-          of: find.text(label),
-          matching: find.byWidgetPredicate(
-            (w) => w is Semantics && w.properties.label == label,
-          ),
-        ).first,
+        find
+            .ancestor(
+              of: find.text(label),
+              matching: find.byWidgetPredicate(
+                (w) => w is Semantics && w.properties.label == label,
+              ),
+            )
+            .first,
       );
       expect(tabSemantics.flagsCollection.isButton, isTrue, reason: label);
       expect(tabSemantics.flagsCollection.isSelected, Tristate.isFalse,
@@ -167,7 +169,8 @@ void main() {
       of: find.text('Settings'),
       matching: find.byType(InkWell),
     );
-    expect(tester.getSize(settingsInk.first).height, greaterThanOrEqualTo(48.0));
+    expect(
+        tester.getSize(settingsInk.first).height, greaterThanOrEqualTo(48.0));
 
     await tester.tap(find.text('Settings'));
     await tester.pump();

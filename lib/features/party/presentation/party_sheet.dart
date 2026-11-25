@@ -18,6 +18,7 @@ import '../../../data/party/listen_together_service.dart';
 import '../../../data/party/party_models.dart';
 
 import '../../../core/utils/pulsr_haptics.dart';
+
 class PartySheet extends StatefulWidget {
   final String? initialCode;
   final String? initialServerUrl;
@@ -503,8 +504,7 @@ class _PartySheetState extends State<PartySheet> {
             liveRegion: true,
             child: Text(
               _errorMessage!,
-              style: TextStyle(
-                  color: p.error, fontSize: AppFontSize.bodySmall),
+              style: TextStyle(color: p.error, fontSize: AppFontSize.bodySmall),
             ),
           ),
         ],
@@ -831,8 +831,8 @@ class _PartySheetState extends State<PartySheet> {
         // Leave Party Button
         OutlinedButton.icon(
           icon: Icon(Icons.exit_to_app_rounded, color: p.error),
-          label: Text(context.l10n.partyLeave,
-              style: TextStyle(color: p.error)),
+          label:
+              Text(context.l10n.partyLeave, style: TextStyle(color: p.error)),
           style: OutlinedButton.styleFrom(
             side: BorderSide(color: p.error),
             minimumSize: const Size(

@@ -63,8 +63,7 @@ void main() {
       }),
     );
 
-    final artifact =
-        await exportCustodyCertificate(source, directory: tempDir);
+    final artifact = await exportCustodyCertificate(source, directory: tempDir);
 
     expect(artifact.file.existsSync(), isTrue);
     final decoded =
@@ -102,12 +101,12 @@ void main() {
 
   test('an unverified report exports as unverified, never as bit-exact',
       () async {
-    final artifact = await exportCustodyCertificate(report(),
-        directory: tempDir);
-    final decoded =
-        jsonDecode(artifact.jsonText) as Map<String, dynamic>;
+    final artifact =
+        await exportCustodyCertificate(report(), directory: tempDir);
+    final decoded = jsonDecode(artifact.jsonText) as Map<String, dynamic>;
     expect(decoded['verdict'], 'unverified');
-    expect((decoded['verificationBadge'] as String), isNot(contains('Bit-Exact')));
+    expect(
+        (decoded['verificationBadge'] as String), isNot(contains('Bit-Exact')));
   });
 
   test('the artifact carries no filesystem path of the track', () async {
@@ -118,7 +117,8 @@ void main() {
     // The library path must not travel with a certificate shared outside the app.
     expect(artifact.jsonText.contains('file:///'), isFalse);
     expect(artifact.jsonText.contains(r'C:\'), isFalse);
-    expect((jsonDecode(artifact.jsonText) as Map).containsKey('filePath'), isFalse);
+    expect((jsonDecode(artifact.jsonText) as Map).containsKey('filePath'),
+        isFalse);
   });
 
   test('hostile track ids cannot escape the output directory', () async {

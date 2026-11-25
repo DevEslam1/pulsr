@@ -123,7 +123,8 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
         Duration(milliseconds: math.max(1, baseDurationMs));
   }
 
-  void _syncSpool({bool restartIfAnimating = false, bool? allowMotionOverride}) {
+  void _syncSpool(
+      {bool restartIfAnimating = false, bool? allowMotionOverride}) {
     final allowMotion = allowMotionOverride ?? _allowMotion(context);
     final duration = _spoolController.duration;
     final hasValidDuration = duration != null && duration > Duration.zero;

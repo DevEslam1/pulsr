@@ -184,7 +184,8 @@ void main() {
     var offset = 0;
     install((call) async {
       if (call.method != 'openReadChunk') return null;
-      final requestedOffset = (call.arguments as Map<Object?, Object?>)['offset']! as int;
+      final requestedOffset =
+          (call.arguments as Map<Object?, Object?>)['offset']! as int;
       expect(requestedOffset, offset);
       if (offset >= payload.length) return Uint8List(0);
       // Return a short 2-byte frame even though chunkSize is 8.
@@ -210,8 +211,10 @@ void main() {
     });
     final provider = SmbFsProvider(_smbSource(), chunkSize: 8);
 
-    final bytes =
-        await provider.openRead('song.mp3', start: 2, end: 5).expand((c) => c).toList();
+    final bytes = await provider
+        .openRead('song.mp3', start: 2, end: 5)
+        .expand((c) => c)
+        .toList();
 
     expect(bytes, [2, 3, 4, 5]);
     final args = calls.single.arguments as Map<Object?, Object?>;

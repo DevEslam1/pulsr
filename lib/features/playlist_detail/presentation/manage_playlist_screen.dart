@@ -103,8 +103,11 @@ class _ManagePlaylistScreenState extends State<ManagePlaylistScreen> {
         _updateSongsStream();
       });
     } catch (e, st) {
-      ErrorLogger.log('Failed to load excluded folders for ManagePlaylistScreen',
-          error: e, stackTrace: st, category: 'ManagePlaylist');
+      ErrorLogger.log(
+          'Failed to load excluded folders for ManagePlaylistScreen',
+          error: e,
+          stackTrace: st,
+          category: 'ManagePlaylist');
     }
   }
 

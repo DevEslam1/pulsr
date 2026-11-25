@@ -359,8 +359,8 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
         if (!persisted && !isClosed && gen == _quranToggleGen) {
           final st = _getState();
           _emit(st.copyWith(
-            playback: st.playback
-                .copyWith(error: _quranError('Failed to save Quran Mode setting')),
+            playback: st.playback.copyWith(
+                error: _quranError('Failed to save Quran Mode setting')),
           ));
         }
         if (isClosed || gen != _quranToggleGen) return;

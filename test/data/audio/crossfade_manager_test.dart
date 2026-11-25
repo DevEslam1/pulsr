@@ -488,7 +488,8 @@ void main() {
       });
     });
 
-    test('cancel stops inactive player and restores volumes even when an armed curve is not cleared',
+    test(
+        'cancel stops inactive player and restores volumes even when an armed curve is not cleared',
         () {
       fakeAsync((async) {
         when(() => mockPlayerA.dspSetGainCurve(any(),

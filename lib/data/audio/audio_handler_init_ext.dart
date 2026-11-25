@@ -94,8 +94,7 @@ extension _PulsrAudioInitExt on PulsrAudioHandler {
         debugPrint(
             '[AudioHandler] Preload rejected for $key ($sizeBytes bytes)');
       },
-      onBackgroundReleaseRequested: () =>
-          _tripleBufferPipeline.clearPreload(),
+      onBackgroundReleaseRequested: () => _tripleBufferPipeline.clearPreload(),
     );
 
     _preloadScheduler = SmartPreloadScheduler(
@@ -198,11 +197,12 @@ extension _PulsrAudioInitExt on PulsrAudioHandler {
     _hardwareVolumeOwned = _hardwareVolumeOwnsOutput();
     _subscriptions.add(UsbExclusiveService().statusStream.listen((status) {
       if (_disposed) return;
-      final startedStreaming = (!wasDirectStreaming && status.streamingActive) ||
-          (status.streamingActive &&
-              _isUsbHardwareVolumeEnabled() &&
-              status.hasVolumeControl &&
-              !status.hardwareVolumeApplied);
+      final startedStreaming =
+          (!wasDirectStreaming && status.streamingActive) ||
+              (status.streamingActive &&
+                  _isUsbHardwareVolumeEnabled() &&
+                  status.hasVolumeControl &&
+                  !status.hardwareVolumeApplied);
       wasDirectStreaming = status.streamingActive;
       if (!status.streamingActive) {
         _externalHardwareVolumeSet = false;
@@ -252,7 +252,8 @@ extension _PulsrAudioInitExt on PulsrAudioHandler {
     }));
 
     _equalizerManager.attachDspPipeline(_dspPipeline);
-    unawaited(_equalizerManager.syncNativeLatency(PulsrAudioHandler.assumedOutputSampleRate));
+    unawaited(_equalizerManager
+        .syncNativeLatency(PulsrAudioHandler.assumedOutputSampleRate));
 
     _gaplessMonitor.attach(
       currentIndexStream: _activePlayer.currentIndexStream,
@@ -364,7 +365,8 @@ extension _PulsrAudioInitExt on PulsrAudioHandler {
               category: 'AudioHandler',
             );
             if (!_errorSubject.isClosed) {
-              _errorSubject.add('${PulsrAudioHandler.outputModeNoticePrefix}$message');
+              _errorSubject
+                  .add('${PulsrAudioHandler.outputModeNoticePrefix}$message');
             }
           },
           onError: (e, st) {
@@ -781,9 +783,9 @@ extension _PulsrAudioInitExt on PulsrAudioHandler {
         }
         // Route-tagged: a speaker index of 0 during a USB sink rebuild must
         // not mute the live Direct USB stream.
-        final belongsToThisRoute = PulsrAudioHandler.systemVolumeReadingBelongsToRoute(
-          directUsbStreaming:
-              UsbExclusiveService().lastStatus.streamingActive,
+        final belongsToThisRoute =
+            PulsrAudioHandler.systemVolumeReadingBelongsToRoute(
+          directUsbStreaming: UsbExclusiveService().lastStatus.streamingActive,
           routeKnown: reading.routeKnown,
           isUsb: reading.isUsb,
         );

@@ -111,7 +111,8 @@ extension YtmAccountDatasync on YtmAccountService {
       final json = jsonDecode(res.body) as Map<String, dynamic>;
       _harvestSessionState(json);
       if (_hasDataSyncId(before)) {
-        debugPrint('[YTM_ACCOUNT] datasyncId harvested from the WEB account_menu');
+        debugPrint(
+            '[YTM_ACCOUNT] datasyncId harvested from the WEB account_menu');
         return true;
       }
       _accountMenuDiagnostic = 'WEB account_menu response keys: '

@@ -33,14 +33,20 @@ void main() {
       expect(decoded.rules.length, 1);
     });
 
-    test('fromJson safely handles non-Map rule entries and parses limit from num', () {
+    test(
+        'fromJson safely handles non-Map rule entries and parses limit from num',
+        () {
       final decoded = SmartCriteria.fromJson({
         'rules': [
           {'field': 'playCount', 'operator': '>', 'value': '5'},
           'invalid_string_rule',
           123,
           null,
-          <dynamic, dynamic>{'field': 'genre', 'operator': 'contains', 'value': 'rock'},
+          <dynamic, dynamic>{
+            'field': 'genre',
+            'operator': 'contains',
+            'value': 'rock'
+          },
         ],
         'limit': 25.0,
       });

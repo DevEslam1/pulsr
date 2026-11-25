@@ -17,7 +17,9 @@ import 'package:pulsr/features/player/cubit/quran_restore_snapshot.dart';
 import '../player_test_support.dart';
 
 class MockAudioHandler extends Mock implements PulsrAudioHandler {}
+
 class MockPerSongPlaybackStore extends Mock implements PerSongPlaybackStore {}
+
 class MockPerSongVolumeStore extends Mock implements PerSongVolumeStore {}
 
 void main() {
@@ -29,7 +31,9 @@ void main() {
 
   group('Phase 1: State Integrity & Concurrency', () {
     group('1.1 & 1.2 DSP Mutex & Rollback Merge', () {
-      test('DspEffectApplier serializes concurrent applies and merge-policy does not clobber newer value', () async {
+      test(
+          'DspEffectApplier serializes concurrent applies and merge-policy does not clobber newer value',
+          () async {
         PlayerState state = const PlayerState();
         final applier = DspEffectApplier(
           getState: () => state,
@@ -75,7 +79,9 @@ void main() {
     });
 
     group('1.3 Clamped Effective Boosts', () {
-      test('DspSlice stores clamped effective values and exposes them via PlayerState', () {
+      test(
+          'DspSlice stores clamped effective values and exposes them via PlayerState',
+          () {
         const state = PlayerState(
           dsp: DspSlice(
             volumeBoost: 15.0,
@@ -90,7 +96,8 @@ void main() {
     });
 
     group('1.4 PlaybackVolumeMute FIFO & Concurrency', () {
-      test('routes concurrent operations through FIFO and updates state', () async {
+      test('routes concurrent operations through FIFO and updates state',
+          () async {
         final handler = MockAudioHandler();
         when(() => handler.usbHardwareVolumeOwned).thenReturn(false);
         when(() => handler.usbHardwareMute).thenReturn(null);
@@ -131,7 +138,8 @@ void main() {
         when(() => handler.usbHardwareVolumeOwned).thenReturn(false);
         when(() => handler.usbHardwareMute).thenReturn(null);
         when(() => handler.volume).thenAnswer((_) => 0.7);
-        when(() => handler.setVolume(any())).thenThrow(Exception('Native mute error'));
+        when(() => handler.setVolume(any()))
+            .thenThrow(Exception('Native mute error'));
 
         PlayerState state = const PlayerState();
         final mute = PlaybackVolumeMute(
@@ -146,7 +154,8 @@ void main() {
     });
 
     group('1.5 Per-song memory restoration', () {
-      test('restores global defaults when track has no stored speed or pitch', () async {
+      test('restores global defaults when track has no stored speed or pitch',
+          () async {
         final handler = MockAudioHandler();
         stubPlaybackRateHandler(handler);
         when(() => handler.userBaseSpeed).thenReturn(1.0);
@@ -185,7 +194,8 @@ void main() {
         expect(state.playbackPitch, equals(1.2));
 
         // Now move to B (which has no stored playback memory)
-        state = state.copyWith(playback: state.playback.copyWith(currentSong: songB));
+        state = state.copyWith(
+            playback: state.playback.copyWith(currentSong: songB));
         await controller.applyPerSongPlaybackMemory(songB);
 
         // Speed must be restored to default (1.0) and pitch to 1.0!
@@ -322,7 +332,8 @@ void main() {
     });
 
     group('1.11 cacheSlotSongs LRU Cap', () {
-      test('enforces maxSlotLookupCacheEntries cap by evicting oldest entries', () {
+      test('enforces maxSlotLookupCacheEntries cap by evicting oldest entries',
+          () {
         final cache = <int, SongsTableData>{};
 
         // Add 4100 songs

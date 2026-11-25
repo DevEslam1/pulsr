@@ -175,8 +175,10 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
           query.orderBy([
             (t) => OrderingTerm(
                 expression: t.album.collate(Collate.noCase), mode: mode),
-            (t) => OrderingTerm(expression: t.discNumber, mode: OrderingMode.asc),
-            (t) => OrderingTerm(expression: t.trackNumber, mode: OrderingMode.asc),
+            (t) =>
+                OrderingTerm(expression: t.discNumber, mode: OrderingMode.asc),
+            (t) =>
+                OrderingTerm(expression: t.trackNumber, mode: OrderingMode.asc),
             (t) => OrderingTerm(
                 expression: t.title.collate(Collate.noCase), mode: mode),
             (t) => OrderingTerm.asc(t.id),
@@ -801,16 +803,14 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
       },
     );
 
-    return combinedStream
-        .debounceTime(const Duration(milliseconds: 500))
-        .map((parts) => _postProcessAny(parts.$1, parts.$2, criteria, dartRules));
+    return combinedStream.debounceTime(const Duration(milliseconds: 500)).map(
+        (parts) => _postProcessAny(parts.$1, parts.$2, criteria, dartRules));
   }
 
   Stream<void>? _buildExternalTrigger(SmartCriteria criteria) {
     final hasRatingRule =
         criteria.rules.any((r) => r.field == SmartRuleField.rating);
-    final hasBpmRule =
-        criteria.rules.any((r) => r.field == SmartRuleField.bpm);
+    final hasBpmRule = criteria.rules.any((r) => r.field == SmartRuleField.bpm);
     final hasRatingSort = criteria.sortBy == 'rating';
     final hasBpmSort = criteria.sortBy == 'bpm';
 
@@ -1228,10 +1228,10 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
     int compare(SongsTableData a, SongsTableData b) => switch (sortBy) {
           'artist' => a.artist.toLowerCase().compareTo(b.artist.toLowerCase()),
           'album' => () {
-              final alb = a.album.toLowerCase().compareTo(b.album.toLowerCase());
+              final alb =
+                  a.album.toLowerCase().compareTo(b.album.toLowerCase());
               if (alb != 0) return ascending ? alb : -alb;
-              final disc =
-                  (a.discNumber ?? 0).compareTo(b.discNumber ?? 0);
+              final disc = (a.discNumber ?? 0).compareTo(b.discNumber ?? 0);
               if (disc != 0) return disc;
               return (a.trackNumber ?? 0).compareTo(b.trackNumber ?? 0);
             }(),

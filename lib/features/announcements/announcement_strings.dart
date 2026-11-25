@@ -81,8 +81,7 @@ abstract final class AnnouncementStrings {
   static String get skipBitPerfectTitle => _l10n().annSkipBitPerfectTitle;
 
   /// Bit-perfect skip switch explanation.
-  static String get skipBitPerfectSubtitle =>
-      _l10n().annSkipBitPerfectSubtitle;
+  static String get skipBitPerfectSubtitle => _l10n().annSkipBitPerfectSubtitle;
 
   /// Section header for voice selection.
   static String get sectionVoice => _l10n().annSectionVoice;

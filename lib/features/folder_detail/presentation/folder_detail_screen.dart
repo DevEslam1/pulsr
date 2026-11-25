@@ -264,7 +264,8 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
 
       final allFavorited = _isAllFavorited(songs);
       final targetFavorite = !allFavorited;
-      final affected = songs.where((s) => s.isFavorite != targetFavorite).toList();
+      final affected =
+          songs.where((s) => s.isFavorite != targetFavorite).toList();
       if (affected.isNotEmpty) {
         await libraryCubit.setSongsFavorite(affected, targetFavorite);
       }

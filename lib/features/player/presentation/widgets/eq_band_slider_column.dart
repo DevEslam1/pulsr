@@ -496,12 +496,12 @@ class _VerticalEqSliderState extends State<_VerticalEqSlider> {
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 5, vertical: 2),
                               decoration: BoxDecoration(
-                                color: widget.surfaceColor
-                                    .withValues(alpha: 0.95),
+                                color:
+                                    widget.surfaceColor.withValues(alpha: 0.95),
                                 borderRadius: AppRadii.r6All,
                                 border: Border.all(
-                                  color: widget.accentColor
-                                      .withValues(alpha: 0.7),
+                                  color:
+                                      widget.accentColor.withValues(alpha: 0.7),
                                   width: 1.0,
                                 ),
                                 boxShadow: [

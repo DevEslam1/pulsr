@@ -124,7 +124,8 @@ void main() {
     expect(settings.snapshot.stopWhenTaskRemoved, isTrue);
     expect(settings.snapshot.volumeRockerTrackSwitch, isTrue);
     expect(settings.snapshot.fadeOutOnPauseMs, 750);
-    expect(settings.snapshot.softwareVolumeCurve, SoftwareVolumeCurve.logarithmic);
+    expect(
+        settings.snapshot.softwareVolumeCurve, SoftwareVolumeCurve.logarithmic);
     expect(settings.snapshot.volumeStepPercent, 8);
     expect(settings.snapshot.resumeAfterCall, isFalse);
   });
@@ -150,8 +151,8 @@ void main() {
         isTrue);
     expect(prefs.getString(PrefsKeys.duckingMode), 'pause');
     expect(prefs.getBool(SystemBehaviorPrefsKeys.stopWhenTaskRemoved), isTrue);
-    expect(prefs.getBool(SystemBehaviorPrefsKeys.volumeRockerTrackSwitch),
-        isTrue);
+    expect(
+        prefs.getBool(SystemBehaviorPrefsKeys.volumeRockerTrackSwitch), isTrue);
     expect(prefs.getInt(SystemBehaviorPrefsKeys.fadeOutOnPauseMs), 320);
     expect(prefs.getString(SystemBehaviorPrefsKeys.softwareVolumeCurve),
         'logarithmic');
@@ -183,8 +184,8 @@ void main() {
   test('unknown enum names never throw on parse', () {
     expect(UsbReleaseOnFocusLoss.parse(null), UsbReleaseOnFocusLoss.never);
     expect(UsbReleaseOnFocusLoss.parse(''), UsbReleaseOnFocusLoss.never);
-    expect(UsbReleaseOnFocusLoss.parse('TRANSIENT'),
-        UsbReleaseOnFocusLoss.never);
+    expect(
+        UsbReleaseOnFocusLoss.parse('TRANSIENT'), UsbReleaseOnFocusLoss.never);
     expect(UsbReleaseOnFocusLoss.parse('transient'),
         UsbReleaseOnFocusLoss.transient);
     expect(SoftwareVolumeCurve.parse('nope'), SoftwareVolumeCurve.linear);
@@ -260,7 +261,8 @@ void main() {
     expect(settings.isLoaded, isTrue);
   });
 
-  test('resumeAfterCall getter reflects live shared preferences overlay', () async {
+  test('resumeAfterCall getter reflects live shared preferences overlay',
+      () async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.setBool(PrefsKeys.resumeAfterInterruption, true);
     final SystemBehaviorSettings settings = SystemBehaviorSettings();

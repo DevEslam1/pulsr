@@ -629,15 +629,13 @@ class AudioProfileService {
   /// Clears the automatic-apply marker so the next matching event applies the
   /// default profile again (used when the user changes which profile is the
   /// default, or detaches the device).
-  Future<void> clearLastAppliedMarker() =>
-      _prefs.remove(lastAppliedProfileKey);
+  Future<void> clearLastAppliedMarker() => _prefs.remove(lastAppliedProfileKey);
 
   /// Deletes the profile whose id is [id]. Missing files are treated as done.
   ///
   /// Deleting the profile that is currently marked as the default also clears
   /// the default selection so it can never point at a missing file.
-  Future<void> delete(String id) =>
-      _mutex.protect(() => _deleteUnlocked(id));
+  Future<void> delete(String id) => _mutex.protect(() => _deleteUnlocked(id));
 
   Future<void> _deleteUnlocked(String id) async {
     try {

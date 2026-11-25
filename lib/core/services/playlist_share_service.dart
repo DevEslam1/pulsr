@@ -30,9 +30,7 @@ class SharedPlaylistBundle {
         name: json['name'] as String? ?? 'Shared Playlist',
         appVersion: json['appVersion'] as String? ?? '1.0.0',
         exportTimestamp: (json['exportTimestamp'] as num?)?.toInt() ?? 0,
-        tracks: (json['tracks'] as List<dynamic>?)
-                ?.whereType<Map>()
-                .map((raw) {
+        tracks: (json['tracks'] as List<dynamic>?)?.whereType<Map>().map((raw) {
               final e = Map<String, dynamic>.from(raw);
               final src = e['source'] as String?;
               final String validSource;

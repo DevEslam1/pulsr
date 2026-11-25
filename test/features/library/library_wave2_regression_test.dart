@@ -52,9 +52,11 @@ void main() {
     registerFallbackValue(const domain.SmartCriteria());
   });
 
-  group('M-02 & L-01: article stripping and SmartPlaylistRuleBuilder ms conversion',
+  group(
+      'M-02 & L-01: article stripping and SmartPlaylistRuleBuilder ms conversion',
       () {
-    test('libraryRailLetterIndex strips leading The, A, An when remainder exists',
+    test(
+        'libraryRailLetterIndex strips leading The, A, An when remainder exists',
         () {
       final songs = [
         createTestSong(id: 1, title: 'The Beatles'),
@@ -66,7 +68,8 @@ void main() {
       expect(libraryRailLetterIndex('T', songs), 2);
     });
 
-    test('SmartRule converts duration between UI seconds and domain milliseconds',
+    test(
+        'SmartRule converts duration between UI seconds and domain milliseconds',
         () {
       final uiRule = SmartRule(
         field: SmartRuleField.duration,
@@ -81,14 +84,17 @@ void main() {
     });
   });
 
-  group('H-31: LibraryStatsScreen time-range topArtists & loading skeleton', () {
-    testWidgets('shows SkeletonList while getAllSongs is loading and filters topArtists by time range',
+  group('H-31: LibraryStatsScreen time-range topArtists & loading skeleton',
+      () {
+    testWidgets(
+        'shows SkeletonList while getAllSongs is loading and filters topArtists by time range',
         (tester) async {
       final repo = _Repo();
       final completer = Completer<Result<List<SongsTableData>>>();
       when(() => repo.getExcludedFolderPaths())
           .thenAnswer((_) async => const Right([]));
-      when(() => repo.getAllSongs(excludedFolders: any(named: 'excludedFolders')))
+      when(() =>
+              repo.getAllSongs(excludedFolders: any(named: 'excludedFolders')))
           .thenAnswer((_) => completer.future);
 
       final state = const LibraryState();
@@ -107,10 +113,12 @@ void main() {
       expect(find.byType(SkeletonList), findsOneWidget);
 
       final now = DateTime.now().millisecondsSinceEpoch;
-      final twoDaysAgo =
-          DateTime.now().subtract(const Duration(days: 2)).millisecondsSinceEpoch;
-      final fortyDaysAgo =
-          DateTime.now().subtract(const Duration(days: 40)).millisecondsSinceEpoch;
+      final twoDaysAgo = DateTime.now()
+          .subtract(const Duration(days: 2))
+          .millisecondsSinceEpoch;
+      final fortyDaysAgo = DateTime.now()
+          .subtract(const Duration(days: 40))
+          .millisecondsSinceEpoch;
 
       completer.complete(Right([
         createTestSong(
@@ -197,9 +205,11 @@ void main() {
     });
   });
 
-  group('H-36 & M-04: SmartPlaylistBuilderScreen template clears _limitError & parses mm:ss',
+  group(
+      'H-36 & M-04: SmartPlaylistBuilderScreen template clears _limitError & parses mm:ss',
       () {
-    testWidgets('tapping a preset template clears an active limit validation error',
+    testWidgets(
+        'tapping a preset template clears an active limit validation error',
         (tester) async {
       await getIt.reset();
       SharedPreferences.setMockInitialValues({});
@@ -207,7 +217,8 @@ void main() {
       final repo = _Repo();
       when(() => engine.watchCriteria(any()))
           .thenAnswer((_) => const Stream<List<SongsTableData>>.empty());
-      when(() => engine.evaluateCriteria(any())).thenAnswer((_) async => const []);
+      when(() => engine.evaluateCriteria(any()))
+          .thenAnswer((_) async => const []);
       when(() => engine.validateRules(any())).thenReturn(const []);
       final cubit =
           SmartPlaylistBuilderCubit(engine, PlaylistUseCases(repo, engine));

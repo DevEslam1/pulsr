@@ -163,8 +163,7 @@ BitPerfectState resolveBitPerfectState({
   // covers OEM post-processing the app cannot reach. Both live outside the PCM
   // buffer, so the active tier requires both here as well. Every fact must
   // hold *and* the chain must be verified; anything else is degraded.
-  final allFactsHold =
-      exclusive &&
+  final allFactsHold = exclusive &&
       (integerBypass || isDsdNative) &&
       halClean &&
       !systemEffectsCompromised &&

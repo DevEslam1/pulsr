@@ -27,7 +27,8 @@ void _writeBe64(Uint8List target, int offset, int value) {
   }
 }
 
-Uint8List _dsfHeader(int sampleRate, {int channels = 2, int bitsPerSample = 1}) {
+Uint8List _dsfHeader(int sampleRate,
+    {int channels = 2, int bitsPerSample = 1}) {
   final bytes = Uint8List(0x60);
   bytes.setRange(0, 4, _ascii('DSD '));
   bytes.setRange(0x1C, 0x20, _ascii('fmt '));
@@ -45,7 +46,8 @@ Uint8List _dsfHeader(int sampleRate, {int channels = 2, int bitsPerSample = 1}) 
 Uint8List _dffHeader(int sampleRate) {
   // FRM8 + size, 'DSD ', then a PROP chunk containing 'SND ' + 'FS  '.
   final propSize = 4 + 12 + 4; // 'SND ' + FS header + 4-byte rate
-  final total = 12 + 4 + 12 + propSize; // FRM8 hdr + form type + PROP hdr + data
+  final total =
+      12 + 4 + 12 + propSize; // FRM8 hdr + form type + PROP hdr + data
   final bytes = Uint8List(total);
   bytes.setRange(0, 4, _ascii('FRM8'));
   _writeBe64(bytes, 4, total - 12);
@@ -90,7 +92,8 @@ void main() {
       expect(DsdHeaderProbe.parseDsfMultiple(_dsfHeader(1411200)), 0);
     });
 
-    test('reads the declared bit order from fmt +32, not the channel count', () {
+    test('reads the declared bit order from fmt +32, not the channel count',
+        () {
       // The rate lives at 0x38 and bits at 0x3C; reading the rate at 0x34
       // (channel count) made every stereo DSF probe as "unknown rate".
       expect(
@@ -135,7 +138,8 @@ void main() {
 
     test('returns 0 when the declared chunk size overruns the buffer', () {
       final bytes = _dffHeader(2822400);
-      _writeBe64(bytes, 20, 1 << 20); // PROP claims 1 MB inside a ~60-byte buffer
+      _writeBe64(
+          bytes, 20, 1 << 20); // PROP claims 1 MB inside a ~60-byte buffer
       expect(DsdHeaderProbe.parseDffMultiple(bytes), 0);
     });
   });

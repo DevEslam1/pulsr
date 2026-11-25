@@ -244,546 +244,551 @@ class _QuranModePanelState extends State<QuranModePanel> {
           a.currentSong?.uri != b.currentSong?.uri,
       listener: (_, __) => unawaited(_refreshAlwaysOnRadio()),
       child: BlocBuilder<PlayerCubit, PlayerState>(
-      // AUDIT-FIX (P3-23): Omit `position` from outer `buildWhen` so 4Hz+
-      // playback ticks do not rebuild the entire sheet; only `QuranMushafView`
-      // needs live position via its own `BlocSelector`.
-      buildWhen: (a, b) =>
-          a.isQuranModeEnabled != b.isQuranModeEnabled ||
-          a.quranReciterStyle != b.quranReciterStyle ||
-          a.isReverbEnabled != b.isReverbEnabled ||
-          a.reverbWetDry != b.reverbWetDry ||
-          a.isSaturationEnabled != b.isSaturationEnabled ||
-          a.saturationMix != b.saturationMix ||
-          a.playbackSpeed != b.playbackSpeed ||
-          a.playback.error != b.playback.error ||
-          a.abLoopEnabled != b.abLoopEnabled ||
-          a.abPointA != b.abPointA ||
-          a.abPointB != b.abPointB ||
-          a.currentSong != b.currentSong,
-      builder: (context, state) {
-        final cubit = context.read<PlayerCubit>();
-        final enabled = state.isQuranModeEnabled && !_isApplying;
-        final style = state.quranReciterStyle;
-        final currentTrackUri =
-            state.currentSong?.uri ?? state.currentSong?.path;
+        // AUDIT-FIX (P3-23): Omit `position` from outer `buildWhen` so 4Hz+
+        // playback ticks do not rebuild the entire sheet; only `QuranMushafView`
+        // needs live position via its own `BlocSelector`.
+        buildWhen: (a, b) =>
+            a.isQuranModeEnabled != b.isQuranModeEnabled ||
+            a.quranReciterStyle != b.quranReciterStyle ||
+            a.isReverbEnabled != b.isReverbEnabled ||
+            a.reverbWetDry != b.reverbWetDry ||
+            a.isSaturationEnabled != b.isSaturationEnabled ||
+            a.saturationMix != b.saturationMix ||
+            a.playbackSpeed != b.playbackSpeed ||
+            a.playback.error != b.playback.error ||
+            a.abLoopEnabled != b.abLoopEnabled ||
+            a.abPointA != b.abPointA ||
+            a.abPointB != b.abPointB ||
+            a.currentSong != b.currentSong,
+        builder: (context, state) {
+          final cubit = context.read<PlayerCubit>();
+          final enabled = state.isQuranModeEnabled && !_isApplying;
+          final style = state.quranReciterStyle;
+          final currentTrackUri =
+              state.currentSong?.uri ?? state.currentSong?.path;
 
-        if (currentTrackUri != _lastLoadedTrackUri) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) _checkMetadata(currentTrackUri);
-          });
-        }
+          if (currentTrackUri != _lastLoadedTrackUri) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) _checkMetadata(currentTrackUri);
+            });
+          }
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header
-            Padding(
-              padding: const EdgeInsetsDirectional.fromSTEB(
-                  AppSpacing.s20, AppSpacing.xxs, AppSpacing.s20, 0),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(AppSpacing.s10),
-                    decoration: BoxDecoration(
-                      color: p.accent.withValues(alpha: 0.14),
-                      borderRadius: AppRadii.r14All,
-                    ),
-                    child: Icon(Icons.menu_book_rounded,
-                        color: p.accent, size: 22),
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(context.l10n.quranMode,
-                            style: TextStyle(
-                              color: p.textPrimary,
-                              fontSize: AppFontSize.title,
-                              fontWeight: FontWeight.w800,
-                            )),
-                        Text(
-                          context.l10n.reciterDesc,
-                          style: TextStyle(
-                              color: p.textSecondary,
-                              fontSize: AppFontSize.label),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Semantics(
-                    label: context.l10n.quranMode,
-                    value: state.isQuranModeEnabled
-                        ? context.l10n.semanticsStateOn
-                        : context.l10n.semanticsStateOff,
-                    child: PulsrSwitch(
-                      value: state.isQuranModeEnabled,
-                      onChanged: _isApplying
-                          ? null
-                          : (v) => unawaited(
-                                _runQuranAction(
-                                    () => cubit.setQuranModeEnabled(v)),
-                              ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: AppSpacing.s14),
-
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
-              child: Align(
-                alignment: AlignmentDirectional.centerStart,
-                child: TextButton.icon(
-                  onPressed: _isApplying
-                      ? null
-                      : () => unawaited(
-                            _runQuranAction(() => cubit.resetQuranAutoMode()),
-                          ),
-                  icon: const Icon(Icons.auto_mode_rounded, size: 18),
-                  label: Text(context.l10n.quranAutoDetectRecitations),
-                  style: TextButton.styleFrom(
-                    foregroundColor: p.textSecondary,
-                    padding: EdgeInsets.zero,
-                    visualDensity: VisualDensity.compact,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: AppSpacing.xs),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.radio_rounded,
-                    size: 20,
-                    color: _alwaysOnRadio ? p.accent : p.textSecondary,
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          context.l10n.alwaysOnRadio,
-                          style: TextStyle(
-                            color: p.textPrimary,
-                            fontSize: AppFontSize.label,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        Text(
-                          context.l10n.alwaysOnRadioDesc,
-                          style: TextStyle(
-                            color: p.textSecondary,
-                            fontSize: AppFontSize.caption,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  PulsrSwitch(
-                    value: _alwaysOnRadio,
-                    onChanged: _alwaysOnRadioUpdating
-                        ? null
-                        : (v) {
-                            PulsrHaptics.selectionClick();
-                            unawaited(_toggleAlwaysOnRadio(cubit, v));
-                          },
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: AppSpacing.s8),
-
-            // Reciter styles
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
-              child: Text(context.l10n.reciterStyle,
-                  style: TextStyle(
-                    color: p.textSecondary,
-                    fontSize: AppFontSize.caption,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: AppTracking.overline,
-                  )),
-            ),
-            const SizedBox(height: AppSpacing.xs),
-            SizedBox(
-              height: AppSpacing.s40,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
-                itemCount: QuranReciterStyle.values.length,
-                separatorBuilder: (_, __) =>
-                    const SizedBox(width: AppSpacing.xs),
-                itemBuilder: (context, i) {
-                  final s = QuranReciterStyle.values[i];
-                  final selected = s == style;
-                  return Semantics(
-                    label: '${context.l10n.reciterStyle}: ${s.label}',
-                    selected: selected,
-                    child: ChoiceChip(
-                      selected: selected,
-                      onSelected: _isApplying
-                          ? null
-                          : (_) {
-                              PulsrHaptics.selectionClick();
-                              unawaited(_runQuranAction(
-                                  () => cubit.setQuranReciterStyle(s)));
-                            },
-                      label: Text(s.label),
-                      labelStyle: TextStyle(
-                        color: selected ? p.onAccent : p.textPrimary,
-                        fontWeight: FontWeight.w700,
-                        fontSize: AppFontSize.label,
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header
+              Padding(
+                padding: const EdgeInsetsDirectional.fromSTEB(
+                    AppSpacing.s20, AppSpacing.xxs, AppSpacing.s20, 0),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(AppSpacing.s10),
+                      decoration: BoxDecoration(
+                        color: p.accent.withValues(alpha: 0.14),
+                        borderRadius: AppRadii.r14All,
                       ),
-                      backgroundColor: p.surfaceContainer,
-                      selectedColor: p.accent,
-                      side: BorderSide(color: p.hairline),
-                      showCheckmark: false,
+                      child: Icon(Icons.menu_book_rounded,
+                          color: p.accent, size: 22),
                     ),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: AppSpacing.s6),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
-              child: Text(
-                '${style.tagline} • ${style.sanctuaryName.isNotEmpty ? style.sanctuaryName : style.description}',
-                style: TextStyle(
-                    color: p.textTertiary, fontSize: AppFontSize.label),
-              ),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            _buildQuranMetadataCard(context, p, state, cubit),
-            const SizedBox(height: AppSpacing.md),
-
-            if (_isApplying)
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: AppSpacing.s20),
-                child: LinearProgressIndicator(),
-              ),
-            if (_isApplying) const SizedBox(height: AppSpacing.sm),
-
-            if (_isQuranModeError(state.playback.error)) ...[
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
-                child: QuranErrorCard(
-                  message: resolveUiErrorMessage(
-                    context,
-                    state.playback.error!.userMessage,
-                  ),
-                  onRetry: !_isApplying
-                      ? () => unawaited(
-                            _runQuranAction(() => cubit.reapplyQuranProfile()),
-                          )
-                      : null,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.sm),
-            ],
-
-            // Tuning sliders
-            _QuranSliderTile(
-              icon: Icons.mosque_rounded,
-              title: context.l10n.dspMosqueAmbience,
-              subtitle: context.l10n.dspMosqueAmbienceDesc,
-              value: state.isReverbEnabled
-                  ? state.reverbWetDry.clamp(0.0, 0.6)
-                  : 0.0,
-              max: 0.6,
-              enabled: enabled,
-              valueLabel: state.isReverbEnabled
-                  ? '${(state.reverbWetDry * 100).round()}%'
-                  : '0%',
-              onChanged: (value) => unawaited(
-                cubit.setQuranAmbience(value),
-              ),
-              applyOnRelease: true,
-            ),
-            if (state.isReverbEnabled)
-              Padding(
-                padding: const EdgeInsetsDirectional.only(
-                  start: AppSpacing.s20,
-                  end: AppSpacing.s20,
-                  bottom: AppSpacing.xs,
-                ),
-                child: Align(
-                  alignment: AlignmentDirectional.centerEnd,
-                  child: TextButton.icon(
-                    onPressed: enabled
-                        ? () => unawaited(
-                              _runQuranAction(() => cubit.setQuranAmbience(0)),
-                            )
-                        : null,
-                    icon: const Icon(Icons.volume_off_rounded, size: 18),
-                    label: Text(context.l10n.noneLabel),
-                  ),
-                ),
-              ),
-            _QuranSliderTile(
-              icon: Icons.local_fire_department_rounded,
-              title: context.l10n.dspVocalWarmth,
-              subtitle: context.l10n.dspVocalWarmthDesc,
-              value: state.isSaturationEnabled
-                  ? state.saturationMix.clamp(0.0, 0.6)
-                  : 0.0,
-              max: 0.6,
-              enabled: enabled,
-              valueLabel: state.isSaturationEnabled
-                  ? '${(state.saturationMix * 100).round()}%'
-                  : '0%',
-              onChanged: (value) => unawaited(
-                cubit.setQuranWarmth(value),
-              ),
-              applyOnRelease: true,
-            ),
-
-            // Ambient sounds
-            const SizedBox(height: AppSpacing.sm),
-            const AmbientSoundPanel(
-              padding: EdgeInsets.symmetric(horizontal: AppSpacing.s20),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-
-            // Learning speed
-            Padding(
-              padding: const EdgeInsetsDirectional.fromSTEB(
-                  AppSpacing.s20, AppSpacing.s6, AppSpacing.s20, 0),
-              child: Row(
-                children: [
-                  Icon(Icons.speed_rounded, color: p.textSecondary, size: 20),
-                  const SizedBox(width: AppSpacing.sm),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(context.l10n.learningSpeed,
-                            style: TextStyle(
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(context.l10n.quranMode,
+                              style: TextStyle(
                                 color: p.textPrimary,
-                                fontSize: AppFontSize.body,
-                                fontWeight: FontWeight.w700)),
-                        Text(context.l10n.reciterSpeedDesc,
+                                fontSize: AppFontSize.title,
+                                fontWeight: FontWeight.w800,
+                              )),
+                          Text(
+                            context.l10n.reciterDesc,
                             style: TextStyle(
                                 color: p.textSecondary,
-                                fontSize: AppFontSize.label)),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: AppSpacing.xs),
-            Builder(
-              builder: (context) {
-                final isStandardSpeed = [0.5, 0.75, 1.0].any(
-                  (s) => (s - state.playbackSpeed).abs() < 0.01,
-                );
-                final speedSegments = <ButtonSegment<double>>[
-                  const ButtonSegment(value: 0.5, label: Text('0.5x')),
-                  const ButtonSegment(value: 0.75, label: Text('0.75x')),
-                  const ButtonSegment(value: 1.0, label: Text('1.0x')),
-                  if (!isStandardSpeed)
-                    ButtonSegment(
-                      value: state.playbackSpeed,
-                      label: Text(
-                        '${state.playbackSpeed.toStringAsFixed(2).replaceAll(RegExp(r"\.?0+$"), "")}x',
+                                fontSize: AppFontSize.label),
+                          ),
+                        ],
                       ),
                     ),
-                ];
-                final selectedSpeed = isStandardSpeed
-                    ? [0.5, 0.75, 1.0].reduce((a, b) =>
-                        (a - state.playbackSpeed).abs() <
-                                (b - state.playbackSpeed).abs()
-                            ? a
-                            : b)
-                    : state.playbackSpeed;
+                    Semantics(
+                      label: context.l10n.quranMode,
+                      value: state.isQuranModeEnabled
+                          ? context.l10n.semanticsStateOn
+                          : context.l10n.semanticsStateOff,
+                      child: PulsrSwitch(
+                        value: state.isQuranModeEnabled,
+                        onChanged: _isApplying
+                            ? null
+                            : (v) => unawaited(
+                                  _runQuranAction(
+                                      () => cubit.setQuranModeEnabled(v)),
+                                ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: AppSpacing.s14),
 
-                return Padding(
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
+                child: Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: TextButton.icon(
+                    onPressed: _isApplying
+                        ? null
+                        : () => unawaited(
+                              _runQuranAction(() => cubit.resetQuranAutoMode()),
+                            ),
+                    icon: const Icon(Icons.auto_mode_rounded, size: 18),
+                    label: Text(context.l10n.quranAutoDetectRecitations),
+                    style: TextButton.styleFrom(
+                      foregroundColor: p.textSecondary,
+                      padding: EdgeInsets.zero,
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.radio_rounded,
+                      size: 20,
+                      color: _alwaysOnRadio ? p.accent : p.textSecondary,
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            context.l10n.alwaysOnRadio,
+                            style: TextStyle(
+                              color: p.textPrimary,
+                              fontSize: AppFontSize.label,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          Text(
+                            context.l10n.alwaysOnRadioDesc,
+                            style: TextStyle(
+                              color: p.textSecondary,
+                              fontSize: AppFontSize.caption,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    PulsrSwitch(
+                      value: _alwaysOnRadio,
+                      onChanged: _alwaysOnRadioUpdating
+                          ? null
+                          : (v) {
+                              PulsrHaptics.selectionClick();
+                              unawaited(_toggleAlwaysOnRadio(cubit, v));
+                            },
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: AppSpacing.s8),
+
+              // Reciter styles
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
+                child: Text(context.l10n.reciterStyle,
+                    style: TextStyle(
+                      color: p.textSecondary,
+                      fontSize: AppFontSize.caption,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: AppTracking.overline,
+                    )),
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              SizedBox(
+                height: AppSpacing.s40,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
                   padding:
                       const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
-                  child: SegmentedButton<double>(
-                    segments: speedSegments,
-                    selected: {selectedSpeed},
-                    onSelectionChanged: enabled
-                        ? (v) => unawaited(
+                  itemCount: QuranReciterStyle.values.length,
+                  separatorBuilder: (_, __) =>
+                      const SizedBox(width: AppSpacing.xs),
+                  itemBuilder: (context, i) {
+                    final s = QuranReciterStyle.values[i];
+                    final selected = s == style;
+                    return Semantics(
+                      label: '${context.l10n.reciterStyle}: ${s.label}',
+                      selected: selected,
+                      child: ChoiceChip(
+                        selected: selected,
+                        onSelected: _isApplying
+                            ? null
+                            : (_) {
+                                PulsrHaptics.selectionClick();
+                                unawaited(_runQuranAction(
+                                    () => cubit.setQuranReciterStyle(s)));
+                              },
+                        label: Text(s.label),
+                        labelStyle: TextStyle(
+                          color: selected ? p.onAccent : p.textPrimary,
+                          fontWeight: FontWeight.w700,
+                          fontSize: AppFontSize.label,
+                        ),
+                        backgroundColor: p.surfaceContainer,
+                        selectedColor: p.accent,
+                        side: BorderSide(color: p.hairline),
+                        showCheckmark: false,
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: AppSpacing.s6),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
+                child: Text(
+                  '${style.tagline} • ${style.sanctuaryName.isNotEmpty ? style.sanctuaryName : style.description}',
+                  style: TextStyle(
+                      color: p.textTertiary, fontSize: AppFontSize.label),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              _buildQuranMetadataCard(context, p, state, cubit),
+              const SizedBox(height: AppSpacing.md),
+
+              if (_isApplying)
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: AppSpacing.s20),
+                  child: LinearProgressIndicator(),
+                ),
+              if (_isApplying) const SizedBox(height: AppSpacing.sm),
+
+              if (_isQuranModeError(state.playback.error)) ...[
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
+                  child: QuranErrorCard(
+                    message: resolveUiErrorMessage(
+                      context,
+                      state.playback.error!.userMessage,
+                    ),
+                    onRetry: !_isApplying
+                        ? () => unawaited(
                               _runQuranAction(
-                                () => cubit.setQuranPlaybackSpeed(v.first),
-                              ),
+                                  () => cubit.reapplyQuranProfile()),
                             )
                         : null,
-                    style: ButtonStyle(
-                      foregroundColor: WidgetStatePropertyAll(p.textPrimary),
-                      side:
-                          WidgetStatePropertyAll(BorderSide(color: p.hairline)),
-                    ),
                   ),
-                );
-              },
-            ),
-            const SizedBox(height: AppSpacing.s18),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+              ],
 
-            // Detected output hardware
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(context.l10n.outputHardware,
-                      style: TextStyle(
-                        color: p.textSecondary,
-                        fontSize: AppFontSize.caption,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: AppTracking.overline,
-                      )),
-                  GestureDetector(
-                    onTap: _refreshCaps,
-                    behavior: HitTestBehavior.opaque,
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(
-                        minWidth: AppSpacing.minTouchTarget,
-                        minHeight: AppSpacing.minTouchTarget,
-                      ),
-                      child: Center(
-                        child: Icon(Icons.refresh_rounded,
-                            size: 16, color: p.textSecondary),
-                      ),
-                    ),
+              // Tuning sliders
+              _QuranSliderTile(
+                icon: Icons.mosque_rounded,
+                title: context.l10n.dspMosqueAmbience,
+                subtitle: context.l10n.dspMosqueAmbienceDesc,
+                value: state.isReverbEnabled
+                    ? state.reverbWetDry.clamp(0.0, 0.6)
+                    : 0.0,
+                max: 0.6,
+                enabled: enabled,
+                valueLabel: state.isReverbEnabled
+                    ? '${(state.reverbWetDry * 100).round()}%'
+                    : '0%',
+                onChanged: (value) => unawaited(
+                  cubit.setQuranAmbience(value),
+                ),
+                applyOnRelease: true,
+              ),
+              if (state.isReverbEnabled)
+                Padding(
+                  padding: const EdgeInsetsDirectional.only(
+                    start: AppSpacing.s20,
+                    end: AppSpacing.s20,
+                    bottom: AppSpacing.xs,
                   ),
-                ],
-              ),
-            ),
-            const SizedBox(height: AppSpacing.xs),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
-              child: FutureBuilder<EarbudCapabilities>(
-                future: _capsFuture,
-                builder: (context, snap) {
-                  if (snap.hasError) {
-                    return _card(
-                      p,
-                      Padding(
-                        padding: const EdgeInsets.symmetric(
-                            vertical: AppSpacing.xxs),
-                        child: Text(
-                          context.l10n.outputHardware,
-                          style: TextStyle(
-                            color: p.textSecondary,
-                            fontSize: AppFontSize.label,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    );
-                  }
-                  if (!snap.hasData) {
-                    return _card(
-                      p,
-                      const Center(
-                        child: Padding(
-                          padding: EdgeInsets.all(AppSpacing.md),
-                          child: SizedBox(
-                            width: AppSpacing.s18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          ),
-                        ),
-                      ),
-                    );
-                  }
-                  final caps = snap.data!;
-                  return _card(
-                    p,
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _kv(p, context.l10n.dspDevice, caps.deviceName),
-                        _kv(p, context.l10n.dspCodec,
-                            '${caps.codec.label} (${caps.codec.quality})'),
-                        _kv(
-                            p,
-                            context.l10n.format,
-                            '${caps.bitDepth}-bit • '
-                            '${caps.sampleRateHz ~/ 1000} kHz'),
-                        _kv(
-                          p,
-                          context.l10n.dspLatency,
-                          caps.isBluetooth ? '~${caps.latencyMs} ms' : '—',
-                        ),
-                        const SizedBox(height: AppSpacing.s6),
-                        Text(
-                          caps.isBluetooth
-                              ? context.l10n.dspBluetoothCompensationDesc
-                              : context.l10n.dspWiredCompensationDesc,
-                          style: TextStyle(
-                              color: p.textTertiary,
-                              fontSize: AppFontSize.caption),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-
-            // Reset
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
+                  child: Align(
+                    alignment: AlignmentDirectional.centerEnd,
+                    child: TextButton.icon(
                       onPressed: enabled
                           ? () => unawaited(
                                 _runQuranAction(
-                                  () => cubit.resetQuranProfile(),
+                                    () => cubit.setQuranAmbience(0)),
+                              )
+                          : null,
+                      icon: const Icon(Icons.volume_off_rounded, size: 18),
+                      label: Text(context.l10n.noneLabel),
+                    ),
+                  ),
+                ),
+              _QuranSliderTile(
+                icon: Icons.local_fire_department_rounded,
+                title: context.l10n.dspVocalWarmth,
+                subtitle: context.l10n.dspVocalWarmthDesc,
+                value: state.isSaturationEnabled
+                    ? state.saturationMix.clamp(0.0, 0.6)
+                    : 0.0,
+                max: 0.6,
+                enabled: enabled,
+                valueLabel: state.isSaturationEnabled
+                    ? '${(state.saturationMix * 100).round()}%'
+                    : '0%',
+                onChanged: (value) => unawaited(
+                  cubit.setQuranWarmth(value),
+                ),
+                applyOnRelease: true,
+              ),
+
+              // Ambient sounds
+              const SizedBox(height: AppSpacing.sm),
+              const AmbientSoundPanel(
+                padding: EdgeInsets.symmetric(horizontal: AppSpacing.s20),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+
+              // Learning speed
+              Padding(
+                padding: const EdgeInsetsDirectional.fromSTEB(
+                    AppSpacing.s20, AppSpacing.s6, AppSpacing.s20, 0),
+                child: Row(
+                  children: [
+                    Icon(Icons.speed_rounded, color: p.textSecondary, size: 20),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(context.l10n.learningSpeed,
+                              style: TextStyle(
+                                  color: p.textPrimary,
+                                  fontSize: AppFontSize.body,
+                                  fontWeight: FontWeight.w700)),
+                          Text(context.l10n.reciterSpeedDesc,
+                              style: TextStyle(
+                                  color: p.textSecondary,
+                                  fontSize: AppFontSize.label)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              Builder(
+                builder: (context) {
+                  final isStandardSpeed = [0.5, 0.75, 1.0].any(
+                    (s) => (s - state.playbackSpeed).abs() < 0.01,
+                  );
+                  final speedSegments = <ButtonSegment<double>>[
+                    const ButtonSegment(value: 0.5, label: Text('0.5x')),
+                    const ButtonSegment(value: 0.75, label: Text('0.75x')),
+                    const ButtonSegment(value: 1.0, label: Text('1.0x')),
+                    if (!isStandardSpeed)
+                      ButtonSegment(
+                        value: state.playbackSpeed,
+                        label: Text(
+                          '${state.playbackSpeed.toStringAsFixed(2).replaceAll(RegExp(r"\.?0+$"), "")}x',
+                        ),
+                      ),
+                  ];
+                  final selectedSpeed = isStandardSpeed
+                      ? [0.5, 0.75, 1.0].reduce((a, b) =>
+                          (a - state.playbackSpeed).abs() <
+                                  (b - state.playbackSpeed).abs()
+                              ? a
+                              : b)
+                      : state.playbackSpeed;
+
+                  return Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
+                    child: SegmentedButton<double>(
+                      segments: speedSegments,
+                      selected: {selectedSpeed},
+                      onSelectionChanged: enabled
+                          ? (v) => unawaited(
+                                _runQuranAction(
+                                  () => cubit.setQuranPlaybackSpeed(v.first),
                                 ),
                               )
                           : null,
-                      icon: const Icon(Icons.restart_alt_rounded, size: 18),
-                      label: Text(context.l10n.resetProfile),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: p.accent,
-                        side:
-                            BorderSide(color: p.accent.withValues(alpha: 0.5)),
-                        minimumSize: const Size(0, 44),
+                      style: ButtonStyle(
+                        foregroundColor: WidgetStatePropertyAll(p.textPrimary),
+                        side: WidgetStatePropertyAll(
+                            BorderSide(color: p.hairline)),
                       ),
                     ),
-                  ),
-                ],
+                  );
+                },
               ),
-            ),
-            const SizedBox(height: AppSpacing.s6),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
-              child: Text(
-                context.l10n.sibilanceDesc,
-                style: TextStyle(
-                    color: p.textTertiary, fontSize: AppFontSize.caption),
-              ),
-            ),
-            if (state.isQuranModeEnabled) ...[
-              const SizedBox(height: AppSpacing.md),
-              BlocSelector<PlayerCubit, PlayerState, int?>(
-                selector: (s) => (currentTrackUri == _lastLoadedTrackUri
-                    ? _metadata?.ayahAt(s.position)
-                    : null),
-                builder: (context, activeAyah) => QuranMushafView(
-                  key: ValueKey(currentTrackUri),
-                  metadata:
-                      currentTrackUri == _lastLoadedTrackUri ? _metadata : null,
-                  activeAyah: activeAyah,
-                  onSeek: (pos) => cubit.seek(pos),
+              const SizedBox(height: AppSpacing.s18),
+
+              // Detected output hardware
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(context.l10n.outputHardware,
+                        style: TextStyle(
+                          color: p.textSecondary,
+                          fontSize: AppFontSize.caption,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: AppTracking.overline,
+                        )),
+                    GestureDetector(
+                      onTap: _refreshCaps,
+                      behavior: HitTestBehavior.opaque,
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(
+                          minWidth: AppSpacing.minTouchTarget,
+                          minHeight: AppSpacing.minTouchTarget,
+                        ),
+                        child: Center(
+                          child: Icon(Icons.refresh_rounded,
+                              size: 16, color: p.textSecondary),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
+              const SizedBox(height: AppSpacing.xs),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
+                child: FutureBuilder<EarbudCapabilities>(
+                  future: _capsFuture,
+                  builder: (context, snap) {
+                    if (snap.hasError) {
+                      return _card(
+                        p,
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                              vertical: AppSpacing.xxs),
+                          child: Text(
+                            context.l10n.outputHardware,
+                            style: TextStyle(
+                              color: p.textSecondary,
+                              fontSize: AppFontSize.label,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      );
+                    }
+                    if (!snap.hasData) {
+                      return _card(
+                        p,
+                        const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(AppSpacing.md),
+                            child: SizedBox(
+                              width: AppSpacing.s18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          ),
+                        ),
+                      );
+                    }
+                    final caps = snap.data!;
+                    return _card(
+                      p,
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _kv(p, context.l10n.dspDevice, caps.deviceName),
+                          _kv(p, context.l10n.dspCodec,
+                              '${caps.codec.label} (${caps.codec.quality})'),
+                          _kv(
+                              p,
+                              context.l10n.format,
+                              '${caps.bitDepth}-bit • '
+                              '${caps.sampleRateHz ~/ 1000} kHz'),
+                          _kv(
+                            p,
+                            context.l10n.dspLatency,
+                            caps.isBluetooth ? '~${caps.latencyMs} ms' : '—',
+                          ),
+                          const SizedBox(height: AppSpacing.s6),
+                          Text(
+                            caps.isBluetooth
+                                ? context.l10n.dspBluetoothCompensationDesc
+                                : context.l10n.dspWiredCompensationDesc,
+                            style: TextStyle(
+                                color: p.textTertiary,
+                                fontSize: AppFontSize.caption),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+
+              // Reset
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: enabled
+                            ? () => unawaited(
+                                  _runQuranAction(
+                                    () => cubit.resetQuranProfile(),
+                                  ),
+                                )
+                            : null,
+                        icon: const Icon(Icons.restart_alt_rounded, size: 18),
+                        label: Text(context.l10n.resetProfile),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: p.accent,
+                          side: BorderSide(
+                              color: p.accent.withValues(alpha: 0.5)),
+                          minimumSize: const Size(0, 44),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: AppSpacing.s6),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
+                child: Text(
+                  context.l10n.sibilanceDesc,
+                  style: TextStyle(
+                      color: p.textTertiary, fontSize: AppFontSize.caption),
+                ),
+              ),
+              if (state.isQuranModeEnabled) ...[
+                const SizedBox(height: AppSpacing.md),
+                BlocSelector<PlayerCubit, PlayerState, int?>(
+                  selector: (s) => (currentTrackUri == _lastLoadedTrackUri
+                      ? _metadata?.ayahAt(s.position)
+                      : null),
+                  builder: (context, activeAyah) => QuranMushafView(
+                    key: ValueKey(currentTrackUri),
+                    metadata: currentTrackUri == _lastLoadedTrackUri
+                        ? _metadata
+                        : null,
+                    activeAyah: activeAyah,
+                    onSeek: (pos) => cubit.seek(pos),
+                  ),
+                ),
+              ],
             ],
-          ],
-        );
-      },
+          );
+        },
       ),
     );
   }

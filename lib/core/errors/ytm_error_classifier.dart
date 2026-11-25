@@ -701,8 +701,7 @@ class YtmErrorClassifier {
   /// HTTP status carried by just_audio's media-fetch failure
   /// (`HTTP Status Error: 403`), or null when this is not that shape.
   static int? _mediaFetchStatus(String lower) {
-    final match =
-        RegExp(r'http status error:\s*(\d{3})').firstMatch(lower);
+    final match = RegExp(r'http status error:\s*(\d{3})').firstMatch(lower);
     return match == null ? null : int.tryParse(match.group(1)!);
   }
 

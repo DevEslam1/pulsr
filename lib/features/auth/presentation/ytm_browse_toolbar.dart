@@ -28,8 +28,7 @@ extension _YtmBrowseToolbar on _YtmWebLoginSheetState {
               label: _currentUrl.replaceFirst('https://', ''),
               child: Container(
                 height: 36,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: AppSpacing.s10),
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s10),
                 decoration: BoxDecoration(
                   color: p.surfaceContainerHigh,
                   borderRadius: AppRadii.r10All,
@@ -221,8 +220,7 @@ extension _YtmBrowseToolbar on _YtmWebLoginSheetState {
                     style: TextStyle(
                       color: isCurrent ? p.accent : p.textPrimary,
                       fontSize: AppFontSize.caption,
-                      fontWeight:
-                          isCurrent ? FontWeight.w700 : FontWeight.w500,
+                      fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w500,
                     ),
                   ),
                 ],

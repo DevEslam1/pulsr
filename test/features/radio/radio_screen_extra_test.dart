@@ -27,6 +27,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../helpers/test_song_factory.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 class MockPlayerCubit extends Mock implements PlayerCubit {}
 
 const _s1 = {

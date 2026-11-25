@@ -26,6 +26,8 @@ fi
 
 echo "== Native DSP tests: compiler=$CXX =="
 
+JOBS="${NATIVE_DSP_JOBS:-$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)}"
+
 run_config() {
   local config="$1"      # Release | Debug
   local sanitizers="$2"  # ON | OFF
@@ -36,10 +38,10 @@ run_config() {
     -DCMAKE_BUILD_TYPE="$config" \
     -DCMAKE_CXX_COMPILER="$CXX" \
     -DPULSR_TEST_SANITIZERS="$sanitizers"
-  echo "== [$config] building =="
-  cmake --build "$build_dir" --parallel
+  echo "== [$config] building (jobs=$JOBS) =="
+  cmake --build "$build_dir" --parallel "$JOBS"
   echo "== [$config] running CTest =="
-  ctest --test-dir "$build_dir" --output-on-failure
+  ctest --test-dir "$build_dir" --parallel "$JOBS" --output-on-failure
 }
 
 run_config Release OFF

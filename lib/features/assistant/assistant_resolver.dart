@@ -128,7 +128,8 @@ class AssistantResolver {
   final Future<List<int>> Function() _lastAlbumSongIds;
 
   /// Resolves a request built from Android search-intent extras.
-  Future<AssistantResolution> resolveSearchExtras(AssistantPlayRequest request) {
+  Future<AssistantResolution> resolveSearchExtras(
+      AssistantPlayRequest request) {
     if (request.term.isEmpty) {
       return Future<AssistantResolution>.value(
         AssistantResolutionFailure(AssistantStrings.nothingMatched('')),
@@ -247,8 +248,7 @@ class AssistantResolver {
     }
     return AssistantPlayPlan(
       songIds: songIds,
-      title:
-          radio ? AssistantStrings.artistRadioTitle(display) : display,
+      title: radio ? AssistantStrings.artistRadioTitle(display) : display,
       source: source,
       shuffle: shuffle,
     );

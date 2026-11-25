@@ -265,8 +265,7 @@ void showAudioFeatureInfoDialog(BuildContext context, AudioFeatureInfo info,
             decoration: BoxDecoration(
                 color: p.warningSoft,
                 borderRadius: AppRadii.r10All,
-                border:
-                    Border.all(color: p.goldAccent.withValues(alpha: 0.4))),
+                border: Border.all(color: p.goldAccent.withValues(alpha: 0.4))),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [

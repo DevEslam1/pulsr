@@ -14,7 +14,8 @@ void main() {
   setUp(() async {
     tempDir = await Directory.systemTemp.createTemp('pulsr_media_http_lru');
     mediaFile = File('${tempDir.path}/track.mp3');
-    await mediaFile.writeAsBytes(List<int>.generate(2048, (index) => index % 251));
+    await mediaFile
+        .writeAsBytes(List<int>.generate(2048, (index) => index % 251));
     client = HttpClient();
   });
 

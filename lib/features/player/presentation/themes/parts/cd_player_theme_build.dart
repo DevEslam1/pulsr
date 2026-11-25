@@ -126,7 +126,8 @@ class _CdChassisPalette {
         lcdInk: Color.lerp(surface.ledGlow, AppColors.accentCyan, 0.35)!,
         lcdInkDim: AppColors.discSilver.withValues(alpha: 0.72),
         lcdGridDot: AppColors.specularAt(0.06),
-        sliderActive: Color.lerp(AppColors.surfaceGreyLight, activeColor, 0.40)!,
+        sliderActive:
+            Color.lerp(AppColors.surfaceGreyLight, activeColor, 0.40)!,
         sliderInactive: AppColors.specularAt(0.18),
         sliderThumb: AppColors.surfaceGreyLight,
         actionDeckSurface: PlayerMaterialColors.cdClampWell.withValues(
@@ -181,9 +182,8 @@ class _CdChassisPalette {
       inkPrimary: isHighContrast ? p.textPrimary : AppColors.lightTextPrimary,
       inkSecondary:
           isHighContrast ? p.textSecondary : AppColors.lightTextSecondary,
-      hairline: isHighContrast
-          ? p.hairline
-          : AppColors.slate.withValues(alpha: 0.24),
+      hairline:
+          isHighContrast ? p.hairline : AppColors.slate.withValues(alpha: 0.24),
       lcdSurfaceTop: Color.lerp(
         PlayerMaterialColors.cdSurfaceTop,
         AppColors.slate,
@@ -235,8 +235,9 @@ extension _CdPlayerThemeBuild on _CdPlayerThemeState {
 
         // Drop the "TRK" prefix only when a tablet viewport is artificially
         // squeezed below 600 dp height (matches squeezed-tray accessibility guard).
-        final bool squeezeDropTrackPrefix =
-            metrics.isTablet && metrics.constraints.maxHeight <= 600.0 && !isInSplitView;
+        final bool squeezeDropTrackPrefix = metrics.isTablet &&
+            metrics.constraints.maxHeight <= 600.0 &&
+            !isInSplitView;
 
         Widget buildStage({required double? maxHeight}) {
           final stage = Hero(
@@ -370,7 +371,8 @@ extension _CdPlayerThemeBuild on _CdPlayerThemeState {
         if (metrics.isLandscape && !isInSplitView && !isPreview) {
           return SafeArea(
             child: Padding(
-              padding: EdgeInsets.only(top: topBarReserve, bottom: AppSpacing.xs),
+              padding:
+                  EdgeInsets.only(top: topBarReserve, bottom: AppSpacing.xs),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -1045,8 +1047,7 @@ class _CdMetallicSeekBarState extends State<_CdMetallicSeekBar> {
   Widget build(BuildContext context) {
     final song = widget.props.state.currentSong;
     final duration = widget.props.state.duration;
-    final (:sliderStyle, :waveformEnabled) = context.select<
-        SettingsCubit,
+    final (:sliderStyle, :waveformEnabled) = context.select<SettingsCubit,
         ({PlayerSliderStyle sliderStyle, bool waveformEnabled})>(
       (c) => (
         sliderStyle: c.state.playerSliderStyle,
@@ -1077,8 +1078,7 @@ class _CdMetallicSeekBarState extends State<_CdMetallicSeekBar> {
           return target;
         }
 
-        String labelFor(Duration d) =>
-            '${Formatters.formatDuration(d)} / '
+        String labelFor(Duration d) => '${Formatters.formatDuration(d)} / '
             '${Formatters.formatDuration(duration)}';
 
         final showWaveform = waveformEnabled &&
@@ -1103,8 +1103,9 @@ class _CdMetallicSeekBarState extends State<_CdMetallicSeekBar> {
             initialData: instant,
             future: _cachedWaveformFuture,
             builder: (context, snap) {
-              final samples =
-                  (snap.hasData && snap.data!.isNotEmpty) ? snap.data! : instant;
+              final samples = (snap.hasData && snap.data!.isNotEmpty)
+                  ? snap.data!
+                  : instant;
               return WaveformSeekBar(
                 position: playback.position,
                 duration: duration,
@@ -1128,8 +1129,8 @@ class _CdMetallicSeekBarState extends State<_CdMetallicSeekBar> {
           decreasedValue: labelFor(clampSeek(const Duration(seconds: -10))),
           onIncrease: playback.isBuffering
               ? null
-              : () =>
-                  widget.props.cubit.seek(clampSeek(const Duration(seconds: 10))),
+              : () => widget.props.cubit
+                  .seek(clampSeek(const Duration(seconds: 10))),
           onDecrease: playback.isBuffering
               ? null
               : () => widget.props.cubit
@@ -1271,9 +1272,7 @@ class _CdMetalTransportBar extends StatelessWidget {
                     ),
                   )
                 : Icon(
-                    isPlaying
-                        ? Icons.pause_rounded
-                        : Icons.play_arrow_rounded,
+                    isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
                     size: 30,
                     color: chassis.heroKeyInk,
                   ),

@@ -150,7 +150,9 @@ void main() {
       subsonicSource,
       searchResults: const SubsonicSearchResult(
         artists: [SubsonicArtist(id: 'art-1', name: 'Radiohead')],
-        albums: [SubsonicAlbum(id: 'alb-1', name: 'Kid A', artist: 'Radiohead')],
+        albums: [
+          SubsonicAlbum(id: 'alb-1', name: 'Kid A', artist: 'Radiohead')
+        ],
         songs: [
           SubsonicSong(
             id: 's-1',
@@ -282,5 +284,7 @@ class _FakeSubsonicProvider implements SubsonicFsProvider {
 
   @override
   String? getCoverArtCacheKey(String? coverArtId, {int? size}) =>
-      coverArtId != null ? 'subsonic://music.example.com/art/$coverArtId' : null;
+      coverArtId != null
+          ? 'subsonic://music.example.com/art/$coverArtId'
+          : null;
 }

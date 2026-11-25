@@ -420,14 +420,12 @@ class DiagnosticsBundleService {
       <String, Object?>{
         'stage': 'loudness_contour',
         'enabled': enabled(PrefsKeys.loudnessContourEnabled),
-        'detail':
-            '${_doubleValue(PrefsKeys.loudnessContourIntensity) ?? 0.0}',
+        'detail': '${_doubleValue(PrefsKeys.loudnessContourIntensity) ?? 0.0}',
       },
       <String, Object?>{
         'stage': 'sub_crossover',
         'enabled': enabled(PrefsKeys.subCrossoverEnabled),
-        'detail':
-            '${_doubleValue(PrefsKeys.subCrossoverCornerHz) ?? 80.0} Hz',
+        'detail': '${_doubleValue(PrefsKeys.subCrossoverCornerHz) ?? 80.0} Hz',
       },
       <String, Object?>{
         'stage': 'dynamic_eq',

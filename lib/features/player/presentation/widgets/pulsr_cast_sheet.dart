@@ -318,7 +318,8 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
         startPositionMs: selection.startPositionMs,
       );
       _showToast(result.success
-          ? l10n.settingsCastingQueueTo(_session.deviceName ?? l10n.castDefaultDevice)
+          ? l10n.settingsCastingQueueTo(
+              _session.deviceName ?? l10n.castDefaultDevice)
           : (result.error ?? l10n.settingsCastFailed));
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -618,7 +619,9 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
                                 const TextStyle(fontWeight: FontWeight.w600)),
                       ),
                     ),
-                    if (_session.title != null || _session.playing || _session.paused) ...[
+                    if (_session.title != null ||
+                        _session.playing ||
+                        _session.paused) ...[
                       const SizedBox(height: AppSpacing.sm),
                       Container(
                         padding: const EdgeInsets.all(AppSpacing.xs),
@@ -655,14 +658,17 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
                             if (_session.durationMs > 0)
                               SliderTheme(
                                 data: SliderTheme.of(context).copyWith(
-                                  thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                                  thumbShape: const RoundSliderThumbShape(
+                                      enabledThumbRadius: 6),
                                   trackHeight: 3,
                                 ),
                                 child: Slider(
-                                  value: _session.positionMs.toDouble().clamp(0.0, _session.durationMs.toDouble()),
+                                  value: _session.positionMs.toDouble().clamp(
+                                      0.0, _session.durationMs.toDouble()),
                                   max: _session.durationMs.toDouble(),
                                   activeColor: p.accent,
-                                  onChanged: (v) => _service.seek(Duration(milliseconds: v.round())),
+                                  onChanged: (v) => _service
+                                      .seek(Duration(milliseconds: v.round())),
                                 ),
                               ),
                             Row(
@@ -671,11 +677,14 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
                                 IconButton(
                                   tooltip: context.l10n.previous,
                                   icon: const Icon(Icons.skip_previous_rounded),
-                                  onPressed: _busy ? null : () => _service.previous(),
+                                  onPressed:
+                                      _busy ? null : () => _service.previous(),
                                 ),
                                 const SizedBox(width: AppSpacing.xs),
                                 IconButton(
-                                  tooltip: _session.playing ? context.l10n.pause : context.l10n.play,
+                                  tooltip: _session.playing
+                                      ? context.l10n.pause
+                                      : context.l10n.play,
                                   iconSize: 36,
                                   color: p.accent,
                                   icon: Icon(_session.playing
@@ -683,19 +692,23 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
                                       : Icons.play_circle_filled_rounded),
                                   onPressed: _busy
                                       ? null
-                                      : () => _session.playing ? _service.pause() : _service.play(),
+                                      : () => _session.playing
+                                          ? _service.pause()
+                                          : _service.play(),
                                 ),
                                 const SizedBox(width: AppSpacing.xs),
                                 IconButton(
                                   tooltip: context.l10n.stopCast,
                                   icon: const Icon(Icons.stop_rounded),
-                                  onPressed: _busy ? null : () => _service.stop(),
+                                  onPressed:
+                                      _busy ? null : () => _service.stop(),
                                 ),
                                 const SizedBox(width: AppSpacing.xs),
                                 IconButton(
                                   tooltip: context.l10n.next,
                                   icon: const Icon(Icons.skip_next_rounded),
-                                  onPressed: _busy ? null : () => _service.next(),
+                                  onPressed:
+                                      _busy ? null : () => _service.next(),
                                 ),
                               ],
                             ),
@@ -804,10 +817,7 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
                     if (_sdk) ...[
                       for (int i = 0; i < _routes.length; i++) ...[
                         if (i > 0)
-                          Divider(
-                              height: 1,
-                              thickness: 1,
-                              color: p.hairline),
+                          Divider(height: 1, thickness: 1, color: p.hairline),
                         ListTile(
                           leading: Icon(
                             _routes[i].selected
@@ -835,10 +845,7 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
                     ] else ...[
                       for (int i = 0; i < _devices.length; i++) ...[
                         if (i > 0)
-                          Divider(
-                              height: 1,
-                              thickness: 1,
-                              color: p.hairline),
+                          Divider(height: 1, thickness: 1, color: p.hairline),
                         ListTile(
                           leading:
                               Icon(Icons.cast_rounded, color: p.textPrimary),

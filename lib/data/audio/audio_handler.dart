@@ -771,10 +771,12 @@ class PulsrAudioHandler extends BaseAudioHandler
   /// auto-skip recovery so UI cubits do not double-skip on error streams.
   bool get ownsAutoSkipOnError => true;
   String? _lastOutputModeNotice;
+
   /// Last temporary-suspension reason logged. A suspension and its resume
   /// repeat the same reason, so this keeps the informational line to one per
   /// episode instead of two.
   String? _lastSuspendedReason;
+
   /// Sink reasons that mean "temporarily parked on the AudioTrack path", not
   /// "this output refuses the direct path". Both arrive with a non-null reason,
   /// but only a real rejection may feed safe mode or raise a notice.
@@ -2753,6 +2755,5 @@ class PulsrAudioHandler extends BaseAudioHandler
   }
 
   /// Queries the actual platform audio focus state via platform channel.
-  Future<bool> getPlatformFocusState() =>
-      AudioEffectsChannel().getFocusState();
+  Future<bool> getPlatformFocusState() => AudioEffectsChannel().getFocusState();
 }

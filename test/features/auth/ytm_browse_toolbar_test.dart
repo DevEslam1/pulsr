@@ -15,6 +15,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'ytm_webview_test_support.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 class MockYtmAccountService extends Mock implements YtmAccountService {}
 
 void main() {

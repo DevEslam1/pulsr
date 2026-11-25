@@ -1393,9 +1393,11 @@ void main() {
       final retry = await service.download(_song(videoId: videoId));
       expect(retry.isRight(), isTrue);
       expect(client.requests.length, equals(requestsAfterFirst),
-          reason: 'retry must reuse the committed temp file without re-downloading');
+          reason:
+              'retry must reuse the committed temp file without re-downloading');
       expect(destFile.existsSync(), isFalse,
-          reason: 'committed temp file should be cleaned up once save completes');
+          reason:
+              'committed temp file should be cleaned up once save completes');
     });
   });
 }

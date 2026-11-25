@@ -332,9 +332,7 @@ class MiniPlayerState extends State<MiniPlayer> {
   void _handleVerticalDragEnd(DragEndDetails d) {
     if (_swipeInFlight) return;
     final vy = d.velocity.pixelsPerSecond.dy;
-    if ((_verticalDragDy > 25 || vy > 120) &&
-        _verticalDragDy >= 0 &&
-        vy >= 0) {
+    if ((_verticalDragDy > 25 || vy > 120) && _verticalDragDy >= 0 && vy >= 0) {
       _swipeInFlight = true;
       PulsrHaptics.selectionClick();
       widget.onSwipeDown?.call();

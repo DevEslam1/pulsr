@@ -19,6 +19,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'ytm_webview_test_support.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 class MockYtmAccountService extends Mock implements YtmAccountService {}
 
 void main() {
@@ -192,7 +193,8 @@ void main() {
     expect(find.byType(YtmWebLoginSheet), findsNothing);
   });
 
-  testWidgets('session validation error during init is handled cleanly', (tester) async {
+  testWidgets('session validation error during init is handled cleanly',
+      (tester) async {
     when(() => account.isLoggedIn).thenReturn(true);
     when(() => account.validateSessionDetailed())
         .thenAnswer((_) => Future.error(Exception('Network error')));

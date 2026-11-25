@@ -530,7 +530,8 @@ void main() {
 
     test('v5 round-trip exports and imports v5 keys', () async {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('usb_quirks_v1', '{"deviceA":{"sampleRate":48000}}');
+      await prefs.setString(
+          'usb_quirks_v1', '{"deviceA":{"sampleRate":48000}}');
       await prefs.setString('audio_profile_default_id', 'profile_123');
       await prefs.setString('remote_sources_v1', '{"sources":[]}');
       await prefs.setBool('assistant_suggestions_enabled', true);
@@ -554,7 +555,8 @@ void main() {
 
       final result = await importUseCase.execute(exported);
       expect(result.restoredSettingsCount, greaterThan(0));
-      expect(prefs.getString('usb_quirks_v1'), '{"deviceA":{"sampleRate":48000}}');
+      expect(
+          prefs.getString('usb_quirks_v1'), '{"deviceA":{"sampleRate":48000}}');
       expect(prefs.getString('audio_profile_default_id'), 'profile_123');
       expect(prefs.getString('remote_sources_v1'), '{"sources":[]}');
       expect(prefs.getBool('assistant_suggestions_enabled'), true);

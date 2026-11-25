@@ -8,6 +8,7 @@ import 'package:pulsr/features/settings/presentation/widgets/settings_picker_she
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   final l10n = lookupAppLocalizations(const Locale('en'));
