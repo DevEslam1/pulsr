@@ -57,6 +57,9 @@ jobs:
 
       - name: Flavor Isolation Guard Check
         run: |
+          if [ ! -f android/local.properties ]; then
+            echo "flutter.sdk=$(dirname "$(dirname "$(command -v flutter)")")" > android/local.properties
+          fi
           cd android && ./gradlew :app:processProdReleaseMainManifest && cd ..
           python3 scripts/check_prod_flavor.py
 
@@ -202,6 +205,12 @@ jobs:
           echo "storePassword=pulsrci123" >> android/key.properties
           echo "keyAlias=pulsr_release" >> android/key.properties
           echo "keyPassword=pulsrci123" >> android/key.properties
+
+      - name: Ensure Android local.properties
+        run: |
+          if [ ! -f android/local.properties ]; then
+            echo "flutter.sdk=$(dirname "$(dirname "$(command -v flutter)")")" > android/local.properties
+          fi
 
       - name: Run Android Kotlin Unit Tests
         run: cd android && ./gradlew :app:testDevDebugUnitTest --no-daemon
