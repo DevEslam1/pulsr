@@ -38,7 +38,9 @@ jobs:
             ${{ runner.os }}-gradle-
 
       - name: Install Dependencies
-        run: flutter pub get
+        run: |
+          flutter pub get
+          sed -i 's/proguard-android\.txt/proguard-android-optimize.txt/g' ~/.pub-cache/hosted/pub.dev/flutter_inappwebview_android-*/android/build.gradle
 
       - name: Run Build Runner Codegen
         run: dart run build_runner build --delete-conflicting-outputs
@@ -192,7 +194,9 @@ jobs:
             ${{ runner.os }}-gradle-
 
       - name: Install Dependencies
-        run: flutter pub get
+        run: |
+          flutter pub get
+          sed -i 's/proguard-android\.txt/proguard-android-optimize.txt/g' ~/.pub-cache/hosted/pub.dev/flutter_inappwebview_android-*/android/build.gradle
 
       - name: Run Build Runner Codegen
         run: dart run build_runner build --delete-conflicting-outputs

@@ -34,10 +34,15 @@ run_config() {
   local build_dir="$OUT_ROOT/$config"
   echo ""
   echo "== [$config] configuring (sanitizers=$sanitizers) =="
+  local extra_flags=()
+  if [ "$config" = "Debug" ]; then
+    extra_flags+=(-DCMAKE_CXX_FLAGS_DEBUG="-O1 -g")
+  fi
   cmake -S "$TEST_DIR" -B "$build_dir" \
     -DCMAKE_BUILD_TYPE="$config" \
     -DCMAKE_CXX_COMPILER="$CXX" \
-    -DPULSR_TEST_SANITIZERS="$sanitizers"
+    -DPULSR_TEST_SANITIZERS="$sanitizers" \
+    "${extra_flags[@]}"
   echo "== [$config] building (jobs=$JOBS) =="
   cmake --build "$build_dir" --parallel "$JOBS"
   echo "== [$config] running CTest =="
