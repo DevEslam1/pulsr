@@ -1,6 +1,6 @@
 <div align="center">
 
-  <img src="assets/app_icon/app_icon.svg" width="128" height="128" alt="Pulsr Music Logo" />
+  <img src="assets/app_icon/app_icon_plus.png" width="128" height="128" alt="Pulsr Music Logo" />
 
   # Pulsr Music
   ### Premium Offline-First Audiophile Player for Android
