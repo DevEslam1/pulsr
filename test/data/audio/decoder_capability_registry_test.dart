@@ -33,8 +33,9 @@ void main() {
       final seen = <String>{};
       final duplicates = <String>[];
       for (final capability in DecoderCapabilityRegistry.capabilities) {
-        if (!seen.add(capability.extension))
+        if (!seen.add(capability.extension)) {
           duplicates.add(capability.extension);
+        }
       }
       expect(duplicates, isEmpty,
           reason: 'DecoderCapabilityRegistry.capabilities declares '

@@ -378,8 +378,9 @@ class AudioSessionLog {
       if (sourceCodec != null) active.sourceCodec = sourceCodec;
       if (sourceSampleRate != null) active.sourceSampleRate = sourceSampleRate;
       if (sourceBitDepth != null) active.sourceBitDepth = sourceBitDepth;
-      if (decoderSampleRate != null)
+      if (decoderSampleRate != null) {
         active.decoderSampleRate = decoderSampleRate;
+      }
       if (decoderBitDepth != null) active.decoderBitDepth = decoderBitDepth;
       if (decoderEncoding != null) active.decoderEncoding = decoderEncoding;
       if (driverPath != null) active.driverPath = driverPath;

@@ -717,7 +717,9 @@ abstract final class Mp4BoxParser {
         subHeaderSize = 16;
       }
       if (subBoxSize < subHeaderSize ||
-          subOffset + subBoxSize > entryBytes.length) break;
+          subOffset + subBoxSize > entryBytes.length) {
+        break;
+      }
       final subBoxType = _asciiString(entryBytes, subOffset + 4, 4);
 
       if (subBoxType == 'alac') {
@@ -742,7 +744,9 @@ abstract final class Mp4BoxParser {
             waveHeaderSize = 16;
           }
           if (waveBoxSize < waveHeaderSize ||
-              waveOffset + waveBoxSize > waveEnd) break;
+              waveOffset + waveBoxSize > waveEnd) {
+            break;
+          }
           final waveBoxType = _asciiString(entryBytes, waveOffset + 4, 4);
           if (waveBoxType == 'alac') {
             alacConfig = _parseAlacBox(entryBytes, waveOffset + waveHeaderSize,

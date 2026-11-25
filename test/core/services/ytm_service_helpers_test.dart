@@ -14,7 +14,6 @@ import 'package:http/testing.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/di/injection.dart';
 import 'package:pulsr/core/errors/ytm_error_classifier.dart';
-import 'package:pulsr/core/services/ytm_account_models.dart';
 import 'package:pulsr/core/services/ytm_account_service.dart';
 import 'package:pulsr/core/services/ytm_browse_service.dart';
 import 'package:pulsr/core/services/ytm_service.dart';

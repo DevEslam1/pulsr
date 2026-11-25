@@ -103,8 +103,9 @@ class QuranModeService {
         if (raw != null && raw.isNotEmpty) {
           try {
             final decoded = jsonDecode(raw);
-            if (decoded is Map)
+            if (decoded is Map) {
               values.addAll(Map<String, dynamic>.from(decoded));
+            }
           } on FormatException {
             // Corrupt optional tuning must not block Quran Mode.
           }

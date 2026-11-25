@@ -310,8 +310,9 @@ abstract final class RemoteTargetPolicy {
     if (a == 192 && b == 168) return true; // 192.168.0.0/16
     if (a == 169 && b == 254) return true; // 169.254.0.0/16
     if (a == 100 && b >= 64 && b <= 127) return true; // 100.64.0.0/10
-    if (a >= 224)
+    if (a >= 224) {
       return true; // 224.0.0.0/4 multicast, 240.0.0.0/4 reserved, 255.255.255.255
+    }
     return false;
   }
 }

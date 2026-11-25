@@ -331,8 +331,9 @@ class YtmDownloadCubit extends PulsrCubit<YtmDownloadState> {
       _canceledVideoIds.remove(videoId);
       if (quality != null && _queuedQualityByVideoId[videoId] != quality) {
         await _downloads.cancelDownload(videoId);
-        if (isClosed)
+        if (isClosed) {
           return (outcome: _AdmitOutcome.alreadyActive, error: null);
+        }
         _queuedQualityByVideoId.remove(videoId);
       } else {
         final resumed = await _downloads.resumeDownload(videoId);

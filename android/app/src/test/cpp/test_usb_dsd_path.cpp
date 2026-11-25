@@ -223,8 +223,13 @@ int main() {
     // Open never publishes the DSD latch.
     {
         UsbAudioSinkTestAccess::reset(sink);
+#if defined(__linux__) || defined(__ANDROID__)
+        constexpr int kPlatformGateErrno = EINVAL;
+#else
+        constexpr int kPlatformGateErrno = ENOSYS;
+#endif
         check(sink.Open(9, 1, 1, 1, 88200, 2, 4, 32, false, 3) == UsbStreamResult::InvalidArgs &&
-                  UsbAudioSinkTestAccess::lastError(sink) == ENOSYS,
+                  UsbAudioSinkTestAccess::lastError(sink) == kPlatformGateErrno,
               "host Open must reach the platform gate for an admitted DSD shape");
         check(!sink.IsDsdActive(), "a failed Open must never publish IsDsdActive()");
         check(sink.Open(9, 1, 1, 1, 48000, 2, 4, 32, false, 3) == UsbStreamResult::RateUnsupported &&
