@@ -175,6 +175,7 @@ class _RecentlyPlayedSectionState extends State<RecentlyPlayedSection> {
             height: scaledCarouselHeight(context, widget.isTablet),
             child: PulsrScrollEdgeFade(
               extent: 40,
+              fadeColor: context.palette.bg,
               child: SkeletonShimmer(
                 child: ListView(
                   scrollDirection: Axis.horizontal,
@@ -294,6 +295,7 @@ class _RecentlyPlayedSectionState extends State<RecentlyPlayedSection> {
                     height: scaledCarouselHeight(context, widget.isTablet),
                     child: PulsrScrollEdgeFade(
                       extent: 40,
+                      fadeColor: p.bg,
                       child: ListView.builder(
                         controller: _scrollController,
                         scrollDirection: Axis.horizontal,

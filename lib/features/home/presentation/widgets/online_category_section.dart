@@ -102,6 +102,7 @@ class _OnlineCategorySectionState extends State<OnlineCategorySection> {
           height: scaledCarouselHeight(context, isTablet),
           child: PulsrScrollEdgeFade(
             extent: 40,
+            fadeColor: context.palette.bg,
             child: SkeletonShimmer(
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
@@ -177,6 +178,7 @@ class _OnlineCategorySectionState extends State<OnlineCategorySection> {
               height: scaledCarouselHeight(context, isTablet),
               child: PulsrScrollEdgeFade(
                 extent: 40,
+                fadeColor: context.palette.bg,
                 child: ListView.builder(
                   scrollDirection: Axis.horizontal,
                   physics: const BouncingScrollPhysics(),

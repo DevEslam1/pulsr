@@ -354,7 +354,11 @@ class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
   late final CurvedAnimation _curvedAnimation;
   late final Tween<double> _tween;
   late Animation<double> _anim;
-  double _dragOffset = 0.0;
+  final ValueNotifier<double> _dragOffsetNotifier = ValueNotifier<double>(0.0);
+  late final Listenable _dragListenable;
+
+  double get _dragOffset => _dragOffsetNotifier.value;
+  set _dragOffset(double value) => _dragOffsetNotifier.value = value;
 
   /// BUG-01: only the vertical dismiss gesture owns this flag. The previous
   /// Listener-based pointer set counted taps on child buttons as extra
@@ -375,14 +379,13 @@ class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
     );
     _tween = Tween<double>(begin: 0.0, end: 0.0);
     _anim = _tween.animate(_curvedAnimation);
+    _dragListenable = Listenable.merge([_animController, _dragOffsetNotifier]);
     // BUG-12: once a snap-back finishes, the resting offset must return to 0
     // so the next drag does not begin from a stale offset.
     _animController.addStatusListener((status) {
       if (status == AnimationStatus.completed && mounted) {
-        setState(() {
-          _dragOffset = 0.0;
-          _crossedThreshold = false;
-        });
+        _crossedThreshold = false;
+        _dragOffset = 0.0;
       }
     });
   }
@@ -399,6 +402,7 @@ class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
     _animController.stop();
     _curvedAnimation.dispose();
     _animController.dispose();
+    _dragOffsetNotifier.dispose();
     super.dispose();
   }
 
@@ -430,9 +434,7 @@ class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
           _crossedThreshold = nowCrossed;
           PulsrHaptics.selectionClick();
         }
-        setState(() {
-          _dragOffset = newOffset;
-        });
+        _dragOffset = newOffset;
       }
     }
   }
@@ -441,10 +443,8 @@ class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
   void _snapBack() {
     if (_dragOffset > 0) {
       if (!PulsrMotion.shouldAnimate(context)) {
-        setState(() {
-          _dragOffset = 0.0;
-          _crossedThreshold = false;
-        });
+        _crossedThreshold = false;
+        _dragOffset = 0.0;
         return;
       }
       _tween.begin = _dragOffset;
@@ -458,10 +458,8 @@ class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
     final velocity = details.primaryVelocity ?? 0;
     if (_dragOffset > _dismissThreshold || velocity > _dismissVelocity) {
       PulsrHaptics.lightImpact();
-      setState(() {
-        _dragOffset = 0.0;
-        _crossedThreshold = false;
-      });
+      _crossedThreshold = false;
+      _dragOffset = 0.0;
       widget.onDismiss();
     } else {
       _snapBack();
@@ -497,7 +495,7 @@ class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
         onVerticalDragEnd: _onVerticalDragEnd,
         onVerticalDragCancel: _onVerticalDragCancel,
         child: AnimatedBuilder(
-          animation: _animController,
+          animation: _dragListenable,
           child: boundChild,
           builder: (context, child) {
             // While the controller runs, read the animated value; otherwise
@@ -544,10 +542,17 @@ class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
                     child: Stack(
                       fit: StackFit.expand,
                       children: [
-                        Opacity(
-                          opacity: (1.0 - progress * 0.35).clamp(0.0, 1.0),
-                          child: child,
-                        ),
+                        if (child != null) child,
+                        if (progress > 0.0)
+                          Positioned.fill(
+                            child: IgnorePointer(
+                              child: ColoredBox(
+                                color: AppColors.scrimAt(
+                                  (progress * 0.35).clamp(0.0, 0.35),
+                                ),
+                              ),
+                            ),
+                          ),
                         // Top specular rim & dynamic grab pill during pull-down
                         PositionedDirectional(
                           top: 0,

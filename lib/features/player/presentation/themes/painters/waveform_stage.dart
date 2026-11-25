@@ -663,7 +663,7 @@ class _OscilloscopeWaveformPainter extends CustomPainter {
     ..strokeWidth = 1.4
     ..strokeJoin = StrokeJoin.round;
   static final Paint _playheadGlowPaint = Paint()
-    ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5.0);
+    ..strokeCap = StrokeCap.round;
   static final Paint _playheadCorePaint = Paint()..strokeCap = StrokeCap.round;
   static final Paint _markerPaint = Paint();
 
@@ -898,8 +898,15 @@ class _OscilloscopeWaveformPainter extends CustomPainter {
         Offset(playheadX, 2),
         Offset(playheadX, size.height - 2),
         _playheadGlowPaint
-          ..color = activeColor.withValues(alpha: isDragging ? 0.65 : 0.45)
-          ..strokeWidth = isDragging ? 7.0 : 5.5,
+          ..color = activeColor.withValues(alpha: isDragging ? 0.22 : 0.15)
+          ..strokeWidth = isDragging ? 11.0 : 8.5,
+      );
+      canvas.drawLine(
+        Offset(playheadX, 2),
+        Offset(playheadX, size.height - 2),
+        _playheadGlowPaint
+          ..color = activeColor.withValues(alpha: isDragging ? 0.45 : 0.30)
+          ..strokeWidth = isDragging ? 5.5 : 4.2,
       );
     }
 

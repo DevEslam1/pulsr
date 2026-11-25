@@ -140,6 +140,7 @@ class StudioToolsRail extends StatelessWidget {
           height: railHeight,
           child: PulsrScrollEdgeFade(
             extent: 44,
+            fadeColor: context.palette.bg,
             child: ListView.separated(
               key: const ValueKey('studio_tools_horizontal_list'),
               scrollDirection: Axis.horizontal,

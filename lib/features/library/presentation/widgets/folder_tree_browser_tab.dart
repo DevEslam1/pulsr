@@ -374,216 +374,242 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
 
                 // Content list (sub-folders + files)
                 Expanded(
-                  child: ListView(
-                    padding: EdgeInsetsDirectional.fromSTEB(
-                      Adaptive.pagePadding(context),
-                      AppSpacing.xs,
-                      Adaptive.pagePadding(context),
-                      PulsrLayoutMetrics.scrollBottom(context),
-                    ),
-                    children: [
-                      // Parent folder button
-                      if (breadcrumbs.length > 1) ...[
-                        Container(
-                          margin: const EdgeInsets.only(bottom: AppSpacing.xs),
-                          child: Material(
-                            color: p.surfaceContainer,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: AppRadii.r14All,
-                              side: BorderSide(
-                                color: p.hairline,
-                              ),
-                            ),
-                            child: ListTile(
-                              shape: RoundedRectangleBorder(
-                                borderRadius: AppRadii.r14All,
-                              ),
-                              leading: Container(
-                                width: 42,
-                                height: 42,
-                                decoration: BoxDecoration(
-                                  color: p.accent.withValues(alpha: 0.14),
-                                  borderRadius: AppRadii.r10All,
-                                ),
-                                child: Icon(
-                                  Icons.arrow_upward_rounded,
-                                  color: p.accent,
-                                  size: 20,
-                                ),
-                              ),
-                              title: Text(
-                                context.l10n.parentDirectory,
-                                style: TextStyle(
-                                  color: p.textPrimary,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: AppFontSize.bodySmall,
-                                ),
-                              ),
-                              subtitle: Text(
-                                p_path.posix
-                                    .basename(p_path.posix.dirname(currentDir)),
-                                style: TextStyle(
-                                  color: p.textTertiary,
-                                  fontSize: AppFontSize.caption,
-                                ),
-                              ),
-                              trailing: Icon(
-                                Icons.chevron_left_rounded,
-                                color: p.textTertiary,
-                              ),
-                              onTap: () {
-                                _navigateTo(p_path.posix.dirname(currentDir));
-                              },
-                            ),
-                          ),
+                  child: CustomScrollView(
+                    slivers: [
+                      SliverPadding(
+                        padding: EdgeInsetsDirectional.fromSTEB(
+                          Adaptive.pagePadding(context),
+                          AppSpacing.xs,
+                          Adaptive.pagePadding(context),
+                          PulsrLayoutMetrics.scrollBottom(context),
                         ),
-                      ],
-
-                      // Subfolders (all of them — ListView virtualizes, no cap).
-                      for (final sub in childFolders) ...[
-                        Builder(
-                          builder: (context) {
-                            final item = representatives[p_path.posix
-                                .normalize(sub.replaceAll('\\', '/'))];
-
-                            final int? songId = item?.representativeSongId;
-                            final int? albumId = item?.representativeAlbumId;
-                            final String? remoteUrl =
-                                item?.representativeRemoteUrl ??
-                                    item?.representativeArtworkUri;
-
-                            final hasArtwork = (songId != null && songId > 0) ||
-                                (remoteUrl != null && remoteUrl.isNotEmpty);
-
-                            return Container(
-                              margin: const EdgeInsets.symmetric(vertical: 3),
-                              child: Material(
-                                color: p.surfaceContainer,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: AppRadii.r14All,
-                                  side: BorderSide(
-                                    color: p.hairline,
-                                  ),
-                                ),
-                                child: ListTile(
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: AppRadii.r14All,
-                                  ),
-                                  leading: hasArtwork
-                                      ? CachedArtwork(
-                                          id: songId ?? 0,
-                                          albumId: albumId,
-                                          remoteUrl: remoteUrl,
-                                          type: ArtworkType.AUDIO,
-                                          size: 44,
-                                          borderRadius: AppRadii.r10,
-                                          fallbackIcon: Icons.folder_rounded,
-                                        )
-                                      : Container(
-                                          width: 44,
-                                          height: 44,
-                                          decoration: BoxDecoration(
-                                            gradient: LinearGradient(
-                                              colors: [
-                                                p.accentContainer,
-                                                p.surfaceContainerHigh,
-                                              ],
-                                              begin: Alignment.topLeft,
-                                              end: Alignment.bottomRight,
-                                            ),
-                                            borderRadius: AppRadii.r10All,
-                                            border: Border.all(
-                                              color: p.accent
-                                                  .withValues(alpha: 0.2),
-                                            ),
-                                          ),
-                                          child: Icon(
-                                            Icons.folder_rounded,
-                                            color: p.accent,
-                                            size: 22,
-                                          ),
+                        sliver: SliverMainAxisGroup(
+                          slivers: [
+                            // Parent folder button
+                            if (breadcrumbs.length > 1)
+                              SliverToBoxAdapter(
+                                child: Container(
+                                  margin: const EdgeInsets.only(
+                                      bottom: AppSpacing.xs),
+                                  child: Material(
+                                    color: p.surfaceContainer,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: AppRadii.r14All,
+                                      side: BorderSide(
+                                        color: p.hairline,
+                                      ),
+                                    ),
+                                    child: ListTile(
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: AppRadii.r14All,
+                                      ),
+                                      leading: Container(
+                                        width: 42,
+                                        height: 42,
+                                        decoration: BoxDecoration(
+                                          color:
+                                              p.accent.withValues(alpha: 0.14),
+                                          borderRadius: AppRadii.r10All,
                                         ),
-                                  title: Text(
-                                    p_path.posix.basename(sub),
-                                    style: TextStyle(
-                                      color: p.textPrimary,
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: AppFontSize.bodySmall,
+                                        child: Icon(
+                                          Icons.arrow_upward_rounded,
+                                          color: p.accent,
+                                          size: 20,
+                                        ),
+                                      ),
+                                      title: Text(
+                                        context.l10n.parentDirectory,
+                                        style: TextStyle(
+                                          color: p.textPrimary,
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: AppFontSize.bodySmall,
+                                        ),
+                                      ),
+                                      subtitle: Text(
+                                        p_path.posix.basename(
+                                            p_path.posix.dirname(currentDir)),
+                                        style: TextStyle(
+                                          color: p.textTertiary,
+                                          fontSize: AppFontSize.caption,
+                                        ),
+                                      ),
+                                      trailing: Icon(
+                                        Icons.chevron_left_rounded,
+                                        color: p.textTertiary,
+                                      ),
+                                      onTap: () {
+                                        _navigateTo(
+                                            p_path.posix.dirname(currentDir));
+                                      },
                                     ),
                                   ),
-                                  trailing: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      if (item != null)
-                                        IconButton(
-                                          icon: Icon(
-                                            Icons.open_in_new_rounded,
-                                            color: p.textSecondary,
-                                            size: 18,
-                                          ),
-                                          tooltip: context
-                                              .l10n.browseOpenFolderDetails,
-                                          constraints: const BoxConstraints(
-                                            minWidth: AppSpacing.minTouchTarget,
-                                            minHeight:
-                                                AppSpacing.minTouchTarget,
-                                          ),
-                                          onPressed: () {
-                                            context.push(
-                                              '/folder?path=${Uri.encodeComponent(item.path)}&name=${Uri.encodeComponent(item.name)}',
-                                              extra: item,
-                                            );
-                                          },
-                                        ),
-                                      Icon(
-                                        Icons.chevron_right_rounded,
-                                        color: p.textTertiary,
-                                        size: 20,
-                                      ),
-                                    ],
-                                  ),
-                                  onTap: () => _navigateTo(sub),
                                 ),
                               ),
-                            );
-                          },
-                        ),
-                      ],
 
-                      // Songs in current folder (repository watch, not the
-                      // paginated library page).
-                      if (snapshot.connectionState == ConnectionState.waiting &&
-                          result == null)
-                        const Padding(
-                          padding: EdgeInsets.only(top: AppSpacing.md),
-                          child: SkeletonList(itemCount: 3),
-                        ),
-                      ListView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: childSongs.length,
-                        itemBuilder: (context, i) => SongTile(
-                          song: childSongs[i],
-                          onTap: () {
-                            context
-                                .read<PlayerCubit>()
-                                .playSong(childSongs[i], queue: childSongs);
-                          },
-                          onMorePressed: () => SongOptionsSheet.show(context,
-                              song: childSongs[i]),
+                            // Subfolders (virtualized lazily).
+                            if (childFolders.isNotEmpty)
+                              SliverList.builder(
+                                itemCount: childFolders.length,
+                                itemBuilder: (context, index) {
+                                  final sub = childFolders[index];
+                                  final item = representatives[p_path.posix
+                                      .normalize(sub.replaceAll('\\', '/'))];
+
+                                  final int? songId =
+                                      item?.representativeSongId;
+                                  final int? albumId =
+                                      item?.representativeAlbumId;
+                                  final String? remoteUrl =
+                                      item?.representativeRemoteUrl ??
+                                          item?.representativeArtworkUri;
+
+                                  final hasArtwork =
+                                      (songId != null && songId > 0) ||
+                                          (remoteUrl != null &&
+                                              remoteUrl.isNotEmpty);
+
+                                  return Container(
+                                    margin:
+                                        const EdgeInsets.symmetric(vertical: 3),
+                                    child: Material(
+                                      color: p.surfaceContainer,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: AppRadii.r14All,
+                                        side: BorderSide(
+                                          color: p.hairline,
+                                        ),
+                                      ),
+                                      child: ListTile(
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: AppRadii.r14All,
+                                        ),
+                                        leading: hasArtwork
+                                            ? CachedArtwork(
+                                                id: songId ?? 0,
+                                                albumId: albumId,
+                                                remoteUrl: remoteUrl,
+                                                type: ArtworkType.AUDIO,
+                                                size: 44,
+                                                borderRadius: AppRadii.r10,
+                                                fallbackIcon:
+                                                    Icons.folder_rounded,
+                                              )
+                                            : Container(
+                                                width: 44,
+                                                height: 44,
+                                                decoration: BoxDecoration(
+                                                  gradient: LinearGradient(
+                                                    colors: [
+                                                      p.accentContainer,
+                                                      p.surfaceContainerHigh,
+                                                    ],
+                                                    begin: Alignment.topLeft,
+                                                    end: Alignment.bottomRight,
+                                                  ),
+                                                  borderRadius: AppRadii.r10All,
+                                                  border: Border.all(
+                                                    color: p.accent
+                                                        .withValues(alpha: 0.2),
+                                                  ),
+                                                ),
+                                                child: Icon(
+                                                  Icons.folder_rounded,
+                                                  color: p.accent,
+                                                  size: 22,
+                                                ),
+                                              ),
+                                        title: Text(
+                                          p_path.posix.basename(sub),
+                                          style: TextStyle(
+                                            color: p.textPrimary,
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: AppFontSize.bodySmall,
+                                          ),
+                                        ),
+                                        trailing: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            if (item != null)
+                                              IconButton(
+                                                icon: Icon(
+                                                  Icons.open_in_new_rounded,
+                                                  color: p.textSecondary,
+                                                  size: 18,
+                                                ),
+                                                tooltip: context.l10n
+                                                    .browseOpenFolderDetails,
+                                                constraints:
+                                                    const BoxConstraints(
+                                                  minWidth:
+                                                      AppSpacing.minTouchTarget,
+                                                  minHeight:
+                                                      AppSpacing.minTouchTarget,
+                                                ),
+                                                onPressed: () {
+                                                  context.push(
+                                                    '/folder?path=${Uri.encodeComponent(item.path)}&name=${Uri.encodeComponent(item.name)}',
+                                                    extra: item,
+                                                  );
+                                                },
+                                              ),
+                                            Icon(
+                                              Icons.chevron_right_rounded,
+                                              color: p.textTertiary,
+                                              size: 20,
+                                            ),
+                                          ],
+                                        ),
+                                        onTap: () => _navigateTo(sub),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+
+                            // Songs in current folder (repository watch, not the
+                            // paginated library page).
+                            if (snapshot.connectionState ==
+                                    ConnectionState.waiting &&
+                                result == null)
+                              const SliverToBoxAdapter(
+                                child: Padding(
+                                  padding: EdgeInsets.only(top: AppSpacing.md),
+                                  child: SkeletonList(itemCount: 3),
+                                ),
+                              ),
+                            if (childSongs.isNotEmpty)
+                              SliverList.builder(
+                                itemCount: childSongs.length,
+                                itemBuilder: (context, i) => SongTile(
+                                  song: childSongs[i],
+                                  onTap: () {
+                                    context.read<PlayerCubit>().playSong(
+                                        childSongs[i],
+                                        queue: childSongs);
+                                  },
+                                  onMorePressed: () => SongOptionsSheet.show(
+                                      context,
+                                      song: childSongs[i]),
+                                ),
+                              ),
+
+                            if (childFolders.isEmpty &&
+                                childSongs.isEmpty &&
+                                snapshot.connectionState !=
+                                    ConnectionState.waiting)
+                              SliverToBoxAdapter(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(AppSpacing.xl),
+                                  child: Center(
+                                    child: Text(context.l10n.folderEmpty,
+                                        style:
+                                            TextStyle(color: p.textSecondary)),
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
                       ),
-
-                      if (childFolders.isEmpty &&
-                          childSongs.isEmpty &&
-                          snapshot.connectionState != ConnectionState.waiting)
-                        Padding(
-                          padding: const EdgeInsets.all(AppSpacing.xl),
-                          child: Center(
-                            child: Text(context.l10n.folderEmpty,
-                                style: TextStyle(color: p.textSecondary)),
-                          ),
-                        ),
                     ],
                   ),
                 ),

@@ -36,6 +36,7 @@ mixin CategoryFilterBarSection
     return SizedBox(
       height: barHeight,
       child: PulsrScrollEdgeFade(
+        fadeColor: p.bg,
         child: ListView.separated(
           scrollDirection: Axis.horizontal,
           physics: const BouncingScrollPhysics(),

@@ -1086,6 +1086,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
         // ---------- Category Chips ----------
         PulsrScrollEdgeFade(
           extent: 32,
+          fadeColor: p.bg,
           child: SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             physics: const BouncingScrollPhysics(),

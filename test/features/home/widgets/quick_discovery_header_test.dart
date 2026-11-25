@@ -1,9 +1,19 @@
+import 'dart:async';
+
+import 'package:bloc_test/bloc_test.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:pulsr/domain/models/audio_output_info.dart';
 import 'package:pulsr/features/home/presentation/widgets/quick_discovery_header.dart';
+import 'package:pulsr/features/settings/cubit/settings_cubit.dart';
+import 'package:pulsr/features/settings/cubit/settings_state.dart';
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
+
+class _MockSettingsCubit extends MockCubit<SettingsState>
+    implements SettingsCubit {}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -175,6 +185,75 @@ void main() {
       await tester.pump();
 
       expect(tapped, isTrue);
+    });
+
+    testWidgets('updates live when SettingsCubit currentOutputDevice changes',
+        (tester) async {
+      final cubit = _MockSettingsCubit();
+      final controller = StreamController<SettingsState>.broadcast();
+      addTearDown(() async {
+        await controller.close();
+        await cubit.close();
+      });
+
+      const initialState = SettingsState();
+      whenListen(cubit, controller.stream, initialState: initialState);
+
+      await tester.pumpWidget(
+        BlocProvider<SettingsCubit>.value(
+          value: cubit,
+          child: MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: const Scaffold(
+              body: ActiveAudioOutputPill(),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text(l10n.dspSpeaker), findsOneWidget);
+
+      // Switch to Bluetooth (LDAC)
+      controller.add(
+        initialState.copyWith(
+          currentOutputDevice: const AudioOutputInfo(
+            deviceName: 'Sony WH-1000XM5',
+            isUsbDac: false,
+            sampleRate: 96000,
+            bitDepth: 24,
+            isBitPerfectActive: false,
+            activeDeviceType: 'bluetooth',
+            isBluetooth: true,
+            btCodecName: 'LDAC',
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('LDAC'), findsOneWidget);
+      expect(find.text(l10n.dspSpeaker), findsNothing);
+
+      // Switch to USB DAC
+      controller.add(
+        initialState.copyWith(
+          currentOutputDevice: const AudioOutputInfo(
+            deviceName: 'FiiO KA13',
+            isUsbDac: true,
+            sampleRate: 192000,
+            sinkSampleRate: 192000,
+            bitDepth: 32,
+            isBitPerfectActive: true,
+            activeDeviceType: 'usb',
+            usbDacLabel: 'FiiO KA13',
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('FiiO KA13 · 192kHz'), findsOneWidget);
+      expect(find.text('LDAC'), findsNothing);
     });
   });
 

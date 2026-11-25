@@ -510,8 +510,9 @@ class CrossfadeManager {
       return completer.future;
     }
 
+    final stepMs = totalMs <= 200 ? 10 : 25;
     late final Timer timer;
-    timer = Timer.periodic(const Duration(milliseconds: 10), (t) {
+    timer = Timer.periodic(Duration(milliseconds: stepMs), (t) {
       if (_fadeId != fadeId) {
         t.cancel();
         _activeTimers.remove(t);
@@ -654,11 +655,13 @@ class CrossfadeManager {
     // no full-gain buffer can leak.
     stopwatch.start();
     double lastFraction = 0.0;
-    // A normal 10 ms tick advances 10/totalMs; flag only a jump of 5x that
-    // (and never below 5%), so short fades don't count as glitches.
-    final glitchThreshold = math.max(0.05, 5 * 10.0 / totalMs);
+    // A normal tick advances stepMs/totalMs (10 ms for short micro-fades,
+    // 25 ms for full crossfades); flag only a jump of 5x that (and never
+    // below 5%), so short fades don't count as glitches.
+    final stepMs = totalMs <= 200 ? 10 : 25;
+    final glitchThreshold = math.max(0.05, 5 * stepMs / totalMs);
     late final Timer timer;
-    timer = Timer.periodic(const Duration(milliseconds: 10), (t) {
+    timer = Timer.periodic(Duration(milliseconds: stepMs), (t) {
       if (_fadeId != fadeId) {
         t.cancel();
         _activeTimers.remove(t);

@@ -26,7 +26,7 @@ class ArtworkLruCache {
   ArtworkLruCache.withCapacity(this.maxCapacity);
 
   final int maxCapacity;
-  static const int maxBytes = 50 * 1024 * 1024; // 50MB cap
+  static const int maxBytes = 20 * 1024 * 1024; // 20MB cap
   static const int largePayloadThreshold = 512 * 1024; // 512 KB
   final Map<String, Uint8List> _cache = {};
   final Map<String, WeakReference<Uint8List>> _weakLargeCache = {};

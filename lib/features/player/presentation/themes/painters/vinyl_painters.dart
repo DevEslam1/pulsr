@@ -657,12 +657,18 @@ class _TonearmPainter extends CustomPainter {
     // Subtle warm stylus contact glow when tonearm is dropped onto groove
     if (liftProgress > 0.8 && !GpuBudget.isGpuSaverActive) {
       final glowAlpha = ((liftProgress - 0.8) / 0.2).clamp(0.0, 1.0) * 0.45;
+      final glowCenter = Offset(headshellEnd.dx, headshellEnd.dy + 11);
+      const glowRadius = 8.0;
       final stylusGlowPaint = Paint()
-        ..color = activeColor.withValues(alpha: glowAlpha)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4.0);
+        ..shader = RadialGradient(
+          colors: [
+            activeColor.withValues(alpha: glowAlpha),
+            activeColor.withValues(alpha: 0.0),
+          ],
+        ).createShader(Rect.fromCircle(center: glowCenter, radius: glowRadius));
       canvas.drawCircle(
-        Offset(headshellEnd.dx, headshellEnd.dy + 11),
-        4.0,
+        glowCenter,
+        glowRadius,
         stylusGlowPaint,
       );
     }

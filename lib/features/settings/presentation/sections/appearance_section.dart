@@ -110,6 +110,7 @@ mixin SettingsAppearanceSection
               ),
               const SizedBox(height: AppSpacing.sm),
               PulsrScrollEdgeFade(
+                fadeColor: p.surfaceContainer,
                 child: SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   physics: const BouncingScrollPhysics(),

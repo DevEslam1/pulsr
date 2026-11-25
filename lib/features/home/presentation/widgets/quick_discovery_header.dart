@@ -128,8 +128,13 @@ class ActiveAudioOutputPill extends StatelessWidget {
     }
 
     final p = context.palette;
-    final playerState = context.read<PlayerCubit?>()?.state;
-    final currentSong = playerState?.currentSong ??
+    SongsTableData? currentSong;
+    try {
+      currentSong = context.read<PlayerCubit>().state.currentSong;
+    } on ProviderNotFoundException {
+      currentSong = null;
+    }
+    currentSong ??=
         SongsTableData(
           id: 0,
           title: context.l10n.settingsHardwareAudioOutput,
@@ -150,11 +155,17 @@ class ActiveAudioOutputPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    final settingsCubit = context.watch<SettingsCubit?>();
-    final info = settingsCubit?.state.currentOutputDevice ??
-        (getIt.isRegistered<HiResAudioService>()
-            ? getIt<HiResAudioService>().currentOutputInfo
-            : null);
+    AudioOutputInfo? info;
+    try {
+      info = context.select<SettingsCubit, AudioOutputInfo?>(
+        (c) => c.state.currentOutputDevice,
+      );
+    } on ProviderNotFoundException {
+      info = null;
+    }
+    info ??= getIt.isRegistered<HiResAudioService>()
+        ? getIt<HiResAudioService>().currentOutputInfo
+        : null;
 
     final details = resolveOutputDetails(context, info);
     final accent = details.accentColor;

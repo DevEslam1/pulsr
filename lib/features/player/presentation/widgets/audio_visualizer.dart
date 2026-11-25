@@ -110,7 +110,7 @@ class AudioVisualizer extends StatefulWidget {
 }
 
 class AudioVisualizerState extends State<AudioVisualizer>
-    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
+    with WidgetsBindingObserver {
   bool get _isAndroid =>
       !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
 
@@ -140,13 +140,9 @@ class AudioVisualizerState extends State<AudioVisualizer>
       EventChannel(PulsrChannels.visualizerStream);
 
   StreamSubscription? _subscription;
-  late AnimationController _animController;
+  Timer? _tickTimer;
   bool _isAppActive = true;
   bool _hasActiveSession = false;
-  // Wall-clock of the last tick that actually did work. The AnimationController
-  // fires _onTick on every vsync frame (~60fps); the recompute+repaint only
-  // needs ~30fps, so _onTick throttles against this. 0 means "never ticked".
-  int _lastTickMs = 0;
 
   static const int _numBands = 32;
   final List<double> _currentData = List.filled(_numBands, 0.0);
@@ -169,10 +165,6 @@ class AudioVisualizerState extends State<AudioVisualizer>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _dataNotifier = ValueNotifier<List<double>>(List.from(_currentData));
-    _animController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 33),
-    )..addListener(_onTick);
 
     if (widget.style == VisualizerStyle.milkdrop) {
       _loadMilkPreset();
@@ -274,15 +266,15 @@ class AudioVisualizerState extends State<AudioVisualizer>
       _stopAnimation();
       return;
     }
-    if (!_animController.isAnimating) {
-      _animController.repeat();
-    }
+    _tickTimer ??= Timer.periodic(
+      const Duration(milliseconds: 33),
+      (_) => _onTick(),
+    );
   }
 
   void _stopAnimation() {
-    if (_animController.isAnimating) {
-      _animController.stop();
-    }
+    _tickTimer?.cancel();
+    _tickTimer = null;
   }
 
   @override
@@ -450,11 +442,6 @@ class AudioVisualizerState extends State<AudioVisualizer>
 
   @visibleForTesting
   void onTickForTesting() {
-    // Bypass the ~30fps wall-clock throttle in _onTick: tests drive ticks in a
-    // tight synchronous loop where no real time elapses between calls, and they
-    // rely on each call advancing the decay. Resetting the throttle marker keeps
-    // that deterministic behavior unchanged while production still throttles.
-    _lastTickMs = 0;
     _onTick();
   }
 
@@ -472,17 +459,6 @@ class AudioVisualizerState extends State<AudioVisualizer>
   }
 
   void _onTick() {
-    // Throttle to ~30fps. The AnimationController's addListener fires on every
-    // vsync frame (~60fps); its 33ms duration only sets value speed, not
-    // callback cadence. Gating the recompute+ValueNotifier+repaint below behind
-    // a ~32ms window halves per-frame CPU/GPU while staying visually smooth.
-    // The decay-to-baseline path still runs (now at 30fps) and still converges
-    // and still calls _stopAnimation() once settled. The deterministic test
-    // hook (onTickForTesting) resets _lastTickMs so each simulated tick works.
-    final nowMs = DateTime.now().millisecondsSinceEpoch;
-    if (nowMs - _lastTickMs < 32) return;
-    _lastTickMs = nowMs;
-
     if (!mounted ||
         !context.motionEnabled ||
         !TickerMode.valuesOf(context).enabled ||
@@ -574,7 +550,6 @@ class AudioVisualizerState extends State<AudioVisualizer>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _stopAnimation();
-    _animController.dispose();
     _stopNativeStream();
     _dataNotifier.dispose();
     _milkShader?.dispose();

@@ -820,6 +820,7 @@ class _SearchViewState extends State<_SearchView> {
         return SizedBox(
           height: AppSpacing.minTouchTarget + (AppSpacing.xs * 2),
           child: PulsrScrollEdgeFade(
+            fadeColor: p.bg,
             child: ListView(
               scrollDirection: Axis.horizontal,
               physics: const BouncingScrollPhysics(),
@@ -1321,6 +1322,7 @@ class _EntityRail extends StatelessWidget {
     return SizedBox(
       height: 124 + (scale - 1.0) * 30,
       child: PulsrScrollEdgeFade(
+        fadeColor: p.bg,
         child: ListView.separated(
           scrollDirection: Axis.horizontal,
           physics: const BouncingScrollPhysics(),

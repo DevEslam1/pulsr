@@ -251,7 +251,8 @@ class DynamicThemeCubit extends PulsrCubit<DynamicThemeState> {
           final cachedBytes = ArtworkLruCache().get(highResUrl) ??
               ArtworkLruCache().get(remoteArtworkUrl);
           if (cachedBytes != null && cachedBytes.isNotEmpty) {
-            imageProvider = MemoryImage(cachedBytes);
+            imageProvider =
+                ResizeImage(MemoryImage(cachedBytes), width: 64, height: 64);
           } else {
             // Palette sampling only needs a 64x64 swatch, so fetching the ~1200px
             // high-res artwork here wastes bandwidth and memory. Feed the low-res

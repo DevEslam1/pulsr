@@ -369,7 +369,7 @@ class _MilkdropLiveCanvas extends StatefulWidget {
 }
 
 class _MilkdropLiveCanvasState extends State<_MilkdropLiveCanvas>
-    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
+    with WidgetsBindingObserver {
   static const int _numBands = 32;
   static const MethodChannel _methodChannel =
       MethodChannel(PulsrChannels.visualizer);
@@ -378,7 +378,7 @@ class _MilkdropLiveCanvasState extends State<_MilkdropLiveCanvas>
 
   static ui.FragmentProgram? _cachedProgram;
 
-  late final AnimationController _ticker;
+  Timer? _tickTimer;
   late final ValueNotifier<List<double>> _bandsNotifier;
   final List<double> _currentBands = List<double>.filled(_numBands, 0.0);
   final List<double> _targetBands = List<double>.filled(_numBands, 0.0);
@@ -390,7 +390,6 @@ class _MilkdropLiveCanvasState extends State<_MilkdropLiveCanvas>
   StreamSubscription<dynamic>? _nativeSub;
   DateTime _lastNativeSampleAt = DateTime.fromMillisecondsSinceEpoch(0);
   ui.FragmentShader? _shader;
-  int _lastTickMs = 0;
   bool _isAppActive = true;
 
   bool get _isAndroid =>
@@ -406,10 +405,6 @@ class _MilkdropLiveCanvasState extends State<_MilkdropLiveCanvas>
     _bandsNotifier = ValueNotifier<List<double>>(
       List<double>.from(_currentBands),
     );
-    _ticker = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 33),
-    )..addListener(_onTick);
 
     if (!_isStaticMode) {
       unawaited(_loadShader());
@@ -512,15 +507,15 @@ class _MilkdropLiveCanvasState extends State<_MilkdropLiveCanvas>
 
   void _startTicker() {
     if (_isStaticMode) return;
-    if (!_ticker.isAnimating) {
-      _ticker.repeat();
-    }
+    _tickTimer ??= Timer.periodic(
+      const Duration(milliseconds: 33),
+      (_) => _onTick(),
+    );
   }
 
   void _stopTicker() {
-    if (_ticker.isAnimating) {
-      _ticker.stop();
-    }
+    _tickTimer?.cancel();
+    _tickTimer = null;
   }
 
   void _restartNativeStream() {
@@ -567,10 +562,6 @@ class _MilkdropLiveCanvasState extends State<_MilkdropLiveCanvas>
   }
 
   void _onTick() {
-    final nowMs = DateTime.now().millisecondsSinceEpoch;
-    if (nowMs - _lastTickMs < 32) return;
-    _lastTickMs = nowMs;
-
     if (!mounted ||
         _isStaticMode ||
         !_isAppActive ||
@@ -635,7 +626,6 @@ class _MilkdropLiveCanvasState extends State<_MilkdropLiveCanvas>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _stopTicker();
-    _ticker.dispose();
     _stopNativeStream();
     _bandsNotifier.dispose();
     _shader?.dispose();
@@ -770,7 +760,8 @@ class _MilkdropPresetBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final allowBlur = !isPreview && AppBlur.canBlur(context);
-    final sigma = AppBlur.clampSigma(AppBlur.chip);
+    const double milkdropBlurSigma = 6.0;
+    final sigma = AppBlur.clampSigma(milkdropBlurSigma);
     final Color ink = AppColors.onPrimary;
     final Color fill = AppColors.scrimAt(
       allowBlur ? 0.42 : AppBlur.solidFallbackMinAlpha,
@@ -892,7 +883,8 @@ class _MilkdropGlassCapsule extends StatelessWidget {
     final isFav = song?.isFavorite == true;
 
     final allowBlur = !isPreview && AppBlur.canBlur(context);
-    final sigma = AppBlur.clampSigma(AppBlur.chip);
+    const double milkdropBlurSigma = 6.0;
+    final sigma = AppBlur.clampSigma(milkdropBlurSigma);
     final clampedRadius = capsuleRadius.clamp(14.0, 36.0);
     final clampedArtRadius = artRadius.clamp(4.0, 22.0);
     final corners = AppRadii.circular(clampedRadius);

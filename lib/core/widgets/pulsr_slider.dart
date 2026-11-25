@@ -517,18 +517,29 @@ class _PulsrSliderPainter extends CustomPainter {
 
       if (style != PlayerSliderStyle.wavy || thumbX < 16.0) {
         if (glowScale > 0) {
-          final lineGlowPaint = Paint()
+          final outerGlowPaint = Paint()
             ..color = activeColor.withValues(
-              alpha: (0.16 + (0.16 * expandFactor)) * glowScale,
+              alpha: (0.10 + (0.10 * expandFactor)) * glowScale,
             )
             ..style = PaintingStyle.stroke
-            ..strokeWidth = trackHeight + 3.0
-            ..strokeCap = StrokeCap.round
-            ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.5);
+            ..strokeWidth = trackHeight + 5.5
+            ..strokeCap = StrokeCap.round;
           canvas.drawLine(
             Offset(0, centerY),
             Offset(thumbX, centerY),
-            lineGlowPaint,
+            outerGlowPaint,
+          );
+          final innerGlowPaint = Paint()
+            ..color = activeColor.withValues(
+              alpha: (0.16 + (0.14 * expandFactor)) * glowScale,
+            )
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = trackHeight + 2.5
+            ..strokeCap = StrokeCap.round;
+          canvas.drawLine(
+            Offset(0, centerY),
+            Offset(thumbX, centerY),
+            innerGlowPaint,
           );
         }
         canvas.drawLine(
@@ -558,17 +569,25 @@ class _PulsrSliderPainter extends CustomPainter {
         wavePath.lineTo(thumbX, centerY);
 
         if (glowScale > 0) {
-          final waveGlowPaint = Paint()
+          final outerWaveGlowPaint = Paint()
             ..color = activeColor.withValues(
-              alpha: (0.18 + (0.20 * expandFactor)) * glowScale,
+              alpha: (0.11 + (0.11 * expandFactor)) * glowScale,
             )
             ..style = PaintingStyle.stroke
-            ..strokeWidth = trackHeight + 3.8
+            ..strokeWidth = trackHeight + 6.0
             ..strokeCap = StrokeCap.round
-            ..strokeJoin = StrokeJoin.round
-            ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4.5);
+            ..strokeJoin = StrokeJoin.round;
+          canvas.drawPath(wavePath, outerWaveGlowPaint);
 
-          canvas.drawPath(wavePath, waveGlowPaint);
+          final innerWaveGlowPaint = Paint()
+            ..color = activeColor.withValues(
+              alpha: (0.18 + (0.16 * expandFactor)) * glowScale,
+            )
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = trackHeight + 2.8
+            ..strokeCap = StrokeCap.round
+            ..strokeJoin = StrokeJoin.round;
+          canvas.drawPath(wavePath, innerWaveGlowPaint);
         }
         canvas.drawPath(wavePath, activePaint);
       }
@@ -595,26 +614,38 @@ class _PulsrSliderPainter extends CustomPainter {
       }
     }
 
-    // 3. Ambient halo behind thumb
+    // 3. Ambient halo behind thumb (radial gradient avoids MaskFilter.blur)
     if (glowScale > 0) {
+      final haloCenter = Offset(thumbX, centerY);
+      final haloRadius = thumbRadius + 8.5 + (3.0 * expandFactor);
+      final haloAlpha = (0.28 + (0.36 * expandFactor)) * glowScale;
       final glowPaint = Paint()
-        ..color = glowColor.withValues(
-          alpha: (0.24 + (0.36 * expandFactor)) * glowScale,
-        )
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4.0)
+        ..shader = RadialGradient(
+          colors: [
+            glowColor.withValues(alpha: haloAlpha),
+            glowColor.withValues(alpha: haloAlpha * 0.45),
+            glowColor.withValues(alpha: 0.0),
+          ],
+          stops: const [0.0, 0.45, 1.0],
+        ).createShader(Rect.fromCircle(center: haloCenter, radius: haloRadius))
         ..style = PaintingStyle.fill;
-      canvas.drawCircle(
-        Offset(thumbX, centerY),
-        thumbRadius + 4.5 + (2.5 * expandFactor),
-        glowPaint,
-      );
+      canvas.drawCircle(haloCenter, haloRadius, glowPaint);
     }
 
-    // 4. Elevation drop shadow
+    // 4. Elevation drop shadow (radial gradient avoids MaskFilter.blur)
+    final shadowCenter = Offset(thumbX, centerY + 1.5);
+    final shadowRadius = thumbRadius + 3.5;
     final shadowPaint = Paint()
-      ..color = AppColors.scrimAt(0.34)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.0);
-    canvas.drawCircle(Offset(thumbX, centerY + 1.5), thumbRadius, shadowPaint);
+      ..shader = RadialGradient(
+        colors: [
+          AppColors.scrimAt(0.32),
+          AppColors.scrimAt(0.14),
+          AppColors.scrimAt(0.0),
+        ],
+        stops: const [0.45, 0.72, 1.0],
+      ).createShader(
+          Rect.fromCircle(center: shadowCenter, radius: shadowRadius));
+    canvas.drawCircle(shadowCenter, shadowRadius, shadowPaint);
 
     // 5. Solid thumb core
     final thumbPaint = Paint()
