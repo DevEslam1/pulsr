@@ -103,7 +103,7 @@ class FolderUseCases {
     final Map<String, FolderSongEntry> folderRepresentative = {};
 
     for (final entry in entries) {
-      final parentDir = p.dirname(entry.path);
+      final parentDir = _parentDir(entry.path);
       folderSongCounts[parentDir] = (folderSongCounts[parentDir] ?? 0) + 1;
       folderRepresentative.putIfAbsent(parentDir, () => entry);
     }
@@ -142,6 +142,16 @@ class FolderUseCases {
 
     items.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
     return Right(items);
+  }
+
+  static String _parentDir(String path) {
+    final lastSlash = path.lastIndexOf('/');
+    final lastBackslash = path.lastIndexOf('\\');
+    final sepIdx = lastSlash > lastBackslash ? lastSlash : lastBackslash;
+    if (sepIdx < 0) return p.dirname(path);
+    if (sepIdx == 0) return path.substring(0, 1);
+    if (sepIdx == 2 && path[1] == ':') return path.substring(0, 3);
+    return path.substring(0, sepIdx);
   }
 
   static String _normalizeFolderPath(String raw) {

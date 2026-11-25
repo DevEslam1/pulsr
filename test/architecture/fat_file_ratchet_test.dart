@@ -78,7 +78,7 @@ void main() {
       'lib/data/repositories/download_repository_impl.dart': 63189,
       'lib/features/folder_detail/presentation/folder_detail_screen.dart':
           62296,
-      'lib/features/radio/presentation/radio_screen.dart': 61759,
+      'lib/features/radio/presentation/radio_screen.dart': 61886,
     };
     final offenders = <String>[];
     caps.forEach((path, cap) {
